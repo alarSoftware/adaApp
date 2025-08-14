@@ -1,3 +1,5 @@
+
+
 class Cliente {
   final int? id;
   final String nombre;
@@ -27,6 +29,31 @@ class Cliente {
     );
   }
 
+  // Constructor desde JSON (para API)
+  factory Cliente.fromJson(Map<String, dynamic> json) {
+    DateTime fechaCreacion;
+    try {
+      if (json['fecha_creacion'] != null) {
+        fechaCreacion = DateTime.parse(json['fecha_creacion']);
+      } else if (json['fechaCreacion'] != null) {
+        fechaCreacion = DateTime.parse(json['fechaCreacion']);
+      } else {
+        fechaCreacion = DateTime.now();
+      }
+    } catch (e) {
+      fechaCreacion = DateTime.now();
+    }
+
+    return Cliente(
+      id: json['id'],
+      nombre: json['nombre'] ?? '',
+      email: json['email'] ?? '',
+      telefono: json['telefono'],
+      direccion: json['direccion'],
+      fechaCreacion: fechaCreacion,
+    );
+  }
+
   // Convertir de Cliente a Map (para guardar en base de datos)
   Map<String, dynamic> toMap() {
     return {
@@ -39,7 +66,7 @@ class Cliente {
     };
   }
 
-  // Convertir a JSON para enviar al EDP
+  // Convertir a JSON para enviar al API
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -74,4 +101,16 @@ class Cliente {
   String toString() {
     return 'Cliente{id: $id, nombre: $nombre, email: $email}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+          other is Cliente &&
+              runtimeType == other.runtimeType &&
+              id == other.id &&
+              nombre == other.nombre &&
+              email == other.email;
+
+  @override
+  int get hashCode => id.hashCode ^ nombre.hashCode ^ email.hashCode;
 }

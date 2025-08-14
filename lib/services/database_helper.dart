@@ -40,81 +40,29 @@ class DatabaseHelper {
         fecha_creacion TEXT NOT NULL
       )
     ''');
-
-    // Insertar algunos datos de ejemplo
-    await _insertarDatosEjemplo(db);
   }
 
-  Future<void> _insertarDatosEjemplo(Database db) async {
+  /*Future<void> _insertarDatosEjemplo(Database db) async {
     List<Map<String, dynamic>> clientesEjemplo = [
       {
-        'nombre': 'Ana Torres',
-        'email': 'ana.torres@email.com',
-        'telefono': '0981-222333',
-        'direccion': 'Encarnación, Paraguay',
+        'nombre': 'Juan Pérez',
+        'email': 'juan@email.com',
+        'telefono': '0981-123456',
+        'direccion': 'Asunción, Paraguay',
         'fecha_creacion': DateTime.now().toIso8601String(),
       },
       {
-        'nombre': 'Luis Fernández',
-        'email': 'luis.fernandez@email.com',
-        'telefono': '0982-334455',
-        'direccion': 'Ciudad del Este, Paraguay',
+        'nombre': 'María García',
+        'email': 'maria@email.com',
+        'telefono': '0984-654321',
+        'direccion': 'Luque, Paraguay',
         'fecha_creacion': DateTime.now().toIso8601String(),
       },
       {
-        'nombre': 'Carmen Duarte',
-        'email': 'carmen.duarte@email.com',
-        'telefono': '0983-556677',
-        'direccion': 'Villarrica, Paraguay',
-        'fecha_creacion': DateTime.now().toIso8601String(),
-      },
-      {
-        'nombre': 'Pedro González',
-        'email': 'pedro.gonzalez@email.com',
-        'telefono': '0984-778899',
-        'direccion': 'Caaguazú, Paraguay',
-        'fecha_creacion': DateTime.now().toIso8601String(),
-      },
-      {
-        'nombre': 'Sofía Benítez',
-        'email': 'sofia.benitez@email.com',
-        'telefono': '0985-112233',
-        'direccion': 'Itauguá, Paraguay',
-        'fecha_creacion': DateTime.now().toIso8601String(),
-      },
-      {
-        'nombre': 'Diego Martínez',
-        'email': 'diego.martinez@email.com',
-        'telefono': '0986-445566',
-        'direccion': 'Limpio, Paraguay',
-        'fecha_creacion': DateTime.now().toIso8601String(),
-      },
-      {
-        'nombre': 'Patricia López',
-        'email': 'patricia.lopez@email.com',
-        'telefono': '0987-778800',
-        'direccion': 'Areguá, Paraguay',
-        'fecha_creacion': DateTime.now().toIso8601String(),
-      },
-      {
-        'nombre': 'Miguel Romero',
-        'email': 'miguel.romero@email.com',
-        'telefono': '0981-998877',
-        'direccion': 'Coronel Oviedo, Paraguay',
-        'fecha_creacion': DateTime.now().toIso8601String(),
-      },
-      {
-        'nombre': 'Valeria Chávez',
-        'email': 'valeria.chavez@email.com',
-        'telefono': '0982-667788',
-        'direccion': 'Paraguarí, Paraguay',
-        'fecha_creacion': DateTime.now().toIso8601String(),
-      },
-      {
-        'nombre': 'Andrés Castro',
-        'email': 'andres.castro@email.com',
-        'telefono': '0983-445599',
-        'direccion': 'Ypacaraí, Paraguay',
+        'nombre': 'Carlos López',
+        'email': 'carlos@email.com',
+        'telefono': '0985-789123',
+        'direccion': 'San Lorenzo, Paraguay',
         'fecha_creacion': DateTime.now().toIso8601String(),
       },
     ];
@@ -122,39 +70,157 @@ class DatabaseHelper {
     for (var cliente in clientesEjemplo) {
       await db.insert('clientes', cliente);
     }
+  }*/
+
+  // NUEVO: Método público para limpiar y sincronizar con datos de API
+  Future<void> limpiarYSincronizar(List<Cliente> clientesAPI) async {
+    final db = await database;
+
+    await db.transaction((txn) async {
+      // Limpiar tabla
+      await txn.delete('clientes');
+      print('🗑️ Tabla clientes limpiada');
+
+      // Insertar nuevos datos
+      for (Cliente cliente in clientesAPI) {
+        try {
+          await txn.insert('clientes', cliente.toMap());
+        } catch (e) {
+          print('⚠️ Error insertando cliente ${cliente.nombre}: $e');
+        }
+      }
+
+      print('✅ ${clientesAPI.length} clientes sincronizados');
+    });
   }
 
-  // Obtener todos los clientes con límite
-  Future<List<Cliente>> obtenerTodosLosClientes({int limit = 3}) async {
+  // NUEVO: Método público para limpiar y reiniciar con datos de ejemplo
+  Future<void> reiniciarConDatosEjemplo() async {
+    final db = await database;
+
+    await db.transaction((txn) async {
+      // Limpiar tabla
+      await txn.delete('clientes');
+      print('🗑️ Tabla clientes limpiada');
+
+      // Insertar datos de ejemplo
+      List<Map<String, dynamic>> clientesEjemplo = [
+        {
+          'nombre': 'Juan Pérez',
+          'email': 'juan@email.com',
+          'telefono': '0981-123456',
+          'direccion': 'Asunción, Paraguay',
+          'fecha_creacion': DateTime.now().toIso8601String(),
+        },
+        {
+          'nombre': 'María García',
+          'email': 'maria@email.com',
+          'telefono': '0984-654321',
+          'direccion': 'Luque, Paraguay',
+          'fecha_creacion': DateTime.now().toIso8601String(),
+        },
+        {
+          'nombre': 'Carlos López',
+          'email': 'carlos@email.com',
+          'telefono': '0985-789123',
+          'direccion': 'San Lorenzo, Paraguay',
+          'fecha_creacion': DateTime.now().toIso8601String(),
+        },
+      ];
+
+      for (var cliente in clientesEjemplo) {
+        await txn.insert('clientes', cliente);
+      }
+    });
+
+    print('🔄 Base de datos reiniciada con datos de ejemplo');
+  }
+
+  // NUEVO: Obtener estadísticas de la base de datos
+  Future<Map<String, int>> obtenerEstadisticas() async {
+    final db = await database;
+    final List<Map<String, dynamic>> result = await db.rawQuery(
+        'SELECT COUNT(*) as total FROM clientes'
+    );
+
+    return {
+      'totalClientes': result.first['total'] ?? 0,
+    };
+  }
+
+  // Obtener todos los clientes
+  Future<List<Cliente>> obtenerTodosLosClientes() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'clientes',
       orderBy: 'nombre ASC',
-      limit: limit,
     );
 
-    return maps.map((e) => Cliente.fromMap(e)).toList();
+    return List.generate(maps.length, (i) {
+      return Cliente.fromMap(maps[i]);
+    });
   }
 
-// Buscar clientes con límite
-  Future<List<Cliente>> buscarClientes(String query, {int limit = 5}) async {
+  // Buscar clientes por nombre o email
+  Future<List<Cliente>> buscarClientes(String query) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'clientes',
       where: 'nombre LIKE ? OR email LIKE ?',
       whereArgs: ['%$query%', '%$query%'],
       orderBy: 'nombre ASC',
-      limit: limit,
     );
 
-    return maps.map((e) => Cliente.fromMap(e)).toList();
+    return List.generate(maps.length, (i) {
+      return Cliente.fromMap(maps[i]);
+    });
   }
-
 
   // Insertar un cliente
   Future<int> insertarCliente(Cliente cliente) async {
     final db = await database;
-    return await db.insert('clientes', cliente.toMap());
+    try {
+      return await db.insert('clientes', cliente.toMap());
+    } catch (e) {
+      // Si hay error de duplicado de email, intentar actualizar
+      if (e.toString().contains('UNIQUE constraint failed')) {
+        print('⚠️ Email duplicado, intentando actualizar: ${cliente.email}');
+        return await db.update(
+          'clientes',
+          cliente.toMap(),
+          where: 'email = ?',
+          whereArgs: [cliente.email],
+        );
+      }
+      rethrow;
+    }
+  }
+
+  // Insertar múltiples clientes (útil para sincronización)
+  Future<int> insertarMultiplesClientes(List<Cliente> clientes) async {
+    final db = await database;
+    int insertados = 0;
+
+    await db.transaction((txn) async {
+      for (Cliente cliente in clientes) {
+        try {
+          await txn.insert('clientes', cliente.toMap());
+          insertados++;
+        } catch (e) {
+          if (e.toString().contains('UNIQUE constraint failed')) {
+            await txn.update(
+              'clientes',
+              cliente.toMap(),
+              where: 'email = ?',
+              whereArgs: [cliente.email],
+            );
+            insertados++;
+          }
+        }
+      }
+    });
+
+    return insertados;
   }
 
   // Actualizar un cliente
@@ -191,6 +257,18 @@ class DatabaseHelper {
       return Cliente.fromMap(maps.first);
     }
     return null;
+  }
+
+  // Verificar si existe un cliente con el email
+  Future<bool> existeEmail(String email) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'clientes',
+      where: 'email = ?',
+      whereArgs: [email],
+      limit: 1,
+    );
+    return maps.isNotEmpty;
   }
 
   // Cerrar la base de datos
