@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'models/cliente.dart';
 import 'services/database_helper.dart';
+import 'services/api_service.dart';
 import 'services/sync_service.dart';
+import 'package:logger/logger.dart';
 
+var logger = Logger();
 void main() {
   runApp(MyApp());
 }
@@ -69,8 +72,8 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
 
       // Cargar primera página
       _cargarSiguientePagina();
-    } catch (e) {
-      print('Error al cargar clientes: $e');
+    } catch (e, stackTrace) {
+      logger.e('Error al cargar clientes', error: e, stackTrace: stackTrace);
       setState(() {
         isLoading = false;
       });
@@ -495,16 +498,237 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
   }
 }
 
-// Nueva pantalla de detalle de cliente (solo lectura)
+// Nueva pantalla de detalle de cliente (solo lectura) - CON ENVÍO POST
 class ClienteDetailScreen extends StatelessWidget {
   final Cliente cliente;
 
   const ClienteDetailScreen({
     Key? key,
     required this.cliente,
-  }) : super(key:key);
+  }) : super(key: key);
 
+  // Método para enviar todos los datos del cliente al servidor
+  void _enviarTodosLosDatos(BuildContext context) async {
+    // Mostrar diálogo de confirmación con preview de los datos
+    bool? confirmar = await _mostrarDialogoConfirmacion(context);
+    if (confirmar != true) return;
 
+    // Ejecutar el envío
+    await _ejecutarEnvio(context);
+  }
+
+  // Diálogo de confirmación antes del envío
+  Future<bool?> _mostrarDialogoConfirmacion(BuildContext context) async {
+    String datosCompletos = '''
+Datos del Cliente:
+━━━━━━━━━━━━━━━━
+Nombre: ${cliente.nombre}
+Email: ${cliente.email}
+${cliente.telefono?.isNotEmpty == true ? 'Teléfono: ${cliente.telefono}\n' : ''}${cliente.direccion?.isNotEmpty == true ? 'Dirección: ${cliente.direccion}\n' : ''}${cliente.id != null ? 'ID: ${cliente.id}' : ''}
+    '''.trim();
+
+    return showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.send, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('Enviar datos'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Se enviarán los siguientes datos al servidor:'),
+              SizedBox(height: 12),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  datosCompletos,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                '• Endpoint: POST /clientes\n• Servidor: 192.168.1.185:3000',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text('Enviar'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Método que ejecuta el envío real al servidor Node.js
+  Future<void> _ejecutarEnvio(BuildContext context) async {
+    // Mostrar indicador de carga
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('Enviando datos...'),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    try {
+      // Usar el servicio de sincronización para enviar el cliente
+      final resultado = await SyncService.enviarClienteAAPI(cliente);
+
+      // Cerrar el diálogo de carga
+      Navigator.of(context).pop();
+
+      if (resultado.exito) {
+        // Envío exitoso
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('✅ Datos enviados correctamente al servidor'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'Ver detalles',
+              textColor: Colors.white,
+              onPressed: () => _mostrarDetallesEnvio(context, resultado),
+            ),
+          ),
+        );
+      } else {
+        // Error en el envío
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.error, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('❌ Error: ${resultado.mensaje}'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Reintentar',
+              textColor: Colors.white,
+              onPressed: () => _ejecutarEnvio(context),
+            ),
+          ),
+        );
+      }
+
+    } catch (e) {
+      // Cerrar el diálogo de carga si está abierto
+      Navigator.of(context).pop();
+
+      // Mostrar error inesperado
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error inesperado: $e'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  // Mostrar detalles del envío exitoso
+  void _mostrarDetallesEnvio(BuildContext context, ApiResponse resultado) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('Detalles del envío'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('✅ Estado: Enviado correctamente'),
+              SizedBox(height: 8),
+              Text('📤 Cliente: ${cliente.nombre}'),
+              Text('📧 Email: ${cliente.email}'),
+              if (cliente.id != null) Text('🆔 ID: ${cliente.id}'),
+              SizedBox(height: 12),
+              Text('🕒 Enviado: ${DateTime.now().toString().substring(0, 19)}'),
+              if (resultado.datos != null) ...[
+                SizedBox(height: 8),
+                Text('📋 Respuesta del servidor:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                Container(
+                  padding: EdgeInsets.all(8),
+                  margin: EdgeInsets.only(top: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    resultado.datos.toString(),
+                    style: TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cerrar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -512,8 +736,16 @@ class ClienteDetailScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text('Detalle de Cliente'),
         backgroundColor: Colors.blue,
+        actions: [
+          // Botón rápido de envío en el AppBar
+          IconButton(
+            onPressed: () => _enviarTodosLosDatos(context),
+            icon: Icon(Icons.send),
+            tooltip: 'Enviar datos al servidor',
+          ),
+        ],
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -581,12 +813,86 @@ class ClienteDetailScreen extends StatelessWidget {
                 content: cliente.id.toString(),
                 color: Colors.grey,
               ),
+
+            // Información técnica
+            _buildInfoCard(
+              icon: Icons.access_time,
+              title: 'Fecha de creación',
+              content: cliente.fechaCreacion.toString().substring(0, 19),
+              color: Colors.purple,
+            ),
+
+            // Espacio adicional
+            SizedBox(height: 32),
+
+            // Botón principal para enviar todos los datos
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _enviarTodosLosDatos(context),
+                icon: Icon(Icons.send),
+                label: Text('Enviar al servidor Node.js'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  textStyle: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+
+            // Información sobre el servidor
+            SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue, size: 16),
+                      SizedBox(width: 8),
+                      Text(
+                        'Información del servidor',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '• Servidor: http://192.168.1.185:3000\n• Endpoint: POST /clientes\n• Los datos se enviarán en formato JSON',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Espacio adicional al final para mejor UX
+            SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
 
+  // Método para construir las cards de información
   Widget _buildInfoCard({
     required IconData icon,
     required String title,
@@ -604,7 +910,7 @@ class ClienteDetailScreen extends StatelessWidget {
               height: 48,
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(

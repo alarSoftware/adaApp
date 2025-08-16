@@ -2,10 +2,14 @@ import 'dart:async';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/cliente.dart';
+import 'package:logger/logger.dart';
+
+var logger= Logger();
 
 class DatabaseHelper {
   static DatabaseHelper? _instance;
   static Database? _database;
+
 
   DatabaseHelper._internal();
 
@@ -76,22 +80,22 @@ class DatabaseHelper {
   Future<void> limpiarYSincronizar(List<Cliente> clientesAPI) async {
     final db = await database;
 
-    await db.transaction((txn) async {
-      // Limpiar tabla
-      await txn.delete('clientes');
-      print('🗑️ Tabla clientes limpiada');
+    try {
+      await db.transaction((txn) async {
+        // Limpiar tabla existente
+        await txn.delete('clientes');
 
-      // Insertar nuevos datos
-      for (Cliente cliente in clientesAPI) {
-        try {
+        // Insertar nuevos clientes
+        for (Cliente cliente in clientesAPI) {
           await txn.insert('clientes', cliente.toMap());
-        } catch (e) {
-          print('⚠️ Error insertando cliente ${cliente.nombre}: $e');
         }
-      }
+      });
 
-      print('✅ ${clientesAPI.length} clientes sincronizados');
-    });
+      logger.i('✅ Base de datos sincronizada: ${clientesAPI.length} clientes');
+    } catch (e) {
+      logger.e('❌ Error en sincronización de base de datos: $e');
+      throw Exception('Error sincronizando base de datos: $e');
+    }
   }
 
   // NUEVO: Método público para limpiar y reiniciar con datos de ejemplo
@@ -101,7 +105,7 @@ class DatabaseHelper {
     await db.transaction((txn) async {
       // Limpiar tabla
       await txn.delete('clientes');
-      print('🗑️ Tabla clientes limpiada');
+      logger.i('🗑️ Tabla clientes limpiada');
 
       // Insertar datos de ejemplo
       List<Map<String, dynamic>> clientesEjemplo = [
@@ -133,7 +137,7 @@ class DatabaseHelper {
       }
     });
 
-    print('🔄 Base de datos reiniciada con datos de ejemplo');
+    logger.i('🔄 Base de datos reiniciada con datos de ejemplo');
   }
 
   // NUEVO: Obtener estadísticas de la base de datos
@@ -184,7 +188,7 @@ class DatabaseHelper {
     } catch (e) {
       // Si hay error de duplicado de email, intentar actualizar
       if (e.toString().contains('UNIQUE constraint failed')) {
-        print('⚠️ Email duplicado, intentando actualizar: ${cliente.email}');
+        logger.e('⚠️ Email duplicado, intentando actualizar: ${cliente.email}');
         return await db.update(
           'clientes',
           cliente.toMap(),

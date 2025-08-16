@@ -3,11 +3,14 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/cliente.dart';
 import 'dart:async';
+import 'package:logger/logger.dart';
 
+
+var logger = Logger();
 
 class ApiService {
   // Cambia esta URL por tu endpoint real
-  static const String baseUrl = 'http://192.168.1.185:3000';
+  static const String baseUrl = 'http://192.168.100.128:3000';
   static const String clientesEndpoint = '$baseUrl/clientes';
 
   // Timeout para las peticiones
@@ -28,15 +31,15 @@ class ApiService {
       final encodedQuery = Uri.encodeQueryComponent(query);
       final url = '$clientesEndpoint/buscar?q=$encodedQuery&page=$page&limit=$limit';
 
-      print('Buscando en URL: $url');
+      logger.i('Buscando en URL: $url');
 
       final response = await http.get(
         Uri.parse(url),
         headers: _headers,
       ).timeout(timeout);
 
-      print('Respuesta búsqueda - Status: ${response.statusCode}');
-      print('Respuesta búsqueda - Body: ${response.body}');
+      logger.i('Respuesta búsqueda - Status: ${response.statusCode}');
+      logger.i('Respuesta búsqueda - Body: ${response.body}');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         try {
@@ -70,7 +73,7 @@ class ApiService {
           );
 
         } catch (e) {
-          print('Error parseando respuesta: $e');
+          logger.e('Error parseando respuesta: $e');
           return BusquedaResponse(
             exito: false,
             mensaje: 'Error procesando los datos de búsqueda: ${e.toString()}',
@@ -116,7 +119,7 @@ class ApiService {
         clientes: [],
       );
     } catch (e) {
-      print('Error inesperado en búsqueda: $e');
+      logger.e('Error inesperado en búsqueda: $e');
       return BusquedaResponse(
         exito: false,
         mensaje: 'Error inesperado: ${e.toString()}',
@@ -130,15 +133,15 @@ class ApiService {
     try {
       final url = '$clientesEndpoint?page=$page&limit=$limit';
 
-      print('Obteniendo todos los clientes desde: $url');
+      logger.i('Obteniendo todos los clientes desde: $url');
 
       final response = await http.get(
         Uri.parse(url),
         headers: _headers,
       ).timeout(timeout);
 
-      print('Respuesta obtener todos - Status: ${response.statusCode}');
-      print('Respuesta obtener todos - Body: ${response.body}');
+      logger.i('Respuesta obtener todos - Status: ${response.statusCode}');
+      logger.i('Respuesta obtener todos - Body: ${response.body}');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         try {
@@ -171,7 +174,7 @@ class ApiService {
           );
 
         } catch (e) {
-          print('Error parseando respuesta: $e');
+          logger.e('Error parseando respuesta: $e');
           return BusquedaResponse(
             exito: false,
             mensaje: 'Error procesando los datos: ${e.toString()}',
@@ -201,7 +204,7 @@ class ApiService {
   // Enviar un cliente individual
   static Future<ApiResponse> enviarCliente(Cliente cliente) async {
     try {
-      print('Enviando cliente al EDP: ${cliente.toJson()}');
+      logger.e('Enviando cliente al EDP: ${cliente.toJson()}');
 
       final response = await http.post(
         Uri.parse(clientesEndpoint),
@@ -240,7 +243,7 @@ class ApiService {
         'timestamp': DateTime.now().toIso8601String(),
       };
 
-      print('Enviando ${clientes.length} clientes al EDP');
+      logger.e('Enviando ${clientes.length} clientes al EDP');
 
       final response = await http.post(
         Uri.parse('$clientesEndpoint/multiples'),
@@ -270,8 +273,8 @@ class ApiService {
 
   // Procesar la respuesta del servidor
   static ApiResponse _procesarRespuesta(http.Response response, String mensajeExito) {
-    print('Respuesta del servidor - Status: ${response.statusCode}');
-    print('Respuesta del servidor - Body: ${response.body}');
+    logger.i('Respuesta del servidor - Status: ${response.statusCode}');
+    logger.i('Respuesta del servidor - Body: ${response.body}');
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       try {
@@ -373,6 +376,7 @@ class ApiResponse {
     this.datos,
     this.codigoEstado,
   });
+
 
   @override
   String toString() {

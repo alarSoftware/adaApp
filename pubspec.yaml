@@ -35,7 +35,7 @@ dependencies:
   #Nuevas Dependencias
   sqflite: ^2.3.0
   path: ^1.8.3
-  logger: ^2.3.0
+  logger: ^2.4.0
 
 
 
