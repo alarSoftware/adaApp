@@ -4,6 +4,8 @@ import 'services/database_helper.dart';
 import 'services/api_service.dart';
 import 'services/sync_service.dart';
 import 'package:logger/logger.dart';
+import 'screens/login_screen.dart';
+
 
 var logger = Logger();
 void main() {
@@ -12,6 +14,7 @@ void main() {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -20,11 +23,16 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: ClienteListScreen(),
       debugShowCheckedModeBanner: false,
+      initialRoute:'/login',
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        '/home': (context) => const ClienteListScreen(),
+      },
     );
   }
 }
+
 
 // Pantalla principal - Lista de clientes
 class ClienteListScreen extends StatefulWidget {
