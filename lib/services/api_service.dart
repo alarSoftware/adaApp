@@ -10,7 +10,7 @@ var logger = Logger();
 
 class ApiService {
   // Cambia esta URL por tu endpoint real
-  static const String baseUrl = 'http://192.168.100.128:3000';
+  static const String baseUrl = 'http://192.168.1.185:3000';
   static const String clientesEndpoint = '$baseUrl/clientes';
 
   // Timeout para las peticiones
@@ -20,7 +20,6 @@ class ApiService {
   static Map<String, String> get _headers => {
     'Content-Type': 'application/json; charset=UTF-8',
     'Accept': 'application/json',
-    // Agrega aquí headers de autenticación si los necesitas
     // 'Authorization': 'Bearer $token',
   };
 

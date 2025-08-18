@@ -217,6 +217,139 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
     );
   }
 
+  // NUEVO: Método para borrar la base de datos local
+  Future<void> _borrarBaseDeDatos() async {
+    // Mostrar diálogo de confirmación
+    bool? confirmar = await _mostrarDialogoBorrarBD();
+    if (confirmar != true) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Borrar todos los datos de la base de datos
+      await dbHelper.borrarTodosLosClientes();
+
+      // Limpiar las listas en memoria
+      setState(() {
+        clientes.clear();
+        clientesFiltrados.clear();
+        clientesMostrados.clear();
+        paginaActual = 0;
+        hayMasDatos = true;
+        isLoading = false;
+      });
+
+      // Mostrar mensaje de éxito
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 8),
+              Text('🗑️ Base de datos borrada correctamente'),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error al borrar la base de datos: $e'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  // NUEVO: Diálogo de confirmación para borrar la BD
+  Future<bool?> _mostrarDialogoBorrarBD() async {
+    return showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.delete_forever, color: Colors.red),
+              SizedBox(width: 2.5),
+              Text('Borrar Base de Datos',
+              style: TextStyle(
+                fontSize: 20
+              ),),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '¡ATENCIÓN!',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                  fontSize: 16,
+                ),
+              ),
+              SizedBox(height: 12),
+              Text('Esta acción:'),
+              SizedBox(height: 8),
+              Text('• Borrará TODOS los clientes de la base de datos local'),
+              Text('• NO se puede deshacer'),
+              Text('• Los datos del servidor NO se verán afectados'),
+              SizedBox(height: 12),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                ),
+                child: Text(
+                  'Clientes actuales: ${clientes.length}\nTodos serán eliminados permanentemente.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.red[700],
+                  ),
+                ),
+              ),
+              SizedBox(height: 16),
+              Text(
+                '¿Estás completamente seguro?',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text('Sí, Borrar Todo'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _filtrarClientes() async {
     String query = searchController.text.trim();
 
@@ -290,13 +423,15 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
             onPressed: isSyncing ? null : _sincronizarConAPI,
             tooltip: 'Sincronizar con servidor',
           ),
-          // Menú de opciones (solo opciones de visualización)
+          // Menú de opciones (ACTUALIZADO con opción de borrar BD)
           PopupMenuButton<String>(
             onSelected: (String value) {
               if (value == 'probar_conexion') {
                 _probarConexion();
               } else if (value == 'recargar_local') {
                 _cargarClientes();
+              } else if (value == 'borrar_bd') {
+                _borrarBaseDeDatos();
               }
             },
             itemBuilder: (BuildContext context) => [
@@ -317,6 +452,17 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                     Icon(Icons.wifi_find, color: Colors.green),
                     SizedBox(width: 8),
                     Text('Probar conexión'),
+                  ],
+                ),
+              ),
+              PopupMenuDivider(), // SEPARADOR
+              PopupMenuItem<String>(
+                value: 'borrar_bd',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_forever, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Borrar base de datos', style: TextStyle(color: Colors.red)),
                   ],
                 ),
               ),

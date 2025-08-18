@@ -7,7 +7,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 📊 MIDDLEWARE DE LOGGING DETALLADO
+//  MIDDLEWARE DE LOGGING DETALLADO
 app.use((req, res, next) => {
     const timestamp = new Date().toISOString();
     const localTime = new Date().toLocaleString('es-PY', { 
@@ -21,22 +21,22 @@ app.use((req, res, next) => {
     });
     
     console.log('\n' + '='.repeat(80));
-    console.log(`📡 PETICIÓN RECIBIDA [${localTime}]`);
+    console.log(` PETICIÓN RECIBIDA [${localTime}]`);
     console.log('='.repeat(80));
-    console.log(`🔍 Método: ${req.method}`);
-    console.log(`📍 URL: ${req.url}`);
-    console.log(`🌍 IP Cliente: ${req.ip || req.connection.remoteAddress}`);
-    console.log(`🖥️  User-Agent: ${req.headers['user-agent']?.substring(0, 50) || 'No especificado'}...`);
+    console.log(` Método: ${req.method}`);
+    console.log(` URL: ${req.url}`);
+    console.log(` IP Cliente: ${req.ip || req.connection.remoteAddress}`);
+    console.log(`  User-Agent: ${req.headers['user-agent']?.substring(0, 50) || 'No especificado'}...`);
     
     // Log de headers importantes
-    console.log('\n📋 HEADERS IMPORTANTES:');
+    console.log('\n HEADERS IMPORTANTES:');
     console.log(`   Content-Type: ${req.headers['content-type'] || 'No especificado'}`);
     console.log(`   Content-Length: ${req.headers['content-length'] || 'No especificado'}`);
     console.log(`   Accept: ${req.headers['accept']?.substring(0, 50) || 'No especificado'}...`);
     
     // Log de query parameters
     if (req.query && Object.keys(req.query).length > 0) {
-        console.log('\n🔍 QUERY PARAMETERS:');
+        console.log('\n QUERY PARAMETERS:');
         Object.entries(req.query).forEach(([key, value]) => {
             console.log(`   ${key}: ${value}`);
         });
@@ -44,11 +44,11 @@ app.use((req, res, next) => {
     
     // Log del body (datos enviados)
     if (req.body && Object.keys(req.body).length > 0) {
-        console.log('\n📦 DATOS RECIBIDOS (BODY):');
+        console.log('\n DATOS RECIBIDOS (BODY):');
         console.log('┌' + '─'.repeat(78) + '┐');
         
         if (req.method === 'POST' || req.method === 'PUT') {
-            console.log('│ 🎯 DATOS ENVIADOS DESDE FLUTTER:');
+            console.log('│  DATOS ENVIADOS DESDE FLUTTER:');
             console.log('│');
             
             try {
@@ -70,14 +70,14 @@ app.use((req, res, next) => {
     // Capturar la respuesta para logging
     const originalSend = res.send;
     res.send = function(data) {
-        console.log('\n📤 RESPUESTA ENVIADA:');
+        console.log('\n RESPUESTA ENVIADA:');
         console.log(`   Status: ${res.statusCode}`);
         console.log(`   Tamaño: ${Buffer.byteLength(data)} bytes`);
         
         if (res.statusCode >= 200 && res.statusCode < 300) {
-            console.log(`   ✅ Éxito: ${res.statusCode}`);
+            console.log(`   Éxito: ${res.statusCode}`);
         } else if (res.statusCode >= 400) {
-            console.log(`   ❌ Error: ${res.statusCode}`);
+            console.log(`    Error: ${res.statusCode}`);
         }
         
         console.log('='.repeat(80));
@@ -122,10 +122,10 @@ let clientes = [
     { id: 30, nombre: 'Tomás González', email: 'tomas@email.com', telefono: '0964-000111', direccion: 'Capiatá', fecha_creacion: new Date().toISOString() }
 ];
 
-// 🏓 GET /ping - Verificar conexión
+//  GET /ping - Verificar conexión
 app.get('/ping', (req, res) => {
-    console.log('\n🏓 PING - Verificando conexión...');
-    console.log('✅ Servidor funcionando correctamente');
+    console.log('\n PING - Verificando conexión...');
+    console.log('✅Servidor funcionando correctamente');
     
     res.json({
         success: true,
@@ -137,24 +137,24 @@ app.get('/ping', (req, res) => {
     });
 });
 
-// 📋 GET /clientes - Obtener todos los clientes con paginación
+//  GET /clientes - Obtener todos los clientes con paginación
 app.get('/clientes', (req, res) => {
-    console.log('\n📋 GET /clientes - Obteniendo lista de clientes...');
+    console.log('\n GET /clientes - Obteniendo lista de clientes...');
     
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 1000; // Alto por defecto para obtener todos
     
-    console.log(`   📄 Página solicitada: ${page}`);
-    console.log(`   📊 Límite por página: ${limit}`);
-    console.log(`   📈 Total de clientes en BD: ${clientes.length}`);
+    console.log(`    Página solicitada: ${page}`);
+    console.log(`    Límite por página: ${limit}`);
+    console.log(`    Total de clientes en BD: ${clientes.length}`);
 
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
 
     const resultados = clientes.slice(startIndex, endIndex);
     
-    console.log(`   📤 Enviando ${resultados.length} clientes`);
-    console.log(`   📍 Índices: ${startIndex} - ${endIndex}`);
+    console.log(`    Enviando ${resultados.length} clientes`);
+    console.log(`    Índices: ${startIndex} - ${endIndex}`);
 
     // Respuesta compatible con ambos formatos
     res.json(resultados); // Array directo para compatibilidad con Flutter
@@ -166,10 +166,10 @@ app.get('/clientes/buscar', (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
 
-    console.log('\n🔍 BÚSQUEDA DE CLIENTES:');
-    console.log(`   🔤 Término de búsqueda: "${q}"`);
-    console.log(`   📄 Página: ${page}`);
-    console.log(`   📊 Límite: ${limit}`);
+    console.log('\n BÚSQUEDA DE CLIENTES:');
+    console.log(`    Término de búsqueda: "${q}"`);
+    console.log(`    Página: ${page}`);
+    console.log(`    Límite: ${limit}`);
 
     const encontrados = clientes.filter(c =>
         c.nombre.toLowerCase().includes(q) || 
@@ -177,13 +177,13 @@ app.get('/clientes/buscar', (req, res) => {
         (c.telefono && c.telefono.toLowerCase().includes(q))
     );
 
-    console.log(`   🎯 Resultados encontrados: ${encontrados.length}`);
+    console.log(`    Resultados encontrados: ${encontrados.length}`);
 
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
     const resultados = encontrados.slice(startIndex, endIndex);
 
-    console.log(`   📤 Enviando ${resultados.length} resultados`);
+    console.log(`    Enviando ${resultados.length} resultados`);
 
     res.json({
         exito: true,
@@ -198,21 +198,21 @@ app.get('/clientes/buscar', (req, res) => {
 
 // ➕ POST /clientes - Crear un nuevo cliente (ENDPOINT PRINCIPAL)
 app.post('/clientes', (req, res) => {
-    console.log('\n' + '🎯'.repeat(40));
-    console.log('🎯 ¡CLIENTE RECIBIDO DESDE FLUTTER!');
-    console.log('🎯'.repeat(40));
+    console.log('\n' + ''.repeat(40));
+    console.log(' ¡CLIENTE RECIBIDO DESDE FLUTTER!');
+    console.log(''.repeat(40));
     
     const cliente = req.body;
     
     // Log detallado del cliente recibido
-    console.log('\n📋 ANÁLISIS DETALLADO DE DATOS RECIBIDOS:');
+    console.log('\n ANÁLISIS DETALLADO DE DATOS RECIBIDOS:');
     console.log('┌─────────────────────────────────────────────┐');
-    console.log(`│ 🆔 ID:         ${String(cliente.id || 'No especificado').padEnd(25)} │`);
-    console.log(`│ 👤 Nombre:     ${String(cliente.nombre || '').padEnd(25)} │`);
-    console.log(`│ 📧 Email:      ${String(cliente.email || '').padEnd(25)} │`);
-    console.log(`│ 📞 Teléfono:   ${String(cliente.telefono || 'No especificado').padEnd(25)} │`);
-    console.log(`│ 🏠 Dirección:  ${String(cliente.direccion || 'No especificado').padEnd(25)} │`);
-    console.log(`│ 📅 Fecha:      ${String(cliente.fechaCreacion || 'No especificado').padEnd(25)} │`);
+    console.log(`│  ID:         ${String(cliente.id || 'No especificado').padEnd(25)} │`);
+    console.log(`│  Nombre:     ${String(cliente.nombre || '').padEnd(25)} │`);
+    console.log(`│  Email:      ${String(cliente.email || '').padEnd(25)} │`);
+    console.log(`│  Teléfono:   ${String(cliente.telefono || 'No especificado').padEnd(25)} │`);
+    console.log(`│  Dirección:  ${String(cliente.direccion || 'No especificado').padEnd(25)} │`);
+    console.log(`│  Fecha:      ${String(cliente.fechaCreacion || 'No especificado').padEnd(25)} │`);
     console.log('└─────────────────────────────────────────────┘');
     
     // Validación de datos
@@ -222,7 +222,7 @@ app.post('/clientes', (req, res) => {
     if (cliente.email && !cliente.email.includes('@')) errores.push('Email debe tener formato válido');
     
     if (errores.length > 0) {
-        console.log('\n❌ ERRORES DE VALIDACIÓN:');
+        console.log('\n ERRORES DE VALIDACIÓN:');
         errores.forEach((error, index) => {
             console.log(`   ${index + 1}. ${error}`);
         });
@@ -253,16 +253,16 @@ app.post('/clientes', (req, res) => {
     // Guardar en la "base de datos" (array)
     clientes.push(clienteGuardado);
     
-    console.log('\n💾 CLIENTE PROCESADO Y GUARDADO:');
+    console.log('\n CLIENTE PROCESADO Y GUARDADO:');
     console.log('┌─────────────────────────────────────────────┐');
-    console.log(`│ ✅ Cliente guardado correctamente           │`);
-    console.log(`│ 🆔 Nuevo ID asignado: ${String(nuevoId).padEnd(18)} │`);
-    console.log(`│ 📊 Total clientes en BD: ${String(clientes.length).padEnd(14)} │`);
-    console.log(`│ 🕒 Guardado en: ${new Date().toLocaleTimeString('es-PY').padEnd(19)} │`);
+    console.log(`│  Cliente guardado correctamente           │`);
+    console.log(`│  Nuevo ID asignado: ${String(nuevoId).padEnd(18)} │`);
+    console.log(`│  Total clientes en BD: ${String(clientes.length).padEnd(14)} │`);
+    console.log(`│  Guardado en: ${new Date().toLocaleTimeString('es-PY').padEnd(19)} │`);
     console.log('└─────────────────────────────────────────────┘');
     
-    console.log('\n🎉 Enviando confirmación a Flutter...');
-    console.log('🎯'.repeat(40));
+    console.log('\n Enviando confirmación a Flutter...');
+    console.log(''.repeat(40));
     
     // Respuesta exitosa
     res.status(201).json({
@@ -278,18 +278,18 @@ app.post('/clientes', (req, res) => {
     });
 });
 
-// 📦 POST /clientes/multiples - Para múltiples clientes
+// 📦POST /clientes/multiples - Para múltiples clientes
 app.post('/clientes/multiples', (req, res) => {
-    console.log('\n📦 POST /clientes/multiples - Recibiendo múltiples clientes...');
+    console.log('\n POST /clientes/multiples - Recibiendo múltiples clientes...');
     
     const { clientes: nuevosClientes } = req.body;
     const total = req.body.total || nuevosClientes?.length || 0;
     
-    console.log(`   📊 Total declarado: ${total}`);
-    console.log(`   📦 Array recibido: ${Array.isArray(nuevosClientes) ? nuevosClientes.length : 'No es array'}`);
+    console.log(`    Total declarado: ${total}`);
+    console.log(`    Array recibido: ${Array.isArray(nuevosClientes) ? nuevosClientes.length : 'No es array'}`);
 
     if (!Array.isArray(nuevosClientes)) {
-        console.log('❌ Error: No se recibió un array de clientes');
+        console.log(' Error: No se recibió un array de clientes');
         return res.status(400).json({
             error: 'Se esperaba un array de clientes',
             message: 'Formato incorrecto'
@@ -317,14 +317,14 @@ app.post('/clientes/multiples', (req, res) => {
             };
             clientes.push(nuevoCliente);
             clientesCreados.push(nuevoCliente);
-            console.log(`      ✅ Guardado con ID: ${nuevoCliente.id}`);
+            console.log(`       Guardado con ID: ${nuevoCliente.id}`);
         } else {
-            console.log(`      ❌ Saltado (datos incompletos)`);
+            console.log(`       Saltado (datos incompletos)`);
         }
     });
 
-    console.log(`\n💾 Resumen: ${clientesCreados.length} de ${nuevosClientes.length} clientes guardados`);
-    console.log(`📊 Total en BD ahora: ${clientes.length} clientes`);
+    console.log(`\n Resumen: ${clientesCreados.length} de ${nuevosClientes.length} clientes guardados`);
+    console.log(` Total en BD ahora: ${clientes.length} clientes`);
 
     res.status(201).json({
         success: true,
@@ -335,12 +335,12 @@ app.post('/clientes/multiples', (req, res) => {
     });
 });
 
-// ❌ Middleware de manejo de errores
+// Middleware de manejo de errores
 app.use((err, req, res, next) => {
-    console.log('\n❌ ERROR EN EL SERVIDOR:');
+    console.log('\n ERROR EN EL SERVIDOR:');
     console.log('━'.repeat(50));
-    console.error(`🔥 Error: ${err.message}`);
-    console.error(`📍 Stack: ${err.stack}`);
+    console.error(`Error: ${err.message}`);
+    console.error(`Stack: ${err.stack}`);
     console.log('━'.repeat(50));
     
     res.status(500).json({
@@ -376,32 +376,30 @@ app.listen(PORT, HOST, () => {
     
     const fecha = new Date().toLocaleString('es-PY', { timeZone: 'America/Asuncion' });
     
-    console.log('\n' + '🚀'.repeat(50));
-    console.log('🚀 API NODE.JS INICIADA CORRECTAMENTE! 🚀');
-    console.log('🚀'.repeat(50));
-    
-    console.log('\n📍 INFORMACIÓN DEL SERVIDOR:');
+    console.log('API NODE.JS INICIADA CORRECTAMENTE! 🚀');
+
+    console.log('\n INFORMACIÓN DEL SERVIDOR:');
     console.log('┌─────────────────────────────────────────────────────┐');
-    console.log(`│ 📅 Fecha inicio: ${fecha.padEnd(30)} │`);
-    console.log(`│ 🌐 Host: ${HOST.padEnd(42)} │`);
-    console.log(`│ 🔌 Puerto: ${PORT.toString().padEnd(40)} │`);
-    console.log(`│ 📊 Clientes precargados: ${clientes.length.toString().padEnd(24)} │`);
+    console.log(`│  Fecha inicio: ${fecha.padEnd(30)} │`);
+    console.log(`│  Host: ${HOST.padEnd(42)} │`);
+    console.log(`│  Puerto: ${PORT.toString().padEnd(40)} │`);
+    console.log(`│  Clientes precargados: ${clientes.length.toString().padEnd(24)} │`);
     console.log('└─────────────────────────────────────────────────────┘');
     
-    console.log('\n🌍 URLs DE ACCESO:');
-    console.log(`   📱 Desde Flutter: http://192.168.100.128:${PORT}`);
-    console.log(`   💻 Local:         http://localhost:${PORT}`);
+    console.log('\n URLs DE ACCESO:');
+    console.log(`    Desde Flutter: http://192.168.100.128:${PORT}`);
+    console.log(`    Local:         http://localhost:${PORT}`);
     
-    console.log('\n🎯 ENDPOINTS DISPONIBLES:');
+    console.log('\n ENDPOINTS DISPONIBLES:');
     console.log('┌──────────────────────────────────────────────────────────┐');
-    console.log('│ 🏓 GET  /ping                    - Verificar conexión   │');
-    console.log('│ 📋 GET  /clientes                - Obtener todos         │');
-    console.log('│ 🔍 GET  /clientes/buscar?q=...   - Buscar clientes       │');
-    console.log('│ ➕ POST /clientes                - Crear cliente         │');
-    console.log('│ 📦 POST /clientes/multiples      - Crear múltiples       │');
+    console.log('│  GET  /ping                    - Verificar conexión   │');
+    console.log('│  GET  /clientes                - Obtener todos         │');
+    console.log('│  GET  /clientes/buscar?q=...   - Buscar clientes       │');
+    console.log('│  POST /clientes                - Crear cliente         │');
+    console.log('│  POST /clientes/multiples      - Crear múltiples       │');
     console.log('└──────────────────────────────────────────────────────────┘');
     
-    console.log('\n📡 ESTADO: Esperando peticiones de Flutter...');
+    console.log('\n ESTADO: Esperando peticiones de Flutter...');
     console.log('   (Todos los datos enviados serán mostrados en detalle)');
     console.log('\n' + '─'.repeat(80));
 });

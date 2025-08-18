@@ -11,7 +11,7 @@ var logger = Logger();
 
 class SyncService {
   // ⚠️ ACTUALIZAr con la IP correcta del servidor.
-  static const String baseUrl = 'http://192.168.100.128:3000';
+  static const String baseUrl = 'http://192.168.1.185:3000';
   static const String clientesEndpoint = '$baseUrl/clientes';
   static const Duration timeout = Duration(seconds: 30);
 
@@ -27,7 +27,8 @@ class SyncService {
 
       // Obtener todos los clientes de la API (sin límite)
       final response = await http.get(
-        Uri.parse('$clientesEndpoint?limit=1000'), // Límite alto para obtener todos
+        Uri.parse('$clientesEndpoint?limit=1000'),
+        // Límite alto para obtener todos
         headers: _headers,
       ).timeout(timeout);
 
@@ -53,13 +54,15 @@ class SyncService {
             // Si la respuesta es un objeto
             final Map<String, dynamic> responseData = jsonDecode(responseBody);
 
-            if (responseData.containsKey('clientes') && responseData['clientes'] is List) {
+            if (responseData.containsKey('clientes') &&
+                responseData['clientes'] is List) {
               clientesAPI = (responseData['clientes'] as List)
                   .map((clienteJson) => _crearClienteDesdeAPI(clienteJson))
                   .where((cliente) => cliente != null)
                   .cast<Cliente>()
                   .toList();
-            } else if (responseData.containsKey('data') && responseData['data'] is List) {
+            } else if (responseData.containsKey('data') &&
+                responseData['data'] is List) {
               clientesAPI = (responseData['data'] as List)
                   .map((clienteJson) => _crearClienteDesdeAPI(clienteJson))
                   .where((cliente) => cliente != null)
@@ -80,41 +83,47 @@ class SyncService {
 
           // Limpiar base de datos local y insertar nuevos datos
           final dbHelper = DatabaseHelper();
-          await dbHelper.limpiarYSincronizar(clientesAPI);
 
-          int clientesInsertados = clientesAPI.length;
+          int clientesNuevos = 0;
+          int clientesActualizados = 0;
 
-          logger.i('✅ Sincronización completada: $clientesInsertados clientes guardados');
+          for (var cliente in clientesAPI) {
+            final existente = await dbHelper.obtenerClientePorEmail(
+                cliente.email);
+
+            if (existente != null) {
+              // Conservar el ID local
+              final actualizado = cliente.copyWith(id: existente.id);
+              await dbHelper.actualizarCliente(actualizado);
+              clientesActualizados++;
+            } else {
+              await dbHelper.insertarCliente(cliente);
+              clientesNuevos++;
+            }
+          }
+
+          logger.i(
+              '✅ Sincronización completada: $clientesNuevos nuevos, $clientesActualizados actualizados');
 
           return SyncResult(
             exito: true,
-            mensaje: 'Sincronización exitosa',
-            clientesSincronizados: clientesInsertados,
+            mensaje: 'Sincronización: $clientesNuevos nuevos, $clientesActualizados actualizados',
+            clientesSincronizados: clientesAPI.length,
             totalEnAPI: clientesAPI.length,
           );
-
-        } catch (e) {
-          logger.e('❌ Error procesando datos de API: $e');
+        } catch(e, stack){
+          logger.e('❌ Error en sincronización: $e', stackTrace: stack);
           return SyncResult(
             exito: false,
-            mensaje: 'Error procesando datos de la API: ${e.toString()}',
-            clientesSincronizados: 0,
-          );
+            mensaje: 'Error durante la sincronización: $e',
+            clientesSincronizados: 0,);
         }
       } else {
-        String mensajeError;
-        try {
-          Map<String, dynamic> errorData = jsonDecode(response.body);
-          mensajeError = errorData['message'] ??
-              errorData['error'] ??
-              'Error del servidor (${response.statusCode})';
-        } catch (e) {
-          mensajeError = 'Error del servidor (${response.statusCode})';
-        }
-
+        // ⭐ AQUÍ ESTABA EL PROBLEMA: faltaba el return para códigos de estado no exitosos
+        logger.e('❌ Error del servidor - Status: ${response.statusCode}');
         return SyncResult(
           exito: false,
-          mensaje: mensajeError,
+          mensaje: 'Error del servidor (${response.statusCode}): ${response.body}',
           clientesSincronizados: 0,
         );
       }

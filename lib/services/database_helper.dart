@@ -4,12 +4,11 @@ import 'package:path/path.dart';
 import '../models/cliente.dart';
 import 'package:logger/logger.dart';
 
-var logger= Logger();
+var logger = Logger();
 
 class DatabaseHelper {
   static DatabaseHelper? _instance;
   static Database? _database;
-
 
   DatabaseHelper._internal();
 
@@ -106,35 +105,6 @@ class DatabaseHelper {
       // Limpiar tabla
       await txn.delete('clientes');
       logger.i('🗑️ Tabla clientes limpiada');
-
-      // Insertar datos de ejemplo
-      List<Map<String, dynamic>> clientesEjemplo = [
-        {
-          'nombre': 'Juan Pérez',
-          'email': 'juan@email.com',
-          'telefono': '0981-123456',
-          'direccion': 'Asunción, Paraguay',
-          'fecha_creacion': DateTime.now().toIso8601String(),
-        },
-        {
-          'nombre': 'María García',
-          'email': 'maria@email.com',
-          'telefono': '0984-654321',
-          'direccion': 'Luque, Paraguay',
-          'fecha_creacion': DateTime.now().toIso8601String(),
-        },
-        {
-          'nombre': 'Carlos López',
-          'email': 'carlos@email.com',
-          'telefono': '0985-789123',
-          'direccion': 'San Lorenzo, Paraguay',
-          'fecha_creacion': DateTime.now().toIso8601String(),
-        },
-      ];
-
-      for (var cliente in clientesEjemplo) {
-        await txn.insert('clientes', cliente);
-      }
     });
 
     logger.i('🔄 Base de datos reiniciada con datos de ejemplo');
@@ -144,8 +114,7 @@ class DatabaseHelper {
   Future<Map<String, int>> obtenerEstadisticas() async {
     final db = await database;
     final List<Map<String, dynamic>> result = await db.rawQuery(
-        'SELECT COUNT(*) as total FROM clientes'
-    );
+        'SELECT COUNT(*) as total FROM clientes');
 
     return {
       'totalClientes': result.first['total'] ?? 0,
@@ -183,21 +152,12 @@ class DatabaseHelper {
   // Insertar un cliente
   Future<int> insertarCliente(Cliente cliente) async {
     final db = await database;
-    try {
-      return await db.insert('clientes', cliente.toMap());
-    } catch (e) {
-      // Si hay error de duplicado de email, intentar actualizar
-      if (e.toString().contains('UNIQUE constraint failed')) {
-        logger.e('⚠️ Email duplicado, intentando actualizar: ${cliente.email}');
-        return await db.update(
-          'clientes',
-          cliente.toMap(),
-          where: 'email = ?',
-          whereArgs: [cliente.email],
-        );
-      }
-      rethrow;
-    }
+    // ⭐ CORREGIDO: Cambié 'cliente' por 'clientes' (nombre correcto de la tabla)
+    return await db.insert(
+      'clientes',
+      cliente.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   // Insertar múltiples clientes (útil para sincronización)
@@ -225,6 +185,22 @@ class DatabaseHelper {
     });
 
     return insertados;
+  }
+
+  // Obtener cliente por email
+  Future<Cliente?> obtenerClientePorEmail(String email) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'clientes',
+      where: 'email = ?',
+      whereArgs: [email],
+      limit: 1,
+    );
+
+    if (maps.isNotEmpty) {
+      return Cliente.fromMap(maps.first);
+    }
+    return null;
   }
 
   // Actualizar un cliente
@@ -279,5 +255,11 @@ class DatabaseHelper {
   Future<void> close() async {
     final db = await database;
     db.close();
+  }
+
+  // Borrar todos los clientes
+  Future<void> borrarTodosLosClientes() async {
+    final db = await database;
+    await db.delete('clientes');
   }
 }
