@@ -173,7 +173,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                           ],
                         ),
                         child: Icon(
-                          Icons.lock_outline,
+                          Icons.dashboard,
                           size: 60,
                           color: Theme.of(context).primaryColor,
                         ),
