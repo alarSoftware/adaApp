@@ -149,7 +149,7 @@ class SyncService {
       ).timeout(timeout);
 
       logger.i('📡 Respuesta de API - Status: ${response.statusCode}');
-      logger.d('📄 Respuesta de API (primeros 300 chars): ${response.body.length > 300 ? response.body.substring(0, 300) + '...' : response.body}');
+      logger.d('📄 Respuesta de API (primeros 300 chars): ${response.body.length > 300 ? '${response.body.substring(0, 300)}...' : response.body}');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         try {
@@ -538,7 +538,7 @@ class SyncService {
           errorData['mensaje'] ??
           'Error del servidor (${response.statusCode})';
     } catch (e) {
-      return 'Error del servidor (${response.statusCode}): ${response.body.length > 100 ? response.body.substring(0, 100) + '...' : response.body}';
+      return 'Error del servidor (${response.statusCode}): ${response.body.length > 100 ? '${response.body.substring(0, 100)}...' : response.body}';
     }
   }
 
