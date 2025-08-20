@@ -3,6 +3,9 @@ import 'package:logger/logger.dart';
 import 'screens/login_screen.dart';
 import 'screens/clients_screen.dart';
 import 'screens/select_screen.dart';
+import 'screens/equipos_screen.dart';
+import 'screens/cliente_detail_screen.dart';
+import 'models/cliente.dart';  // ✅ AGREGA ESTA IMPORTACIÓN
 
 var logger = Logger();
 
@@ -16,7 +19,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Cliente App',
+      title: 'AdaApp',
       theme: ThemeData(
         primarySwatch: Colors.grey,
         visualDensity: VisualDensity.adaptivePlatformDensity,
@@ -27,46 +30,17 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const SelectScreen(),
         '/clienteLista': (context) => const ClienteListScreen(),
-        '/equipos': (context) => const EquiposPlaceholderScreen(),
+        '/equiposLista': (context) => const EquipoListScreen(),
       },
-    );
-  }
-}
-
-// Pantalla temporal para equipos
-class EquiposPlaceholderScreen extends StatelessWidget {
-  const EquiposPlaceholderScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Equipos'),
-        backgroundColor: Colors.grey,
-        foregroundColor: Colors.white,
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.devices,
-              size: 100,
-              color: Colors.grey,
-            ),
-            SizedBox(height: 20),
-            Text(
-              'Pantalla de Equipos',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'En construcción...',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
+      onGenerateRoute: (settings) {
+        if (settings.name == '/detalleCliente') {
+          final cliente = settings.arguments as Cliente;
+          return MaterialPageRoute(
+            builder: (context) => ClienteDetailScreen(cliente: cliente),
+          );
+        }
+        return null;
+      },
     );
   }
 }

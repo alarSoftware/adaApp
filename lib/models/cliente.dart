@@ -7,6 +7,7 @@ class Cliente {
   final String? telefono;
   final String? direccion;
   final DateTime fechaCreacion;
+  final bool estaSincronizado;
 
   Cliente({
     this.id,
@@ -15,7 +16,8 @@ class Cliente {
     this.telefono,
     this.direccion,
     DateTime? fechaCreacion,
-  }) : fechaCreacion = fechaCreacion ?? DateTime.now();
+  }) : fechaCreacion = fechaCreacion ?? DateTime.now(),
+       estaSincronizado = false;
 
   // Convertir de Map (base de datos) a Cliente
   factory Cliente.fromMap(Map<String, dynamic> map) {

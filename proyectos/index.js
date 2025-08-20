@@ -3,403 +3,472 @@ const cors = require('cors');
 
 const app = express();
 
-// Middleware básico
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-//  MIDDLEWARE DE LOGGING DETALLADO
+// Logging middleware
 app.use((req, res, next) => {
-    const timestamp = new Date().toISOString();
-    const localTime = new Date().toLocaleString('es-PY', { 
-        timeZone: 'America/Asuncion',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-    });
-    
-    console.log('\n' + '='.repeat(80));
-    console.log(` PETICIÓN RECIBIDA [${localTime}]`);
-    console.log('='.repeat(80));
-    console.log(` Método: ${req.method}`);
-    console.log(` URL: ${req.url}`);
-    console.log(` IP Cliente: ${req.ip || req.connection.remoteAddress}`);
-    console.log(`  User-Agent: ${req.headers['user-agent']?.substring(0, 50) || 'No especificado'}...`);
-    
-    // Log de headers importantes
-    console.log('\n HEADERS IMPORTANTES:');
-    console.log(`   Content-Type: ${req.headers['content-type'] || 'No especificado'}`);
-    console.log(`   Content-Length: ${req.headers['content-length'] || 'No especificado'}`);
-    console.log(`   Accept: ${req.headers['accept']?.substring(0, 50) || 'No especificado'}...`);
-    
-    // Log de query parameters
-    if (req.query && Object.keys(req.query).length > 0) {
-        console.log('\n QUERY PARAMETERS:');
-        Object.entries(req.query).forEach(([key, value]) => {
-            console.log(`   ${key}: ${value}`);
-        });
-    }
-    
-    // Log del body (datos enviados)
+    const time = new Date().toLocaleString('es-PY', { timeZone: 'America/Asuncion' });
+    console.log(`\n[${time}] ${req.method} ${req.url}`);
     if (req.body && Object.keys(req.body).length > 0) {
-        console.log('\n DATOS RECIBIDOS (BODY):');
-        console.log('┌' + '─'.repeat(78) + '┐');
-        
-        if (req.method === 'POST' || req.method === 'PUT') {
-            console.log('│  DATOS ENVIADOS DESDE FLUTTER:');
-            console.log('│');
-            
-            try {
-                const bodyStr = JSON.stringify(req.body, null, 2);
-                const lines = bodyStr.split('\n');
-                lines.forEach(line => {
-                    console.log(`│ ${line.padEnd(76)} │`);
-                });
-            } catch (error) {
-                console.log('│ Error al mostrar el body:', error.message);
-            }
-        }
-        
-        console.log('└' + '─'.repeat(78) + '┘');
+        console.log('Body:', JSON.stringify(req.body, null, 2));
     }
-    
-    console.log('\n⏳ Procesando petición...');
-    
-    // Capturar la respuesta para logging
-    const originalSend = res.send;
-    res.send = function(data) {
-        console.log('\n RESPUESTA ENVIADA:');
-        console.log(`   Status: ${res.statusCode}`);
-        console.log(`   Tamaño: ${Buffer.byteLength(data)} bytes`);
-        
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-            console.log(`   Éxito: ${res.statusCode}`);
-        } else if (res.statusCode >= 400) {
-            console.log(`    Error: ${res.statusCode}`);
-        }
-        
-        console.log('='.repeat(80));
-        
-        originalSend.call(this, data);
-    };
-    
     next();
 });
 
-// 🎯 DATOS DE EJEMPLO - Lista amplia de clientes
+// DATOS DE EJEMPLO
 let clientes = [
-    { id: 1, nombre: 'Juan Pérez', email: 'juan@email.com', telefono: '0981-123456', direccion: 'Asunción, Paraguay', fecha_creacion: new Date().toISOString() },
-    { id: 2, nombre: 'María García', email: 'maria@email.com', telefono: '0984-654321', direccion: 'Luque, Paraguay', fecha_creacion: new Date().toISOString() },
-    { id: 3, nombre: 'Carlos López', email: 'carlos@email.com', telefono: '0985-789123', direccion: 'San Lorenzo, Paraguay', fecha_creacion: new Date().toISOString() },
-    { id: 4, nombre: 'Ronaldo Rebollo', email: 'ronaldo@email.com', telefono: '0986-987654', direccion: 'Fernando de la Mora', fecha_creacion: new Date().toISOString() },
-    { id: 5, nombre: 'Ana Martínez', email: 'ana@email.com', telefono: '0987-112233', direccion: 'San Lorenzo', fecha_creacion: new Date().toISOString() },
-    { id: 6, nombre: 'Pedro Fernández', email: 'pedro@email.com', telefono: '0988-445566', direccion: 'Luque', fecha_creacion: new Date().toISOString() },
-    { id: 7, nombre: 'Lucía Gómez', email: 'lucia@email.com', telefono: '0989-778899', direccion: 'Asunción', fecha_creacion: new Date().toISOString() },
-    { id: 8, nombre: 'Diego Ramírez', email: 'diego@email.com', telefono: '0990-223344', direccion: 'San Lorenzo', fecha_creacion: new Date().toISOString() },
-    { id: 9, nombre: 'Sofía Torres', email: 'sofia@email.com', telefono: '0991-556677', direccion: 'Luque', fecha_creacion: new Date().toISOString() },
-    { id: 10, nombre: 'Miguel Díaz', email: 'miguel@email.com', telefono: '0992-889900', direccion: 'Asunción', fecha_creacion: new Date().toISOString() },
-    { id: 11, nombre: 'Valentina Ríos', email: 'valentina@email.com', telefono: '0993-111222', direccion: 'Capiatá', fecha_creacion: new Date().toISOString() },
-    { id: 12, nombre: 'Javier Medina', email: 'javier@email.com', telefono: '0994-333444', direccion: 'Asunción', fecha_creacion: new Date().toISOString() },
-    { id: 13, nombre: 'Camila Sánchez', email: 'camila@email.com', telefono: '0995-555666', direccion: 'Luque', fecha_creacion: new Date().toISOString() },
-    { id: 14, nombre: 'Andrés Villalba', email: 'andres@email.com', telefono: '0996-777888', direccion: 'San Lorenzo', fecha_creacion: new Date().toISOString() },
-    { id: 15, nombre: 'Laura Duarte', email: 'laura@email.com', telefono: '0997-999000', direccion: 'Fernando de la Mora', fecha_creacion: new Date().toISOString() },
-    { id: 16, nombre: 'Gonzalo Torres', email: 'gonzalo@email.com', telefono: '0998-111333', direccion: 'Capiatá', fecha_creacion: new Date().toISOString() },
-    { id: 17, nombre: 'Paola Giménez', email: 'paola@email.com', telefono: '0999-444555', direccion: 'Lambaré', fecha_creacion: new Date().toISOString() },
-    { id: 18, nombre: 'Martín Benítez', email: 'martin@email.com', telefono: '0971-666777', direccion: 'Asunción', fecha_creacion: new Date().toISOString() },
-    { id: 19, nombre: 'Florencia Caballero', email: 'florencia@email.com', telefono: '0972-888999', direccion: 'San Lorenzo', fecha_creacion: new Date().toISOString() },
-    { id: 20, nombre: 'Hernán Vera', email: 'hernan@email.com', telefono: '0973-000111', direccion: 'Luque', fecha_creacion: new Date().toISOString() },
-    { id: 21, nombre: 'Daniela López', email: 'daniela@email.com', telefono: '0974-222333', direccion: 'Asunción', fecha_creacion: new Date().toISOString() },
-    { id: 22, nombre: 'Sebastián Acosta', email: 'sebastian@email.com', telefono: '0975-444555', direccion: 'Capiatá', fecha_creacion: new Date().toISOString() },
-    { id: 23, nombre: 'Natalia Rojas', email: 'natalia@email.com', telefono: '0976-666777', direccion: 'San Lorenzo', fecha_creacion: new Date().toISOString() },
-    { id: 24, nombre: 'Pablo Martínez', email: 'pablo@email.com', telefono: '0977-888999', direccion: 'Fernando de la Mora', fecha_creacion: new Date().toISOString() },
-    { id: 25, nombre: 'Marisol Cáceres', email: 'marisol@email.com', telefono: '0978-000111', direccion: 'Luque', fecha_creacion: new Date().toISOString() },
-    { id: 26, nombre: 'Rodrigo Ayala', email: 'rodrigo@email.com', telefono: '0979-222333', direccion: 'Lambaré', fecha_creacion: new Date().toISOString() },
-    { id: 27, nombre: 'Isabel Franco', email: 'isabel@email.com', telefono: '0961-444555', direccion: 'Asunción', fecha_creacion: new Date().toISOString() },
-    { id: 28, nombre: 'Federico Ortiz', email: 'federico@email.com', telefono: '0962-666777', direccion: 'San Lorenzo', fecha_creacion: new Date().toISOString() },
-    { id: 29, nombre: 'Gabriela Núñez', email: 'gabriela@email.com', telefono: '0963-888999', direccion: 'Luque', fecha_creacion: new Date().toISOString() },
-    { id: 30, nombre: 'Tomás González', email: 'tomas@email.com', telefono: '0964-000111', direccion: 'Capiatá', fecha_creacion: new Date().toISOString() }
+    { id: 1, nombre: 'Juan Pérez', email: 'juan@email.com', telefono: '0981-123456', direccion: 'Asunción', activo: true, fecha_creacion: new Date().toISOString() },
+    { id: 2, nombre: 'María García', email: 'maria@email.com', telefono: '0984-654321', direccion: 'Luque', activo: true, fecha_creacion: new Date().toISOString() },
+    { id: 3, nombre: 'Carlos López', email: 'carlos@email.com', telefono: '0985-789123', direccion: 'San Lorenzo', activo: true, fecha_creacion: new Date().toISOString() },
+    { id: 4, nombre: 'Ana Torres', email: 'ana@email.com', telefono: '0971-222333', direccion: 'Fernando de la Mora', activo: true, fecha_creacion: new Date().toISOString() },
+    { id: 5, nombre: 'Luis González', email: 'luis@email.com', telefono: '0972-444555', direccion: 'Lambaré', activo: false, fecha_creacion: new Date().toISOString() },
+    { id: 6, nombre: 'Marta Rivas', email: 'marta@email.com', telefono: '0961-666777', direccion: 'Encarnación', activo: true, fecha_creacion: new Date().toISOString() },
+    { id: 7, nombre: 'Diego Silva', email: 'diego@email.com', telefono: '0962-888999', direccion: 'Capiatá', activo: true, fecha_creacion: new Date().toISOString() },
+    { id: 8, nombre: 'Lucía Benítez', email: 'lucia@email.com', telefono: '0983-121314', direccion: 'Itauguá', activo: true, fecha_creacion: new Date().toISOString() },
+    { id: 9, nombre: 'Pedro Duarte', email: 'pedro@email.com', telefono: '0986-151617', direccion: 'Villa Elisa', activo: true, fecha_creacion: new Date().toISOString() },
+    { id: 10, nombre: 'Gabriela Fernández', email: 'gaby@email.com', telefono: '0973-181920', direccion: 'Ñemby', activo: true, fecha_creacion: new Date().toISOString() },
+    { id: 11, nombre: 'Rodrigo Medina', email: 'rodrigo@email.com', telefono: '0963-212223', direccion: 'Caacupé', activo: false, fecha_creacion: new Date().toISOString() },
+    { id: 12, nombre: 'Camila Ortiz', email: 'camila@email.com', telefono: '0974-242526', direccion: 'Coronel Oviedo', activo: true, fecha_creacion: new Date().toISOString() },
+    { id: 13, nombre: 'Santiago Cabrera', email: 'santiago@email.com', telefono: '0964-272829', direccion: 'Paraguarí', activo: true, fecha_creacion: new Date().toISOString() },
+    { id: 14, nombre: 'Patricia Villalba', email: 'patricia@email.com', telefono: '0987-303132', direccion: 'Ciudad del Este', activo: true, fecha_creacion: new Date().toISOString() },
+    { id: 15, nombre: 'Hugo Ramírez', email: 'hugo@email.com', telefono: '0975-333444', direccion: 'Areguá', activo: true, fecha_creacion: new Date().toISOString() }
 ];
 
-//  GET /ping - Verificar conexión
+let equipos = [
+    { id: 1, cod_barras: 'REF001', marca: 'Samsung', modelo: 'RT38K5932SL', tipo_equipo: 'Refrigerador No Frost', fecha_creacion: new Date().toISOString() },
+    { id: 2, cod_barras: 'REF002', marca: 'LG', modelo: 'GS65SPP1', tipo_equipo: 'Refrigerador Side by Side', fecha_creacion: new Date().toISOString() },
+    { id: 3, cod_barras: 'REF003', marca: 'Whirlpool', modelo: 'WRM35AKTWW', tipo_equipo: 'Refrigerador Convencional', fecha_creacion: new Date().toISOString() },
+    { id: 4, cod_barras: 'REF004', marca: 'Electrolux', modelo: 'DF35', tipo_equipo: 'Freezer Vertical', fecha_creacion: new Date().toISOString() },
+    { id: 5, cod_barras: 'REF005', marca: 'Panasonic', modelo: 'NR-BL389', tipo_equipo: 'Refrigerador Inverter', fecha_creacion: new Date().toISOString() },
+    { id: 6, cod_barras: 'REF006', marca: 'Midea', modelo: 'HS-384', tipo_equipo: 'Freezer Horizontal', fecha_creacion: new Date().toISOString() },
+    { id: 7, cod_barras: 'REF007', marca: 'Bosch', modelo: 'KSV36VI3P', tipo_equipo: 'Refrigerador Inteligente', fecha_creacion: new Date().toISOString() },
+    { id: 8, cod_barras: 'REF008', marca: 'Daewoo', modelo: 'FRS-U20', tipo_equipo: 'Refrigerador Side by Side', fecha_creacion: new Date().toISOString() },
+    { id: 9, cod_barras: 'REF009', marca: 'GE', modelo: 'GTS18', tipo_equipo: 'Refrigerador Convencional', fecha_creacion: new Date().toISOString() },
+    { id: 10, cod_barras: 'REF010', marca: 'Sharp', modelo: 'SJ-FS85', tipo_equipo: 'Refrigerador No Frost', fecha_creacion: new Date().toISOString() },
+    { id: 11, cod_barras: 'REF011', marca: 'Samsung', modelo: 'RB29HSR2DWW', tipo_equipo: 'Refrigerador Inverter', fecha_creacion: new Date().toISOString() },
+    { id: 12, cod_barras: 'REF012', marca: 'LG', modelo: 'GC-X247', tipo_equipo: 'Refrigerador Door-in-Door', fecha_creacion: new Date().toISOString() },
+    { id: 13, cod_barras: 'REF013', marca: 'Whirlpool', modelo: 'WRF535SMHZ', tipo_equipo: 'French Door', fecha_creacion: new Date().toISOString() },
+    { id: 14, cod_barras: 'REF014', marca: 'Electrolux', modelo: 'TF39', tipo_equipo: 'Refrigerador Convencional', fecha_creacion: new Date().toISOString() },
+    { id: 15, cod_barras: 'REF015', marca: 'Panasonic', modelo: 'NR-BY602', tipo_equipo: 'Refrigerador No Frost', fecha_creacion: new Date().toISOString() }
+];
+
+let usuarios = [
+    { id: 1, nombre: 'Admin', email: 'admin@sistema.com', contraseña: 'admin123', rol: 'administrador', fecha_creacion: new Date().toISOString() },
+    { id: 2, nombre: 'Técnico 1', email: 'tecnico1@sistema.com', contraseña: 'tec123', rol: 'tecnico', fecha_creacion: new Date().toISOString() },
+    { id: 3, nombre: 'Técnico 2', email: 'tecnico2@sistema.com', contraseña: 'tec234', rol: 'tecnico', fecha_creacion: new Date().toISOString() },
+    { id: 4, nombre: 'Técnico 3', email: 'tecnico3@sistema.com', contraseña: 'tec345', rol: 'tecnico', fecha_creacion: new Date().toISOString() },
+    { id: 5, nombre: 'Supervisor', email: 'supervisor@sistema.com', contraseña: 'sup123', rol: 'supervisor', fecha_creacion: new Date().toISOString() },
+    { id: 6, nombre: 'Gerente', email: 'gerente@sistema.com', contraseña: 'ger123', rol: 'administrador', fecha_creacion: new Date().toISOString() },
+    { id: 7, nombre: 'Operador 1', email: 'operador1@sistema.com', contraseña: 'ope123', rol: 'operador', fecha_creacion: new Date().toISOString() },
+    { id: 8, nombre: 'Operador 2', email: 'operador2@sistema.com', contraseña: 'ope234', rol: 'operador', fecha_creacion: new Date().toISOString() },
+    { id: 9, nombre: 'Operador 3', email: 'operador3@sistema.com', contraseña: 'ope345', rol: 'operador', fecha_creacion: new Date().toISOString() },
+    { id: 10, nombre: 'Supervisor 2', email: 'supervisor2@sistema.com', contraseña: 'sup234', rol: 'supervisor', fecha_creacion: new Date().toISOString() },
+    { id: 11, nombre: 'Soporte 1', email: 'soporte1@sistema.com', contraseña: 'sop123', rol: 'soporte', fecha_creacion: new Date().toISOString() },
+    { id: 12, nombre: 'Soporte 2', email: 'soporte2@sistema.com', contraseña: 'sop234', rol: 'soporte', fecha_creacion: new Date().toISOString() },
+    { id: 13, nombre: 'Invitado', email: 'invitado@sistema.com', contraseña: 'inv123', rol: 'invitado', fecha_creacion: new Date().toISOString() },
+    { id: 14, nombre: 'Auditor', email: 'auditor@sistema.com', contraseña: 'aud123', rol: 'auditor', fecha_creacion: new Date().toISOString() },
+    { id: 15, nombre: 'Root', email: 'root@sistema.com', contraseña: 'root123', rol: 'administrador', fecha_creacion: new Date().toISOString() }
+];
+
+let equipoCliente = [
+    { id: 1, equipo_id: 1, cliente_id: 1, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 2, equipo_id: 2, cliente_id: 2, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 3, equipo_id: 3, cliente_id: 3, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 4, equipo_id: 4, cliente_id: 4, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 5, equipo_id: 5, cliente_id: 5, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
+    { id: 6, equipo_id: 6, cliente_id: 6, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 7, equipo_id: 7, cliente_id: 7, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 8, equipo_id: 8, cliente_id: 8, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 9, equipo_id: 9, cliente_id: 9, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 10, equipo_id: 10, cliente_id: 10, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 11, equipo_id: 11, cliente_id: 11, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
+    { id: 12, equipo_id: 12, cliente_id: 12, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 13, equipo_id: 13, cliente_id: 13, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 14, equipo_id: 14, cliente_id: 14, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 15, equipo_id: 15, cliente_id: 15, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true }
+];
+
+let estadoEquipo = [
+    { id: 1, equipo_id: 1, cliente_id: 1, usuario_id: 1, funcionando: true, estado_general: 'Funcionando correctamente', temperatura_actual: 4.2, temperatura_freezer: -18.5, latitud: -25.2637, longitud: -57.5759, fecha_revision: new Date().toISOString() },
+    { id: 2, equipo_id: 2, cliente_id: 2, usuario_id: 2, funcionando: false, estado_general: 'Problema de temperatura', temperatura_actual: 8.5, temperatura_freezer: -12.0, latitud: -25.2800, longitud: -57.6300, fecha_revision: new Date().toISOString() },
+    { id: 3, equipo_id: 3, cliente_id: 3, usuario_id: 3, funcionando: true, estado_general: 'Óptimas condiciones', temperatura_actual: 3.9, temperatura_freezer: -19.1, latitud: -25.3100, longitud: -57.6000, fecha_revision: new Date().toISOString() },
+    { id: 4, equipo_id: 4, cliente_id: 4, usuario_id: 4, funcionando: true, estado_general: 'Funcionando estable', temperatura_actual: 5.0, temperatura_freezer: -17.0, latitud: -25.2950, longitud: -57.5800, fecha_revision: new Date().toISOString() },
+    { id: 5, equipo_id: 5, cliente_id: 5, usuario_id: 5, funcionando: false, estado_general: 'Apagado por cliente', temperatura_actual: null, temperatura_freezer: null, latitud: -25.3200, longitud: -57.6100, fecha_revision: new Date().toISOString() },
+    { id: 6, equipo_id: 6, cliente_id: 6, usuario_id: 6, funcionando: true, estado_general: 'Sin anomalías', temperatura_actual: 4.5, temperatura_freezer: -18.2, latitud: -25.2805, longitud: -57.5990, fecha_revision: new Date().toISOString() },
+    { id: 7, equipo_id: 7, cliente_id: 7, usuario_id: 7, funcionando: true, estado_general: 'Correcto funcionamiento', temperatura_actual: 4.0, temperatura_freezer: -18.0, latitud: -25.2700, longitud: -57.5900, fecha_revision: new Date().toISOString() },
+    { id: 8, equipo_id: 8, cliente_id: 8, usuario_id: 8, funcionando: false, estado_general: 'Compresor con fallas', temperatura_actual: 10.0, temperatura_freezer: -8.0, latitud: -25.2650, longitud: -57.5850, fecha_revision: new Date().toISOString() },
+    { id: 9, equipo_id: 9, cliente_id: 9, usuario_id: 9, funcionando: true, estado_general: 'Revisión completa', temperatura_actual: 3.5, temperatura_freezer: -19.0, latitud: -25.2750, longitud: -57.5950, fecha_revision: new Date().toISOString() },
+    { id: 10, equipo_id: 10, cliente_id: 10, usuario_id: 10, funcionando: true, estado_general: 'Operativo', temperatura_actual: 4.1, temperatura_freezer: -18.4, latitud: -25.2600, longitud: -57.5700, fecha_revision: new Date().toISOString() },
+    { id: 11, equipo_id: 11, cliente_id: 11, usuario_id: 11, funcionando: false, estado_general: 'Falla eléctrica', temperatura_actual: null, temperatura_freezer: null, latitud: -25.2850, longitud: -57.6000, fecha_revision: new Date().toISOString() },
+    { id: 12, equipo_id: 12, cliente_id: 12, usuario_id: 12, funcionando: true, estado_general: 'Sistema normal', temperatura_actual: 3.8, temperatura_freezer: -19.2, latitud: -25.2955, longitud: -57.6020, fecha_revision: new Date().toISOString() },
+    { id: 13, equipo_id: 13, cliente_id: 13, usuario_id: 13, funcionando: true, estado_general: 'Temperatura estable', temperatura_actual: 4.3, temperatura_freezer: -18.3, latitud: -25.2990, longitud: -57.6050, fecha_revision: new Date().toISOString() },
+    { id: 14, equipo_id: 14, cliente_id: 14, usuario_id: 14, funcionando: false, estado_general: 'Pérdida de gas refrigerante', temperatura_actual: 12.0, temperatura_freezer: -5.0, latitud: -25.3010, longitud: -57.6070, fecha_revision: new Date().toISOString() },
+    { id: 15, equipo_id: 15, cliente_id: 15, usuario_id: 15, funcionando: true, estado_general: 'Sin observaciones', temperatura_actual: 4.0, temperatura_freezer: -18.0, latitud: -25.3050, longitud: -57.6090, fecha_revision: new Date().toISOString() }
+];
+
+
+// ENDPOINTS
+
+// Ping
 app.get('/ping', (req, res) => {
-    console.log('\n PING - Verificando conexión...');
-    console.log('✅Servidor funcionando correctamente');
-    
     res.json({
         success: true,
-        message: 'Servidor Node.js funcionando correctamente',
+        message: 'Servidor funcionando correctamente',
         timestamp: new Date().toISOString(),
-        uptime: Math.floor(process.uptime()),
-        version: '2.0.0',
-        servidor: 'Node.js + Express'
+        version: '3.0.0'
     });
 });
 
-//  GET /clientes - Obtener todos los clientes con paginación
+// CLIENTES
 app.get('/clientes', (req, res) => {
-    console.log('\n GET /clientes - Obteniendo lista de clientes...');
-    
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 1000; // Alto por defecto para obtener todos
-    
-    console.log(`    Página solicitada: ${page}`);
-    console.log(`    Límite por página: ${limit}`);
-    console.log(`    Total de clientes en BD: ${clientes.length}`);
-
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-
-    const resultados = clientes.slice(startIndex, endIndex);
-    
-    console.log(`    Enviando ${resultados.length} clientes`);
-    console.log(`    Índices: ${startIndex} - ${endIndex}`);
-
-    // Respuesta compatible con ambos formatos
-    res.json(resultados); // Array directo para compatibilidad con Flutter
+    console.log(`Enviando ${clientes.length} clientes`);
+    res.json(clientes);
 });
 
-// 🔍 GET /clientes/buscar - Buscar clientes por nombre o email
-app.get('/clientes/buscar', (req, res) => {
-    const q = req.query.q?.toLowerCase() || '';
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-
-    console.log('\n BÚSQUEDA DE CLIENTES:');
-    console.log(`    Término de búsqueda: "${q}"`);
-    console.log(`    Página: ${page}`);
-    console.log(`    Límite: ${limit}`);
-
-    const encontrados = clientes.filter(c =>
-        c.nombre.toLowerCase().includes(q) || 
-        c.email.toLowerCase().includes(q) ||
-        (c.telefono && c.telefono.toLowerCase().includes(q))
-    );
-
-    console.log(`    Resultados encontrados: ${encontrados.length}`);
-
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const resultados = encontrados.slice(startIndex, endIndex);
-
-    console.log(`    Enviando ${resultados.length} resultados`);
-
-    res.json({
-        exito: true,
-        mensaje: `Búsqueda completada - ${resultados.length} resultados encontrados`,
-        clientes: resultados,
-        total: encontrados.length,
-        page: page,
-        totalPaginas: Math.ceil(encontrados.length / limit),
-        query: req.query.q
-    });
-});
-
-// ➕ POST /clientes - Crear un nuevo cliente (ENDPOINT PRINCIPAL)
 app.post('/clientes', (req, res) => {
-    console.log('\n' + ''.repeat(40));
-    console.log(' ¡CLIENTE RECIBIDO DESDE FLUTTER!');
-    console.log(''.repeat(40));
+    const { nombre, email, telefono, direccion } = req.body;
     
-    const cliente = req.body;
-    
-    // Log detallado del cliente recibido
-    console.log('\n ANÁLISIS DETALLADO DE DATOS RECIBIDOS:');
-    console.log('┌─────────────────────────────────────────────┐');
-    console.log(`│  ID:         ${String(cliente.id || 'No especificado').padEnd(25)} │`);
-    console.log(`│  Nombre:     ${String(cliente.nombre || '').padEnd(25)} │`);
-    console.log(`│  Email:      ${String(cliente.email || '').padEnd(25)} │`);
-    console.log(`│  Teléfono:   ${String(cliente.telefono || 'No especificado').padEnd(25)} │`);
-    console.log(`│  Dirección:  ${String(cliente.direccion || 'No especificado').padEnd(25)} │`);
-    console.log(`│  Fecha:      ${String(cliente.fechaCreacion || 'No especificado').padEnd(25)} │`);
-    console.log('└─────────────────────────────────────────────┘');
-    
-    // Validación de datos
-    const errores = [];
-    if (!cliente.nombre || cliente.nombre.trim() === '') errores.push('Nombre es requerido');
-    if (!cliente.email || cliente.email.trim() === '') errores.push('Email es requerido');
-    if (cliente.email && !cliente.email.includes('@')) errores.push('Email debe tener formato válido');
-    
-    if (errores.length > 0) {
-        console.log('\n ERRORES DE VALIDACIÓN:');
-        errores.forEach((error, index) => {
-            console.log(`   ${index + 1}. ${error}`);
-        });
-        
+    if (!nombre || !email) {
         return res.status(400).json({
             success: false,
-            message: 'Datos incompletos o inválidos',
-            errors: errores,
-            error: 'DATOS_INCOMPLETOS'
+            message: 'Nombre y email son requeridos'
         });
     }
     
-    // Generar nuevo ID
     const nuevoId = Math.max(...clientes.map(c => c.id)) + 1;
-    
-    // Crear cliente procesado
-    const clienteGuardado = {
+    const cliente = {
         id: nuevoId,
-        nombre: cliente.nombre.trim(),
-        email: cliente.email.trim().toLowerCase(),
-        telefono: cliente.telefono?.trim() || '',
-        direccion: cliente.direccion?.trim() || '',
-        fecha_creacion: new Date().toISOString(),
-        fechaGuardado: new Date().toISOString(),
-        estado: 'GUARDADO'
+        nombre: nombre.trim(),
+        email: email.trim().toLowerCase(),
+        telefono: telefono || '',
+        direccion: direccion || '',
+        activo: true,
+        fecha_creacion: new Date().toISOString()
     };
     
-    // Guardar en la "base de datos" (array)
-    clientes.push(clienteGuardado);
+    clientes.push(cliente);
+    console.log(`Cliente creado: ${cliente.nombre}`);
     
-    console.log('\n CLIENTE PROCESADO Y GUARDADO:');
-    console.log('┌─────────────────────────────────────────────┐');
-    console.log(`│  Cliente guardado correctamente           │`);
-    console.log(`│  Nuevo ID asignado: ${String(nuevoId).padEnd(18)} │`);
-    console.log(`│  Total clientes en BD: ${String(clientes.length).padEnd(14)} │`);
-    console.log(`│  Guardado en: ${new Date().toLocaleTimeString('es-PY').padEnd(19)} │`);
-    console.log('└─────────────────────────────────────────────┘');
-    
-    console.log('\n Enviando confirmación a Flutter...');
-    console.log(''.repeat(40));
-    
-    // Respuesta exitosa
     res.status(201).json({
         success: true,
-        message: 'Cliente recibido y guardado correctamente',
-        cliente: clienteGuardado,
-        servidor: {
-            timestamp: new Date().toISOString(),
-            version: '2.0.0',
-            endpoint: '/clientes',
-            totalClientes: clientes.length
-        }
+        message: 'Cliente creado correctamente',
+        cliente
     });
 });
 
-// 📦POST /clientes/multiples - Para múltiples clientes
-app.post('/clientes/multiples', (req, res) => {
-    console.log('\n POST /clientes/multiples - Recibiendo múltiples clientes...');
+// EQUIPOS
+app.get('/equipos', (req, res) => {
+    const equiposConInfo = equipos.map(equipo => {
+        const asignacion = equipoCliente.find(ec => ec.equipo_id === equipo.id && ec.activo);
+        const cliente = asignacion ? clientes.find(c => c.id === asignacion.cliente_id) : null;
+        const estado = estadoEquipo.find(ee => ee.equipo_id === equipo.id);
+        
+        return {
+            ...equipo,
+            asignado_a: cliente ? cliente.nombre : null,
+            cliente_id: cliente ? cliente.id : null,
+            estado_actual: estado ? estado.estado_general : 'Sin revisar',
+            funcionando: estado ? estado.funcionando : null,
+            temperatura_actual: estado ? estado.temperatura_actual : null,
+            temperatura_freezer: estado ? estado.temperatura_freezer : null
+        };
+    });
     
-    const { clientes: nuevosClientes } = req.body;
-    const total = req.body.total || nuevosClientes?.length || 0;
-    
-    console.log(`    Total declarado: ${total}`);
-    console.log(`    Array recibido: ${Array.isArray(nuevosClientes) ? nuevosClientes.length : 'No es array'}`);
+    console.log(`Enviando ${equiposConInfo.length} equipos`);
+    res.json(equiposConInfo);
+});
 
-    if (!Array.isArray(nuevosClientes)) {
-        console.log(' Error: No se recibió un array de clientes');
+app.get('/equipos/buscar', (req, res) => {
+    const q = req.query.q?.toLowerCase() || '';
+    const encontrados = equipos.filter(e =>
+        e.cod_barras.toLowerCase().includes(q) || 
+        e.marca.toLowerCase().includes(q) ||
+        e.modelo.toLowerCase().includes(q)
+    );
+    
+    res.json({
+        success: true,
+        equipos: encontrados,
+        total: encontrados.length
+    });
+});
+
+app.post('/equipos', (req, res) => {
+    const { cod_barras, marca, modelo, tipo_equipo } = req.body;
+    
+    if (!cod_barras || !marca || !modelo || !tipo_equipo) {
         return res.status(400).json({
-            error: 'Se esperaba un array de clientes',
-            message: 'Formato incorrecto'
+            success: false,
+            message: 'Todos los campos son requeridos'
         });
     }
-
-    console.log('\n👥 PROCESANDO CLIENTES EN LOTE:');
-    const clientesCreados = [];
-    let siguienteId = Math.max(...clientes.map(c => c.id)) + 1;
-
-    nuevosClientes.forEach((clienteData, index) => {
-        console.log(`\n   👤 Cliente ${index + 1}/${nuevosClientes.length}:`);
-        console.log(`      Nombre: ${clienteData.nombre || 'Sin nombre'}`);
-        console.log(`      Email: ${clienteData.email || 'Sin email'}`);
-        console.log(`      Teléfono: ${clienteData.telefono || 'N/A'}`);
-        
-        if (clienteData.nombre && clienteData.email) {
-            const nuevoCliente = {
-                id: siguienteId++,
-                nombre: clienteData.nombre,
-                email: clienteData.email,
-                telefono: clienteData.telefono || '',
-                direccion: clienteData.direccion || '',
-                fecha_creacion: new Date().toISOString()
-            };
-            clientes.push(nuevoCliente);
-            clientesCreados.push(nuevoCliente);
-            console.log(`       Guardado con ID: ${nuevoCliente.id}`);
-        } else {
-            console.log(`       Saltado (datos incompletos)`);
-        }
-    });
-
-    console.log(`\n Resumen: ${clientesCreados.length} de ${nuevosClientes.length} clientes guardados`);
-    console.log(` Total en BD ahora: ${clientes.length} clientes`);
-
+    
+    if (equipos.find(e => e.cod_barras === cod_barras)) {
+        return res.status(400).json({
+            success: false,
+            message: 'El código de barras ya existe'
+        });
+    }
+    
+    const nuevoId = Math.max(...equipos.map(e => e.id)) + 1;
+    const equipo = {
+        id: nuevoId,
+        cod_barras: cod_barras.trim(),
+        marca: marca.trim(),
+        modelo: modelo.trim(),
+        tipo_equipo: tipo_equipo.trim(),
+        fecha_creacion: new Date().toISOString()
+    };
+    
+    equipos.push(equipo);
+    console.log(`Equipo creado: ${equipo.marca} ${equipo.modelo}`);
+    
     res.status(201).json({
         success: true,
-        message: `${clientesCreados.length} clientes recibidos correctamente`,
-        procesados: clientesCreados.length,
-        recibidos: nuevosClientes.length,
-        clientes: clientesCreados
+        message: 'Equipo creado correctamente',
+        equipo
     });
 });
 
-// Middleware de manejo de errores
-app.use((err, req, res, next) => {
-    console.log('\n ERROR EN EL SERVIDOR:');
-    console.log('━'.repeat(50));
-    console.error(`Error: ${err.message}`);
-    console.error(`Stack: ${err.stack}`);
-    console.log('━'.repeat(50));
+// USUARIOS
+app.get('/usuarios', (req, res) => {
+    const usuariosSinPassword = usuarios.map(u => ({
+        id: u.id,
+        nombre: u.nombre,
+        email: u.email,
+        rol: u.rol,
+        fecha_creacion: u.fecha_creacion
+    }));
     
+    res.json(usuariosSinPassword);
+});
+
+app.post('/usuarios/login', (req, res) => {
+    const { email, contraseña } = req.body;
+    const usuario = usuarios.find(u => u.email === email && u.contraseña === contraseña);
+    
+    if (usuario) {
+        console.log(`Login exitoso: ${usuario.nombre}`);
+        res.json({
+            success: true,
+            message: 'Login exitoso',
+            usuario: {
+                id: usuario.id,
+                nombre: usuario.nombre,
+                email: usuario.email,
+                rol: usuario.rol
+            }
+        });
+    } else {
+        console.log('Login fallido');
+        res.status(401).json({
+            success: false,
+            message: 'Credenciales incorrectas'
+        });
+    }
+});
+
+// ASIGNACIONES
+app.get('/asignaciones', (req, res) => {
+    const asignaciones = equipoCliente
+        .filter(ec => ec.activo)
+        .map(asignacion => {
+            const equipo = equipos.find(e => e.id === asignacion.equipo_id);
+            const cliente = clientes.find(c => c.id === asignacion.cliente_id);
+            const estado = estadoEquipo.find(ee => ee.equipo_id === asignacion.equipo_id);
+            
+            return {
+                id: asignacion.id,
+                refrigerador: equipo ? `${equipo.marca} ${equipo.modelo}` : 'No encontrado',
+                cliente: cliente ? cliente.nombre : 'No encontrado',
+                equipo_id: asignacion.equipo_id,
+                cliente_id: asignacion.cliente_id,
+                fecha_asignacion: asignacion.fecha_asignacion,
+                estado_actual: estado ? estado.estado_general : 'Sin estado',
+                funcionando: estado ? estado.funcionando : null,
+                temperatura_actual: estado ? estado.temperatura_actual : null
+            };
+        });
+    
+    res.json(asignaciones);
+});
+
+app.post('/asignaciones', (req, res) => {
+    const { equipo_id, cliente_id, usuario_id } = req.body;
+    
+    if (!equipo_id || !cliente_id || !usuario_id) {
+        return res.status(400).json({
+            success: false,
+            message: 'Todos los IDs son requeridos'
+        });
+    }
+    
+    const equipo = equipos.find(e => e.id === parseInt(equipo_id));
+    const cliente = clientes.find(c => c.id === parseInt(cliente_id));
+    const usuario = usuarios.find(u => u.id === parseInt(usuario_id));
+    
+    if (!equipo || !cliente || !usuario) {
+        return res.status(400).json({
+            success: false,
+            message: 'Equipo, cliente o usuario no encontrado'
+        });
+    }
+    
+    const yaAsignado = equipoCliente.find(ec => ec.equipo_id === parseInt(equipo_id) && ec.activo);
+    if (yaAsignado) {
+        return res.status(400).json({
+            success: false,
+            message: 'El equipo ya está asignado'
+        });
+    }
+    
+    // Crear asignación
+    const nuevaAsignacionId = Math.max(...equipoCliente.map(ec => ec.id)) + 1;
+    const asignacion = {
+        id: nuevaAsignacionId,
+        equipo_id: parseInt(equipo_id),
+        cliente_id: parseInt(cliente_id),
+        fecha_asignacion: new Date().toISOString(),
+        fecha_retiro: null,
+        activo: true
+    };
+    
+    // Crear estado inicial
+    const nuevoEstadoId = Math.max(...estadoEquipo.map(ee => ee.id)) + 1;
+    const estado = {
+        id: nuevoEstadoId,
+        equipo_id: parseInt(equipo_id),
+        cliente_id: parseInt(cliente_id),
+        usuario_id: parseInt(usuario_id),
+        funcionando: true,
+        estado_general: 'Asignado - Pendiente revisión',
+        temperatura_actual: null,
+        temperatura_freezer: null,
+        latitud: -25.2637,
+        longitud: -57.5759,
+        fecha_revision: new Date().toISOString()
+    };
+    
+    equipoCliente.push(asignacion);
+    estadoEquipo.push(estado);
+    
+    console.log(`Asignación creada: ${equipo.marca} → ${cliente.nombre}`);
+    
+    res.status(201).json({
+        success: true,
+        message: 'Asignación creada correctamente',
+        asignacion,
+        estado
+    });
+});
+
+// ESTADOS
+app.get('/estados', (req, res) => {
+    const estados = estadoEquipo.map(estado => {
+        const equipo = equipos.find(e => e.id === estado.equipo_id);
+        const cliente = clientes.find(c => c.id === estado.cliente_id);
+        const usuario = usuarios.find(u => u.id === estado.usuario_id);
+        
+        return {
+            ...estado,
+            refrigerador_info: equipo ? `${equipo.marca} ${equipo.modelo}` : 'No encontrado',
+            cliente_nombre: cliente ? cliente.nombre : 'No encontrado',
+            usuario_nombre: usuario ? usuario.nombre : 'No encontrado'
+        };
+    });
+    
+    res.json(estados);
+});
+
+app.post('/estados', (req, res) => {
+    const { equipo_id, cliente_id, usuario_id, funcionando, estado_general, temperatura_actual, temperatura_freezer, latitud, longitud } = req.body;
+    
+    if (!equipo_id || !cliente_id || !usuario_id || funcionando === undefined || !estado_general) {
+        return res.status(400).json({
+            success: false,
+            message: 'Datos incompletos'
+        });
+    }
+    
+    const nuevoId = Math.max(...estadoEquipo.map(ee => ee.id)) + 1;
+    const estado = {
+        id: nuevoId,
+        equipo_id: parseInt(equipo_id),
+        cliente_id: parseInt(cliente_id),
+        usuario_id: parseInt(usuario_id),
+        funcionando,
+        estado_general,
+        temperatura_actual: temperatura_actual || null,
+        temperatura_freezer: temperatura_freezer || null,
+        latitud: latitud || -25.2637,
+        longitud: longitud || -57.5759,
+        fecha_revision: new Date().toISOString()
+    };
+    
+    estadoEquipo.push(estado);
+    console.log(`Estado actualizado para equipo ${equipo_id}`);
+    
+    res.status(201).json({
+        success: true,
+        message: 'Estado actualizado correctamente',
+        estado
+    });
+});
+
+// DASHBOARD
+app.get('/dashboard', (req, res) => {
+    const equiposAsignados = equipoCliente.filter(ec => ec.activo).length;
+    const equiposFuncionando = estadoEquipo.filter(ee => ee.funcionando).length;
+    
+    const estadisticas = {
+        clientes: {
+            total: clientes.length,
+            activos: clientes.filter(c => c.activo).length
+        },
+        refrigeradores: {
+            total: equipos.length,
+            asignados: equiposAsignados,
+            libres: equipos.length - equiposAsignados,
+            funcionando: equiposFuncionando,
+            en_reparacion: estadoEquipo.filter(ee => !ee.funcionando).length
+        },
+        usuarios: {
+            total: usuarios.length
+        },
+        timestamp: new Date().toISOString()
+    };
+    
+    res.json(estadisticas);
+});
+
+// Error handling
+app.use((err, req, res, next) => {
+    console.error('Error:', err.message);
     res.status(500).json({
         success: false,
-        message: 'Error interno del servidor',
-        error: err.message,
-        timestamp: new Date().toISOString()
+        message: 'Error interno del servidor'
     });
 });
 
-// 🔄 Middleware para rutas no encontradas
+// 404
 app.use((req, res) => {
-    console.log(`\n❓ RUTA NO ENCONTRADA: ${req.method} ${req.url}`);
     res.status(404).json({
         success: false,
-        message: `Ruta no encontrada: ${req.method} ${req.url}`,
-        availableEndpoints: [
-            'GET /ping',
-            'GET /clientes',
-            'GET /clientes/buscar',
-            'POST /clientes',
-            'POST /clientes/multiples'
-        ]
+        message: `Ruta no encontrada: ${req.method} ${req.url}`
     });
 });
 
-// 🚀 INICIAR SERVIDOR
+// INICIAR SERVIDOR
 const PORT = 3000;
-const HOST = '0.0.0.0'; // Para acceso desde la red
+const HOST = '0.0.0.0';
 
 app.listen(PORT, HOST, () => {
-    console.clear(); // Limpiar consola al iniciar
-    
-    const fecha = new Date().toLocaleString('es-PY', { timeZone: 'America/Asuncion' });
-    
-    console.log('API NODE.JS INICIADA CORRECTAMENTE! 🚀');
-
-    console.log('\n INFORMACIÓN DEL SERVIDOR:');
-    console.log('┌─────────────────────────────────────────────────────┐');
-    console.log(`│  Fecha inicio: ${fecha.padEnd(30)} │`);
-    console.log(`│  Host: ${HOST.padEnd(42)} │`);
-    console.log(`│  Puerto: ${PORT.toString().padEnd(40)} │`);
-    console.log(`│  Clientes precargados: ${clientes.length.toString().padEnd(24)} │`);
-    console.log('└─────────────────────────────────────────────────────┘');
-    
-    console.log('\n URLs DE ACCESO:');
-    console.log(`    Desde Flutter: http://192.168.100.128:${PORT}`);
-    console.log(`    Local:         http://localhost:${PORT}`);
-    
-    console.log('\n ENDPOINTS DISPONIBLES:');
-    console.log('┌──────────────────────────────────────────────────────────┐');
-    console.log('│  GET  /ping                    - Verificar conexión   │');
-    console.log('│  GET  /clientes                - Obtener todos         │');
-    console.log('│  GET  /clientes/buscar?q=...   - Buscar clientes       │');
-    console.log('│  POST /clientes                - Crear cliente         │');
-    console.log('│  POST /clientes/multiples      - Crear múltiples       │');
-    console.log('└──────────────────────────────────────────────────────────┘');
-    
-    console.log('\n ESTADO: Esperando peticiones de Flutter...');
-    console.log('   (Todos los datos enviados serán mostrados en detalle)');
-    console.log('\n' + '─'.repeat(80));
+    console.clear();
+    console.log('\n❄️ SISTEMA DE REFRIGERADORES - API INICIADA ❄️');
+    console.log('═'.repeat(50));
+    console.log(`🌐 URL: http://192.168.100.128:${PORT}`);
+    console.log(`📊 Datos: ${clientes.length} clientes, ${equipos.length} equipos`);
+    console.log('✅ Servidor listo para peticiones\n');
 });

@@ -2,16 +2,17 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/cliente.dart';
+import '../models/equipos.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
-
 
 var logger = Logger();
 
 class ApiService {
   // Cambia esta URL por tu endpoint real
-  static const String baseUrl = 'http://192.168.1.185:3000';
+  static const String baseUrl = 'http://192.168.1.186:3000';
   static const String clientesEndpoint = '$baseUrl/clientes';
+  static const String equiposEndpoint = '$baseUrl/equipos';
 
   // Timeout para las peticiones
   static const Duration timeout = Duration(seconds: 30);
@@ -198,8 +199,6 @@ class ApiService {
     }
   }
 
-  // Resto de métodos existentes...
-
   // Enviar un cliente individual
   static Future<ApiResponse> enviarCliente(Cliente cliente) async {
     try {
@@ -266,6 +265,77 @@ class ApiService {
       return ApiResponse(
           exito: false,
           mensaje: 'Error inesperado: ${e.toString()}'
+      );
+    }
+  }
+
+  // Obtener todos los equipos
+  static Future<BusquedaResponseEquipos> obtenerTodosLosEquipos({int page = 1, int limit = 50}) async {
+    try {
+      final url = '$equiposEndpoint?page=$page&limit=$limit';
+
+      logger.i('Obteniendo todos los equipos desde: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: _headers,
+      ).timeout(timeout);
+
+      logger.i('Respuesta equipos - Status: ${response.statusCode}');
+      logger.i('Respuesta equipos - Body: ${response.body}');
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        try {
+          final responseData = jsonDecode(response.body);
+
+          List<Equipo> equipos = [];
+          if (responseData is Map<String, dynamic>) {
+            if (responseData.containsKey('equipos') && responseData['equipos'] is List) {
+              equipos = (responseData['equipos'] as List)
+                  .map((equipoJson) => Equipo.fromJson(equipoJson))
+                  .toList();
+            } else if (responseData.containsKey('data') && responseData['data'] is List) {
+              equipos = (responseData['data'] as List)
+                  .map((equipoJson) => Equipo.fromJson(equipoJson))
+                  .toList();
+            }
+          } else if (responseData is List) {
+            equipos = (responseData)
+                .map((equipoJson) => Equipo.fromJson(equipoJson))
+                .toList();
+          }
+
+          return BusquedaResponseEquipos(
+            exito: true,
+            mensaje: 'Equipos obtenidos correctamente - ${equipos.length} resultados',
+            equipos: equipos,
+            total: equipos.length,
+            pagina: page,
+            totalPaginas: 1,
+          );
+
+        } catch (e) {
+          logger.e('Error parseando respuesta equipos: $e');
+          return BusquedaResponseEquipos(
+            exito: false,
+            mensaje: 'Error procesando los datos: ${e.toString()}',
+            equipos: [],
+          );
+        }
+      } else {
+        return BusquedaResponseEquipos(
+          exito: false,
+          mensaje: 'Error del servidor (${response.statusCode})',
+          equipos: [],
+          codigoEstado: response.statusCode,
+        );
+      }
+
+    } catch (e) {
+      return BusquedaResponseEquipos(
+        exito: false,
+        mensaje: 'Error: ${e.toString()}',
+        equipos: [],
       );
     }
   }
@@ -362,6 +432,32 @@ class BusquedaResponse {
   }
 }
 
+// Clase específica para manejar respuestas de búsqueda de equipos
+class BusquedaResponseEquipos {
+  final bool exito;
+  final String mensaje;
+  final List<Equipo> equipos;
+  final int total;
+  final int pagina;
+  final int totalPaginas;
+  final int? codigoEstado;
+
+  BusquedaResponseEquipos({
+    required this.exito,
+    required this.mensaje,
+    required this.equipos,
+    this.total = 0,
+    this.pagina = 1,
+    this.totalPaginas = 1,
+    this.codigoEstado,
+  });
+
+  @override
+  String toString() {
+    return 'BusquedaResponseEquipos{exito: $exito, mensaje: $mensaje, equipos: ${equipos.length}, total: $total}';
+  }
+}
+
 // Clase para manejar las respuestas generales de la API
 class ApiResponse {
   final bool exito;
@@ -375,7 +471,6 @@ class ApiResponse {
     this.datos,
     this.codigoEstado,
   });
-
 
   @override
   String toString() {
