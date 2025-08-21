@@ -271,10 +271,10 @@ app.post('/usuarios/login', (req, res) => {
     }
 });
 
-// ASIGNACIONES
+// ASIGNACIONES - Modificar para incluir TODOS los registros
 app.get('/asignaciones', (req, res) => {
     const asignaciones = equipoCliente
-        .filter(ec => ec.activo)
+        // .filter(ec => ec.activo)  // ← REMOVER ESTE FILTRO
         .map(asignacion => {
             const equipo = equipos.find(e => e.id === asignacion.equipo_id);
             const cliente = clientes.find(c => c.id === asignacion.cliente_id);
@@ -282,11 +282,16 @@ app.get('/asignaciones', (req, res) => {
             
             return {
                 id: asignacion.id,
-                refrigerador: equipo ? `${equipo.marca} ${equipo.modelo}` : 'No encontrado',
-                cliente: cliente ? cliente.nombre : 'No encontrado',
                 equipo_id: asignacion.equipo_id,
                 cliente_id: asignacion.cliente_id,
                 fecha_asignacion: asignacion.fecha_asignacion,
+                fecha_retiro: asignacion.fecha_retiro,
+                activo: asignacion.activo,  // ← AGREGAR ESTE CAMPO
+                fecha_creacion: asignacion.fecha_creacion || new Date().toISOString(), // ← AGREGAR
+                
+                // Datos relacionados (opcional)
+                refrigerador: equipo ? `${equipo.marca} ${equipo.modelo}` : 'No encontrado',
+                cliente: cliente ? cliente.nombre : 'No encontrado',
                 estado_actual: estado ? estado.estado_general : 'Sin estado',
                 funcionando: estado ? estado.funcionando : null,
                 temperatura_actual: estado ? estado.temperatura_actual : null

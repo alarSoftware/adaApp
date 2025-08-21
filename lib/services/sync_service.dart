@@ -5,7 +5,6 @@ import 'package:cliente_app/repositories/equipo_repository.dart';
 import 'package:cliente_app/repositories/equipo_cliente_repository.dart';
 import 'package:http/http.dart' as http;
 import 'package:cliente_app/models/cliente.dart';
-import 'package:cliente_app/models/equipos_cliente.dart';
 import 'package:cliente_app/services/api_service.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
@@ -196,6 +195,7 @@ class SyncService {
     }
   }
 
+
   // SINCRONIZACIÓN DE CLIENTES
   static Future<SyncResult> sincronizarConAPI() async {
     try {
@@ -313,10 +313,6 @@ class SyncService {
       );
     }
   }
-
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // RESTO DEL CÓDIGO ORIGINAL (ENVÍO, CONEXIÓN, ETC.)
-  // ═══════════════════════════════════════════════════════════════════════════════
 
   static Future<ApiResponse> enviarClienteAAPI(Cliente cliente) async {
     try {
