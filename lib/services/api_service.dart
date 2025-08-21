@@ -5,12 +5,14 @@ import '../models/cliente.dart';
 import '../models/equipos.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
+import '../models/equipos_cliente.dart';
+
 
 var logger = Logger();
 
 class ApiService {
   // Cambia esta URL por tu endpoint real
-  static const String baseUrl = 'http://192.168.1.186:3000';
+  static const String baseUrl = 'http://192.168.1.185:3000';
   static const String clientesEndpoint = '$baseUrl/clientes';
   static const String equiposEndpoint = '$baseUrl/equipos';
 
@@ -124,6 +126,77 @@ class ApiService {
         exito: false,
         mensaje: 'Error inesperado: ${e.toString()}',
         clientes: [],
+      );
+    }
+  }
+  // Obtener todas las asignaciones equipo-cliente
+  static Future<BusquedaResponseEquipoCliente> obtenerTodasLasAsignaciones({int page = 1, int limit = 50}) async {
+    try {
+      const String asignacionesEndpoint = '$baseUrl/asignaciones'; // o el endpoint que tengas
+      final url = '$asignacionesEndpoint?page=$page&limit=$limit';
+
+      logger.i('Obteniendo todas las asignaciones desde: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: _headers,
+      ).timeout(timeout);
+
+      logger.i('Respuesta asignaciones - Status: ${response.statusCode}');
+      logger.i('Respuesta asignaciones - Body: ${response.body}');
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        try {
+          final responseData = jsonDecode(response.body);
+
+          List<EquipoCliente> asignaciones = [];
+          if (responseData is Map<String, dynamic>) {
+            if (responseData.containsKey('asignaciones') && responseData['asignaciones'] is List) {
+              asignaciones = (responseData['asignaciones'] as List)
+                  .map((asignacionJson) => EquipoCliente.fromJson(asignacionJson))
+                  .toList();
+            } else if (responseData.containsKey('data') && responseData['data'] is List) {
+              asignaciones = (responseData['data'] as List)
+                  .map((asignacionJson) => EquipoCliente.fromJson(asignacionJson))
+                  .toList();
+            }
+          } else if (responseData is List) {
+            asignaciones = (responseData)
+                .map((asignacionJson) => EquipoCliente.fromJson(asignacionJson))
+                .toList();
+          }
+
+          return BusquedaResponseEquipoCliente(
+            exito: true,
+            mensaje: 'Asignaciones obtenidas correctamente - ${asignaciones.length} resultados',
+            asignaciones: asignaciones,
+            total: asignaciones.length,
+            pagina: page,
+            totalPaginas: 1,
+          );
+
+        } catch (e) {
+          logger.e('Error parseando respuesta asignaciones: $e');
+          return BusquedaResponseEquipoCliente(
+            exito: false,
+            mensaje: 'Error procesando los datos: ${e.toString()}',
+            asignaciones: [],
+          );
+        }
+      } else {
+        return BusquedaResponseEquipoCliente(
+          exito: false,
+          mensaje: 'Error del servidor (${response.statusCode})',
+          asignaciones: [],
+          codigoEstado: response.statusCode,
+        );
+      }
+
+    } catch (e) {
+      return BusquedaResponseEquipoCliente(
+        exito: false,
+        mensaje: 'Error: ${e.toString()}',
+        asignaciones: [],
       );
     }
   }
@@ -476,4 +549,7 @@ class ApiResponse {
   String toString() {
     return 'ApiResponse{exito: $exito, mensaje: $mensaje, codigoEstado: $codigoEstado}';
   }
+
+
+
 }

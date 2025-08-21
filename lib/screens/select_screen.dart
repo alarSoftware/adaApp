@@ -1,3 +1,5 @@
+import 'package:cliente_app/repositories/cliente_repository.dart';
+import 'package:cliente_app/repositories/equipo_repository.dart';
 import 'package:flutter/material.dart';
 import '../services/sync_service.dart';
 import '../services/database_helper.dart';
@@ -81,22 +83,22 @@ class _SelectScreenState extends State<SelectScreen> {
     });
 
     try {
-      print('🔍 INICIANDO TEST DE CLIENTES...');
+      logger.i('🔍 INICIANDO TEST DE CLIENTES...');
 
       final resultado = await ApiService.obtenerTodosLosClientes();
 
-      print('🔍 RESULTADO:');
-      print('Éxito: ${resultado.exito}');
-      print('Total clientes: ${resultado.clientes.length}');
-      print('Mensaje: ${resultado.mensaje}');
+      logger.i('🔍 RESULTADO:');
+      logger.i('Éxito: ${resultado.exito}');
+      logger.i('Total clientes: ${resultado.clientes.length}');
+      logger.i('Mensaje: ${resultado.mensaje}');
 
       for (int i = 0; i < resultado.clientes.length && i < 5; i++) {
-        print('Cliente ${i + 1}: ${resultado.clientes[i].nombre}');
+        logger.i('Cliente ${i + 1}: ${resultado.clientes[i].nombre}');
       }
 
       _mostrarExito('Test completado: ${resultado.clientes.length} clientes recibidos');
     } catch (e) {
-      print('❌ Error en test: $e');
+      logger.e('❌ Error en test: $e');
       _mostrarError('Error en test: $e');
     } finally {
       setState(() {
@@ -194,10 +196,12 @@ class _SelectScreenState extends State<SelectScreen> {
     });
 
     try {
-      final dbHelper = DatabaseHelper();
+      final clienteRepo = ClienteRepository();
+      final equipoRepo = EquipoRepository();
 
       // Usar el nuevo método que borra todo
-      await dbHelper.borrarTodosLosDatos();
+      await clienteRepo.limpiarYSincronizar([]); // lista vacía borra todo
+      await equipoRepo.limpiarYSincronizar([]);
 
       _mostrarExito('Base de datos completa borrada correctamente\\n• Clientes eliminados\\n• Equipos eliminados\\n• Todos los datos borrados');
 

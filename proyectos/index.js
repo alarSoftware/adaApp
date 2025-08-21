@@ -73,22 +73,23 @@ let usuarios = [
 ];
 
 let equipoCliente = [
-    { id: 1, equipo_id: 1, cliente_id: 1, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 2, equipo_id: 2, cliente_id: 2, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 3, equipo_id: 3, cliente_id: 3, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 4, equipo_id: 4, cliente_id: 4, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 5, equipo_id: 5, cliente_id: 5, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
-    { id: 6, equipo_id: 6, cliente_id: 6, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 7, equipo_id: 7, cliente_id: 7, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 8, equipo_id: 8, cliente_id: 8, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 9, equipo_id: 9, cliente_id: 9, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 10, equipo_id: 10, cliente_id: 10, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 11, equipo_id: 11, cliente_id: 11, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
-    { id: 12, equipo_id: 12, cliente_id: 12, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 13, equipo_id: 13, cliente_id: 13, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 14, equipo_id: 14, cliente_id: 14, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 15, equipo_id: 15, cliente_id: 15, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true }
+    { id: 1, equipo_id: 14, cliente_id: 3, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 2, equipo_id: 7, cliente_id: 12, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 3, equipo_id: 10, cliente_id: 1, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 4, equipo_id: 2, cliente_id: 9, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 5, equipo_id: 5, cliente_id: 14, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
+    { id: 6, equipo_id: 12, cliente_id: 5, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 7, equipo_id: 4, cliente_id: 8, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 8, equipo_id: 1, cliente_id: 11, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 9, equipo_id: 13, cliente_id: 2, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 10, equipo_id: 6, cliente_id: 7, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 11, equipo_id: 3, cliente_id: 10, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
+    { id: 12, equipo_id: 15, cliente_id: 4, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 13, equipo_id: 8, cliente_id: 13, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 14, equipo_id: 11, cliente_id: 6, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+    { id: 15, equipo_id: 9, cliente_id: 15, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true }
 ];
+
 
 let estadoEquipo = [
     { id: 1, equipo_id: 1, cliente_id: 1, usuario_id: 1, funcionando: true, estado_general: 'Funcionando correctamente', temperatura_actual: 4.2, temperatura_freezer: -18.5, latitud: -25.2637, longitud: -57.5759, fecha_revision: new Date().toISOString() },

@@ -1,3 +1,4 @@
+import 'package:cliente_app/repositories/equipo_repository.dart';
 import 'package:flutter/material.dart';
 import '../models/equipos.dart';
 import '../services/database_helper.dart';
@@ -18,7 +19,7 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
   List<Equipo> equiposFiltrados = [];
   List<Equipo> equiposMostrados = [];
   TextEditingController searchController = TextEditingController();
-  DatabaseHelper dbHelper = DatabaseHelper();
+  EquipoRepository equipoRepository = EquipoRepository();
   bool isLoading = true;
 
   // Configuración de paginación
@@ -54,7 +55,7 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
     });
 
     try {
-      final equiposDB = await dbHelper.buscarEquipoObjeto('');
+      final equiposDB = await equipoRepository.buscar('');
 
       if (!mounted) return;
 
@@ -88,7 +89,7 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
       logger.i('📊 Respuesta API: ${response.toString()}');
 
       if (response.exito && response.equipos.isNotEmpty) {
-        await dbHelper.limpiarYSincronizarEquipos(response.equipos);
+        await equipoRepository.limpiarYSincronizar(response.equipos);
         logger.i('✅ ${response.equipos.length} equipos sincronizados');
       } else {
         logger.w('⚠️ No se pudieron obtener equipos de la API: ${response.mensaje}');

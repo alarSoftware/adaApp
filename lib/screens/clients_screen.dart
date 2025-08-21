@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/cliente.dart';
-import '../services/database_helper.dart';
-import 'cliente_detail_screen.dart'; // ← NUEVA IMPORTACIÓN
+import '../repositories/cliente_repository.dart';
+import 'cliente_detail_screen.dart';
 import 'package:logger/logger.dart';
 
 var logger = Logger();
@@ -17,7 +17,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
   List<Cliente> clientesFiltrados = [];
   List<Cliente> clientesMostrados = [];
   TextEditingController searchController = TextEditingController();
-  DatabaseHelper dbHelper = DatabaseHelper();
+  final ClienteRepository repo = ClienteRepository();
   bool isLoading = true;
 
   // Configuración de paginación
@@ -41,7 +41,8 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
     });
 
     try {
-      List<Cliente> clientesDB = await dbHelper.buscarClientesObjeto('');
+      final clienteRepo = ClienteRepository(); // instancia del repositorio
+      List<Cliente> clientesDB = await clienteRepo.buscar(''); // trae todos los clientes activos
       setState(() {
         clientes = clientesDB;
         clientesFiltrados = clientesDB;
@@ -103,8 +104,8 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
       _cargarSiguientePagina();
     } else {
       try {
-        List<Map<String, dynamic>> mapas = await dbHelper.buscarClientes(query);
-        List<Cliente> resultados = mapas.map((map) => Cliente.fromMap(map)).toList();
+        final clienteRepo = ClienteRepository();
+        List<Cliente> resultados = await clienteRepo.buscar(query);
         setState(() {
           clientesFiltrados = resultados;
           paginaActual = 0;
@@ -115,6 +116,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
       } catch (e) {
         logger.e('Error en búsqueda: $e');
       }
+
     }
   }
 
@@ -368,8 +370,15 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
 
   Future<void> _mostrarEstadisticas() async {
     try {
-      final stats = await dbHelper.obtenerEstadisticas();
+      final clienteRepo = ClienteRepository();
+      final todosLosClientes = await clienteRepo.buscar('');
 
+      final stats = {
+        'totalClientes': todosLosClientes.length,
+        'clientesSincronizados': todosLosClientes.where((c) => c.estaSincronizado == true).length,
+        'clientesNoSincronizados': todosLosClientes.where((c) => c.estaSincronizado == false).length,
+        'clientesEliminados': 0, // Si el repo solo trae activos
+      };
       showDialog(
         context: context,
         builder: (BuildContext context) {

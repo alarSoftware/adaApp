@@ -1,16 +1,19 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:cliente_app/repositories/cliente_repository.dart';
+import 'package:cliente_app/repositories/equipo_repository.dart';
+import 'package:cliente_app/repositories/equipo_cliente_repository.dart';
 import 'package:http/http.dart' as http;
-import '../models/cliente.dart';
-import 'api_service.dart';
-import 'database_helper.dart';
+import 'package:cliente_app/models/cliente.dart';
+import 'package:cliente_app/models/equipos_cliente.dart';
+import 'package:cliente_app/services/api_service.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
 
 var logger = Logger();
 
 class SyncService {
-  static const String baseUrl = 'http://192.168.1.186:3000';
+  static const String baseUrl = 'http://192.168.1.185:3000';
   static const String clientesEndpoint = '$baseUrl/clientes';
   static const String pingEndpoint = '$baseUrl/ping';
   static const Duration timeout = Duration(seconds: 30);
@@ -21,8 +24,7 @@ class SyncService {
     'User-Agent': 'Flutter-SyncService/1.0',
   };
 
-
-  /// Sincronizar todos los datos: clientes y equipos
+  /// Sincronizar todos los datos: clientes, equipos y asignaciones
   static Future<SyncResultUnificado> sincronizarTodosLosDatos() async {
     logger.i('🔄 Iniciando sincronización unificada...');
 
@@ -71,17 +73,34 @@ class SyncService {
         resultado.erroresEquipos = resultadoEquipos.mensaje;
       }
 
+      // 3.1. Sincronizar asignaciones
+      logger.i('🔗 Sincronizando asignaciones...');
+      resultado.estadoActual = 'Descargando asignaciones...';
+
+      final resultadoAsignaciones = await sincronizarAsignaciones();
+      int asignacionesSincronizadas = 0;
+      bool asignacionesExito = false;
+
+      if (resultadoAsignaciones.exito) {
+        logger.i('✅ Asignaciones sincronizadas: ${resultadoAsignaciones.clientesSincronizados}');
+        asignacionesSincronizadas = resultadoAsignaciones.clientesSincronizados;
+        asignacionesExito = true;
+      } else {
+        logger.w('⚠️ Error en asignaciones: ${resultadoAsignaciones.mensaje}');
+      }
+
       // 4. Evaluar resultado final
       resultado.estadoActual = 'Finalizando...';
 
-      if (resultado.clientesExito && resultado.equiposExito) {
+      if (resultado.clientesExito && resultado.equiposExito && asignacionesExito) {
         resultado.exito = true;
-        resultado.mensaje = 'Sincronización completa: ${resultado.clientesSincronizados} clientes y ${resultado.equiposSincronizados} equipos';
-      } else if (resultado.clientesExito || resultado.equiposExito) {
+        resultado.mensaje = 'Sincronización completa: ${resultado.clientesSincronizados} clientes, ${resultado.equiposSincronizados} equipos y ${asignacionesSincronizadas} asignaciones';
+      } else if (resultado.clientesExito || resultado.equiposExito || asignacionesExito) {
         resultado.exito = true; // Éxito parcial
         resultado.mensaje = 'Sincronización parcial: ';
         if (resultado.clientesExito) resultado.mensaje += '${resultado.clientesSincronizados} clientes ';
         if (resultado.equiposExito) resultado.mensaje += '${resultado.equiposSincronizados} equipos ';
+        if (asignacionesExito) resultado.mensaje += '${asignacionesSincronizadas} asignaciones ';
         resultado.mensaje += 'descargados';
       } else {
         resultado.exito = false;
@@ -109,8 +128,8 @@ class SyncService {
       final response = await ApiService.obtenerTodosLosEquipos();
 
       if (response.exito && response.equipos.isNotEmpty) {
-        final dbHelper = DatabaseHelper();
-        await dbHelper.limpiarYSincronizarEquipos(response.equipos);
+        final equipoRepo = EquipoRepository();
+        await equipoRepo.limpiarYSincronizar(response.equipos.cast<dynamic>());
 
         logger.i('✅ Equipos sincronizados: ${response.equipos.length}');
 
@@ -138,6 +157,45 @@ class SyncService {
       );
     }
   }
+
+  /// Sincronizar solo asignaciones equipo-cliente
+  static Future<SyncResult> sincronizarAsignaciones() async {
+    try {
+      logger.i('🔗 Iniciando sincronización de asignaciones...');
+
+      final response = await ApiService.obtenerTodasLasAsignaciones();
+
+      if (response.exito && response.asignaciones.isNotEmpty) {
+        final equipoClienteRepo = EquipoClienteRepository();
+        await equipoClienteRepo.limpiarYSincronizar(response.asignaciones.cast<dynamic>());
+
+        logger.i('✅ Asignaciones sincronizadas: ${response.asignaciones.length}');
+
+        return SyncResult(
+          exito: true,
+          mensaje: 'Asignaciones sincronizadas correctamente',
+          clientesSincronizados: response.asignaciones.length, // Reutilizamos el campo
+          totalEnAPI: response.asignaciones.length,
+        );
+      } else {
+        logger.w('⚠️ No se pudieron obtener asignaciones: ${response.mensaje}');
+        return SyncResult(
+          exito: false,
+          mensaje: 'Error sincronizando asignaciones: ${response.mensaje}',
+          clientesSincronizados: 0,
+        );
+      }
+    } catch (e, stack) {
+      logger.e('❌ Error sincronizando asignaciones: $e');
+      logger.e('🔍 Stack trace: $stack');
+      return SyncResult(
+        exito: false,
+        mensaje: 'Error inesperado en asignaciones: ${e.toString()}',
+        clientesSincronizados: 0,
+      );
+    }
+  }
+
   // SINCRONIZACIÓN DE CLIENTES
   static Future<SyncResult> sincronizarConAPI() async {
     try {
@@ -193,8 +251,8 @@ class SyncService {
             );
           }
 
-          final dbHelper = DatabaseHelper();
-          await dbHelper.limpiarYSincronizar(clientesAPI);
+          final clienteRepo = ClienteRepository();
+          await clienteRepo.limpiarYSincronizar(clientesAPI.cast<dynamic>());
 
           logger.i('✅ Sincronización completada: ${clientesAPI.length} clientes');
 
@@ -341,8 +399,8 @@ class SyncService {
 
   static Future<SyncResult> enviarClientesPendientes() async {
     try {
-      final dbHelper = DatabaseHelper();
-      final clientesPendientes = await dbHelper.obtenerClientesNoSincronizadosObjeto();
+      final clienteRepo = ClienteRepository();
+      final clientesPendientes = await clienteRepo.obtenerNoSincronizados();
 
       if (clientesPendientes.isEmpty) {
         return SyncResult(
@@ -364,7 +422,7 @@ class SyncService {
           if (resultado.exito) {
             exitosos++;
             if (cliente.id != null) {
-              await dbHelper.marcarComoSincronizados([cliente.id!]);
+              await clienteRepo.marcarComoSincronizados([cliente.id!]);
             }
           } else {
             fallidos++;
@@ -544,8 +602,8 @@ class SyncService {
 
   static Future<Map<String, dynamic>> obtenerEstadisticas() async {
     try {
-      final dbHelper = DatabaseHelper();
-      final estadisticasDB = await dbHelper.obtenerEstadisticas();
+      final clienteRepo = ClienteRepository();
+      final estadisticasDB = await clienteRepo.obtenerEstadisticas();
       final conexion = await probarConexion();
 
       return {
@@ -588,7 +646,7 @@ class SyncResult {
   }
 }
 
-/// Resultado de sincronización unificada - NUEVA
+/// Resultado de sincronización unificada
 class SyncResultUnificado {
   bool exito = false;
   String mensaje = '';
