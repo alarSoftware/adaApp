@@ -2,7 +2,6 @@ import 'package:cliente_app/repositories/cliente_repository.dart';
 import 'package:cliente_app/repositories/equipo_repository.dart';
 import 'package:flutter/material.dart';
 import '../services/sync_service.dart';
-import '../services/database_helper.dart';
 import '../services/api_service.dart';
 import 'package:logger/logger.dart';
 import 'equipos_screen.dart';
@@ -224,7 +223,7 @@ class _SelectScreenState extends State<SelectScreen> {
               Icon(Icons.delete_forever, color: Colors.red),
               SizedBox(width: 8),
               Text('Borrar Base de Datos',
-                  style: TextStyle(fontSize: 20),),
+                style: TextStyle(fontSize: 20),),
             ],
           ),
           content: Column(
@@ -285,6 +284,66 @@ class _SelectScreenState extends State<SelectScreen> {
         content: Text('✅ $mensaje'),
         backgroundColor: Colors.green,
         duration: Duration(seconds: 3),
+      ),
+    );
+  }
+
+  // MÉTODO MOVIDO FUERA DEL BUILD - AQUÍ ES DONDE DEBE ESTAR
+  Widget _buildMenuButton(
+      BuildContext context, {
+        required String label,
+        required IconData icon,
+        required Color? color,
+        String? routeName,
+        Widget? page,
+        VoidCallback? onTap,
+      }) {
+    return GestureDetector(
+      onTap: onTap ?? () {
+        if (routeName != null) {
+          Navigator.pushNamed(context, routeName);
+        } else if (page != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => page),
+          );
+        }
+      },
+      child: Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.2),
+              spreadRadius: 2,
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 40,
+              color: color,
+            ),
+            SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -404,90 +463,63 @@ class _SelectScreenState extends State<SelectScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo o título
-                  Icon(
-                    Icons.dashboard,
-                    size: 80,
-                    color: Colors.grey[600],
-                  ),
                   SizedBox(height: 16),
-                  Text(
-                    'Sistema de Gestión',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Selecciona una opción para continuar',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  SizedBox(height: 48),
 
                   // Botones de navegación principales
-                  Row(
+                  Column(
                     children: [
-                      // Botón Clientes
-                      Expanded(
-                        child: SizedBox(
-                          height: 70,
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.pushNamed(context, '/clienteLista');
-                            },
-                            icon: const Icon(Icons.people, size: 32),
-                            label: const Text(
-                              'Clientes',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey[700],
-                              foregroundColor: Colors.white,
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildMenuButton(
+                            context,
+                            label: 'Clientes',
+                            icon: Icons.people,
+                            color: Colors.grey[700],
+                            routeName: '/clienteLista',
                           ),
-                        ),
+                          _buildMenuButton(
+                            context,
+                            label: 'Equipos',
+                            icon: Icons.devices,
+                            color: Colors.grey[600],
+                            page: const EquipoListScreen(),
+                          ),
+                        ],
                       ),
-
-                      const SizedBox(width: 16),
-
-                      // Botón Equipos
-                      Expanded(
-                        child: SizedBox(
-                          height: 70,
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const EquipoListScreen()),
+                      SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildMenuButton(
+                            context,
+                            label: 'Marcas',
+                            icon: Icons.branding_watermark,
+                            color: Colors.grey[600],
+                            onTap: () {
+                              // TODO: Navegar a pantalla de marcas
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Pantalla de marcas próximamente')),
                               );
                             },
-                            icon: const Icon(Icons.devices, size: 32),
-                            label: const Text(
-                              'Equipos',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey[600],
-                              foregroundColor: Colors.white,
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
                           ),
-                        ),
+                          _buildMenuButton(
+                            context,
+                            label: 'Logos',
+                            icon: Icons.newspaper,
+                            color: Colors.grey[600],
+                            onTap: () {
+                              // TODO: Navegar a pantalla de logos
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Pantalla de logos próximamente')),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ],
-                  ),
+                  )
+
                 ],
               ),
             ),

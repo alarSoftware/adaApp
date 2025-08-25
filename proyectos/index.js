@@ -7,7 +7,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Logging middleware
+// Logging middleware como antes
 app.use((req, res, next) => {
     const time = new Date().toLocaleString('es-PY', { timeZone: 'America/Asuncion' });
     console.log(`\n[${time}] ${req.method} ${req.url}`);
@@ -17,7 +17,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// DATOS DE EJEMPLO
+// DATOS DE EJEMPLO (como antes)
 let clientes = [
     { id: 1, nombre: 'Juan Pérez', email: 'juan@email.com', telefono: '0981-123456', direccion: 'Asunción', activo: true, fecha_creacion: new Date().toISOString() },
     { id: 2, nombre: 'María García', email: 'maria@email.com', telefono: '0984-654321', direccion: 'Luque', activo: true, fecha_creacion: new Date().toISOString() },
@@ -36,22 +36,92 @@ let clientes = [
     { id: 15, nombre: 'Hugo Ramírez', email: 'hugo@email.com', telefono: '0975-333444', direccion: 'Areguá', activo: true, fecha_creacion: new Date().toISOString() }
 ];
 
+
+let logo = [
+  { id: 1, nombre: 'Pulp' },
+  { id: 2, nombre: 'Pepsi' },
+  { id: 3, nombre: 'Paso de los Toros' },
+  { id: 4, nombre: 'Mirinda' },
+  { id: 5, nombre: '7Up' },
+  { id: 6, nombre: 'Split' },
+  { id: 7, nombre: 'Watts' },
+  { id: 8, nombre: 'Puro Sol' },
+  { id: 9, nombre: 'La Fuente' },
+  { id: 10, nombre: 'Aquafina' },
+  { id: 11, nombre: 'Gatorade' },
+  { id: 12, nombre: 'Red Bull' },
+  { id: 13, nombre: 'Rockstar' }
+];
+
 let equipos = [
-    { id: 1, cod_barras: 'REF001', marca: 'Samsung', modelo: 'RT38K5932SL', tipo_equipo: 'Refrigerador No Frost', fecha_creacion: new Date().toISOString() },
-    { id: 2, cod_barras: 'REF002', marca: 'LG', modelo: 'GS65SPP1', tipo_equipo: 'Refrigerador Side by Side', fecha_creacion: new Date().toISOString() },
-    { id: 3, cod_barras: 'REF003', marca: 'Whirlpool', modelo: 'WRM35AKTWW', tipo_equipo: 'Refrigerador Convencional', fecha_creacion: new Date().toISOString() },
-    { id: 4, cod_barras: 'REF004', marca: 'Electrolux', modelo: 'DF35', tipo_equipo: 'Freezer Vertical', fecha_creacion: new Date().toISOString() },
-    { id: 5, cod_barras: 'REF005', marca: 'Panasonic', modelo: 'NR-BL389', tipo_equipo: 'Refrigerador Inverter', fecha_creacion: new Date().toISOString() },
-    { id: 6, cod_barras: 'REF006', marca: 'Midea', modelo: 'HS-384', tipo_equipo: 'Freezer Horizontal', fecha_creacion: new Date().toISOString() },
-    { id: 7, cod_barras: 'REF007', marca: 'Bosch', modelo: 'KSV36VI3P', tipo_equipo: 'Refrigerador Inteligente', fecha_creacion: new Date().toISOString() },
-    { id: 8, cod_barras: 'REF008', marca: 'Daewoo', modelo: 'FRS-U20', tipo_equipo: 'Refrigerador Side by Side', fecha_creacion: new Date().toISOString() },
-    { id: 9, cod_barras: 'REF009', marca: 'GE', modelo: 'GTS18', tipo_equipo: 'Refrigerador Convencional', fecha_creacion: new Date().toISOString() },
-    { id: 10, cod_barras: 'REF010', marca: 'Sharp', modelo: 'SJ-FS85', tipo_equipo: 'Refrigerador No Frost', fecha_creacion: new Date().toISOString() },
-    { id: 11, cod_barras: 'REF011', marca: 'Samsung', modelo: 'RB29HSR2DWW', tipo_equipo: 'Refrigerador Inverter', fecha_creacion: new Date().toISOString() },
-    { id: 12, cod_barras: 'REF012', marca: 'LG', modelo: 'GC-X247', tipo_equipo: 'Refrigerador Door-in-Door', fecha_creacion: new Date().toISOString() },
-    { id: 13, cod_barras: 'REF013', marca: 'Whirlpool', modelo: 'WRF535SMHZ', tipo_equipo: 'French Door', fecha_creacion: new Date().toISOString() },
-    { id: 14, cod_barras: 'REF014', marca: 'Electrolux', modelo: 'TF39', tipo_equipo: 'Refrigerador Convencional', fecha_creacion: new Date().toISOString() },
-    { id: 15, cod_barras: 'REF015', marca: 'Panasonic', modelo: 'NR-BY602', tipo_equipo: 'Refrigerador No Frost', fecha_creacion: new Date().toISOString() }
+   { id: 1, cod_barras: 'REF001', marca_id: 1, modelo: 'RT38K5932SL', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234567', logo_id: 1, estado_local: true },
+  { id: 2, cod_barras: 'REF002', marca_id: 2, modelo: 'GS65SPP1',  fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234568', logo_id: 2, estado_local: true },
+  { id: 3, cod_barras: 'REF003', marca_id: 3, modelo: 'WRM35AKTWW', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234569', logo_id: 1, estado_local: true },
+  { id: 4, cod_barras: 'REF004', marca_id: 4, modelo: 'DF35', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234570', logo_id: 4, estado_local: true },
+  { id: 5, cod_barras: 'REF005', marca_id: 5, modelo: 'NR-BL389', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234571', logo_id: 5, estado_local: true },
+  { id: 6, cod_barras: 'REF006', marca_id: 6, modelo: 'HS-384', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234572', logo_id: 6, estado_local: true },
+  { id: 7, cod_barras: 'REF007', marca_id: 7, modelo: 'KSV36VI3P', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234573', logo_id: 7, estado_local: true },
+  { id: 8, cod_barras: 'REF008', marca_id: 8, modelo: 'FRS-U20', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234574', logo_id: 8, estado_local: true },
+  { id: 9, cod_barras: 'REF009', marca_id: 9, modelo: 'GTS18', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234575', logo_id: 9, estado_local: true },
+  { id: 10, cod_barras: 'REF010', marca_id: 10, modelo: 'SJ-FS85', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234576', logo_id: 10, estado_local: true },
+  { id: 11, cod_barras: 'REF011', marca_id: 1, modelo: 'RB29HSR2DWW',  fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234577', logo_id: 1, estado_local: true },
+  { id: 12, cod_barras: 'REF012', marca_id: 2, modelo: 'GC-X247', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234578', logo_id: 2, estado_local: true },
+  { id: 13, cod_barras: 'REF013', marca_id: 3, modelo: 'WRF535SMHZ', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234579', logo_id: 3, estado_local: true },
+  { id: 14, cod_barras: 'REF014', marca_id: 4, modelo: 'TF39',  fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234580', logo_id: 4, estado_local: true },
+  { id: 15, cod_barras: 'REF015', marca_id: 5, modelo: 'NR-BY602', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234581', logo_id: 5, estado_local: true },
+  { id: 16, cod_barras: 'REF016', marca_id: 11, modelo: 'FGTR1837TF', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234582', logo_id: 11, estado_local: true },
+  { id: 17, cod_barras: 'REF017', marca_id: 12, modelo: 'RT42', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234583', logo_id: 12, estado_local: true },
+  { id: 18, cod_barras: 'REF018', marca_id: 13, modelo: 'PHRF380', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234584', logo_id: 13, estado_local: true },
+  { id: 19, cod_barras: 'REF019', marca_id: 14, modelo: 'RCNE560E40ZXBR', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234585', logo_id: 1, estado_local: true },
+  { id: 20, cod_barras: 'REF020', marca_id: 15, modelo: 'RK-60',  fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234586', logo_id: 2, estado_local: true },
+  { id: 21, cod_barras: 'REF021', marca_id: 1, modelo: 'RT46K6230SL', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234587', logo_id: 1, estado_local: true },
+  { id: 22, cod_barras: 'REF022', marca_id: 2, modelo: 'GC-B247', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234588', logo_id: 2, estado_local: true },
+  { id: 23, cod_barras: 'REF023', marca_id: 3, modelo: 'WRF535SWHZ',  fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234589', logo_id: 3, estado_local: true },
+  { id: 24, cod_barras: 'REF024', marca_id: 4, modelo: 'TF39X',  fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234590', logo_id: 4, estado_local: true },
+  { id: 25, cod_barras: 'REF025', marca_id: 5, modelo: 'NR-BY702', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234591', logo_id: 5, estado_local: true },
+  { id: 26, cod_barras: 'REF026', marca_id: 6, modelo: 'HS-484', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234592', logo_id: 6, estado_local: true },
+  { id: 27, cod_barras: 'REF027', marca_id: 7, modelo: 'KSV39VI3P', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234593', logo_id: 7, estado_local: true },
+  { id: 28, cod_barras: 'REF028', marca_id: 8, modelo: 'FRS-U30', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234594', logo_id: 8, estado_local: true },
+  { id: 29, cod_barras: 'REF029', marca_id: 9, modelo: 'GTS20',fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234595', logo_id: 9, estado_local: true },
+  { id: 30, cod_barras: 'REF030', marca_id: 10, modelo: 'SJ-FS95',  fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234596', logo_id: 10, estado_local: true },
+  { id: 31, cod_barras: 'REF031', marca_id: 1, modelo: 'RB32HSR2DWW', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234597', logo_id: 1, estado_local: true },
+  { id: 32, cod_barras: 'REF032', marca_id: 2, modelo: 'GC-X307',  fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234598', logo_id: 2, estado_local: true },
+  { id: 33, cod_barras: 'REF033', marca_id: 3, modelo: 'WRF555SMHZ', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234599', logo_id: 3, estado_local: true },
+  { id: 34, cod_barras: 'REF034', marca_id: 4, modelo: 'TF49', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234600', logo_id: 4, estado_local: true },
+  { id: 35, cod_barras: 'REF035', marca_id: 5, modelo: 'NR-BY802', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234601', logo_id: 5, estado_local: true },
+  { id: 36, cod_barras: 'REF036', marca_id: 11, modelo: 'FGTR1847TF', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234602', logo_id: 11, estado_local: true },
+  { id: 37, cod_barras: 'REF037', marca_id: 12, modelo: 'RT52', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234603', logo_id: 12, estado_local: true },
+  { id: 38, cod_barras: 'REF038', marca_id: 13, modelo: 'PHRF480', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234604', logo_id: 13, estado_local: true },
+  { id: 39, cod_barras: 'REF039', marca_id: 14, modelo: 'RCNE560E50ZXBR',fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234605', logo_id: 1, estado_local: true },
+  { id: 40, cod_barras: 'REF040', marca_id: 15, modelo: 'RK-80', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234606', logo_id: 2, estado_local: true },
+  { id: 41, cod_barras: 'REF041', marca_id: 1, modelo: 'RT48K6230SL',  fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234607', logo_id: 1, estado_local: true },
+  { id: 42, cod_barras: 'REF042', marca_id: 2, modelo: 'GC-B307',  fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234608', logo_id: 2, estado_local: true },
+  { id: 43, cod_barras: 'REF043', marca_id: 3, modelo: 'WRF555SWHZ', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234609', logo_id: 3, estado_local: true },
+  { id: 44, cod_barras: 'REF044', marca_id: 4, modelo: 'TF49X', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234610', logo_id: 4, estado_local: true },
+  { id: 45, cod_barras: 'REF045', marca_id: 5, modelo: 'NR-BY902',  fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234611', logo_id: 5, estado_local: true },
+  { id: 46, cod_barras: 'REF046', marca_id: 6, modelo: 'HS-584', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234612', logo_id: 6, estado_local: true },
+  { id: 47, cod_barras: 'REF047', marca_id: 7, modelo: 'KSV40VI3P', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234613', logo_id: 7, estado_local: true },
+  { id: 48, cod_barras: 'REF048', marca_id: 8, modelo: 'FRS-U40', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234614', logo_id: 8, estado_local: true },
+  { id: 49, cod_barras: 'REF049', marca_id: 9, modelo: 'GTS22',  fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234615', logo_id: 9, estado_local: true },
+  { id: 50, cod_barras: 'REF050', marca_id: 10, modelo: 'SJ-FS105', fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234616', logo_id: 10, estado_local: true },
+];
+
+let marcas = [
+  { id: 1, nombre: 'Samsung' },
+  { id: 2, nombre: 'LG' },
+  { id: 3, nombre: 'Whirlpool' },
+  { id: 4, nombre: 'Electrolux' },
+  { id: 5, nombre: 'Panasonic' },
+  { id: 6, nombre: 'Midea' },
+  { id: 7, nombre: 'Bosch' },
+  { id: 8, nombre: 'Daewoo' },
+  { id: 9, nombre: 'GE' },
+  { id: 10, nombre: 'Sharp' },
+  { id: 11, nombre: 'Frigidaire' },
+  { id: 12, nombre: 'Hisense' },
+  { id: 13, nombre: 'Philco' },
+  { id: 14, nombre: 'Beko' },
+  { id: 15, nombre: 'Koblenz' }
 ];
 
 let usuarios = [
@@ -73,23 +143,70 @@ let usuarios = [
 ];
 
 let equipoCliente = [
-    { id: 1, equipo_id: 14, cliente_id: 3, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 2, equipo_id: 7, cliente_id: 12, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 3, equipo_id: 10, cliente_id: 1, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 4, equipo_id: 2, cliente_id: 9, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 5, equipo_id: 5, cliente_id: 14, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
-    { id: 6, equipo_id: 12, cliente_id: 5, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 7, equipo_id: 4, cliente_id: 8, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 8, equipo_id: 1, cliente_id: 11, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 9, equipo_id: 13, cliente_id: 2, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 10, equipo_id: 6, cliente_id: 7, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 11, equipo_id: 3, cliente_id: 10, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
-    { id: 12, equipo_id: 15, cliente_id: 4, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 13, equipo_id: 8, cliente_id: 13, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 14, equipo_id: 11, cliente_id: 6, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-    { id: 15, equipo_id: 9, cliente_id: 15, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true }
-];
+  // Cliente 1
+  { id: 1, equipo_id: 1, cliente_id: 1, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 2, equipo_id: 2, cliente_id: 1, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 3, equipo_id: 3, cliente_id: 1, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
 
+  // Cliente 2
+  { id: 4, equipo_id: 4, cliente_id: 2, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 5, equipo_id: 5, cliente_id: 2, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 6, equipo_id: 6, cliente_id: 2, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
+
+  // Cliente 3
+  { id: 7, equipo_id: 7, cliente_id: 3, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 8, equipo_id: 8, cliente_id: 3, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 9, equipo_id: 9, cliente_id: 3, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
+
+  // Cliente 4
+  { id: 10, equipo_id: 10, cliente_id: 4, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 11, equipo_id: 11, cliente_id: 4, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 12, equipo_id: 12, cliente_id: 4, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
+
+  // Cliente 5
+  { id: 13, equipo_id: 13, cliente_id: 5, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 14, equipo_id: 14, cliente_id: 5, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+
+  // Cliente 6
+  { id: 15, equipo_id: 15, cliente_id: 6, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 16, equipo_id: 16, cliente_id: 6, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+
+  // Cliente 7
+  { id: 17, equipo_id: 17, cliente_id: 7, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 18, equipo_id: 18, cliente_id: 7, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+
+  // Cliente 8
+  { id: 19, equipo_id: 19, cliente_id: 8, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 20, equipo_id: 20, cliente_id: 8, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+
+  // Cliente 9
+  { id: 21, equipo_id: 21, cliente_id: 9, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 22, equipo_id: 22, cliente_id: 9, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+
+  // Cliente 10
+  { id: 23, equipo_id: 23, cliente_id: 10, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 24, equipo_id: 24, cliente_id: 10, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+
+  // Cliente 11
+  { id: 25, equipo_id: 25, cliente_id: 11, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 26, equipo_id: 26, cliente_id: 11, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+
+  // Cliente 12
+  { id: 27, equipo_id: 27, cliente_id: 12, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 28, equipo_id: 28, cliente_id: 12, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+
+  // Cliente 13
+  { id: 29, equipo_id: 29, cliente_id: 13, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 30, equipo_id: 30, cliente_id: 13, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+
+  // Cliente 14
+  { id: 31, equipo_id: 31, cliente_id: 14, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 32, equipo_id: 32, cliente_id: 14, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+
+  // Cliente 15
+  { id: 33, equipo_id: 33, cliente_id: 15, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 34, equipo_id: 34, cliente_id: 15, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true }
+];
 
 let estadoEquipo = [
     { id: 1, equipo_id: 1, cliente_id: 1, usuario_id: 1, funcionando: true, estado_general: 'Funcionando correctamente', temperatura_actual: 4.2, temperatura_freezer: -18.5, latitud: -25.2637, longitud: -57.5759, fecha_revision: new Date().toISOString() },
@@ -109,29 +226,48 @@ let estadoEquipo = [
     { id: 15, equipo_id: 15, cliente_id: 15, usuario_id: 15, funcionando: true, estado_general: 'Sin observaciones', temperatura_actual: 4.0, temperatura_freezer: -18.0, latitud: -25.3050, longitud: -57.6090, fecha_revision: new Date().toISOString() }
 ];
 
-
-// ENDPOINTS
+// ENDPOINTS SIMPLES (estilo original)
 
 // Ping
 app.get('/ping', (req, res) => {
+    console.log(`📡 Ping recibido - Servidor funcionando`);
     res.json({
         success: true,
         message: 'Servidor funcionando correctamente',
         timestamp: new Date().toISOString(),
-        version: '3.0.0'
+        version: '3.1.0'
     });
 });
+// MARCAS
+app.get('/marcas', (req, res) => {
+    console.log(`Enviando ${marcas.length} marcas`);
+    res.json(marcas);
+});
 
-// CLIENTES
+// LOGOS  
+app.get('/logo', (req, res) => {
+    console.log(`Enviando ${logo.length} logos`);
+    res.json(logo);
+});
+
+// CLIENTES - Simple y directo como antes
 app.get('/clientes', (req, res) => {
-    console.log(`Enviando ${clientes.length} clientes`);
+    console.log(`📤 Enviando ${clientes.length} clientes`);
+    console.log(`📋 Primeros 3 clientes:`, clientes.slice(0, 3).map(c => `${c.nombre} (${c.email})`));
     res.json(clientes);
 });
 
 app.post('/clientes', (req, res) => {
     const { nombre, email, telefono, direccion } = req.body;
     
+    console.log(`📥 Recibiendo nuevo cliente:`);
+    console.log(`   - Nombre: ${nombre}`);
+    console.log(`   - Email: ${email}`);
+    console.log(`   - Teléfono: ${telefono || 'No especificado'}`);
+    console.log(`   - Dirección: ${direccion || 'No especificada'}`);
+    
     if (!nombre || !email) {
+        console.log(`❌ Error: Datos incompletos`);
         return res.status(400).json({
             success: false,
             message: 'Nombre y email son requeridos'
@@ -150,7 +286,7 @@ app.post('/clientes', (req, res) => {
     };
     
     clientes.push(cliente);
-    console.log(`Cliente creado: ${cliente.nombre}`);
+    console.log(`✅ Cliente creado exitosamente con ID: ${nuevoId}`);
     
     res.status(201).json({
         success: true,
@@ -159,35 +295,24 @@ app.post('/clientes', (req, res) => {
     });
 });
 
-// EQUIPOS
+// EQUIPOS - Simple y directo
 app.get('/equipos', (req, res) => {
-    const equiposConInfo = equipos.map(equipo => {
-        const asignacion = equipoCliente.find(ec => ec.equipo_id === equipo.id && ec.activo);
-        const cliente = asignacion ? clientes.find(c => c.id === asignacion.cliente_id) : null;
-        const estado = estadoEquipo.find(ee => ee.equipo_id === equipo.id);
-        
-        return {
-            ...equipo,
-            asignado_a: cliente ? cliente.nombre : null,
-            cliente_id: cliente ? cliente.id : null,
-            estado_actual: estado ? estado.estado_general : 'Sin revisar',
-            funcionando: estado ? estado.funcionando : null,
-            temperatura_actual: estado ? estado.temperatura_actual : null,
-            temperatura_freezer: estado ? estado.temperatura_freezer : null
-        };
-    });
-    
-    console.log(`Enviando ${equiposConInfo.length} equipos`);
-    res.json(equiposConInfo);
+    console.log(`📤 Enviando ${equipos.length} equipos`);
+    console.log(`📋 Primeros 3 equipos:`, equipos.slice(0, 3).map(e => `${e.marca} ${e.modelo} (${e.cod_barras})`));
+    res.json(equipos);
 });
 
 app.get('/equipos/buscar', (req, res) => {
     const q = req.query.q?.toLowerCase() || '';
+    console.log(`🔍 Buscando equipos con término: "${q}"`);
+    
     const encontrados = equipos.filter(e =>
         e.cod_barras.toLowerCase().includes(q) || 
         e.marca.toLowerCase().includes(q) ||
         e.modelo.toLowerCase().includes(q)
     );
+    
+    console.log(`📊 Encontrados ${encontrados.length} equipos`);
     
     res.json({
         success: true,
@@ -199,7 +324,14 @@ app.get('/equipos/buscar', (req, res) => {
 app.post('/equipos', (req, res) => {
     const { cod_barras, marca, modelo, tipo_equipo } = req.body;
     
+    console.log(`📥 Recibiendo nuevo equipo:`);
+    console.log(`   - Código: ${cod_barras}`);
+    console.log(`   - Marca: ${marca}`);
+    console.log(`   - Modelo: ${modelo}`);
+    console.log(`   - Tipo: ${tipo_equipo}`);
+    
     if (!cod_barras || !marca || !modelo || !tipo_equipo) {
+        console.log(`❌ Error: Datos incompletos`);
         return res.status(400).json({
             success: false,
             message: 'Todos los campos son requeridos'
@@ -207,6 +339,7 @@ app.post('/equipos', (req, res) => {
     }
     
     if (equipos.find(e => e.cod_barras === cod_barras)) {
+        console.log(`❌ Error: Código de barras ya existe`);
         return res.status(400).json({
             success: false,
             message: 'El código de barras ya existe'
@@ -224,7 +357,7 @@ app.post('/equipos', (req, res) => {
     };
     
     equipos.push(equipo);
-    console.log(`Equipo creado: ${equipo.marca} ${equipo.modelo}`);
+    console.log(`✅ Equipo creado exitosamente con ID: ${nuevoId}`);
     
     res.status(201).json({
         success: true,
@@ -243,15 +376,18 @@ app.get('/usuarios', (req, res) => {
         fecha_creacion: u.fecha_creacion
     }));
     
+    console.log(`📤 Enviando ${usuariosSinPassword.length} usuarios (sin contraseñas)`);
     res.json(usuariosSinPassword);
 });
 
 app.post('/usuarios/login', (req, res) => {
     const { email, contraseña } = req.body;
+    console.log(`🔑 Intento de login para: ${email}`);
+    
     const usuario = usuarios.find(u => u.email === email && u.contraseña === contraseña);
     
     if (usuario) {
-        console.log(`Login exitoso: ${usuario.nombre}`);
+        console.log(`✅ Login exitoso: ${usuario.nombre} (${usuario.rol})`);
         res.json({
             success: true,
             message: 'Login exitoso',
@@ -263,7 +399,7 @@ app.post('/usuarios/login', (req, res) => {
             }
         });
     } else {
-        console.log('Login fallido');
+        console.log(`❌ Login fallido para: ${email}`);
         res.status(401).json({
             success: false,
             message: 'Credenciales incorrectas'
@@ -271,40 +407,27 @@ app.post('/usuarios/login', (req, res) => {
     }
 });
 
-// ASIGNACIONES - Modificar para incluir TODOS los registros
+// ASIGNACIONES - Simple, solo datos básicos para Flutter
 app.get('/asignaciones', (req, res) => {
-    const asignaciones = equipoCliente
-        // .filter(ec => ec.activo)  // ← REMOVER ESTE FILTRO
-        .map(asignacion => {
-            const equipo = equipos.find(e => e.id === asignacion.equipo_id);
-            const cliente = clientes.find(c => c.id === asignacion.cliente_id);
-            const estado = estadoEquipo.find(ee => ee.equipo_id === asignacion.equipo_id);
-            
-            return {
-                id: asignacion.id,
-                equipo_id: asignacion.equipo_id,
-                cliente_id: asignacion.cliente_id,
-                fecha_asignacion: asignacion.fecha_asignacion,
-                fecha_retiro: asignacion.fecha_retiro,
-                activo: asignacion.activo,  // ← AGREGAR ESTE CAMPO
-                fecha_creacion: asignacion.fecha_creacion || new Date().toISOString(), // ← AGREGAR
-                
-                // Datos relacionados (opcional)
-                refrigerador: equipo ? `${equipo.marca} ${equipo.modelo}` : 'No encontrado',
-                cliente: cliente ? cliente.nombre : 'No encontrado',
-                estado_actual: estado ? estado.estado_general : 'Sin estado',
-                funcionando: estado ? estado.funcionando : null,
-                temperatura_actual: estado ? estado.temperatura_actual : null
-            };
-        });
+    console.log(`📤 Enviando ${equipoCliente.length} asignaciones (datos básicos)`);
+    console.log(`📋 Primeras 3 asignaciones:`, equipoCliente.slice(0, 3).map(ec => 
+        `Equipo ${ec.equipo_id} → Cliente ${ec.cliente_id} (${ec.activo ? 'Activo' : 'Inactivo'})`
+    ));
     
-    res.json(asignaciones);
+    // Enviar solo datos básicos sin enriquecer (para que funcione con Flutter)
+    res.json(equipoCliente);
 });
 
 app.post('/asignaciones', (req, res) => {
     const { equipo_id, cliente_id, usuario_id } = req.body;
     
+    console.log(`📥 Nueva asignación:`);
+    console.log(`   - Equipo ID: ${equipo_id}`);
+    console.log(`   - Cliente ID: ${cliente_id}`);
+    console.log(`   - Usuario ID: ${usuario_id}`);
+    
     if (!equipo_id || !cliente_id || !usuario_id) {
+        console.log(`❌ Error: IDs incompletos`);
         return res.status(400).json({
             success: false,
             message: 'Todos los IDs son requeridos'
@@ -316,6 +439,7 @@ app.post('/asignaciones', (req, res) => {
     const usuario = usuarios.find(u => u.id === parseInt(usuario_id));
     
     if (!equipo || !cliente || !usuario) {
+        console.log(`❌ Error: Equipo, cliente o usuario no encontrado`);
         return res.status(400).json({
             success: false,
             message: 'Equipo, cliente o usuario no encontrado'
@@ -324,6 +448,7 @@ app.post('/asignaciones', (req, res) => {
     
     const yaAsignado = equipoCliente.find(ec => ec.equipo_id === parseInt(equipo_id) && ec.activo);
     if (yaAsignado) {
+        console.log(`❌ Error: Equipo ya asignado`);
         return res.status(400).json({
             success: false,
             message: 'El equipo ya está asignado'
@@ -360,7 +485,7 @@ app.post('/asignaciones', (req, res) => {
     equipoCliente.push(asignacion);
     estadoEquipo.push(estado);
     
-    console.log(`Asignación creada: ${equipo.marca} → ${cliente.nombre}`);
+    console.log(`✅ Asignación creada: ${equipo.marca} ${equipo.modelo} → ${cliente.nombre}`);
     
     res.status(201).json({
         success: true,
@@ -372,26 +497,26 @@ app.post('/asignaciones', (req, res) => {
 
 // ESTADOS
 app.get('/estados', (req, res) => {
-    const estados = estadoEquipo.map(estado => {
-        const equipo = equipos.find(e => e.id === estado.equipo_id);
-        const cliente = clientes.find(c => c.id === estado.cliente_id);
-        const usuario = usuarios.find(u => u.id === estado.usuario_id);
-        
-        return {
-            ...estado,
-            refrigerador_info: equipo ? `${equipo.marca} ${equipo.modelo}` : 'No encontrado',
-            cliente_nombre: cliente ? cliente.nombre : 'No encontrado',
-            usuario_nombre: usuario ? usuario.nombre : 'No encontrado'
-        };
-    });
-    
-    res.json(estados);
+    console.log(`📤 Enviando ${estadoEquipo.length} estados de equipos`);
+    console.log(`📋 Primeros 3 estados:`, estadoEquipo.slice(0, 3).map(ee => 
+        `Equipo ${ee.equipo_id}: ${ee.estado_general} (${ee.funcionando ? 'OK' : 'FALLA'})`
+    ));
+    res.json(estadoEquipo);
 });
 
 app.post('/estados', (req, res) => {
     const { equipo_id, cliente_id, usuario_id, funcionando, estado_general, temperatura_actual, temperatura_freezer, latitud, longitud } = req.body;
     
+    console.log(`📥 Nuevo estado de equipo:`);
+    console.log(`   - Equipo ID: ${equipo_id}`);
+    console.log(`   - Cliente ID: ${cliente_id}`);
+    console.log(`   - Usuario ID: ${usuario_id}`);
+    console.log(`   - Funcionando: ${funcionando ? 'SÍ' : 'NO'}`);
+    console.log(`   - Estado: ${estado_general}`);
+    console.log(`   - Temperatura: ${temperatura_actual}°C / Freezer: ${temperatura_freezer}°C`);
+    
     if (!equipo_id || !cliente_id || !usuario_id || funcionando === undefined || !estado_general) {
+        console.log(`❌ Error: Datos incompletos`);
         return res.status(400).json({
             success: false,
             message: 'Datos incompletos'
@@ -414,7 +539,7 @@ app.post('/estados', (req, res) => {
     };
     
     estadoEquipo.push(estado);
-    console.log(`Estado actualizado para equipo ${equipo_id}`);
+    console.log(`✅ Estado actualizado para equipo ${equipo_id}`);
     
     res.status(201).json({
         success: true,
@@ -446,12 +571,17 @@ app.get('/dashboard', (req, res) => {
         timestamp: new Date().toISOString()
     };
     
+    console.log(`📊 Enviando estadísticas del dashboard:`);
+    console.log(`   - ${estadisticas.clientes.total} clientes (${estadisticas.clientes.activos} activos)`);
+    console.log(`   - ${estadisticas.refrigeradores.total} equipos (${estadisticas.refrigeradores.asignados} asignados)`);
+    console.log(`   - ${estadisticas.refrigeradores.funcionando} funcionando, ${estadisticas.refrigeradores.en_reparacion} en reparación`);
+    
     res.json(estadisticas);
 });
 
 // Error handling
 app.use((err, req, res, next) => {
-    console.error('Error:', err.message);
+    console.error('💥 Error interno:', err.message);
     res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
@@ -460,6 +590,7 @@ app.use((err, req, res, next) => {
 
 // 404
 app.use((req, res) => {
+    console.log(`❓ Ruta no encontrada: ${req.method} ${req.url}`);
     res.status(404).json({
         success: false,
         message: `Ruta no encontrada: ${req.method} ${req.url}`
@@ -472,9 +603,14 @@ const HOST = '0.0.0.0';
 
 app.listen(PORT, HOST, () => {
     console.clear();
-    console.log('\n❄️ SISTEMA DE REFRIGERADORES - API INICIADA ❄️');
-    console.log('═'.repeat(50));
-    console.log(`🌐 URL: http://192.168.100.128:${PORT}`);
-    console.log(`📊 Datos: ${clientes.length} clientes, ${equipos.length} equipos`);
-    console.log('✅ Servidor listo para peticiones\n');
+    console.log('\n❄️ SISTEMA DE REFRIGERADORES - API ESTILO ORIGINAL ❄️');
+    console.log('═'.repeat(55));
+    console.log(`🌐 URL: http://192.168.1.185:${PORT}`);
+    console.log(`📊 Datos cargados:`);
+    console.log(`   📋 ${clientes.length} clientes`);
+    console.log(`   🔧 ${equipos.length} equipos`);
+    console.log(`   👥 ${usuarios.length} usuarios`);
+    console.log(`   🔗 ${equipoCliente.length} asignaciones`);
+    console.log(`   📈 ${estadoEquipo.length} estados`);
+    console.log('✅ Servidor listo para peticiones con logging detallado\n');
 });

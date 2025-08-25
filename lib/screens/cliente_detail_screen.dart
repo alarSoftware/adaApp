@@ -1,375 +1,564 @@
 import 'package:flutter/material.dart';
 import '../models/cliente.dart';
-import '../services/api_service.dart';
+import '../models/equipos_cliente.dart';
+import '../repositories/equipo_cliente_repository.dart';
+import 'equipos_clientes_detail_screen.dart';
+import 'forms_screen.dart';
 import 'package:logger/logger.dart';
 
-var logger = Logger();
+final _logger = Logger();
 
-class ClienteDetailScreen extends StatelessWidget {
+class ClienteDetailScreen extends StatefulWidget {
   final Cliente cliente;
 
   const ClienteDetailScreen({
-    Key? key,
+    super.key,
     required this.cliente,
-  }) : super(key: key);
+  });
 
-  Future<void> _enviarCliente(BuildContext context) async {
-    bool? confirmar = await _mostrarDialogoConfirmacion(context);
-    if (confirmar != true) return;
+  @override
+  State<ClienteDetailScreen> createState() => _ClienteDetailScreenState();
+}
 
-    await _ejecutarEnvio(context);
+class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
+  List<EquipoCliente> _equiposAsignados = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarEquiposAsignados();
   }
 
-  Future<bool?> _mostrarDialogoConfirmacion(BuildContext context) async {
-    return showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.send, color: Colors.grey[700]),
-              SizedBox(width: 8),
-              Text('Enviar Cliente'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('¿Enviar este cliente al servidor?'),
-              SizedBox(height: 12),
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('👤 ${cliente.nombre}'),
-                    Text('📧 ${cliente.email}'),
-                    if (cliente.telefono?.isNotEmpty == true)
-                      Text('📱 ${cliente.telefono}'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text('Enviar'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[700]),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  // ===============================
+  // MÉTODOS DE DATOS
+  // ===============================
 
-  Future<void> _ejecutarEnvio(BuildContext context) async {
-    // Mostrar indicador de carga
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return Dialog(
-          child: Padding(
-            padding: EdgeInsets.all(20),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: Colors.grey[700]),
-                SizedBox(width: 16),
-                Text('Enviando...'),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  Future<void> _cargarEquiposAsignados() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     try {
-      final resultado = await ApiService.enviarCliente(cliente);
-
-      // Cerrar el diálogo de carga
-      Navigator.of(context).pop();
-
-      if (resultado.exito) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Expanded(child: Text('✅ Cliente enviado correctamente')),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.error, color: Colors.white),
-                SizedBox(width: 8),
-                Expanded(child: Text('❌ Error: ${resultado.mensaje}')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 4),
-            action: SnackBarAction(
-              label: 'Reintentar',
-              textColor: Colors.white,
-              onPressed: () => _ejecutarEnvio(context),
-            ),
-          ),
-        );
+      if (widget.cliente.id == null) {
+        _setEquiposVacios();
+        return;
       }
-    } catch (e) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Error inesperado: $e'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 4),
-        ),
-      );
-      logger.e('Error enviando cliente: $e');
+
+      final equipoClienteRepo = EquipoClienteRepository();
+      final equiposDelCliente = await equipoClienteRepo.obtenerPorCliente(
+          widget.cliente.id!,
+          soloActivos: true);
+
+      if (mounted) {
+        setState(() {
+          _equiposAsignados = equiposDelCliente;
+          _isLoading = false;
+        });
+      }
+    } catch (e, stackTrace) {
+      _logger.e('Error cargando equipos del cliente', error: e, stackTrace: stackTrace);
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Error cargando equipos: ${e.toString()}';
+        });
+      }
     }
   }
+
+  void _setEquiposVacios() {
+    if (mounted) {
+      setState(() {
+        _equiposAsignados = [];
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _refreshData() async {
+    await _cargarEquiposAsignados();
+  }
+
+  // ===============================
+  // MÉTODOS DE NAVEGACIÓN
+  // ===============================
+
+  Future<void> _asignarNuevoEquipo() async {
+    if (!mounted) return;
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FormsScreen(
+          cliente: widget.cliente,
+        ),
+      ),
+    );
+
+    // Si se asignó un equipo exitosamente, recargar los datos
+    if (result == true) {
+      _cargarEquiposAsignados();
+    }
+  }
+
+  void _navegarADetalleEquipo(EquipoCliente equipoCliente) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EquiposClientesDetailScreen(
+          equipoCliente: equipoCliente,
+        ),
+      ),
+    ).then((_) {
+      // Recargar datos al volver de la pantalla de detalle
+      _refreshData();
+    });
+  }
+
+  // ===============================
+  // MÉTODOS DE UI
+  // ===============================
+
+  String _formatearFecha(DateTime fecha) {
+    return '${fecha.day.toString().padLeft(2, '0')}/'
+        '${fecha.month.toString().padLeft(2, '0')}/'
+        '${fecha.year}';
+  }
+
+  // ===============================
+  // WIDGETS
+  // ===============================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Detalle de Cliente'),
-        backgroundColor: Colors.grey[800],
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            onPressed: () => _enviarCliente(context),
-            icon: Icon(Icons.send),
-            tooltip: 'Enviar al servidor',
+      appBar: _buildAppBar(),
+      body: RefreshIndicator(
+        onRefresh: _cargarEquiposAsignados,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildClienteInfoCard(),
+              const SizedBox(height: 24),
+              _buildEquiposSection(),
+            ],
           ),
-        ],
+        ),
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16.0),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: const Text('Detalle de Cliente'),
+      backgroundColor: Colors.grey[800],
+      foregroundColor: Colors.white,
+      elevation: 2,
+      actions: [
+        IconButton(
+          onPressed: _asignarNuevoEquipo,
+          icon: const Icon(Icons.add),
+          tooltip: 'Realizar censo de equipo',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildClienteInfoCard() {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Avatar y nombre principal
-            Center(
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 60,
-                    child: Text(
-                      cliente.nombre.isNotEmpty ? cliente.nombre[0].toUpperCase() : '?',
-                      style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
-                    ),
-                    backgroundColor: Colors.grey[700],
-                    foregroundColor: Colors.white,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    cliente.nombre,
-                    style: TextStyle(
-                      fontSize: 28,
+            // Header con nombre
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.cliente.nombre,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: Colors.grey[800],
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 32),
-
-            // Información del cliente
-            _buildInfoCard(
-              icon: Icons.email,
-              title: 'Email',
-              content: cliente.email,
-              color: Colors.red,
-            ),
-
-            if (cliente.telefono != null && cliente.telefono!.isNotEmpty)
-              _buildInfoCard(
-                icon: Icons.phone,
-                title: 'Teléfono',
-                content: cliente.telefono!,
-                color: Colors.green,
-              ),
-
-            if (cliente.direccion != null && cliente.direccion!.isNotEmpty)
-              _buildInfoCard(
-                icon: Icons.location_on,
-                title: 'Dirección',
-                content: cliente.direccion!,
-                color: Colors.orange,
-              ),
-
-            if (cliente.id != null)
-              _buildInfoCard(
-                icon: Icons.tag,
-                title: 'ID Local',
-                content: cliente.id.toString(),
-                color: Colors.purple,
-              ),
-
-            _buildInfoCard(
-              icon: Icons.access_time,
-              title: 'Fecha de creación',
-              content: cliente.fechaCreacion.toString().substring(0, 19),
-              color: Colors.grey,
-            ),
-
-            _buildInfoCard(
-              icon: cliente.estaSincronizado ? Icons.cloud_done : Icons.cloud_off,
-              title: 'Estado de sincronización',
-              content: cliente.estaSincronizado ? 'Sincronizado' : 'No sincronizado',
-              color: cliente.estaSincronizado ? Colors.green : Colors.orange,
-            ),
-
-            SizedBox(height: 32),
-
-            // Botón principal para enviar
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _enviarCliente(context),
-                icon: Icon(Icons.cloud_upload),
-                label: Text('Enviar al Servidor'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[700],
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  textStyle: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
+              ],
             ),
 
-            SizedBox(height: 16),
+            const SizedBox(height: 20),
 
-            // Información del servidor
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.withOpacity(0.3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.grey[700], size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'Información del servidor',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[700],
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 12),
-                  Text(
-                    '• Servidor: http://192.168.1.186:3000\n• Endpoint: POST /clientes\n• Los datos se enviarán en formato JSON\n• Para sincronización masiva, usa el Panel Principal',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[700],
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
+            // Información del cliente
+            _buildInfoRow(Icons.email_outlined, 'Email', widget.cliente.email),
+
+            if (widget.cliente.telefono?.isNotEmpty == true)
+              _buildInfoRow(Icons.phone_outlined, 'Teléfono', widget.cliente.telefono!),
+
+            if (widget.cliente.direccion?.isNotEmpty == true)
+              _buildInfoRow(Icons.location_on_outlined, 'Dirección', widget.cliente.direccion!),
+
+            _buildInfoRow(
+                Icons.access_time_outlined,
+                'Fecha de creación',
+                _formatearFecha(widget.cliente.fechaCreacion)
             ),
-
-            SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoCard({
-    required IconData icon,
-    required String title,
-    required String content,
-    required Color color,
-  }) {
-    return Card(
-      margin: EdgeInsets.symmetric(vertical: 6),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.grey.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[600],
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Row(
+    );
+  }
+
+  Widget _buildEquiposSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
             Container(
-              width: 50,
-              height: 50,
-              padding: EdgeInsets.all(12),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
-                icon,
-                color: color,
-                size: 26,
+                Icons.kitchen_outlined,
+                color: Colors.orange[700],
+                size: 24,
               ),
             ),
-            SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    content,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+              child: Text(
+                'Equipos Asignados',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange[700],
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                '${_equiposAsignados.length}',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange[700],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _buildEquiposContent(),
+      ],
+    );
+  }
+
+  Widget _buildEquiposContent() {
+    if (_isLoading) {
+      return _buildLoadingState();
+    }
+
+    if (_errorMessage != null) {
+      return _buildErrorState();
+    }
+
+    if (_equiposAsignados.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return _buildEquiposList();
+  }
+
+  Widget _buildLoadingState() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: Column(
+          children: [
+            CircularProgressIndicator(
+              color: Colors.orange[700],
+              strokeWidth: 3,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Cargando equipos...',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 16,
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 48,
+            color: Colors.red[400],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Error al cargar equipos',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.red[700],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _errorMessage!,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.red[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _cargarEquiposAsignados,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Reintentar'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red[600],
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.grey.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.kitchen_outlined,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Sin equipos censados',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Este cliente no tiene equipos censados actualmente',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          OutlinedButton.icon(
+            onPressed: _asignarNuevoEquipo,
+            icon: const Icon(Icons.qr_code_scanner),
+            label: const Text('Realizar Censo'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.orange[700],
+              side: BorderSide(color: Colors.orange[700]!),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEquiposList() {
+    return Column(
+      children: _equiposAsignados.map((equipoCliente) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: InkWell(
+              onTap: () => _navegarADetalleEquipo(equipoCliente),
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    // Avatar del equipo
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.orange[700],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.kitchen,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+
+                    const SizedBox(width: 16),
+
+                    // Información del equipo
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            equipoCliente.equipoNombreCompleto,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          if (equipoCliente.equipoCodBarras?.isNotEmpty == true)
+                            Text(
+                              equipoCliente.equipoCodBarras!,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontFamily: 'monospace',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+
+                          const SizedBox(height: 6),
+
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.access_time,
+                                size: 14,
+                                color: Colors.grey[500],
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Censado hace ${equipoCliente.diasDesdeAsignacion} días',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Flecha
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      size: 16,
+                      color: Colors.grey[400],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

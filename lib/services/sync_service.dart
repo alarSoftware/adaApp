@@ -3,35 +3,36 @@ import 'dart:io';
 import 'package:cliente_app/repositories/cliente_repository.dart';
 import 'package:cliente_app/repositories/equipo_repository.dart';
 import 'package:cliente_app/repositories/equipo_cliente_repository.dart';
+import 'package:cliente_app/repositories/marca_repository.dart';
+import 'package:cliente_app/repositories/logo_repository.dart';
+import 'package:cliente_app/services/database_helper.dart';
 import 'package:http/http.dart' as http;
 import 'package:cliente_app/models/cliente.dart';
-import 'package:cliente_app/services/api_service.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
 
-var logger = Logger();
+final _logger = Logger();
 
 class SyncService {
   static const String baseUrl = 'http://192.168.1.185:3000';
-  static const String clientesEndpoint = '$baseUrl/clientes';
-  static const String pingEndpoint = '$baseUrl/ping';
   static const Duration timeout = Duration(seconds: 30);
 
   static Map<String, String> get _headers => {
     'Content-Type': 'application/json; charset=UTF-8',
     'Accept': 'application/json',
-    'User-Agent': 'Flutter-SyncService/1.0',
   };
 
-  /// Sincronizar todos los datos: clientes, equipos y asignaciones
-  static Future<SyncResultUnificado> sincronizarTodosLosDatos() async {
-    logger.i('🔄 Iniciando sincronización unificada...');
+  static final _dbHelper = DatabaseHelper();
+  static final _clienteRepo = ClienteRepository();
+  static final _equipoRepo = EquipoRepository();
+  static final _equipoClienteRepo = EquipoClienteRepository();
+  static final _marcaRepo = MarcaRepository();
+  static final _logoRepo = LogoRepository();
 
+  static Future<SyncResultUnificado> sincronizarTodosLosDatos() async {
     final resultado = SyncResultUnificado();
 
     try {
-      // 1. Verificar conexión primero
-      logger.i('📡 Verificando conexión...');
       final conexion = await probarConexion();
       if (!conexion.exito) {
         resultado.exito = false;
@@ -40,302 +41,402 @@ class SyncService {
       }
 
       resultado.conexionOK = true;
-      logger.i('✅ Conexión verificada');
 
-      // 2. Sincronizar clientes
-      logger.i('👥 Sincronizando clientes...');
-      resultado.estadoActual = 'Descargando clientes...';
+      await _sincronizarMarcas();
+      await _sincronizarLogos();
 
-      final resultadoClientes = await sincronizarConAPI();
-      resultado.clientesSincronizados = resultadoClientes.clientesSincronizados;
+      final resultadoClientes = await sincronizarClientes();
+      resultado.clientesSincronizados = resultadoClientes.itemsSincronizados;
       resultado.clientesExito = resultadoClientes.exito;
-
-      if (resultadoClientes.exito) {
-        logger.i('✅ Clientes sincronizados: ${resultadoClientes.clientesSincronizados}');
-      } else {
-        logger.w('⚠️ Error en clientes: ${resultadoClientes.mensaje}');
-        resultado.erroresClientes = resultadoClientes.mensaje;
-      }
-
-      // 3. Sincronizar equipos
-      logger.i('🔧 Sincronizando equipos...');
-      resultado.estadoActual = 'Descargando equipos...';
+      if (!resultadoClientes.exito) resultado.erroresClientes = resultadoClientes.mensaje;
 
       final resultadoEquipos = await sincronizarEquipos();
-      resultado.equiposSincronizados = resultadoEquipos.clientesSincronizados; // Reutilizamos el campo
+      resultado.equiposSincronizados = resultadoEquipos.itemsSincronizados;
       resultado.equiposExito = resultadoEquipos.exito;
-
-      if (resultadoEquipos.exito) {
-        logger.i('✅ Equipos sincronizados: ${resultadoEquipos.clientesSincronizados}');
-      } else {
-        logger.w('⚠️ Error en equipos: ${resultadoEquipos.mensaje}');
-        resultado.erroresEquipos = resultadoEquipos.mensaje;
-      }
-
-      // 3.1. Sincronizar asignaciones
-      logger.i('🔗 Sincronizando asignaciones...');
-      resultado.estadoActual = 'Descargando asignaciones...';
+      if (!resultadoEquipos.exito) resultado.erroresEquipos = resultadoEquipos.mensaje;
 
       final resultadoAsignaciones = await sincronizarAsignaciones();
-      int asignacionesSincronizadas = 0;
-      bool asignacionesExito = false;
+      resultado.asignacionesSincronizadas = resultadoAsignaciones.itemsSincronizados;
+      resultado.asignacionesExito = resultadoAsignaciones.exito;
+      if (!resultadoAsignaciones.exito) resultado.erroresAsignaciones = resultadoAsignaciones.mensaje;
 
-      if (resultadoAsignaciones.exito) {
-        logger.i('✅ Asignaciones sincronizadas: ${resultadoAsignaciones.clientesSincronizados}');
-        asignacionesSincronizadas = resultadoAsignaciones.clientesSincronizados;
-        asignacionesExito = true;
-      } else {
-        logger.w('⚠️ Error en asignaciones: ${resultadoAsignaciones.mensaje}');
-      }
+      final exitosos = [resultado.clientesExito, resultado.equiposExito, resultado.asignacionesExito];
+      final totalExitosos = exitosos.where((e) => e).length;
 
-      // 4. Evaluar resultado final
-      resultado.estadoActual = 'Finalizando...';
-
-      if (resultado.clientesExito && resultado.equiposExito && asignacionesExito) {
+      if (totalExitosos == 3) {
         resultado.exito = true;
-        resultado.mensaje = 'Sincronización completa: ${resultado.clientesSincronizados} clientes, ${resultado.equiposSincronizados} equipos y ${asignacionesSincronizadas} asignaciones';
-      } else if (resultado.clientesExito || resultado.equiposExito || asignacionesExito) {
-        resultado.exito = true; // Éxito parcial
-        resultado.mensaje = 'Sincronización parcial: ';
-        if (resultado.clientesExito) resultado.mensaje += '${resultado.clientesSincronizados} clientes ';
-        if (resultado.equiposExito) resultado.mensaje += '${resultado.equiposSincronizados} equipos ';
-        if (asignacionesExito) resultado.mensaje += '${asignacionesSincronizadas} asignaciones ';
-        resultado.mensaje += 'descargados';
+        resultado.mensaje = 'Sincronización completa: ${resultado.clientesSincronizados} clientes, ${resultado.equiposSincronizados} equipos y ${resultado.asignacionesSincronizadas} asignaciones';
+      } else if (totalExitosos > 0) {
+        resultado.exito = true;
+        final partes = <String>[];
+        if (resultado.clientesExito) partes.add('${resultado.clientesSincronizados} clientes');
+        if (resultado.equiposExito) partes.add('${resultado.equiposSincronizados} equipos');
+        if (resultado.asignacionesExito) partes.add('${resultado.asignacionesSincronizadas} asignaciones');
+        resultado.mensaje = 'Sincronización parcial: ${partes.join(', ')}';
       } else {
         resultado.exito = false;
-        resultado.mensaje = 'Error en sincronización';
+        resultado.mensaje = 'Error: no se pudo sincronizar ningún dato';
       }
 
-      logger.i('🏁 Sincronización unificada completada: ${resultado.mensaje}');
       return resultado;
 
-    } catch (e, stack) {
-      logger.e('❌ Error en sincronización unificada: $e');
-      logger.e('🔍 Stack trace: $stack');
-
+    } catch (e) {
+      _logger.e('Error en sincronización unificada: $e');
       resultado.exito = false;
       resultado.mensaje = 'Error inesperado: ${e.toString()}';
       return resultado;
     }
   }
 
-  /// Sincronizar solo equipos
+  static Future<void> _sincronizarMarcas() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/marcas'),
+        headers: _headers,
+      ).timeout(timeout);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> marcasAPI = jsonDecode(response.body);
+        await _dbHelper.sincronizarMarcas(marcasAPI);
+        _logger.i('Marcas sincronizadas: ${marcasAPI.length}');
+      }
+    } catch (e) {
+      _logger.e('Error sincronizando marcas: $e');
+    }
+  }
+
+  static Future<void> _sincronizarLogos() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/logo'),
+        headers: _headers,
+      ).timeout(timeout);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> logosAPI = jsonDecode(response.body);
+        await _dbHelper.sincronizarLogos(logosAPI);
+        _logger.i('Logos sincronizados: ${logosAPI.length}');
+      }
+    } catch (e) {
+      _logger.e('Error sincronizando logos: $e');
+    }
+  }
+
+  static Future<SyncResult> sincronizarClientes() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/clientes'),
+        headers: _headers,
+      ).timeout(timeout);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final List<dynamic> clientesData = _parseResponse(response.body);
+
+        if (clientesData.isEmpty) {
+          return SyncResult(
+            exito: false,
+            mensaje: 'No se encontraron clientes en el servidor',
+            itemsSincronizados: 0,
+          );
+        }
+
+        final clientes = <Cliente>[];
+        for (var clienteJson in clientesData) {
+          final cliente = _crearClienteDesdeAPI(clienteJson);
+          if (cliente != null) {
+            clientes.add(cliente);
+          }
+        }
+
+        if (clientes.isEmpty) {
+          return SyncResult(
+            exito: false,
+            mensaje: 'No se pudieron procesar los clientes del servidor',
+            itemsSincronizados: 0,
+          );
+        }
+
+        await _clienteRepo.limpiarYSincronizar(clientes.cast<dynamic>());
+
+        return SyncResult(
+          exito: true,
+          mensaje: 'Clientes sincronizados correctamente',
+          itemsSincronizados: clientes.length,
+          totalEnAPI: clientes.length,
+        );
+      } else {
+        final mensaje = _extraerMensajeError(response);
+        return SyncResult(
+          exito: false,
+          mensaje: mensaje,
+          itemsSincronizados: 0,
+        );
+      }
+    } catch (e) {
+      return SyncResult(
+        exito: false,
+        mensaje: _getErrorMessage(e),
+        itemsSincronizados: 0,
+      );
+    }
+  }
+
   static Future<SyncResult> sincronizarEquipos() async {
     try {
-      logger.i('🔧 Iniciando sincronización de equipos...');
+      final response = await http.get(
+        Uri.parse('$baseUrl/equipos'),
+        headers: _headers,
+      ).timeout(timeout);
 
-      final response = await ApiService.obtenerTodosLosEquipos();
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final List<dynamic> equiposData = _parseResponse(response.body);
 
-      if (response.exito && response.equipos.isNotEmpty) {
-        final equipoRepo = EquipoRepository();
-        await equipoRepo.limpiarYSincronizar(response.equipos.cast<dynamic>());
+        if (equiposData.isEmpty) {
+          return SyncResult(
+            exito: true,
+            mensaje: 'No hay equipos en el servidor',
+            itemsSincronizados: 0,
+          );
+        }
 
-        logger.i('✅ Equipos sincronizados: ${response.equipos.length}');
+        final equiposLimpios = equiposData.map((equipo) {
+          return {
+            'id': equipo['id'],
+            'cod_barras': equipo['cod_barras'],
+            'marca_id': equipo['marca_id'],
+            'modelo': equipo['modelo'],
+            'numero_serie': equipo['numero_serie'],
+            'logo_id': equipo['logo_id'],
+            'estado_local': equipo['estado_local'] ?? 1,
+            'fecha_creacion': equipo['fecha_creacion'],
+          };
+        }).toList();
+
+        await _equipoRepo.sincronizarDesdeAPI(equiposLimpios);
 
         return SyncResult(
           exito: true,
           mensaje: 'Equipos sincronizados correctamente',
-          clientesSincronizados: response.equipos.length, // Reutilizamos el campo
-          totalEnAPI: response.equipos.length,
+          itemsSincronizados: equiposLimpios.length,
+          totalEnAPI: equiposLimpios.length,
         );
       } else {
-        logger.w('⚠️ No se pudieron obtener equipos: ${response.mensaje}');
+        final mensaje = _extraerMensajeError(response);
         return SyncResult(
           exito: false,
-          mensaje: 'Error sincronizando equipos: ${response.mensaje}',
-          clientesSincronizados: 0,
+          mensaje: 'Error del servidor: $mensaje',
+          itemsSincronizados: 0,
         );
       }
-    } catch (e, stack) {
-      logger.e('❌ Error sincronizando equipos: $e');
-      logger.e('🔍 Stack trace: $stack');
+    } catch (e) {
       return SyncResult(
         exito: false,
-        mensaje: 'Error inesperado en equipos: ${e.toString()}',
-        clientesSincronizados: 0,
+        mensaje: _getErrorMessage(e),
+        itemsSincronizados: 0,
       );
     }
   }
 
-  /// Sincronizar solo asignaciones equipo-cliente
   static Future<SyncResult> sincronizarAsignaciones() async {
     try {
-      logger.i('🔗 Iniciando sincronización de asignaciones...');
+      final response = await http.get(
+        Uri.parse('$baseUrl/asignaciones'),
+        headers: _headers,
+      ).timeout(timeout);
 
-      final response = await ApiService.obtenerTodasLasAsignaciones();
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final List<dynamic> asignacionesData = _parseResponse(response.body);
 
-      if (response.exito && response.asignaciones.isNotEmpty) {
-        final equipoClienteRepo = EquipoClienteRepository();
-        await equipoClienteRepo.limpiarYSincronizar(response.asignaciones.cast<dynamic>());
+        if (asignacionesData.isEmpty) {
+          return SyncResult(
+            exito: true,
+            mensaje: 'No hay asignaciones en el servidor',
+            itemsSincronizados: 0,
+          );
+        }
 
-        logger.i('✅ Asignaciones sincronizadas: ${response.asignaciones.length}');
+        final asignacionesLimpias = asignacionesData.map((asignacion) {
+          return {
+            'id': asignacion['id'],
+            'equipo_id': asignacion['equipo_id'],
+            'cliente_id': asignacion['cliente_id'],
+            'fecha_asignacion': asignacion['fecha_asignacion'],
+            'fecha_retiro': asignacion['fecha_retiro'],
+            'activo': asignacion['activo'] ?? 1,
+          };
+        }).toList();
+
+        await _equipoClienteRepo.limpiarYSincronizar(asignacionesLimpias);
 
         return SyncResult(
           exito: true,
           mensaje: 'Asignaciones sincronizadas correctamente',
-          clientesSincronizados: response.asignaciones.length, // Reutilizamos el campo
-          totalEnAPI: response.asignaciones.length,
+          itemsSincronizados: asignacionesLimpias.length,
+          totalEnAPI: asignacionesLimpias.length,
         );
       } else {
-        logger.w('⚠️ No se pudieron obtener asignaciones: ${response.mensaje}');
+        final mensaje = _extraerMensajeError(response);
         return SyncResult(
           exito: false,
-          mensaje: 'Error sincronizando asignaciones: ${response.mensaje}',
-          clientesSincronizados: 0,
+          mensaje: mensaje,
+          itemsSincronizados: 0,
         );
       }
-    } catch (e, stack) {
-      logger.e('❌ Error sincronizando asignaciones: $e');
-      logger.e('🔍 Stack trace: $stack');
+    } catch (e) {
       return SyncResult(
         exito: false,
-        mensaje: 'Error inesperado en asignaciones: ${e.toString()}',
-        clientesSincronizados: 0,
+        mensaje: _getErrorMessage(e),
+        itemsSincronizados: 0,
       );
     }
   }
 
-
-  // SINCRONIZACIÓN DE CLIENTES
-  static Future<SyncResult> sincronizarConAPI() async {
+  static Future<int> subirRegistrosEquipos() async {
     try {
-      logger.i('🔄 Iniciando sincronización con API...');
+      final registrosPendientes = await _dbHelper.consultar(
+        'registros_equipos',
+        where: 'estado_sincronizacion = ?',
+        whereArgs: ['pendiente'],
+        orderBy: 'fecha_registro ASC',
+        limit: 50,
+      );
 
-      final response = await http.get(
-        Uri.parse(clientesEndpoint),
-        headers: _headers,
-      ).timeout(timeout);
+      if (registrosPendientes.isEmpty) return 0;
 
-      logger.i('📡 Respuesta de API - Status: ${response.statusCode}');
-      logger.d('📄 Respuesta de API (primeros 300 chars): ${response.body.length > 300 ? '${response.body.substring(0, 300)}...' : response.body}');
+      int exitosos = 0;
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
+      for (final registro in registrosPendientes) {
         try {
-          final responseBody = response.body.trim();
-          List<Cliente> clientesAPI = [];
+          final estadoData = {
+            'equipo_id': registro['equipo_id'],
+            'cliente_id': registro['cliente_id'],
+            'usuario_id': 1,
+            'funcionando': registro['funcionando'] ?? 1,
+            'estado_general': registro['estado_general'] ?? 'Revisión móvil',
+            'temperatura_actual': registro['temperatura_actual'],
+            'temperatura_freezer': registro['temperatura_freezer'],
+            'latitud': registro['latitud'],
+            'longitud': registro['longitud'],
+          };
 
-          if (responseBody.startsWith('[')) {
-            final List<dynamic> clientesJson = jsonDecode(responseBody);
-            logger.i('✅ Array de clientes recibido: ${clientesJson.length} elementos');
+          final response = await http.post(
+            Uri.parse('$baseUrl/estados'),
+            headers: _headers,
+            body: jsonEncode(estadoData),
+          ).timeout(const Duration(seconds: 15));
 
-            for (var i = 0; i < clientesJson.length; i++) {
-              try {
-                final clienteData = clientesJson[i];
-                final cliente = _crearClienteDesdeAPI(clienteData);
-                if (cliente != null) {
-                  clientesAPI.add(cliente);
-                  logger.d('✅ Cliente ${i + 1} parseado: ${cliente.nombre}');
-                } else {
-                  logger.w('⚠️ Cliente ${i + 1} ignorado por datos inválidos');
-                }
-              } catch (e) {
-                logger.w('⚠️ Error parseando cliente ${i + 1}: $e');
-              }
-            }
+          if (response.statusCode == 201) {
+            await _dbHelper.actualizar(
+              'registros_equipos',
+              {
+                'estado_sincronizacion': 'sincronizado',
+                'fecha_actualizacion': DateTime.now().toIso8601String(),
+              },
+              where: 'id = ?',
+              whereArgs: [registro['id']],
+            );
+            exitosos++;
           } else {
-            logger.e('❌ Formato de respuesta inesperado. Se esperaba un array JSON.');
-            return SyncResult(
-              exito: false,
-              mensaje: 'Formato de respuesta inesperado del servidor',
-              clientesSincronizados: 0,
+            await _dbHelper.actualizar(
+              'registros_equipos',
+              {
+                'estado_sincronizacion': 'error',
+                'fecha_actualizacion': DateTime.now().toIso8601String(),
+              },
+              where: 'id = ?',
+              whereArgs: [registro['id']],
             );
           }
-
-          logger.i('📥 Clientes procesados de API: ${clientesAPI.length}');
-
-          if (clientesAPI.isEmpty) {
-            return SyncResult(
-              exito: false,
-              mensaje: 'No se encontraron clientes válidos en la API',
-              clientesSincronizados: 0,
-            );
-          }
-
-          final clienteRepo = ClienteRepository();
-          await clienteRepo.limpiarYSincronizar(clientesAPI.cast<dynamic>());
-
-          logger.i('✅ Sincronización completada: ${clientesAPI.length} clientes');
-
-          return SyncResult(
-            exito: true,
-            mensaje: 'Sincronización exitosa: ${clientesAPI.length} clientes descargados',
-            clientesSincronizados: clientesAPI.length,
-            totalEnAPI: clientesAPI.length,
-          );
-
-        } catch (e, stack) {
-          logger.e('❌ Error procesando respuesta de sincronización: $e');
-          logger.e('🔍 Stack trace: $stack');
-          return SyncResult(
-            exito: false,
-            mensaje: 'Error procesando datos de la API: $e',
-            clientesSincronizados: 0,
-          );
+        } catch (e) {
+          _logger.w('Error subiendo registro ${registro['id']}: $e');
         }
-      } else {
-        logger.e('❌ Error del servidor - Status: ${response.statusCode}');
-        String mensajeError = _extraerMensajeError(response);
-        return SyncResult(
-          exito: false,
-          mensaje: mensajeError,
-          clientesSincronizados: 0,
-        );
       }
 
-    } on SocketException catch (e) {
-      logger.e('❌ Sin conexión: $e');
-      return SyncResult(
-        exito: false,
-        mensaje: 'Sin conexión a internet o servidor no disponible (192.168.1.186:3000)',
-        clientesSincronizados: 0,
-      );
-    } on TimeoutException catch (e) {
-      logger.e('❌ Timeout: $e');
-      return SyncResult(
-        exito: false,
-        mensaje: 'Tiempo de espera agotado (30 segundos)',
-        clientesSincronizados: 0,
-      );
-    } on HttpException catch (e) {
-      logger.e('❌ Error HTTP: $e');
-      return SyncResult(
-        exito: false,
-        mensaje: 'Error en la comunicación con el servidor',
-        clientesSincronizados: 0,
-      );
-    } catch (e, stack) {
-      logger.e('❌ Error inesperado en sincronización: $e');
-      logger.e('🔍 Stack trace: $stack');
-      return SyncResult(
-        exito: false,
-        mensaje: 'Error inesperado: ${e.toString()}',
-        clientesSincronizados: 0,
-      );
+      return exitosos;
+    } catch (e) {
+      _logger.e('Error en subida de registros: $e');
+      return 0;
+    }
+  }
+
+  static Future<int> crearRegistroEquipo({
+    required int clienteId,
+    String? clienteNombre,
+    String? clienteDireccion,
+    String? clienteTelefono,
+    int? equipoId,
+    String? codigoBarras,
+    String? modelo,
+    int? marcaId,
+    String? numeroSerie,
+    int? logoId,
+    String? observaciones,
+    double? latitud,
+    double? longitud,
+    bool funcionando = true,
+    String? estadoGeneral,
+    double? temperaturaActual,
+    double? temperaturaFreezer,
+    String? versionApp,
+    String? dispositivo,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final idLocal = now.millisecondsSinceEpoch;
+
+      final registroData = {
+        'id_local': idLocal,
+        'servidor_id': null,
+        'estado_sincronizacion': 'pendiente',
+        'cliente_id': clienteId,
+        'cliente_nombre': clienteNombre,
+        'cliente_direccion': clienteDireccion,
+        'cliente_telefono': clienteTelefono,
+        'equipo_id': equipoId,
+        'codigo_barras': codigoBarras,
+        'modelo': modelo,
+        'marca_id': marcaId,
+        'numero_serie': numeroSerie,
+        'logo_id': logoId,
+        'observaciones': observaciones,
+        'latitud': latitud,
+        'longitud': longitud,
+        'fecha_registro': now.toIso8601String(),
+        'timestamp_gps': now.toIso8601String(),
+        'funcionando': funcionando ? 1 : 0,
+        'estado_general': estadoGeneral ?? 'Revisión desde móvil',
+        'temperatura_actual': temperaturaActual,
+        'temperatura_freezer': temperaturaFreezer,
+        'version_app': versionApp,
+        'dispositivo': dispositivo,
+        'fecha_creacion': now.toIso8601String(),
+        'fecha_actualizacion': now.toIso8601String(),
+      };
+
+      final id = await _dbHelper.insertar('registros_equipos', registroData);
+      _logger.i('Registro de equipo creado con ID local: $idLocal');
+
+      return id;
+    } catch (e) {
+      _logger.e('Error creando registro de equipo: $e');
+      rethrow;
     }
   }
 
   static Future<ApiResponse> enviarClienteAAPI(Cliente cliente) async {
     try {
-      logger.i('📤 Enviando cliente: ${cliente.nombre}');
-
-      Map<String, dynamic> clienteData = {
+      final clienteData = {
         'nombre': cliente.nombre,
         'email': cliente.email,
         'telefono': cliente.telefono ?? '',
         'direccion': cliente.direccion ?? '',
       };
 
-      logger.d('📤 URL: $clientesEndpoint');
-      logger.d('📤 Datos: ${jsonEncode(clienteData)}');
-
       final response = await http.post(
-        Uri.parse(clientesEndpoint),
+        Uri.parse('$baseUrl/clientes'),
         headers: _headers,
         body: jsonEncode(clienteData),
       ).timeout(timeout);
-
-      logger.i('📤 Respuesta envío - Status: ${response.statusCode}');
-      logger.d('📤 Respuesta envío - Body: ${response.body}');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         Map<String, dynamic>? parsedData;
@@ -345,7 +446,7 @@ class SyncService {
             parsedData = jsonDecode(response.body);
           }
         } catch (e) {
-          logger.w('⚠️ No se pudo parsear la respuesta JSON: $e');
+          _logger.w('No se pudo parsear la respuesta JSON: $e');
         }
 
         return ApiResponse(
@@ -355,8 +456,7 @@ class SyncService {
           codigoEstado: response.statusCode,
         );
       } else {
-        String mensajeError = _extraerMensajeError(response);
-        logger.e('❌ Error en envío: $mensajeError');
+        final mensajeError = _extraerMensajeError(response);
 
         return ApiResponse(
           exito: false,
@@ -364,118 +464,74 @@ class SyncService {
           codigoEstado: response.statusCode,
         );
       }
-
-    } on SocketException catch (e) {
-      logger.e('❌ Error de conexión: $e');
+    } catch (e) {
       return ApiResponse(
         exito: false,
-        mensaje: 'Sin conexión al servidor ($baseUrl)',
-      );
-    } on TimeoutException catch (e) {
-      logger.e('❌ Timeout: $e');
-      return ApiResponse(
-        exito: false,
-        mensaje: 'Tiempo de espera agotado al conectar con el servidor',
-      );
-    } on HttpException catch (e) {
-      logger.e('❌ Error HTTP: $e');
-      return ApiResponse(
-        exito: false,
-        mensaje: 'Error en la comunicación HTTP con el servidor',
-      );
-    } catch (e, stack) {
-      logger.e('❌ Error inesperado: $e');
-      logger.e('🔍 Stack trace: $stack');
-      return ApiResponse(
-        exito: false,
-        mensaje: 'Error inesperado al enviar cliente: ${e.toString()}',
+        mensaje: _getErrorMessage(e),
       );
     }
   }
 
   static Future<SyncResult> enviarClientesPendientes() async {
     try {
-      final clienteRepo = ClienteRepository();
-      final clientesPendientes = await clienteRepo.obtenerNoSincronizados();
+      final clientesPendientes = await _clienteRepo.obtenerNoSincronizados();
 
       if (clientesPendientes.isEmpty) {
         return SyncResult(
           exito: true,
           mensaje: 'No hay clientes pendientes por sincronizar',
-          clientesSincronizados: 0,
+          itemsSincronizados: 0,
         );
       }
-
-      logger.i('📤 Enviando ${clientesPendientes.length} clientes pendientes...');
 
       int exitosos = 0;
       int fallidos = 0;
 
-      for (Cliente cliente in clientesPendientes) {
+      for (final cliente in clientesPendientes) {
         try {
           final resultado = await enviarClienteAAPI(cliente);
 
           if (resultado.exito) {
             exitosos++;
             if (cliente.id != null) {
-              await clienteRepo.marcarComoSincronizados([cliente.id!]);
+              await _clienteRepo.marcarComoSincronizados([cliente.id!]);
             }
           } else {
             fallidos++;
-            logger.w('❌ No se pudo enviar: ${cliente.nombre} - ${resultado.mensaje}');
           }
 
-          await Future.delayed(Duration(milliseconds: 200));
-
-        } catch (e, stack) {
+          await Future.delayed(const Duration(milliseconds: 200));
+        } catch (e) {
           fallidos++;
-          logger.e('💥 Error inesperado enviando cliente ${cliente.nombre}: $e');
-          logger.e('🔍 Stack trace: $stack');
         }
       }
 
-      if (fallidos == 0) {
-        return SyncResult(
-          exito: true,
-          mensaje: 'Todos los clientes enviados correctamente ($exitosos/$exitosos)',
-          clientesSincronizados: exitosos,
-        );
-      } else if (exitosos > 0) {
-        return SyncResult(
-          exito: true,
-          mensaje: 'Envío parcial: $exitosos exitosos, $fallidos fallidos',
-          clientesSincronizados: exitosos,
-        );
-      } else {
-        return SyncResult(
-          exito: false,
-          mensaje: 'No se pudo enviar ningún cliente',
-          clientesSincronizados: 0,
-        );
-      }
+      final mensaje = fallidos == 0
+          ? 'Todos los clientes enviados correctamente ($exitosos/$exitosos)'
+          : exitosos > 0
+          ? 'Envío parcial: $exitosos exitosos, $fallidos fallidos'
+          : 'No se pudo enviar ningún cliente';
 
-    } catch (e, stack) {
-      logger.e('❌ Error enviando clientes pendientes: $e');
-      logger.e('🔍 Stack trace: $stack');
+      return SyncResult(
+        exito: exitosos > 0,
+        mensaje: mensaje,
+        itemsSincronizados: exitosos,
+      );
+    } catch (e) {
       return SyncResult(
         exito: false,
         mensaje: 'Error inesperado: ${e.toString()}',
-        clientesSincronizados: 0,
+        itemsSincronizados: 0,
       );
     }
   }
 
   static Future<ApiResponse> probarConexion() async {
     try {
-      logger.i('🏓 Probando conexión con: $pingEndpoint');
-
       final response = await http.get(
-        Uri.parse(pingEndpoint),
+        Uri.parse('$baseUrl/ping'),
         headers: _headers,
-      ).timeout(Duration(seconds: 10));
-
-      logger.i('🏓 Respuesta ping - Status: ${response.statusCode}');
-      logger.d('🏓 Respuesta ping - Body: ${response.body}');
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         Map<String, dynamic>? serverInfo;
@@ -485,121 +541,32 @@ class SyncService {
             serverInfo = jsonDecode(response.body);
           }
         } catch (e) {
-          logger.w('⚠️ No se pudo parsear info del servidor: $e');
+          _logger.w('No se pudo parsear info del servidor: $e');
         }
 
         return ApiResponse(
           exito: true,
-          mensaje: '✅ Conexión exitosa con el servidor ($baseUrl)',
+          mensaje: 'Conexión exitosa con el servidor ($baseUrl)',
           datos: serverInfo,
         );
       } else {
         return ApiResponse(
           exito: false,
-          mensaje: '❌ Servidor no disponible (${response.statusCode})',
+          mensaje: 'Servidor no disponible (${response.statusCode})',
           codigoEstado: response.statusCode,
         );
       }
-    } on SocketException catch (e) {
-      logger.e('❌ Error de conexión: $e');
-      return ApiResponse(
-        exito: false,
-        mensaje: '❌ No se pudo conectar al servidor: Verifica que estés en la misma red WiFi (192.168.1.x)',
-      );
-    } on TimeoutException catch (e) {
-      logger.e('❌ Timeout: $e');
-      return ApiResponse(
-        exito: false,
-        mensaje: '❌ Tiempo de espera agotado: Verifica que el servidor esté ejecutándose',
-      );
-    } catch (e, stack) {
-      logger.e('❌ Error inesperado: $e');
-      logger.e('🔍 Stack trace: $stack');
-      return ApiResponse(
-        exito: false,
-        mensaje: '❌ Error al conectar con el servidor: ${e.toString()}',
-      );
-    }
-  }
-
-  // MÉTODOS AUXILIARES
-  static Cliente? _crearClienteDesdeAPI(dynamic clienteJson) {
-    try {
-      if (clienteJson is! Map<String, dynamic>) {
-        logger.w('⚠️ Datos de cliente no válidos: $clienteJson');
-        return null;
-      }
-
-      final Map<String, dynamic> data = clienteJson;
-
-      if (data['nombre'] == null || data['nombre'].toString().trim().isEmpty) {
-        logger.w('⚠️ Cliente sin nombre válido: $data');
-        return null;
-      }
-
-      if (data['email'] == null || data['email'].toString().trim().isEmpty) {
-        logger.w('⚠️ Cliente sin email válido: $data');
-        return null;
-      }
-
-      return Cliente(
-        id: data['id'] is int ? data['id'] : null,
-        nombre: data['nombre'].toString().trim(),
-        email: data['email'].toString().trim(),
-        telefono: data['telefono']?.toString().trim(),
-        direccion: data['direccion']?.toString().trim(),
-        fechaCreacion: _parsearFecha(data['fecha_creacion']) ?? DateTime.now(),
-      );
-
-    } catch (e, stack) {
-      logger.e('⚠️ Error creando cliente desde JSON: $e');
-      logger.e('⚠️ JSON problemático: $clienteJson');
-      logger.e('🔍 Stack trace: $stack');
-      return null;
-    }
-  }
-
-  static DateTime? _parsearFecha(dynamic fechaString) {
-    if (fechaString == null) return null;
-
-    try {
-      String fechaStr = fechaString.toString();
-
-      if (fechaStr.contains('T') || fechaStr.contains('Z')) {
-        return DateTime.parse(fechaStr);
-      }
-
-      if (fechaStr.contains('-')) {
-        return DateTime.parse(fechaStr);
-      }
-
-      return null;
     } catch (e) {
-      logger.w('⚠️ No se pudo parsear fecha: $fechaString - Error: $e');
-      return null;
-    }
-  }
-
-  static String _extraerMensajeError(http.Response response) {
-    try {
-      if (response.body.trim().isEmpty) {
-        return 'Error del servidor (${response.statusCode})';
-      }
-
-      final Map<String, dynamic> errorData = jsonDecode(response.body);
-      return errorData['message'] ??
-          errorData['error'] ??
-          errorData['mensaje'] ??
-          'Error del servidor (${response.statusCode})';
-    } catch (e) {
-      return 'Error del servidor (${response.statusCode}): ${response.body.length > 100 ? '${response.body.substring(0, 100)}...' : response.body}';
+      return ApiResponse(
+        exito: false,
+        mensaje: _getErrorMessage(e),
+      );
     }
   }
 
   static Future<Map<String, dynamic>> obtenerEstadisticas() async {
     try {
-      final clienteRepo = ClienteRepository();
-      final estadisticasDB = await clienteRepo.obtenerEstadisticas();
+      final estadisticasDB = await _clienteRepo.obtenerEstadisticas();
       final conexion = await probarConexion();
 
       return {
@@ -617,52 +584,185 @@ class SyncService {
       };
     }
   }
-}
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// CLASES DE RESULTADO
-// ═══════════════════════════════════════════════════════════════════════════════
+  static List<dynamic> _parseResponse(String responseBody) {
+    try {
+      final responseData = jsonDecode(responseBody.trim());
+
+      if (responseData is Map<String, dynamic>) {
+        if (responseData.containsKey('data')) {
+          final data = responseData['data'];
+
+          if (data is List) {
+            return data;
+          }
+
+          if (data is Map<String, dynamic>) {
+            final knownFields = ['equipos', 'asignaciones', 'clientes', 'estados'];
+            for (final field in knownFields) {
+              if (data.containsKey(field) && data[field] is List) {
+                return data[field] as List;
+              }
+            }
+
+            for (final entry in data.entries) {
+              if (entry.value is List) {
+                return entry.value as List;
+              }
+            }
+          }
+        }
+        return [];
+      }
+
+      if (responseData is List) {
+        return responseData;
+      }
+
+      return [];
+    } catch (e) {
+      _logger.e('Error parseando respuesta JSON: $e');
+      return [];
+    }
+  }
+
+  static Cliente? _crearClienteDesdeAPI(dynamic clienteJson) {
+    try {
+      if (clienteJson is! Map<String, dynamic>) {
+        return null;
+      }
+
+      final data = clienteJson;
+
+      if (data['nombre'] == null || data['nombre'].toString().trim().isEmpty) {
+        return null;
+      }
+
+      if (data['email'] == null || data['email'].toString().trim().isEmpty) {
+        return null;
+      }
+
+      return Cliente(
+        id: data['id'] is int ? data['id'] : null,
+        nombre: data['nombre'].toString().trim(),
+        email: data['email'].toString().trim(),
+        telefono: data['telefono']?.toString().trim(),
+        direccion: data['direccion']?.toString().trim(),
+        fechaCreacion: _parsearFecha(data['fecha_creacion']) ?? DateTime.now(),
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  static DateTime? _parsearFecha(dynamic fechaString) {
+    if (fechaString == null) return null;
+
+    try {
+      final fechaStr = fechaString.toString();
+
+      if (fechaStr.contains('T') || fechaStr.contains('Z')) {
+        return DateTime.parse(fechaStr);
+      }
+
+      if (fechaStr.contains('-')) {
+        return DateTime.parse(fechaStr);
+      }
+
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  static String _extraerMensajeError(http.Response response) {
+    try {
+      if (response.body.trim().isEmpty) {
+        return 'Error del servidor (${response.statusCode})';
+      }
+
+      final errorData = jsonDecode(response.body) as Map<String, dynamic>;
+      return errorData['message'] ??
+          errorData['error'] ??
+          errorData['mensaje'] ??
+          'Error del servidor (${response.statusCode})';
+    } catch (e) {
+      return 'Error del servidor (${response.statusCode}): ${response.body.length > 100 ? '${response.body.substring(0, 100)}...' : response.body}';
+    }
+  }
+
+  static String _getErrorMessage(dynamic error) {
+    if (error is SocketException) {
+      return 'Sin conexión al servidor. Verifica que estés en la misma red WiFi.';
+    } else if (error is TimeoutException) {
+      return 'Tiempo de espera agotado. Verifica que el servidor esté ejecutándose.';
+    } else if (error is HttpException) {
+      return 'Error en la comunicación con el servidor.';
+    } else {
+      return 'Error inesperado: ${error.toString()}';
+    }
+  }
+}
 
 class SyncResult {
   final bool exito;
   final String mensaje;
-  final int clientesSincronizados;
+  final int itemsSincronizados;
   final int totalEnAPI;
 
   SyncResult({
     required this.exito,
     required this.mensaje,
-    required this.clientesSincronizados,
+    required this.itemsSincronizados,
     this.totalEnAPI = 0,
   });
 
   @override
   String toString() {
-    return 'SyncResult(exito: $exito, mensaje: $mensaje, sincronizados: $clientesSincronizados, total: $totalEnAPI)';
+    return 'SyncResult(exito: $exito, mensaje: $mensaje, sincronizados: $itemsSincronizados, total: $totalEnAPI)';
   }
 }
 
-/// Resultado de sincronización unificada
 class SyncResultUnificado {
   bool exito = false;
   String mensaje = '';
   String estadoActual = '';
 
-  // Conexión
   bool conexionOK = false;
 
-  // Clientes
   bool clientesExito = false;
   int clientesSincronizados = 0;
   String? erroresClientes;
 
-  // Equipos
   bool equiposExito = false;
   int equiposSincronizados = 0;
   String? erroresEquipos;
 
+  bool asignacionesExito = false;
+  int asignacionesSincronizadas = 0;
+  String? erroresAsignaciones;
+
   @override
   String toString() {
-    return 'SyncResultUnificado(exito: $exito, clientes: $clientesSincronizados, equipos: $equiposSincronizados, mensaje: $mensaje)';
+    return 'SyncResultUnificado(exito: $exito, clientes: $clientesSincronizados, equipos: $equiposSincronizados, asignaciones: $asignacionesSincronizadas, mensaje: $mensaje)';
+  }
+}
+
+class ApiResponse {
+  final bool exito;
+  final String mensaje;
+  final Map<String, dynamic>? datos;
+  final int? codigoEstado;
+
+  ApiResponse({
+    required this.exito,
+    required this.mensaje,
+    this.datos,
+    this.codigoEstado,
+  });
+
+  @override
+  String toString() {
+    return 'ApiResponse(exito: $exito, mensaje: $mensaje, codigo: $codigoEstado)';
   }
 }

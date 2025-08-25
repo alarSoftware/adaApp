@@ -1,9 +1,9 @@
 import 'package:cliente_app/repositories/equipo_repository.dart';
 import 'package:flutter/material.dart';
 import '../models/equipos.dart';
-import '../services/database_helper.dart';
-import '../services/api_service.dart';
+import '../services/sync_service.dart';
 import 'package:logger/logger.dart';
+import 'dart:async';
 
 var logger = Logger();
 
@@ -15,26 +15,26 @@ class EquipoListScreen extends StatefulWidget {
 }
 
 class _EquipoListScreenState extends State<EquipoListScreen> {
-  List<Equipo> equipos = [];
-  List<Equipo> equiposFiltrados = [];
-  List<Equipo> equiposMostrados = [];
+  List<Map<String, dynamic>> equipos = [];
+  List<Map<String, dynamic>> equiposFiltrados = [];
+  List<Map<String, dynamic>> equiposMostrados = [];
   TextEditingController searchController = TextEditingController();
   EquipoRepository equipoRepository = EquipoRepository();
   bool isLoading = true;
 
-  // Configuración de paginación
   static const int equiposPorPagina = 10;
   int paginaActual = 0;
   bool hayMasDatos = true;
   bool cargandoMas = false;
 
   final ScrollController _scrollController = ScrollController();
+  Timer? _debounceTimer;
 
   @override
   void initState() {
     super.initState();
     _cargarEquipos();
-    searchController.addListener(_filtrarEquipos);
+    searchController.addListener(_onSearchChanged);
     _scrollController.addListener(_onScroll);
   }
 
@@ -42,7 +42,16 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
   void dispose() {
     searchController.dispose();
     _scrollController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    if (_debounceTimer?.isActive ?? false) _debounceTimer?.cancel();
+
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _filtrarEquipos();
+    });
   }
 
   Future<void> _cargarEquipos() async {
@@ -55,7 +64,7 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
     });
 
     try {
-      final equiposDB = await equipoRepository.buscar('');
+      final equiposDB = await equipoRepository.obtenerCompletos(soloActivos: true);
 
       if (!mounted) return;
 
@@ -81,33 +90,17 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
     }
   }
 
-  Future<void> _sincronizarConAPI() async {
-    try {
-      logger.i('🔄 Sincronizando equipos con API...');
-
-      final response = await ApiService.obtenerTodosLosEquipos();
-      logger.i('📊 Respuesta API: ${response.toString()}');
-
-      if (response.exito && response.equipos.isNotEmpty) {
-        await equipoRepository.limpiarYSincronizar(response.equipos);
-        logger.i('✅ ${response.equipos.length} equipos sincronizados');
-      } else {
-        logger.w('⚠️ No se pudieron obtener equipos de la API: ${response.mensaje}');
-        throw Exception(response.mensaje);
-      }
-    } catch (e) {
-      logger.e('❌ Error sincronizando con API: $e');
-      rethrow;
-    }
-  }
-
   Future<void> _refrescarDatos() async {
     try {
-      await _sincronizarConAPI();
-      await _cargarEquipos();
+      final resultado = await SyncService.sincronizarEquipos();
 
-      if (mounted) {
-        _mostrarExito('Datos actualizados correctamente');
+      if (resultado.exito) {
+        await _cargarEquipos();
+        if (mounted) {
+          _mostrarExito('Equipos actualizados: ${resultado.itemsSincronizados}');
+        }
+      } else {
+        throw Exception(resultado.mensaje);
       }
     } catch (e) {
       logger.e('Error refrescando datos: $e');
@@ -127,17 +120,26 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
     final startIndex = paginaActual * equiposPorPagina;
     final endIndex = (startIndex + equiposPorPagina).clamp(0, equiposFiltrados.length);
 
-    final nuevosEquipos = equiposFiltrados.sublist(startIndex, endIndex);
+    if (startIndex < equiposFiltrados.length) {
+      final nuevosEquipos = equiposFiltrados.sublist(startIndex, endIndex);
 
-    setState(() {
-      equiposMostrados.addAll(nuevosEquipos);
-      paginaActual++;
-      hayMasDatos = endIndex < equiposFiltrados.length;
-      cargandoMas = false;
-    });
+      setState(() {
+        equiposMostrados.addAll(nuevosEquipos);
+        paginaActual++;
+        hayMasDatos = endIndex < equiposFiltrados.length;
+        cargandoMas = false;
+      });
+    } else {
+      setState(() {
+        hayMasDatos = false;
+        cargandoMas = false;
+      });
+    }
   }
 
   void _filtrarEquipos() {
+    if (!mounted) return;
+
     final query = searchController.text.toLowerCase().trim();
 
     setState(() {
@@ -145,17 +147,21 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
         equiposFiltrados = List.from(equipos);
       } else {
         equiposFiltrados = equipos.where((equipo) {
-          return equipo.codBarras.toLowerCase().contains(query) ||
-              equipo.marca.toLowerCase().contains(query) ||
-              equipo.modelo.toLowerCase().contains(query) ||
-              equipo.tipoEquipo.toLowerCase().contains(query);
+          final codBarras = equipo['cod_barras']?.toString().toLowerCase() ?? '';
+          final marcaNombre = equipo['marca_nombre']?.toString().toLowerCase() ?? '';
+          final modelo = equipo['modelo']?.toString().toLowerCase() ?? '';
+          final logoNombre = equipo['logo_nombre']?.toString().toLowerCase() ?? '';
+
+          return codBarras.contains(query) ||
+              marcaNombre.contains(query) ||
+              modelo.contains(query) ||
+              logoNombre.contains(query);
         }).toList();
       }
 
-      // Reiniciar paginación
       paginaActual = 0;
       equiposMostrados.clear();
-      hayMasDatos = equiposFiltrados.length > equiposPorPagina;
+      hayMasDatos = equiposFiltrados.isNotEmpty;
     });
 
     _cargarSiguientePagina();
@@ -168,51 +174,50 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
     }
   }
 
-  Color _getColorByTipo(String tipoEquipo) {
-    final tipo = tipoEquipo.toLowerCase();
+  Color _getColorByLogo(String? logoNombre) {
+    if (logoNombre == null) return Colors.grey;
 
-    switch (tipo) {
-      case 'heladera':
-      case 'refrigerador':
-      case 'refrigerador no frost':
-      case 'refrigerador side by side':
-      case 'refrigerador convencional':
-      case 'refrigerador inverter':
-      case 'refrigerador inteligente':
-      case 'refrigerador door-in-door':
-      case 'french door':
+    final logo = logoNombre.toLowerCase();
+
+    switch (logo) {
+      case 'pepsi':
         return Colors.blue;
-      case 'freezer':
-      case 'congelador':
-      case 'freezer vertical':
-      case 'freezer horizontal':
-        return Colors.cyan;
+      case 'pulp':
+        return Colors.orange;
+      case 'paso de los toros':
+        return Colors.green;
+      case 'mirinda':
+        return Colors.deepOrange;
+      case '7up':
+        return Colors.lightGreen;
+      case 'gatorade':
+        return Colors.blue[800]!;
+      case 'red bull':
+        return Colors.red;
       default:
-        return Colors.grey;
+        return Colors.grey[600]!;
     }
   }
 
-  IconData _getIconByTipo(String tipoEquipo) {
-    final tipo = tipoEquipo.toLowerCase();
+  IconData _getIconByLogo(String? logoNombre) {
+    if (logoNombre == null) return Icons.kitchen;
 
-    switch (tipo) {
-      case 'heladera':
-      case 'refrigerador':
-      case 'refrigerador no frost':
-      case 'refrigerador side by side':
-      case 'refrigerador convencional':
-      case 'refrigerador inverter':
-      case 'refrigerador inteligente':
-      case 'refrigerador door-in-door':
-      case 'french door':
-        return Icons.kitchen;
-      case 'freezer':
-      case 'congelador':
-      case 'freezer vertical':
-      case 'freezer horizontal':
-        return Icons.ac_unit;
+    final logo = logoNombre.toLowerCase();
+
+    switch (logo) {
+      case 'pepsi':
+      case 'mirinda':
+      case '7up':
+      case 'paso de los toros':
+        return Icons.local_drink;
+      case 'gatorade':
+      case 'red bull':
+        return Icons.sports_bar;
+      case 'aquafina':
+      case 'puro sol':
+        return Icons.water_drop;
       default:
-        return Icons.devices;
+        return Icons.kitchen;
     }
   }
 
@@ -240,31 +245,32 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
     );
   }
 
-  void _mostrarDetallesEquipo(Equipo equipo) {
+  void _mostrarDetallesEquipo(Map<String, dynamic> equipo) {
+    final marcaNombre = equipo['marca_nombre'] ?? 'Sin marca';
+    final modelo = equipo['modelo'] ?? 'Sin modelo';
+    final nombreCompleto = '$marcaNombre $modelo';
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
-          equipo.nombreCompleto,
+          nombreCompleto,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Código: ${equipo.codBarras}'),
-            const SizedBox(height: 8),
-            Text('Marca: ${equipo.marca}'),
-            const SizedBox(height: 8),
-            Text('Modelo: ${equipo.modelo}'),
-            const SizedBox(height: 8),
-            Text('Tipo: ${equipo.tipoEquipo}'),
-            const SizedBox(height: 8),
-            Text('Estado: ${equipo.estaActivo ? "Activo" : "Inactivo"}'),
-            const SizedBox(height: 8),
-            Text('Sincronizado: ${equipo.estaSincronizado ? "Sí" : "No"}'),
-            const SizedBox(height: 8),
-            Text('Fecha creación: ${equipo.fechaCreacion.day}/${equipo.fechaCreacion.month}/${equipo.fechaCreacion.year}'),
+            _buildDetalleRow('Código', equipo['cod_barras'] ?? 'N/A'),
+            _buildDetalleRow('Marca', marcaNombre),
+            _buildDetalleRow('Modelo', modelo),
+            _buildDetalleRow('Logo', equipo['logo_nombre'] ?? 'Sin logo'),
+            if (equipo['numero_serie'] != null)
+              _buildDetalleRow('Número de Serie', equipo['numero_serie']),
+            _buildDetalleRow('Estado Local', (equipo['estado_local'] == 1) ? "Activo" : "Inactivo"),
+            _buildDetalleRow('Estado Asignación', equipo['estado_asignacion'] ?? 'Disponible'),
+            if (equipo['cliente_nombre'] != null)
+              _buildDetalleRow('Asignado a', equipo['cliente_nombre']),
           ],
         ),
         actions: [
@@ -277,32 +283,57 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
     );
   }
 
+  Widget _buildDetalleRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              '$label:',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          Expanded(
+            child: Text(value),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Equipos (${equipos.length})'),
+        title: Text('Equipos (${equiposFiltrados.length}/${equipos.length})'),
         backgroundColor: Colors.grey[800],
         foregroundColor: Colors.white,
         actions: [
-
+          IconButton(
+            onPressed: _refrescarDatos,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Actualizar equipos',
+          ),
         ],
       ),
       body: Column(
         children: [
-          // Barra de búsqueda
           Container(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
               controller: searchController,
               decoration: InputDecoration(
-                hintText: 'Buscar por código, marca, modelo o tipo...',
+                hintText: 'Buscar por código, marca, modelo o logo...',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: searchController.text.isNotEmpty
                     ? IconButton(
                   icon: const Icon(Icons.clear),
                   onPressed: () {
                     searchController.clear();
+                    _filtrarEquipos();
                   },
                 )
                     : null,
@@ -315,10 +346,21 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
             ),
           ),
 
-          // Lista de equipos
           Expanded(
             child: isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: Colors.grey[700]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Cargando equipos...',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            )
                 : equiposMostrados.isEmpty
                 ? _buildEmptyState()
                 : RefreshIndicator(
@@ -368,13 +410,31 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
               color: Colors.grey[600],
             ),
           ),
-          const SizedBox(height: 16),
+          if (!isSearching) ...[
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _refrescarDatos,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Actualizar equipos'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey[700],
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ]
         ],
       ),
     );
   }
 
-  Widget _buildEquipoCard(Equipo equipo) {
+  Widget _buildEquipoCard(Map<String, dynamic> equipo) {
+    final marcaNombre = equipo['marca_nombre'] ?? 'Sin marca';
+    final modelo = equipo['modelo'] ?? 'Sin modelo';
+    final nombreCompleto = '$marcaNombre $modelo';
+    final logoNombre = equipo['logo_nombre'];
+    final estadoAsignacion = equipo['estado_asignacion'] ?? 'Disponible';
+    final clienteNombre = equipo['cliente_nombre'];
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       elevation: 2,
@@ -384,15 +444,15 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         leading: CircleAvatar(
-          backgroundColor: _getColorByTipo(equipo.tipoEquipo),
+          backgroundColor: _getColorByLogo(logoNombre),
           child: Icon(
-            _getIconByTipo(equipo.tipoEquipo),
+            _getIconByLogo(logoNombre),
             color: Colors.white,
             size: 20,
           ),
         ),
         title: Text(
-          equipo.nombreCompleto,
+          nombreCompleto,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
@@ -403,33 +463,60 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
           children: [
             const SizedBox(height: 4),
             Text(
-              'Tipo: ${equipo.tipoEquipo}',
+              'Logo: ${logoNombre ?? 'Sin logo'}',
               style: TextStyle(
                 color: Colors.grey[600],
                 fontSize: 14,
               ),
             ),
             Text(
-              'Código: ${equipo.codBarras}',
+              'Código: ${equipo['cod_barras'] ?? 'N/A'}',
               style: TextStyle(
                 color: Colors.grey[500],
                 fontSize: 12,
               ),
             ),
-          ],
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              equipo.estaSincronizado ? Icons.cloud_done : Icons.cloud_off,
-              color: equipo.estaSincronizado ? Colors.green : Colors.orange,
-              size: 16,
+            if (equipo['numero_serie'] != null)
+              Text(
+                'Serie: ${equipo['numero_serie']}',
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 12,
+                ),
+              ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: estadoAsignacion == 'Disponible' ? Colors.green : Colors.orange,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    estadoAsignacion,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (clienteNombre != null) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    clienteNombre,
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ],
             ),
-            const SizedBox(height: 4),
-            const Icon(Icons.arrow_forward_ios, size: 14),
           ],
         ),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 14),
         onTap: () => _mostrarDetallesEquipo(equipo),
       ),
     );
