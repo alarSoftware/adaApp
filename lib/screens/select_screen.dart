@@ -1,10 +1,16 @@
 import 'package:cliente_app/repositories/cliente_repository.dart';
 import 'package:cliente_app/repositories/equipo_repository.dart';
+import 'package:cliente_app/screens/equipos_screen.dart';
 import 'package:flutter/material.dart';
 import '../services/sync_service.dart';
 import '../services/api_service.dart';
 import 'package:logger/logger.dart';
-import 'equipos_screen.dart';
+import 'package:cliente_app/screens/modelos_screen.dart';
+import 'package:cliente_app/screens/logo_screen.dart';
+import '../repositories/models_repository.dart';
+import '../repositories/logo_repository.dart';
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 var logger = Logger();
 
@@ -18,24 +24,101 @@ class SelectScreen extends StatefulWidget {
 class _SelectScreenState extends State<SelectScreen> {
   bool isSyncing = false;
   bool isConnected = false;
+  bool hasInternetConnection = false; // Nueva variable para conexión a internet
+  bool hasApiConnection = false; // Nueva variable para conexión a API
+
+  late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
+  Timer? _apiMonitorTimer; // Timer para monitorear la API
 
   @override
   void initState() {
     super.initState();
     _verificarConexion();
+    _startApiMonitoring(); // Iniciar monitoreo de API
+
+    _connectivitySubscription = Connectivity()
+        .onConnectivityChanged
+        .listen((List<ConnectivityResult> results) {
+      setState(() {
+        hasInternetConnection = results.any((r) => r != ConnectivityResult.none);
+        // Solo actualizar isConnected si hay internet
+        if (!hasInternetConnection) {
+          isConnected = false;
+          hasApiConnection = false;
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription.cancel();
+    _apiMonitorTimer?.cancel(); // Cancelar el timer
+    super.dispose();
+  }
+
+  // Nuevo método para iniciar el monitoreo periódico de la API
+  void _startApiMonitoring() {
+    _apiMonitorTimer = Timer.periodic(Duration(seconds: 10), (timer) {
+      if (hasInternetConnection) {
+        _checkApiConnectionSilently();
+      }
+    });
+  }
+
+  // Verificación silenciosa de la API (sin mostrar errores)
+  Future<void> _checkApiConnectionSilently() async {
+    try {
+      final conexion = await SyncService.probarConexion();
+      if (mounted) {
+        setState(() {
+          hasApiConnection = conexion.exito;
+          isConnected = hasInternetConnection && hasApiConnection;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          hasApiConnection = false;
+          isConnected = false;
+        });
+      }
+      logger.w('API no disponible: $e');
+    }
   }
 
   Future<void> _verificarConexion() async {
     try {
+      // Verificar primero conectividad a internet
+      final connectivityResults = await Connectivity().checkConnectivity();
+      final internetConnection = connectivityResults.any((r) => r != ConnectivityResult.none);
+
+      if (!internetConnection) {
+        setState(() {
+          hasInternetConnection = false;
+          hasApiConnection = false;
+          isConnected = false;
+        });
+        return;
+      }
+
+      // Si hay internet, verificar API
       final conexion = await SyncService.probarConexion();
       setState(() {
-        isConnected = conexion.exito;
+        hasInternetConnection = internetConnection;
+        hasApiConnection = conexion.exito;
+        isConnected = hasInternetConnection && hasApiConnection;
       });
     } catch (e) {
       logger.e('Error verificando conexión: $e');
+      setState(() {
+        hasApiConnection = false;
+        isConnected = false;
+      });
     }
   }
 
+  // Resto de tus métodos existentes...
   Future<void> _sincronizarConAPI() async {
     if (isSyncing) return;
 
@@ -53,7 +136,6 @@ class _SelectScreenState extends State<SelectScreen> {
       bool? confirmar = await _mostrarDialogoSincronizacion();
       if (confirmar != true) return;
 
-      // Usar el método unificado
       final resultado = await SyncService.sincronizarTodosLosDatos();
 
       if (resultado.exito) {
@@ -63,7 +145,7 @@ class _SelectScreenState extends State<SelectScreen> {
           mensaje += '\n• Equipos: ${resultado.equiposSincronizados}';
         }
         _mostrarExito(mensaje);
-        await _verificarConexion(); // Actualizar estado de conexión
+        await _verificarConexion();
       } else {
         _mostrarError('Error en sincronización: ${resultado.mensaje}');
       }
@@ -171,11 +253,13 @@ class _SelectScreenState extends State<SelectScreen> {
       if (response.exito) {
         _mostrarExito(response.mensaje);
         setState(() {
-          isConnected = true;
+          hasApiConnection = true;
+          isConnected = hasInternetConnection && hasApiConnection;
         });
       } else {
         _mostrarError(response.mensaje);
         setState(() {
+          hasApiConnection = false;
           isConnected = false;
         });
       }
@@ -197,12 +281,15 @@ class _SelectScreenState extends State<SelectScreen> {
     try {
       final clienteRepo = ClienteRepository();
       final equipoRepo = EquipoRepository();
+      final modeloRepo = ModeloRepository();
+      final logoRepo = LogoRepository();
 
-      // Usar el nuevo método que borra todo
-      await clienteRepo.limpiarYSincronizar([]); // lista vacía borra todo
+      await clienteRepo.limpiarYSincronizar([]);
       await equipoRepo.limpiarYSincronizar([]);
+      await modeloRepo.borrarTodos();
+      await logoRepo.borrarTodos();
 
-      _mostrarExito('Base de datos completa borrada correctamente\\n• Clientes eliminados\\n• Equipos eliminados\\n• Todos los datos borrados');
+      _mostrarExito('Base de datos completa borrada correctamente');
 
     } catch (e) {
       _mostrarError('Error al borrar la base de datos: $e');
@@ -288,7 +375,6 @@ class _SelectScreenState extends State<SelectScreen> {
     );
   }
 
-  // MÉTODO MOVIDO FUERA DEL BUILD - AQUÍ ES DONDE DEBE ESTAR
   Widget _buildMenuButton(
       BuildContext context, {
         required String label,
@@ -348,6 +434,38 @@ class _SelectScreenState extends State<SelectScreen> {
     );
   }
 
+  // Widget mejorado para mostrar el estado de conexión
+  Widget _buildConnectionStatus() {
+    IconData icon;
+    Color color;
+    String text;
+
+    if (!hasInternetConnection) {
+      icon = Icons.wifi_off;
+      color = Colors.red;
+      text = 'Sin Internet';
+    } else if (!hasApiConnection) {
+      icon = Icons.cloud_off;
+      color = Colors.orange;
+      text = 'API Desconectada';
+    } else {
+      icon = Icons.cloud_done;
+      color = Colors.green;
+      text = 'Conectado';
+    }
+
+    return Container(
+      margin: EdgeInsets.only(right: 8),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          SizedBox(width: 4),
+          Text(text, style: TextStyle(fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -372,24 +490,8 @@ class _SelectScreenState extends State<SelectScreen> {
             tooltip: isSyncing ? 'Sincronizando...' : 'Sincronizar datos',
           ),
 
-          // Indicador de conexión
-          Container(
-            margin: EdgeInsets.only(right: 8),
-            child: Row(
-              children: [
-                Icon(
-                  isConnected ? Icons.wifi : Icons.wifi_off,
-                  color: isConnected ? Colors.green : Colors.red,
-                  size: 20,
-                ),
-                SizedBox(width: 4),
-                Text(
-                  isConnected ? 'Conectado' : 'Desconectado',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ],
-            ),
-          ),
+          // Indicador de conexión mejorado
+          _buildConnectionStatus(),
 
           // Menú de 3 puntos
           PopupMenuButton<String>(
@@ -492,34 +594,23 @@ class _SelectScreenState extends State<SelectScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           _buildMenuButton(
-                            context,
-                            label: 'Marcas',
-                            icon: Icons.branding_watermark,
-                            color: Colors.grey[600],
-                            onTap: () {
-                              // TODO: Navegar a pantalla de marcas
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Pantalla de marcas próximamente')),
-                              );
-                            },
+                              context,
+                              label: 'Modelos',
+                              icon: Icons.branding_watermark,
+                              color: Colors.grey[600],
+                              page: const ModelosScreen()
                           ),
                           _buildMenuButton(
                             context,
                             label: 'Logos',
                             icon: Icons.newspaper,
                             color: Colors.grey[600],
-                            onTap: () {
-                              // TODO: Navegar a pantalla de logos
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Pantalla de logos próximamente')),
-                              );
-                            },
+                            page: const LogosScreen(),
                           ),
                         ],
                       ),
                     ],
                   )
-
                 ],
               ),
             ),

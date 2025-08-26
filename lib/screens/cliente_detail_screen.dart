@@ -22,6 +22,7 @@ class ClienteDetailScreen extends StatefulWidget {
 
 class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
   List<EquipoCliente> _equiposAsignados = [];
+  List<Map<String, dynamic>> _equiposCompletos = []; // Datos completos del repositorio
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -50,19 +51,26 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
       }
 
       final equipoClienteRepo = EquipoClienteRepository();
-      final equiposDelCliente = await equipoClienteRepo.obtenerPorCliente(
+      final equiposDelCliente = await equipoClienteRepo.obtenerPorClienteCompleto(
           widget.cliente.id!,
-          soloActivos: true);
+          soloActivos: true
+      );
 
       if (mounted) {
         setState(() {
-          _equiposAsignados = equiposDelCliente;
+          // Guardar los datos completos del repositorio
+          _equiposCompletos = equiposDelCliente;
+
+          // Convertir los Map a objetos EquipoCliente para compatibilidad
+          _equiposAsignados = equiposDelCliente.map((equipoData) {
+            return EquipoCliente.fromMap(equipoData);
+          }).toList();
+
           _isLoading = false;
         });
       }
     } catch (e, stackTrace) {
       _logger.e('Error cargando equipos del cliente', error: e, stackTrace: stackTrace);
-
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -76,6 +84,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
     if (mounted) {
       setState(() {
         _equiposAsignados = [];
+        _equiposCompletos = [];
         _isLoading = false;
       });
     }
@@ -139,18 +148,25 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _buildAppBar(),
-      body: RefreshIndicator(
-        onRefresh: _cargarEquiposAsignados,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildClienteInfoCard(),
-              const SizedBox(height: 24),
-              _buildEquiposSection(),
-            ],
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _cargarEquiposAsignados,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.only(
+              left: 16.0,
+              right: 16.0,
+              top: 16.0,
+              bottom: 16.0 + MediaQuery.of(context).padding.bottom, // Espacio extra para barras de navegación
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildClienteInfoCard(),
+                const SizedBox(height: 24),
+                _buildEquiposSection(),
+              ],
+            ),
           ),
         ),
       ),
@@ -198,18 +214,13 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 20),
-
             // Información del cliente
             _buildInfoRow(Icons.email_outlined, 'Email', widget.cliente.email),
-
             if (widget.cliente.telefono?.isNotEmpty == true)
               _buildInfoRow(Icons.phone_outlined, 'Teléfono', widget.cliente.telefono!),
-
             if (widget.cliente.direccion?.isNotEmpty == true)
               _buildInfoRow(Icons.location_on_outlined, 'Dirección', widget.cliente.direccion!),
-
             _buildInfoRow(
                 Icons.access_time_outlined,
                 'Fecha de creación',
@@ -305,7 +316,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
-                '${_equiposAsignados.length}',
+                '${_equiposCompletos.length}', // Usar _equiposCompletos para el contador
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -330,7 +341,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
       return _buildErrorState();
     }
 
-    if (_equiposAsignados.isEmpty) {
+    if (_equiposCompletos.isEmpty) {
       return _buildEmptyState();
     }
 
@@ -461,7 +472,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
 
   Widget _buildEquiposList() {
     return Column(
-      children: _equiposAsignados.map((equipoCliente) {
+      children: _equiposCompletos.map((equipoData) {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           child: Card(
@@ -470,7 +481,11 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: InkWell(
-              onTap: () => _navegarADetalleEquipo(equipoCliente),
+              onTap: () {
+                // Convertir a EquipoCliente para navegación
+                final equipoCliente = EquipoCliente.fromMap(equipoData);
+                _navegarADetalleEquipo(equipoCliente);
+              },
               borderRadius: BorderRadius.circular(12),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -490,16 +505,14 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                         size: 28,
                       ),
                     ),
-
                     const SizedBox(width: 16),
-
                     // Información del equipo
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            equipoCliente.equipoNombreCompleto,
+                            '${equipoData['marca_nombre'] ?? 'Sin marca'} ${equipoData['equipo_modelo'] ?? 'Sin modelo'}',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -508,12 +521,10 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-
                           const SizedBox(height: 4),
-
-                          if (equipoCliente.equipoCodBarras?.isNotEmpty == true)
+                          if (equipoData['equipo_cod_barras']?.toString().isNotEmpty == true)
                             Text(
-                              equipoCliente.equipoCodBarras!,
+                              equipoData['equipo_cod_barras'].toString(),
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[600],
@@ -522,9 +533,19 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-
+                          if (equipoData['logo_nombre']?.toString().isNotEmpty == true) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'Logo: ${equipoData['logo_nombre']}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[500],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                           const SizedBox(height: 6),
-
                           Row(
                             children: [
                               Icon(
@@ -534,7 +555,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                'Censado hace ${equipoCliente.diasDesdeAsignacion} días',
+                                'Censado: ${_formatearFecha(DateTime.parse(equipoData['fecha_asignacion']))}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey[500],
@@ -545,7 +566,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                         ],
                       ),
                     ),
-
                     // Flecha
                     Icon(
                       Icons.arrow_forward_ios,

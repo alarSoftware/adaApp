@@ -21,11 +21,21 @@ abstract class BaseRepository<T> {
   // ════════════════════════════════════════════════════════════════
 
   /// Obtener todos los elementos
+// En BaseRepository, cambia el método obtenerTodos:
   Future<List<T>> obtenerTodos({bool soloActivos = true}) async {
-    final maps = await dbHelper.consultar( // ← SIN UNDERSCORE
+    // Verificar si la tabla tiene columna 'activo' antes de usarla
+    String? where;
+    List<dynamic>? whereArgs;
+
+    if (soloActivos && tableName != 'modelos') {  // modelos no tiene columna activo
+      where = 'activo = ?';
+      whereArgs = [1];
+    }
+
+    final maps = await dbHelper.consultar(
       tableName,
-      where: soloActivos ? 'activo = ?' : null,
-      whereArgs: soloActivos ? [1] : null,
+      where: where,
+      whereArgs: whereArgs,
       orderBy: getDefaultOrderBy(),
     );
     return maps.map((map) => fromMap(map)).toList();

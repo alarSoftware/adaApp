@@ -16,28 +16,39 @@ class EquipoRepository extends BaseRepository<Equipo> {
   String getDefaultOrderBy() => 'fecha_creacion DESC';
 
   @override
-  String getBuscarWhere() => 'activo = ? AND (LOWER(cod_barras) LIKE ? OR LOWER(modelo) LIKE ? OR LOWER(numero_serie) LIKE ?)';
+  String getBuscarWhere() => 'activo = ? AND (LOWER(cod_barras) LIKE ? OR LOWER(numero_serie) LIKE ?)';
 
   @override
   List<dynamic> getBuscarArgs(String query) {
     final searchTerm = '%${query.toLowerCase()}%';
-    return [1, searchTerm, searchTerm, searchTerm];
+    return [1, searchTerm, searchTerm];
   }
 
   @override
   String getEntityName() => 'Equipo';
 
-  /// Obtener equipos con datos completos (JOIN con marcas y logos)
+  /// Obtener equipos con datos completos (JOIN con marcas, modelos y logos) - CORREGIDO
   Future<List<Map<String, dynamic>>> obtenerCompletos({bool soloActivos = true}) async {
     final whereClause = soloActivos ? 'WHERE e.activo = 1' : '';
 
     final sql = '''
       SELECT e.*,
              m.nombre as marca_nombre,
-             l.nombre as logo_nombre
+             mo.nombre as modelo_nombre,
+             l.nombre as logo_nombre,
+             CASE 
+               WHEN ec.id IS NOT NULL THEN 'Asignado'
+               ELSE 'Disponible'
+             END as estado_asignacion,
+             c.nombre as cliente_nombre
       FROM equipos e
       LEFT JOIN marcas m ON e.marca_id = m.id
+      LEFT JOIN modelos mo ON e.modelo_id = mo.id
       LEFT JOIN logo l ON e.logo_id = l.id
+      LEFT JOIN equipo_cliente ec ON e.id = ec.equipo_id 
+        AND ec.activo = 1 
+        AND ec.fecha_retiro IS NULL
+      LEFT JOIN clientes c ON ec.cliente_id = c.id
       $whereClause
       ORDER BY e.fecha_creacion DESC
     ''';
@@ -62,6 +73,22 @@ class EquipoRepository extends BaseRepository<Equipo> {
         ? 'marca_id = ? AND activo = ?'
         : 'marca_id = ?';
     final whereArgs = soloActivos ? [marcaId, 1] : [marcaId];
+
+    final maps = await dbHelper.consultar(
+      tableName,
+      where: whereCondition,
+      whereArgs: whereArgs,
+      orderBy: getDefaultOrderBy(),
+    );
+    return maps.map((map) => fromMap(map)).toList();
+  }
+
+  /// Obtener equipos por modelo ID - NUEVO
+  Future<List<Equipo>> obtenerPorModeloId(int modeloId, {bool soloActivos = true}) async {
+    final whereCondition = soloActivos
+        ? 'modelo_id = ? AND activo = ?'
+        : 'modelo_id = ?';
+    final whereArgs = soloActivos ? [modeloId, 1] : [modeloId];
 
     final maps = await dbHelper.consultar(
       tableName,
@@ -158,14 +185,16 @@ class EquipoRepository extends BaseRepository<Equipo> {
     return maps.isNotEmpty;
   }
 
-  /// Obtener equipos disponibles (no asignados)
+  /// Obtener equipos disponibles (no asignados) - CORREGIDO
   Future<List<Map<String, dynamic>>> obtenerDisponiblesConDetalles() async {
     final sql = '''
       SELECT e.*,
              m.nombre as marca_nombre,
+             mo.nombre as modelo_nombre,
              l.nombre as logo_nombre
       FROM equipos e
       LEFT JOIN marcas m ON e.marca_id = m.id
+      LEFT JOIN modelos mo ON e.modelo_id = mo.id
       LEFT JOIN logo l ON e.logo_id = l.id
       LEFT JOIN equipo_cliente ec ON e.id = ec.equipo_id 
         AND ec.activo = 1 
@@ -173,28 +202,30 @@ class EquipoRepository extends BaseRepository<Equipo> {
       WHERE e.activo = 1 
         AND e.estado_local = 1
         AND ec.id IS NULL
-      ORDER BY m.nombre, e.modelo
+      ORDER BY m.nombre, mo.nombre
     ''';
 
     return await dbHelper.consultarPersonalizada(sql);
   }
 
-  /// Obtener equipos asignados
+  /// Obtener equipos asignados - CORREGIDO
   Future<List<Map<String, dynamic>>> obtenerAsignadosConDetalles() async {
     final sql = '''
       SELECT DISTINCT e.*,
              m.nombre as marca_nombre,
+             mo.nombre as modelo_nombre,
              l.nombre as logo_nombre,
              c.nombre as cliente_nombre
       FROM equipos e
       LEFT JOIN marcas m ON e.marca_id = m.id
+      LEFT JOIN modelos mo ON e.modelo_id = mo.id
       LEFT JOIN logo l ON e.logo_id = l.id
       INNER JOIN equipo_cliente ec ON e.id = ec.equipo_id
       LEFT JOIN clientes c ON ec.cliente_id = c.id
       WHERE e.activo = 1 
         AND ec.activo = 1 
         AND ec.fecha_retiro IS NULL
-      ORDER BY m.nombre, e.modelo
+      ORDER BY m.nombre, mo.nombre
     ''';
 
     return await dbHelper.consultarPersonalizada(sql);
@@ -210,7 +241,8 @@ class EquipoRepository extends BaseRepository<Equipo> {
         COUNT(CASE WHEN e.sincronizado = 0 THEN 1 END) as no_sincronizados,
         COUNT(CASE WHEN ec.id IS NOT NULL THEN 1 END) as equipos_asignados,
         COUNT(CASE WHEN ec.id IS NULL AND e.activo = 1 THEN 1 END) as equipos_disponibles,
-        COUNT(DISTINCT e.marca_id) as marcas_diferentes
+        COUNT(DISTINCT e.marca_id) as marcas_diferentes,
+        COUNT(DISTINCT e.modelo_id) as modelos_diferentes
       FROM equipos e
       LEFT JOIN equipo_cliente ec ON e.id = ec.equipo_id 
         AND ec.activo = 1 
@@ -221,10 +253,10 @@ class EquipoRepository extends BaseRepository<Equipo> {
     return result.isNotEmpty ? result.first : {};
   }
 
-  /// Buscar equipos con filtros avanzados
+  /// Buscar equipos con filtros avanzados - CORREGIDO
   Future<List<Map<String, dynamic>>> buscarConFiltros({
     int? marcaId,
-    String? modelo,
+    int? modeloId, // CAMBIADO: de String modelo a int modeloId
     int? logoId,
     String? numeroSerie,
     String? codigoBarras,
@@ -245,9 +277,9 @@ class EquipoRepository extends BaseRepository<Equipo> {
       argumentos.add(marcaId);
     }
 
-    if (modelo?.isNotEmpty == true) {
-      condiciones.add('LOWER(e.modelo) LIKE ?');
-      argumentos.add('%${modelo!.toLowerCase()}%');
+    if (modeloId != null) { // CORREGIDO
+      condiciones.add('e.modelo_id = ?');
+      argumentos.add(modeloId);
     }
 
     if (logoId != null) {
@@ -278,9 +310,11 @@ class EquipoRepository extends BaseRepository<Equipo> {
     String sqlBase = '''
       SELECT e.*, 
              m.nombre as marca_nombre,
+             mo.nombre as modelo_nombre,
              l.nombre as logo_nombre
       FROM equipos e
       LEFT JOIN marcas m ON e.marca_id = m.id
+      LEFT JOIN modelos mo ON e.modelo_id = mo.id
       LEFT JOIN logo l ON e.logo_id = l.id
     ''';
 
@@ -300,7 +334,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
     final sql = '''
       $sqlBase
       $whereClause
-      ORDER BY m.nombre, e.modelo
+      ORDER BY m.nombre, mo.nombre
       LIMIT 100
     ''';
 
@@ -317,6 +351,14 @@ class EquipoRepository extends BaseRepository<Equipo> {
     );
   }
 
+  /// Obtener modelos para dropdown - NUEVO
+  Future<List<Map<String, dynamic>>> obtenerModelos() async {
+    return await dbHelper.consultar(
+      'modelos',
+      orderBy: 'nombre ASC',
+    );
+  }
+
   /// Obtener logos para dropdown
   Future<List<Map<String, dynamic>>> obtenerLogos() async {
     return await dbHelper.consultar(
@@ -327,11 +369,11 @@ class EquipoRepository extends BaseRepository<Equipo> {
     );
   }
 
-  /// Crear equipo con validaciones
+  /// Crear equipo con validaciones - CORREGIDO
   Future<int> crearEquipo({
     required String codBarras,
     required int marcaId,
-    required String modelo,
+    required int modeloId, // CAMBIADO: de String modelo a int modeloId
     required int logoId,
     String? numeroSerie,
     int estadoLocal = 1,
@@ -350,7 +392,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
     final equipoData = {
       'cod_barras': codBarras,
       'marca_id': marcaId,
-      'modelo': modelo,
+      'modelo_id': modeloId, // CORREGIDO
       'logo_id': logoId,
       'numero_serie': numeroSerie,
       'estado_local': estadoLocal,
@@ -363,11 +405,11 @@ class EquipoRepository extends BaseRepository<Equipo> {
     return await dbHelper.insertar(tableName, equipoData);
   }
 
-  /// Actualizar equipo con validaciones
+  /// Actualizar equipo con validaciones - CORREGIDO
   Future<int> actualizarEquipo(int id, {
     String? codBarras,
     int? marcaId,
-    String? modelo,
+    int? modeloId, // CAMBIADO: de String modelo a int modeloId
     int? logoId,
     String? numeroSerie,
     int? estadoLocal,
@@ -394,7 +436,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
     final datosActualizacion = <String, dynamic>{};
     if (codBarras != null) datosActualizacion['cod_barras'] = codBarras;
     if (marcaId != null) datosActualizacion['marca_id'] = marcaId;
-    if (modelo != null) datosActualizacion['modelo'] = modelo;
+    if (modeloId != null) datosActualizacion['modelo_id'] = modeloId; // CORREGIDO
     if (logoId != null) datosActualizacion['logo_id'] = logoId;
     if (numeroSerie != null) datosActualizacion['numero_serie'] = numeroSerie;
     if (estadoLocal != null) datosActualizacion['estado_local'] = estadoLocal;
@@ -462,7 +504,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
     await limpiarYSincronizar(equiposAPI);
   }
 
-  /// Método alternativo para sincronización específica de equipos
+  /// Método alternativo para sincronización específica de equipos - CORREGIDO
   Future<void> sincronizarEquiposCompletos(List<dynamic> equiposAPI) async {
     final db = await dbHelper.database;
 
@@ -485,8 +527,8 @@ class EquipoRepository extends BaseRepository<Equipo> {
         }
 
         // Asegurar campos requeridos
-        datos['activo'] = 1;
-        datos['sincronizado'] = 1;
+        datos['activo'] = 1; // Cambié true por 1
+        datos['sincronizado'] = 1; // Cambié true por 1
         datos['fecha_actualizacion'] = DateTime.now().toIso8601String();
 
         if (datos['fecha_creacion'] == null) {

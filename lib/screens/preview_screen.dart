@@ -568,7 +568,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   int? _buscarEquipoPorCodigo(String? codigoBarras) {
     // TODO: Implementar búsqueda real en base de datos local
-    // Por ahora retornamos un ID fijo, pero debería buscar en tu lista de equipos
     // o hacer una consulta a /equipos/buscar?q=codigo
 
     if (codigoBarras == null) return null;

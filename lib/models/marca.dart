@@ -4,7 +4,7 @@ class Marca {
   final bool activo;
   final bool sincronizado;
   final DateTime fechaCreacion;
-  final DateTime fechaActualizacion;
+  final DateTime? fechaActualizacion;
 
   const Marca({
     this.id,
@@ -12,7 +12,7 @@ class Marca {
     this.activo = true,
     this.sincronizado = false,
     required this.fechaCreacion,
-    required this.fechaActualizacion,
+    this.fechaActualizacion,
   });
 
   factory Marca.fromMap(Map<String, dynamic> map) {
@@ -21,8 +21,12 @@ class Marca {
       nombre: map['nombre'] ?? '',
       activo: (map['activo'] ?? 1) == 1,
       sincronizado: (map['sincronizado'] ?? 0) == 1,
-      fechaCreacion: DateTime.parse(map['fecha_creacion']),
-      fechaActualizacion: DateTime.parse(map['fecha_actualizacion']),
+      fechaCreacion: map['fecha_creacion'] != null
+          ? DateTime.parse(map['fecha_creacion'])
+          : DateTime.now(),
+      fechaActualizacion: map['fecha_actualizacion'] != null
+          ? DateTime.parse(map['fecha_actualizacion'])
+          : null,
     );
   }
 
@@ -33,7 +37,8 @@ class Marca {
       'activo': activo ? 1 : 0,
       'sincronizado': sincronizado ? 1 : 0,
       'fecha_creacion': fechaCreacion.toIso8601String(),
-      'fecha_actualizacion': fechaActualizacion.toIso8601String(),
+      if (fechaActualizacion != null)
+        'fecha_actualizacion': fechaActualizacion!.toIso8601String(),
     };
   }
 

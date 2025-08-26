@@ -49,7 +49,10 @@ class LogoRepository extends BaseRepository<Logo> {
 
     return await dbHelper.existeRegistro(tableName, where, whereArgs);
   }
-
+  /// Borrar todas las marcas/logos
+  Future<void> borrarTodos() async {
+    await dbHelper.eliminar(tableName);
+  }
   /// Contar equipos por logo
   Future<Map<String, dynamic>> obtenerEstadisticasLogo() async {
     const sql = '''

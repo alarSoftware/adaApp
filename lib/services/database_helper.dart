@@ -12,7 +12,7 @@ class DatabaseHelper {
   static Database? _database;
 
   static const String _databaseName = 'AdaAapp.db';
-  static const int _databaseVersion = 5; // Incrementado para las nuevas tablas
+  static const int _databaseVersion = 6; // Incrementado para tabla modelos
 
   DatabaseHelper._internal();
 
@@ -49,15 +49,21 @@ class DatabaseHelper {
   Future<void> _onCreate(Database db, int version) async {
     logger.i('Creando tablas de base de datos v$version');
 
-    // NUEVAS TABLAS: marcas y logo (deben crearse primero por FK)
+    // TABLAS MAESTRAS: modelos, marcas y logo (deben crearse primero por FK)
+
+    await db.execute('''
+      CREATE TABLE modelos (
+        id INTEGER PRIMARY KEY,
+        nombre TEXT NOT NULL UNIQUE
+      )
+    ''');
+
     await db.execute('''
       CREATE TABLE marcas (
         id INTEGER PRIMARY KEY,
         nombre TEXT NOT NULL UNIQUE,
         activo INTEGER DEFAULT 1,
-        sincronizado INTEGER DEFAULT 1,
-        fecha_creacion TEXT NOT NULL,
-        fecha_actualizacion TEXT NOT NULL
+        fecha_creacion TEXT NOT NULL
       )
     ''');
 
@@ -66,13 +72,11 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY,
         nombre TEXT NOT NULL UNIQUE,
         activo INTEGER DEFAULT 1,
-        sincronizado INTEGER DEFAULT 1,
-        fecha_creacion TEXT NOT NULL,
-        fecha_actualizacion TEXT NOT NULL
+        fecha_creacion TEXT NOT NULL
       )
     ''');
 
-    // Tabla clientes (actualizada)
+    // Tabla clientes
     await db.execute('''
       CREATE TABLE clientes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,13 +91,13 @@ class DatabaseHelper {
       )
     ''');
 
-    // Tabla equipos (ACTUALIZADA para coincidir con API)
+    // Tabla equipos CORREGIDA
     await db.execute('''
       CREATE TABLE equipos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         cod_barras TEXT UNIQUE NOT NULL,
         marca_id INTEGER NOT NULL,
-        modelo TEXT NOT NULL,
+        modelo_id INTEGER NOT NULL,
         numero_serie TEXT UNIQUE,
         logo_id INTEGER NOT NULL,
         estado_local INTEGER DEFAULT 1,
@@ -102,11 +106,12 @@ class DatabaseHelper {
         fecha_creacion TEXT NOT NULL,
         fecha_actualizacion TEXT NOT NULL,
         FOREIGN KEY (marca_id) REFERENCES marcas (id),
+        FOREIGN KEY (modelo_id) REFERENCES modelos (id),
         FOREIGN KEY (logo_id) REFERENCES logo (id)
       )
     ''');
 
-    // Tabla equipo_cliente (actualizada)
+    // Tabla equipo_cliente
     await db.execute('''
       CREATE TABLE equipo_cliente (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -138,7 +143,7 @@ class DatabaseHelper {
       )
     ''');
 
-    // TABLA OPTIMIZADA: registros_equipos (para sincronización con /estados)
+    // TABLA registros_equipos (para sincronización con /estados)
     await db.execute('''
       CREATE TABLE registros_equipos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -146,13 +151,11 @@ class DatabaseHelper {
         servidor_id INTEGER,
         estado_sincronizacion TEXT NOT NULL DEFAULT 'pendiente',
         
-        -- Datos del cliente
         cliente_id INTEGER NOT NULL,
         cliente_nombre TEXT,
         cliente_direccion TEXT,
         cliente_telefono TEXT,
         
-        -- Datos del equipo
         equipo_id INTEGER,
         codigo_barras TEXT,
         modelo TEXT,
@@ -161,19 +164,16 @@ class DatabaseHelper {
         logo_id INTEGER,
         observaciones TEXT,
         
-        -- Datos de ubicación
         latitud REAL,
         longitud REAL,
         fecha_registro TEXT,
         timestamp_gps TEXT,
         
-        -- Datos para API (/estados)
         funcionando INTEGER DEFAULT 1,
         estado_general TEXT DEFAULT 'Revisión pendiente',
         temperatura_actual REAL,
         temperatura_freezer REAL,
         
-        -- Metadatos
         version_app TEXT,
         dispositivo TEXT,
         fecha_creacion TEXT NOT NULL,
@@ -196,29 +196,33 @@ class DatabaseHelper {
   }
 
   Future<void> _crearIndices(Database db) async {
-    // Índices existentes optimizados
+    // Índices para clientes
     await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_email ON clientes (email)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_activo ON clientes (activo)');
 
+    // Índices para equipos
     await db.execute('CREATE INDEX IF NOT EXISTS idx_equipos_cod_barras ON equipos (cod_barras)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_equipos_numero_serie ON equipos (numero_serie)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_equipos_marca_id ON equipos (marca_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_equipos_modelo_id ON equipos (modelo_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_equipos_logo_id ON equipos (logo_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_equipos_activo ON equipos (activo)');
 
+    // Índices para equipo_cliente
     await db.execute('CREATE INDEX IF NOT EXISTS idx_equipo_cliente_equipo_id ON equipo_cliente (equipo_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_equipo_cliente_cliente_id ON equipo_cliente (cliente_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_equipo_cliente_activo ON equipo_cliente (activo)');
 
-// Nuevos índices para registros_equipos
+    // Índices para registros_equipos
     await db.execute('CREATE INDEX IF NOT EXISTS idx_registros_estado_sincronizacion ON registros_equipos(estado_sincronizacion)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_registros_cliente_id ON registros_equipos(cliente_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_registros_codigo_barras ON registros_equipos(codigo_barras)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_registros_id_local ON registros_equipos(id_local)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_registros_fecha_registro ON registros_equipos(fecha_registro)');
 
-// Índices para marcas y logo
+    // Índices para marcas, modelos y logo
     await db.execute('CREATE INDEX IF NOT EXISTS idx_marcas_nombre ON marcas (nombre)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_modelos_nombre ON modelos (nombre)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_logo_nombre ON logo (nombre)');
   }
 
@@ -265,9 +269,7 @@ class DatabaseHelper {
       await db.insert('marcas', {
         ...marca,
         'activo': 1,
-        'sincronizado': 1,
         'fecha_creacion': now,
-        'fecha_actualizacion': now,
       });
     }
 
@@ -275,9 +277,7 @@ class DatabaseHelper {
       await db.insert('logo', {
         ...logo,
         'activo': 1,
-        'sincronizado': 1,
         'fecha_creacion': now,
-        'fecha_actualizacion': now,
       });
     }
 
@@ -294,9 +294,7 @@ class DatabaseHelper {
           id INTEGER PRIMARY KEY,
           nombre TEXT NOT NULL UNIQUE,
           activo INTEGER DEFAULT 1,
-          sincronizado INTEGER DEFAULT 1,
-          fecha_creacion TEXT NOT NULL,
-          fecha_actualizacion TEXT NOT NULL
+          fecha_creacion TEXT NOT NULL
         )
       ''');
 
@@ -305,9 +303,7 @@ class DatabaseHelper {
           id INTEGER PRIMARY KEY,
           nombre TEXT NOT NULL UNIQUE,
           activo INTEGER DEFAULT 1,
-          sincronizado INTEGER DEFAULT 1,
-          fecha_creacion TEXT NOT NULL,
-          fecha_actualizacion TEXT NOT NULL
+          fecha_creacion TEXT NOT NULL
         )
       ''');
 
@@ -322,7 +318,7 @@ class DatabaseHelper {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             cod_barras TEXT UNIQUE NOT NULL,
             marca_id INTEGER NOT NULL,
-            modelo TEXT NOT NULL,
+            modelo_id INTEGER NOT NULL,
             numero_serie TEXT UNIQUE,
             logo_id INTEGER NOT NULL,
             estado_local INTEGER DEFAULT 1,
@@ -331,6 +327,7 @@ class DatabaseHelper {
             fecha_creacion TEXT NOT NULL,
             fecha_actualizacion TEXT NOT NULL,
             FOREIGN KEY (marca_id) REFERENCES marcas (id),
+            FOREIGN KEY (modelo_id) REFERENCES modelos (id),
             FOREIGN KEY (logo_id) REFERENCES logo (id)
           )
         ''');
@@ -339,7 +336,7 @@ class DatabaseHelper {
         await _insertarDatosIniciales(db);
 
         // Migrar datos existentes (si existen)
-        final equiposExistentes = await db.query('equipos_old WHERE activo = 1');
+        final equiposExistentes = await db.rawQuery('SELECT * FROM equipos_old WHERE activo = 1');
         for (final equipo in equiposExistentes) {
           // Mapear marca texto a marca_id (buscar en tabla marcas)
           final marcaTexto = equipo['marca'] as String?;
@@ -359,7 +356,7 @@ class DatabaseHelper {
             'id': equipo['id'],
             'cod_barras': equipo['cod_barras'] ?? 'REF${equipo['id']?.toString().padLeft(3, '0')}',
             'marca_id': marcaId,
-            'modelo': equipo['modelo'] ?? 'Modelo Desconocido',
+            'modelo_id': 1, // Default - ajustar según necesidades
             'numero_serie': equipo['numero_serie'],
             'logo_id': 1, // Default Pulp
             'estado_local': 1,
@@ -380,10 +377,26 @@ class DatabaseHelper {
       // Crear nuevos índices
       await _crearIndices(db);
     }
+
+    // Nueva migración para tabla modelos
+    if (oldVersion < 6) {
+      // Crear tabla modelos si no existe
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS modelos (
+          id INTEGER PRIMARY KEY,
+          nombre TEXT NOT NULL UNIQUE
+        )
+      ''');
+
+      // Agregar índice para modelos
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_modelos_nombre ON modelos(nombre)');
+
+      logger.i('Tabla modelos creada en migración v6');
+    }
   }
 
   // ================================================================
-  // MÉTODOS CRUD GENÉRICOS CON MEJORAS (SIN CAMBIOS)
+  // MÉTODOS CRUD GENÉRICOS CON MEJORAS
   // ================================================================
 
   Future<List<Map<String, dynamic>>> consultar(
@@ -441,9 +454,13 @@ class DatabaseHelper {
       }
 
       final now = DateTime.now().toIso8601String();
-      values['fecha_actualizacion'] = now;
-      if (!values.containsKey('fecha_creacion')) {
-        values['fecha_creacion'] = now;
+
+      // Solo agregar timestamps si la tabla los tiene
+      if (await _tablaRequiereFechas(tableName)) {
+        values['fecha_actualizacion'] = now;
+        if (!values.containsKey('fecha_creacion')) {
+          values['fecha_creacion'] = now;
+        }
       }
 
       final db = await database;
@@ -467,7 +484,10 @@ class DatabaseHelper {
         throw ArgumentError('Los valores no pueden estar vacíos');
       }
 
-      values['fecha_actualizacion'] = DateTime.now().toIso8601String();
+      // Solo agregar timestamp si la tabla lo requiere
+      if (await _tablaRequiereFechas(tableName)) {
+        values['fecha_actualizacion'] = DateTime.now().toIso8601String();
+      }
 
       final db = await database;
       final count = await db.update(
@@ -506,6 +526,13 @@ class DatabaseHelper {
 
   Future<int> eliminarPorId(String tableName, int id) async {
     return await eliminar(tableName, where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Método auxiliar para saber si una tabla requiere campos de fecha
+  Future<bool> _tablaRequiereFechas(String tableName) async {
+    // La tabla modelos no tiene campos de fecha
+    if (tableName == 'modelos') return false;
+    return true;
   }
 
   // ================================================================
@@ -550,13 +577,15 @@ class DatabaseHelper {
       SELECT 
         e.*,
         m.nombre as marca_nombre,
+        mo.nombre as modelo_nombre,
         l.nombre as logo_nombre
       FROM equipos e
       JOIN marcas m ON e.marca_id = m.id
+      JOIN modelos mo ON e.modelo_id = mo.id
       JOIN logo l ON e.logo_id = l.id
       LEFT JOIN equipo_cliente ec ON e.id = ec.equipo_id AND ec.activo = 1 AND ec.fecha_retiro IS NULL
       WHERE e.activo = 1 AND e.estado_local = 1 AND ec.equipo_id IS NULL
-      ORDER BY m.nombre, e.modelo
+      ORDER BY m.nombre, mo.nombre
     ''';
     return await consultarPersonalizada(sql);
   }
@@ -566,6 +595,7 @@ class DatabaseHelper {
       SELECT 
         e.*,
         m.nombre as marca_nombre,
+        mo.nombre as modelo_nombre,
         l.nombre as logo_nombre,
         CASE 
           WHEN ec.id IS NOT NULL THEN 'Asignado'
@@ -574,11 +604,12 @@ class DatabaseHelper {
         c.nombre as cliente_nombre
       FROM equipos e
       JOIN marcas m ON e.marca_id = m.id
+      JOIN modelos mo ON e.modelo_id = mo.id
       JOIN logo l ON e.logo_id = l.id
       LEFT JOIN equipo_cliente ec ON e.id = ec.equipo_id AND ec.activo = 1 AND ec.fecha_retiro IS NULL
       LEFT JOIN clientes c ON ec.cliente_id = c.id
       WHERE e.activo = 1
-      ORDER BY m.nombre, e.modelo
+      ORDER BY m.nombre, mo.nombre
     ''';
     return await consultarPersonalizada(sql);
   }
@@ -589,14 +620,15 @@ class DatabaseHelper {
         ec.*,
         c.nombre as cliente_nombre,
         c.email as cliente_email,
-        e.modelo,
         e.numero_serie,
         m.nombre as marca_nombre,
+        mo.nombre as modelo_nombre,
         l.nombre as logo_nombre
       FROM equipo_cliente ec
       JOIN clientes c ON ec.cliente_id = c.id
       JOIN equipos e ON ec.equipo_id = e.id
       JOIN marcas m ON e.marca_id = m.id
+      JOIN modelos mo ON e.modelo_id = mo.id
       JOIN logo l ON e.logo_id = l.id
       WHERE ec.equipo_id = ?
       ORDER BY ec.fecha_asignacion DESC
@@ -608,13 +640,15 @@ class DatabaseHelper {
   // MÉTODOS NUEVOS PARA SINCRONIZACIÓN
   // ================================================================
 
-  /// Obtener marcas y logos para sincronización
-  Future<Map<String, List<Map<String, dynamic>>>> obtenerMarcasYLogos() async {
+  /// Obtener marcas, modelos y logos para sincronización
+  Future<Map<String, List<Map<String, dynamic>>>> obtenerMarcasModelosYLogos() async {
     final marcas = await consultar('marcas', where: 'activo = ?', whereArgs: [1], orderBy: 'nombre');
+    final modelos = await consultar('modelos', orderBy: 'nombre');
     final logos = await consultar('logo', where: 'activo = ?', whereArgs: [1], orderBy: 'nombre');
 
     return {
       'marcas': marcas,
+      'modelos': modelos,
       'logos': logos,
     };
   }
@@ -627,9 +661,19 @@ class DatabaseHelper {
           'id': marcaData['id'],
           'nombre': marcaData['nombre'],
           'activo': 1,
-          'sincronizado': 1,
           'fecha_creacion': DateTime.now().toIso8601String(),
-          'fecha_actualizacion': DateTime.now().toIso8601String(),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    });
+  }
+
+  /// Sincronizar modelos desde API
+  Future<void> sincronizarModelos(List<dynamic> modelosAPI) async {
+    await ejecutarTransaccion((txn) async {
+      for (var modeloData in modelosAPI) {
+        await txn.insert('modelos', {
+          'id': modeloData['id'],
+          'nombre': modeloData['nombre'],
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
     });
@@ -643,16 +687,14 @@ class DatabaseHelper {
           'id': logoData['id'],
           'nombre': logoData['nombre'],
           'activo': 1,
-          'sincronizado': 1,
           'fecha_creacion': DateTime.now().toIso8601String(),
-          'fecha_actualizacion': DateTime.now().toIso8601String(),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
     });
   }
 
   // ================================================================
-  // MÉTODOS DE RESPALDO Y RESTAURACIÓN (SIN CAMBIOS)
+  // MÉTODOS DE RESPALDO Y RESTAURACIÓN
   // ================================================================
 
   Future<String> respaldarDatos() async {
@@ -661,13 +703,15 @@ class DatabaseHelper {
 
       final clientes = await consultar('clientes');
       final equipos = await consultarPersonalizada('''
-        SELECT e.*, m.nombre as marca_nombre, l.nombre as logo_nombre
+        SELECT e.*, m.nombre as marca_nombre, mo.nombre as modelo_nombre, l.nombre as logo_nombre
         FROM equipos e
         JOIN marcas m ON e.marca_id = m.id
+        JOIN modelos mo ON e.modelo_id = mo.id
         JOIN logo l ON e.logo_id = l.id
       ''');
       final equipoCliente = await consultar('equipo_cliente');
       final marcas = await consultar('marcas');
+      final modelos = await consultar('modelos');
       final logos = await consultar('logo');
 
       final backup = {
@@ -678,6 +722,7 @@ class DatabaseHelper {
           'equipos': equipos,
           'equipo_cliente': equipoCliente,
           'marcas': marcas,
+          'modelos': modelos,
           'logos': logos,
         }
       };
@@ -697,7 +742,7 @@ class DatabaseHelper {
   }
 
   // ================================================================
-  // MÉTODOS DE UTILIDAD (SIN CAMBIOS MAYORES)
+  // MÉTODOS DE UTILIDAD
   // ================================================================
 
   Future<List<Map<String, dynamic>>> obtenerEsquemaTabla(String tableName) async {

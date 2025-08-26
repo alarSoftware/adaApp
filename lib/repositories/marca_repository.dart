@@ -49,6 +49,10 @@ class MarcaRepository extends BaseRepository<Marca> {
 
     return await dbHelper.existeRegistro(tableName, where, whereArgs);
   }
+  /// Borrar todas las marcas/logos
+  Future<void> borrarTodos() async {
+    await dbHelper.eliminar(tableName);
+  }
 
   /// Contar equipos por marca
   Future<Map<String, dynamic>> obtenerEstadisticasMarca() async {

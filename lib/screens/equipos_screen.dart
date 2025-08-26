@@ -149,12 +149,12 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
         equiposFiltrados = equipos.where((equipo) {
           final codBarras = equipo['cod_barras']?.toString().toLowerCase() ?? '';
           final marcaNombre = equipo['marca_nombre']?.toString().toLowerCase() ?? '';
-          final modelo = equipo['modelo']?.toString().toLowerCase() ?? '';
+          final modeloNombre = equipo['modelo_nombre']?.toString().toLowerCase() ?? ''; // CORREGIDO: de 'modelo' a 'modelo_nombre'
           final logoNombre = equipo['logo_nombre']?.toString().toLowerCase() ?? '';
 
           return codBarras.contains(query) ||
               marcaNombre.contains(query) ||
-              modelo.contains(query) ||
+              modeloNombre.contains(query) ||
               logoNombre.contains(query);
         }).toList();
       }
@@ -247,8 +247,8 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
 
   void _mostrarDetallesEquipo(Map<String, dynamic> equipo) {
     final marcaNombre = equipo['marca_nombre'] ?? 'Sin marca';
-    final modelo = equipo['modelo'] ?? 'Sin modelo';
-    final nombreCompleto = '$marcaNombre $modelo';
+    final modeloNombre = equipo['modelo_nombre'] ?? 'Sin modelo'; // CORREGIDO
+    final nombreCompleto = '$marcaNombre $modeloNombre';
 
     showDialog(
       context: context,
@@ -263,7 +263,7 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
           children: [
             _buildDetalleRow('Código', equipo['cod_barras'] ?? 'N/A'),
             _buildDetalleRow('Marca', marcaNombre),
-            _buildDetalleRow('Modelo', modelo),
+            _buildDetalleRow('Modelo', modeloNombre), // CORREGIDO
             _buildDetalleRow('Logo', equipo['logo_nombre'] ?? 'Sin logo'),
             if (equipo['numero_serie'] != null)
               _buildDetalleRow('Número de Serie', equipo['numero_serie']),
@@ -429,8 +429,8 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
 
   Widget _buildEquipoCard(Map<String, dynamic> equipo) {
     final marcaNombre = equipo['marca_nombre'] ?? 'Sin marca';
-    final modelo = equipo['modelo'] ?? 'Sin modelo';
-    final nombreCompleto = '$marcaNombre $modelo';
+    final modeloNombre = equipo['modelo_nombre'] ?? 'Sin modelo'; // CORREGIDO
+    final nombreCompleto = '$marcaNombre $modeloNombre';
     final logoNombre = equipo['logo_nombre'];
     final estadoAsignacion = equipo['estado_asignacion'] ?? 'Disponible';
     final clienteNombre = equipo['cliente_nombre'];

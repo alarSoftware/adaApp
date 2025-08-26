@@ -30,13 +30,13 @@ class EquipoClienteRepository extends BaseRepository<EquipoCliente> {
   // MÉTODOS ESPECÍFICOS DE EQUIPO_CLIENTE
   // ════════════════════════════════════════════════════════════════
 
-  /// Obtener asignaciones con datos completos (JOIN)
+  /// Obtener asignaciones con datos completos (JOIN) - CORREGIDO
   Future<List<EquipoCliente>> obtenerCompletas({bool soloActivos = true}) async {
     final whereClause = soloActivos ? 'WHERE ec.activo = 1 AND ec.fecha_retiro IS NULL' : '';
 
     final sql = '''
     SELECT ec.*,
-           e.modelo as equipo_modelo, 
+           mo.nombre as modelo_nombre, 
            e.cod_barras as equipo_cod_barras,
            e.numero_serie as equipo_numero_serie,
            m.nombre as marca_nombre,
@@ -47,6 +47,7 @@ class EquipoClienteRepository extends BaseRepository<EquipoCliente> {
     FROM equipo_cliente ec
     LEFT JOIN equipos e ON ec.equipo_id = e.id
     LEFT JOIN marcas m ON e.marca_id = m.id
+    LEFT JOIN modelos mo ON e.modelo_id = mo.id
     LEFT JOIN logo l ON e.logo_id = l.id
     LEFT JOIN clientes c ON ec.cliente_id = c.id
     $whereClause
@@ -57,17 +58,19 @@ class EquipoClienteRepository extends BaseRepository<EquipoCliente> {
     return maps.map((map) => fromMap(map)).toList();
   }
 
-  /// Obtener asignaciones activas
+  /// Obtener asignaciones activas - CORREGIDO
   Future<List<EquipoCliente>> obtenerActivas() async {
     final sql = '''
       SELECT ec.*,
-             e.marca as equipo_marca, 
-             e.modelo as equipo_modelo, 
+             m.nombre as marca_nombre, 
+             mo.nombre as modelo_nombre, 
              e.cod_barras as equipo_cod_barras,
              c.nombre as cliente_nombre, 
              c.email as cliente_email
       FROM equipo_cliente ec
       LEFT JOIN equipos e ON ec.equipo_id = e.id
+      LEFT JOIN marcas m ON e.marca_id = m.id
+      LEFT JOIN modelos mo ON e.modelo_id = mo.id
       LEFT JOIN clientes c ON ec.cliente_id = c.id
       WHERE ec.activo = 1 AND ec.fecha_retiro IS NULL
       ORDER BY ec.fecha_asignacion DESC
@@ -142,9 +145,8 @@ class EquipoClienteRepository extends BaseRepository<EquipoCliente> {
       whereArgs: [asignacionId],
     );
   }
-  // Agrega este método a tu EquipoClienteRepository o reemplaza el existente
 
-  /// Obtener equipos de un cliente con datos completos
+  /// Obtener equipos de un cliente con datos completos - CORREGIDO
   Future<List<Map<String, dynamic>>> obtenerPorClienteCompleto(int clienteId, {bool soloActivos = true}) async {
     final whereClause = soloActivos ?
     'WHERE ec.cliente_id = ? AND ec.activo = 1 AND ec.fecha_retiro IS NULL' :
@@ -153,7 +155,7 @@ class EquipoClienteRepository extends BaseRepository<EquipoCliente> {
     final sql = '''
     SELECT ec.*,
            e.cod_barras as equipo_cod_barras,
-           e.modelo as equipo_modelo,
+           mo.nombre as modelo_nombre,
            e.numero_serie as equipo_numero_serie,
            m.nombre as marca_nombre,
            l.nombre as logo_nombre,
@@ -161,13 +163,59 @@ class EquipoClienteRepository extends BaseRepository<EquipoCliente> {
     FROM equipo_cliente ec
     LEFT JOIN equipos e ON ec.equipo_id = e.id
     LEFT JOIN marcas m ON e.marca_id = m.id
+    LEFT JOIN modelos mo ON e.modelo_id = mo.id
     LEFT JOIN logo l ON e.logo_id = l.id
     LEFT JOIN clientes c ON ec.cliente_id = c.id
     $whereClause
     ORDER BY ec.fecha_asignacion DESC
   ''';
 
-    final whereArgs = soloActivos ? [clienteId] : [clienteId];
+    final whereArgs = [clienteId];
     return await dbHelper.consultarPersonalizada(sql, whereArgs);
+  }
+
+  /// Obtener estadísticas de asignaciones
+  Future<Map<String, dynamic>> obtenerEstadisticas() async {
+    final sql = '''
+    SELECT 
+      COUNT(*) as total_asignaciones,
+      COUNT(CASE WHEN ec.activo = 1 AND ec.fecha_retiro IS NULL THEN 1 END) as asignaciones_activas,
+      COUNT(CASE WHEN ec.fecha_retiro IS NOT NULL THEN 1 END) as equipos_retirados,
+      COUNT(DISTINCT ec.equipo_id) as equipos_unicos_asignados,
+      COUNT(DISTINCT ec.cliente_id) as clientes_con_equipos
+    FROM equipo_cliente ec
+  ''';
+
+    final result = await dbHelper.consultarPersonalizada(sql);
+    return result.isNotEmpty ? result.first : {};
+  }
+
+  /// Obtener historial completo de asignaciones
+  Future<List<Map<String, dynamic>>> obtenerHistorialCompleto() async {
+    final sql = '''
+    SELECT 
+      ec.*,
+      e.cod_barras as equipo_cod_barras,
+      mo.nombre as modelo_nombre,
+      e.numero_serie as equipo_numero_serie,
+      m.nombre as marca_nombre,
+      l.nombre as logo_nombre,
+      c.nombre as cliente_nombre,
+      c.email as cliente_email,
+      CASE 
+        WHEN ec.fecha_retiro IS NOT NULL THEN 'Retirado'
+        WHEN ec.activo = 0 THEN 'Inactivo'
+        ELSE 'Activo'
+      END as estado
+    FROM equipo_cliente ec
+    LEFT JOIN equipos e ON ec.equipo_id = e.id
+    LEFT JOIN marcas m ON e.marca_id = m.id
+    LEFT JOIN modelos mo ON e.modelo_id = mo.id
+    LEFT JOIN logo l ON e.logo_id = l.id
+    LEFT JOIN clientes c ON ec.cliente_id = c.id
+    ORDER BY ec.fecha_asignacion DESC
+  ''';
+
+    return await dbHelper.consultarPersonalizada(sql);
   }
 }
