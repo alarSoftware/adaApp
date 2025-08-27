@@ -50,9 +50,6 @@ class EquipoCliente {
       equipoId: map['equipo_id'] as int,
       clienteId: map['cliente_id'] as int,
       fechaAsignacion: DateTime.parse(map['fecha_asignacion'] as String),
-      fechaRetiro: map['fecha_retiro'] != null
-          ? DateTime.parse(map['fecha_retiro'] as String)
-          : null,
       estaActivo: (map['activo'] as int?) == 1,
       fechaCreacion: DateTime.parse(map['fecha_creacion'] as String),
       fechaActualizacion: map['fecha_actualizacion'] != null

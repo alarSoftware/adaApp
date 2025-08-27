@@ -43,6 +43,7 @@ class SyncService {
       resultado.conexionOK = true;
 
       await _sincronizarMarcas();
+      await _sincronizarModelos();
       await _sincronizarLogos();
 
       final resultadoClientes = await sincronizarClientes();
@@ -85,6 +86,104 @@ class SyncService {
       resultado.exito = false;
       resultado.mensaje = 'Error inesperado: ${e.toString()}';
       return resultado;
+    }
+  }
+
+  static Future<void> _sincronizarModelos() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/modelos'),
+        headers: _headers,
+      ).timeout(timeout);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> modelosAPI = jsonDecode(response.body);
+
+        // FILTRAR modelos con nombre válido (API usa 'modelo' no 'nombre')
+        final modelosValidos = modelosAPI.where((modelo) {
+          return modelo != null &&
+              modelo['modelo'] != null &&
+              modelo['modelo'].toString().trim().isNotEmpty;
+        }).map((modelo) {
+          return {
+            'id': modelo['id'],
+            'nombre': modelo['modelo'], // Mapear 'modelo' a 'nombre'
+          };
+        }).toList();
+
+        if (modelosValidos.isNotEmpty) {
+          await _dbHelper.sincronizarModelos(modelosValidos);
+          _logger.i('Modelos sincronizados: ${modelosValidos.length} de ${modelosAPI.length}');
+        } else {
+          _logger.w('No hay modelos válidos para sincronizar');
+        }
+      }
+    } catch (e) {
+      _logger.e('Error sincronizando modelos: $e');
+    }
+  }
+
+  static Future<SyncResult> sincronizarModelos() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/modelos'),
+        headers: _headers,
+      ).timeout(timeout);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final List<dynamic> modelosData = _parseResponse(response.body);
+
+        if (modelosData.isEmpty) {
+          return SyncResult(
+            exito: true,
+            mensaje: 'No hay modelos en el servidor',
+            itemsSincronizados: 0,
+          );
+        }
+
+        // FILTRAR modelos válidos (API usa 'modelo' no 'nombre')
+        final modelosLimpios = modelosData.where((modelo) {
+          return modelo != null &&
+              modelo['id'] != null &&
+              modelo['modelo'] != null &&
+              modelo['modelo'].toString().trim().isNotEmpty;
+        }).map((modelo) {
+          return {
+            'id': modelo['id'],
+            'nombre': modelo['modelo'].toString().trim(), // Mapear 'modelo' a 'nombre'
+          };
+        }).toList();
+
+        if (modelosLimpios.isEmpty) {
+          return SyncResult(
+            exito: false,
+            mensaje: 'No se encontraron modelos válidos en el servidor',
+            itemsSincronizados: 0,
+          );
+        }
+
+        await _dbHelper.sincronizarModelos(modelosLimpios);
+
+        return SyncResult(
+          exito: true,
+          mensaje: 'Modelos sincronizados correctamente',
+          itemsSincronizados: modelosLimpios.length,
+          totalEnAPI: modelosData.length,
+        );
+      } else {
+        final mensaje = _extraerMensajeError(response);
+        return SyncResult(
+          exito: false,
+          mensaje: 'Error del servidor: $mensaje',
+          itemsSincronizados: 0,
+        );
+      }
+    } catch (e) {
+      return SyncResult(
+        exito: false,
+        mensaje: _getErrorMessage(e),
+        itemsSincronizados: 0,
+      );
     }
   }
 
@@ -181,6 +280,7 @@ class SyncService {
     }
   }
 
+  // ✅ MÉTODO CORREGIDO - Cambié 'modelo' por 'modelo_id'
   static Future<SyncResult> sincronizarEquipos() async {
     try {
       final response = await http.get(
@@ -204,7 +304,7 @@ class SyncService {
             'id': equipo['id'],
             'cod_barras': equipo['cod_barras'],
             'marca_id': equipo['marca_id'],
-            'modelo': equipo['modelo'],
+            'modelo_id': equipo['modelo_id'], // ✅ CORREGIDO: Era 'modelo', ahora es 'modelo_id'
             'numero_serie': equipo['numero_serie'],
             'logo_id': equipo['logo_id'],
             'estado_local': equipo['estado_local'] ?? 1,

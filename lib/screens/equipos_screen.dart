@@ -149,12 +149,14 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
         equiposFiltrados = equipos.where((equipo) {
           final codBarras = equipo['cod_barras']?.toString().toLowerCase() ?? '';
           final marcaNombre = equipo['marca_nombre']?.toString().toLowerCase() ?? '';
-          final modeloNombre = equipo['modelo_nombre']?.toString().toLowerCase() ?? ''; // CORREGIDO: de 'modelo' a 'modelo_nombre'
+          final modeloNombre = equipo['modelo_nombre']?.toString().toLowerCase() ?? '';
+          final estadoAsignacion = equipo['estado_asignacion']?.toString().toLowerCase()?? '';
           final logoNombre = equipo['logo_nombre']?.toString().toLowerCase() ?? '';
 
           return codBarras.contains(query) ||
               marcaNombre.contains(query) ||
               modeloNombre.contains(query) ||
+              estadoAsignacion.contains(query) ||
               logoNombre.contains(query);
         }).toList();
       }
@@ -204,20 +206,23 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
 
     final logo = logoNombre.toLowerCase();
 
-    switch (logo) {
+    switch (logo.toLowerCase()) {
       case 'pepsi':
       case 'mirinda':
       case '7up':
       case 'paso de los toros':
-        return Icons.local_drink;
       case 'gatorade':
       case 'red bull':
-        return Icons.sports_bar;
       case 'aquafina':
       case 'puro sol':
-        return Icons.water_drop;
+      case 'split':
+      case 'watts':
+      case 'la fuente':
+      case 'pulp':
+      case 'rockstar':
+        return Icons.kitchen; // Visicooler para bebidas/productos refrigerados
       default:
-        return Icons.kitchen;
+        return Icons.kitchen_outlined; // Heladera/refrigerador general
     }
   }
 
@@ -247,7 +252,7 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
 
   void _mostrarDetallesEquipo(Map<String, dynamic> equipo) {
     final marcaNombre = equipo['marca_nombre'] ?? 'Sin marca';
-    final modeloNombre = equipo['modelo_nombre'] ?? 'Sin modelo'; // CORREGIDO
+    final modeloNombre = equipo['modelo_nombre'] ?? 'Sin modelo';
     final nombreCompleto = '$marcaNombre $modeloNombre';
 
     showDialog(
@@ -429,7 +434,7 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
 
   Widget _buildEquipoCard(Map<String, dynamic> equipo) {
     final marcaNombre = equipo['marca_nombre'] ?? 'Sin marca';
-    final modeloNombre = equipo['modelo_nombre'] ?? 'Sin modelo'; // CORREGIDO
+    final modeloNombre = equipo['modelo_nombre'] ?? 'Sin modelo';
     final nombreCompleto = '$marcaNombre $modeloNombre';
     final logoNombre = equipo['logo_nombre'];
     final estadoAsignacion = equipo['estado_asignacion'] ?? 'Disponible';

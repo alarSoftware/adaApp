@@ -68,34 +68,47 @@ class _ModelosScreenState extends State<ModelosScreen> {
     try {
       final modeloRepo = ModeloRepository();
 
-      // Aquí debes agregar tu lógica de descarga desde el servidor
-      // Por ejemplo:
-      // await modeloRepo.sincronizarDesdeServidor();
-
-      // Después de sincronizar, recargar los modelos locales
-      final modelosActualizados = await modeloRepo.obtenerTodos();
+      // Sincronizar desde el servidor
+      final resultado = await modeloRepo.sincronizarDesdeServidor();
 
       if (mounted) {
-        setState(() {
-          _modelos = modelosActualizados.map((modelo) => {
-            'id': modelo.id,
-            'nombre': modelo.nombre,
-          }).toList();
-          _isSyncing = false;
-        });
-      }
+        if (resultado.exito) {
+          // Recargar los modelos locales después de sincronizar
+          final modelosActualizados = await modeloRepo.obtenerTodos();
 
-      _logger.i('Modelos sincronizados exitosamente: ${_modelos.length}');
+          setState(() {
+            _modelos = modelosActualizados.map((modelo) => {
+              'id': modelo.id,
+              'nombre': modelo.nombre,
+            }).toList();
+            _isSyncing = false;
+          });
 
-      // Mostrar mensaje de éxito
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Modelos sincronizados exitosamente'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+          _logger.i('Modelos sincronizados exitosamente: ${_modelos.length}');
+
+          // Mostrar mensaje de éxito
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${resultado.itemsSincronizados} modelos sincronizados'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        } else {
+          setState(() {
+            _isSyncing = false;
+            _errorMessage = resultado.mensaje;
+          });
+
+          // Mostrar mensaje de error
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${resultado.mensaje}'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
       }
     } catch (e) {
       _logger.e('Error sincronizando modelos: $e');
@@ -221,7 +234,7 @@ class _ModelosScreenState extends State<ModelosScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.smartphone_outlined,
+              Icons.devices_outlined,
               size: 64,
               color: Colors.grey[400],
             ),
@@ -235,7 +248,7 @@ class _ModelosScreenState extends State<ModelosScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Presiona el botón de sincronizar para descargar modelos',
+              'Presiona el botón de sincronizar para descargar modelos del servidor',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey[500],
@@ -339,7 +352,7 @@ class _ModelosScreenState extends State<ModelosScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
-                  Icons.smartphone,
+                  Icons.devices,
                   color: Colors.white,
                   size: 24,
                 ),

@@ -512,7 +512,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${equipoData['marca_nombre'] ?? 'Sin marca'} ${equipoData['equipo_modelo'] ?? 'Sin modelo'}',
+                            '${equipoData['marca_nombre'] ?? 'Sin marca'} ${equipoData['modelo_nombre'] ?? 'Sin modelo'}',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,

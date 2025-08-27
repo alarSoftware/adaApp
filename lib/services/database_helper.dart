@@ -670,12 +670,38 @@ class DatabaseHelper {
   /// Sincronizar modelos desde API
   Future<void> sincronizarModelos(List<dynamic> modelosAPI) async {
     await ejecutarTransaccion((txn) async {
+      int sincronizados = 0;
+      int omitidos = 0;
+
       for (var modeloData in modelosAPI) {
-        await txn.insert('modelos', {
-          'id': modeloData['id'],
-          'nombre': modeloData['nombre'],
-        }, conflictAlgorithm: ConflictAlgorithm.replace);
+        // Validar que el modelo tenga datos válidos
+        if (modeloData == null) {
+          omitidos++;
+          continue;
+        }
+
+        final id = modeloData['id'];
+        final nombre = modeloData['nombre'];
+
+        if (id == null || nombre == null || nombre.toString().trim().isEmpty) {
+          logger.w('Modelo omitido - ID: $id, Nombre: $nombre');
+          omitidos++;
+          continue;
+        }
+
+        try {
+          await txn.insert('modelos', {
+            'id': id,
+            'nombre': nombre.toString().trim(),
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+          sincronizados++;
+        } catch (e) {
+          logger.e('Error insertando modelo ID $id: $e');
+          omitidos++;
+        }
       }
+
+      logger.i('Modelos: $sincronizados sincronizados, $omitidos omitidos');
     });
   }
 

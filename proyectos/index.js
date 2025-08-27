@@ -7,7 +7,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Logging middleware como antes
+//login
 app.use((req, res, next) => {
     const time = new Date().toLocaleString('es-PY', { timeZone: 'America/Asuncion' });
     console.log(`\n[${time}] ${req.method} ${req.url}`);
@@ -17,7 +17,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// DATOS DE EJEMPLO (como antes)
+// DATOS DE EJEMPLO 
 let clientes = [
     { id: 1, nombre: 'Juan Pérez', email: 'juan@email.com', telefono: '0981-123456', direccion: 'Asunción', activo: true, fecha_creacion: new Date().toISOString() },
     { id: 2, nombre: 'María García', email: 'maria@email.com', telefono: '0984-654321', direccion: 'Luque', activo: true, fecha_creacion: new Date().toISOString() },
@@ -197,68 +197,68 @@ let usuarios = [
 
 let equipoCliente = [
   // Cliente 1
-  { id: 1, equipo_id: 1, cliente_id: 1, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 2, equipo_id: 2, cliente_id: 1, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 3, equipo_id: 3, cliente_id: 1, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
+  { id: 1, equipo_id: 1, cliente_id: 1, fecha_asignacion: new Date().toISOString(), activo: true },
+  { id: 2, equipo_id: 2, cliente_id: 1, fecha_asignacion: new Date().toISOString(), activo: true },
+  { id: 3, equipo_id: 3, cliente_id: 1, fecha_asignacion: new Date().toISOString(), activo: false },
 
   // Cliente 2
-  { id: 4, equipo_id: 4, cliente_id: 2, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 5, equipo_id: 5, cliente_id: 2, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 6, equipo_id: 6, cliente_id: 2, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
+  { id: 4, equipo_id: 4, cliente_id: 2, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 5, equipo_id: 5, cliente_id: 2, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 6, equipo_id: 6, cliente_id: 2, fecha_asignacion: new Date().toISOString(),  activo: false },
 
   // Cliente 3
-  { id: 7, equipo_id: 7, cliente_id: 3, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 8, equipo_id: 8, cliente_id: 3, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 9, equipo_id: 9, cliente_id: 3, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
+  { id: 7, equipo_id: 7, cliente_id: 3, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 8, equipo_id: 8, cliente_id: 3, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 9, equipo_id: 9, cliente_id: 3, fecha_asignacion: new Date().toISOString(),  activo: false },
 
   // Cliente 4
-  { id: 10, equipo_id: 10, cliente_id: 4, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 11, equipo_id: 11, cliente_id: 4, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 12, equipo_id: 12, cliente_id: 4, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: false },
+  { id: 10, equipo_id: 10, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: true },
+  { id: 11, equipo_id: 11, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: true },
+  { id: 12, equipo_id: 12, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: false },
 
   // Cliente 5
-  { id: 13, equipo_id: 13, cliente_id: 5, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 14, equipo_id: 14, cliente_id: 5, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 13, equipo_id: 13, cliente_id: 5, fecha_asignacion: new Date().toISOString(), activo: true },
+  { id: 14, equipo_id: 14, cliente_id: 5, fecha_asignacion: new Date().toISOString(), activo: true },
 
   // Cliente 6
-  { id: 15, equipo_id: 15, cliente_id: 6, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 16, equipo_id: 16, cliente_id: 6, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 15, equipo_id: 15, cliente_id: 6, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 16, equipo_id: 16, cliente_id: 6, fecha_asignacion: new Date().toISOString(),  activo: true },
 
   // Cliente 7
-  { id: 17, equipo_id: 17, cliente_id: 7, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 18, equipo_id: 18, cliente_id: 7, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 17, equipo_id: 17, cliente_id: 7, fecha_asignacion: new Date().toISOString(), activo: true },
+  { id: 18, equipo_id: 18, cliente_id: 7, fecha_asignacion: new Date().toISOString(), activo: true },
 
   // Cliente 8
-  { id: 19, equipo_id: 19, cliente_id: 8, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 20, equipo_id: 20, cliente_id: 8, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 19, equipo_id: 19, cliente_id: 8, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 20, equipo_id: 20, cliente_id: 8, fecha_asignacion: new Date().toISOString(),  activo: true },
 
   // Cliente 9
-  { id: 21, equipo_id: 21, cliente_id: 9, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 22, equipo_id: 22, cliente_id: 9, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 21, equipo_id: 21, cliente_id: 9, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 22, equipo_id: 22, cliente_id: 9, fecha_asignacion: new Date().toISOString(),  activo: true },
 
   // Cliente 10
-  { id: 23, equipo_id: 23, cliente_id: 10, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 24, equipo_id: 24, cliente_id: 10, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 23, equipo_id: 23, cliente_id: 10, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 24, equipo_id: 24, cliente_id: 10, fecha_asignacion: new Date().toISOString(),  activo: true },
 
   // Cliente 11
-  { id: 25, equipo_id: 25, cliente_id: 11, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 26, equipo_id: 26, cliente_id: 11, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 25, equipo_id: 25, cliente_id: 11, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 26, equipo_id: 26, cliente_id: 11, fecha_asignacion: new Date().toISOString(), activo: true },
 
   // Cliente 12
-  { id: 27, equipo_id: 27, cliente_id: 12, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 28, equipo_id: 28, cliente_id: 12, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 27, equipo_id: 27, cliente_id: 12, fecha_asignacion: new Date().toISOString(), activo: true },
+  { id: 28, equipo_id: 28, cliente_id: 12, fecha_asignacion: new Date().toISOString(), activo: true },
 
   // Cliente 13
-  { id: 29, equipo_id: 29, cliente_id: 13, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 30, equipo_id: 30, cliente_id: 13, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 29, equipo_id: 29, cliente_id: 13, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 30, equipo_id: 30, cliente_id: 13, fecha_asignacion: new Date().toISOString(),  activo: true },
 
   // Cliente 14
-  { id: 31, equipo_id: 31, cliente_id: 14, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 32, equipo_id: 32, cliente_id: 14, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
+  { id: 31, equipo_id: 31, cliente_id: 14, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 32, equipo_id: 32, cliente_id: 14, fecha_asignacion: new Date().toISOString(),  activo: true },
 
   // Cliente 15
-  { id: 33, equipo_id: 33, cliente_id: 15, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true },
-  { id: 34, equipo_id: 34, cliente_id: 15, fecha_asignacion: new Date().toISOString(), fecha_retiro: null, activo: true }
+  { id: 33, equipo_id: 33, cliente_id: 15, fecha_asignacion: new Date().toISOString(), activo: true },
+  { id: 34, equipo_id: 34, cliente_id: 15, fecha_asignacion: new Date().toISOString(),  activo: true }
 ];
 
 let estadoEquipo = [
@@ -310,7 +310,7 @@ app.get('/logo', (req, res) => {
     res.json(logo);
 });
 
-// CLIENTES - Simple y directo como antes
+// CLIENTES 
 app.get('/clientes', (req, res) => {
     console.log(`📤 Enviando ${clientes.length} clientes`);
     console.log(`📋 Primeros 3 clientes:`, clientes.slice(0, 3).map(c => `${c.nombre} (${c.email})`));
@@ -355,7 +355,7 @@ app.post('/clientes', (req, res) => {
     });
 });
 
-// EQUIPOS - Simple y directo
+// EQUIPOS - 
 app.get('/equipos', (req, res) => {
     console.log(`📤 Enviando ${equipos.length} equipos`);
     console.log(`📋 Primeros 3 equipos:`, equipos.slice(0, 3).map(e => `${e.marca} ${e.modelo} (${e.cod_barras})`));

@@ -1,7 +1,10 @@
 // repositories/modelo_repository.dart
+import 'package:logger/logger.dart';
+
 import '../models/modelo.dart';
 import 'base_repository.dart';
-
+import '../services/sync_service.dart';
+var _logger = Logger();
 class ModeloRepository extends BaseRepository<Modelo> {
   @override
   String get tableName => 'modelos';
@@ -83,4 +86,19 @@ class ModeloRepository extends BaseRepository<Modelo> {
     ''';
     return {'modelos_con_equipos': await dbHelper.consultarPersonalizada(sql)};
   }
+
+  Future<SyncResult> sincronizarDesdeServidor() async {
+    try {
+      _logger.i('Iniciando sincronización de modelos desde servidor');
+      return await SyncService.sincronizarModelos();
+    } catch (e) {
+      _logger.e('Error en sincronización de modelos: $e');
+      return SyncResult(
+        exito: false,
+        mensaje: 'Error inesperado: ${e.toString()}',
+        itemsSincronizados: 0,
+      );
+    }
+  }
 }
+
