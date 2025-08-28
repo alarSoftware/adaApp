@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/cliente.dart';
 import '../repositories/equipo_repository.dart';
+import '../repositories/logo_repository.dart';
 import 'preview_screen.dart';
 import 'package:logger/logger.dart';
 import 'package:geolocator/geolocator.dart';
@@ -27,7 +28,9 @@ class _FormsScreenState extends State<FormsScreen> {
   // Controladores de texto
   final _codigoBarrasController = TextEditingController();
   final _modeloController = TextEditingController();
-  final _logoController = TextEditingController();
+  bool _isRegistered = false;
+  List<Map<String, dynamic>> _logos = [];
+  int? _logoSeleccionado;
   final _numeroSerieController = TextEditingController();
 
   // Estado
@@ -35,10 +38,37 @@ class _FormsScreenState extends State<FormsScreen> {
   bool _isScanning = false;
 
   @override
+  void initState(){
+    super.initState();
+    _cargarLogos();
+  }
+
+  Future<void> _cargarLogos() async {
+    try {
+      final logoRepo = LogoRepository();
+      final logos = await logoRepo.obtenerTodos();
+
+      if (mounted) {
+        setState(() {
+          _logos = logos.map((logo) => {
+            'id': logo.id,
+            'nombre': logo.nombre,
+          }).toList();
+        });
+      }
+      _logger.i('Logos cargados ${_logos.length}');
+    } catch (e) {
+      _logger.e('Error cargando logos: $e');
+      if (mounted) {
+        _mostrarSnackBar('Error cargando logos', Colors.red);
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _codigoBarrasController.dispose();
     _modeloController.dispose();
-    _logoController.dispose();
     _numeroSerieController.dispose();
     super.dispose();
   }
@@ -48,6 +78,8 @@ class _FormsScreenState extends State<FormsScreen> {
   // ===============================
 
   Future<void> _escanearCodigoBarras() async {
+    if (!mounted) return;
+
     setState(() {
       _isScanning = true;
     });
@@ -63,28 +95,36 @@ class _FormsScreenState extends State<FormsScreen> {
         ),
       );
 
-      if (result.rawContent.isNotEmpty) {
+      if (mounted && result.rawContent.isNotEmpty) {
         _codigoBarrasController.text = result.rawContent;
         await _buscarEquipoPorCodigo(result.rawContent);
       }
 
     } on PlatformException catch (e) {
-      if (e.code == BarcodeScanner.cameraAccessDenied) {
-        _mostrarSnackBar('Permisos de cámara denegados', Colors.red);
-      } else {
-        _mostrarSnackBar('Error desconocido: ${e.message}', Colors.red);
+      if (mounted) {
+        if (e.code == BarcodeScanner.cameraAccessDenied) {
+          _mostrarSnackBar('Permisos de cámara denegados', Colors.red);
+        } else {
+          _mostrarSnackBar('Error desconocido: ${e.message}', Colors.red);
+        }
       }
     } catch (e) {
       _logger.e('Error escaneando código: $e');
-      _mostrarSnackBar('Error al escanear código', Colors.red);
+      if (mounted) {
+        _mostrarSnackBar('Error al escanear código', Colors.red);
+      }
     } finally {
-      setState(() {
-        _isScanning = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isScanning = false;
+        });
+      }
     }
   }
 
   Future<void> _buscarEquipoPorCodigo(String codigo) async {
+    if (!mounted) return;
+
     try {
       _logger.i('Buscando visicooler con código: $codigo');
       _mostrarSnackBar('Buscando visicooler...', Colors.blue);
@@ -95,17 +135,20 @@ class _FormsScreenState extends State<FormsScreen> {
         soloActivos: true,
       );
 
+      if (!mounted) return;
+
       if (equiposCompletos.isNotEmpty) {
         final equipoCompleto = equiposCompletos.first;
 
         setState(() {
-          _modeloController.text = equipoCompleto['modelo'] ?? '';
-          _logoController.text = equipoCompleto['logo_nombre'] ?? '';
+          _isRegistered = true;  // Es un equipo existente (modo censo)
+          _modeloController.text = equipoCompleto['modelo_nombre'] ?? '';
+          _logoSeleccionado = equipoCompleto['logo_id'];
           _numeroSerieController.text = equipoCompleto['numero_serie'] ?? 'Sin número de serie';
         });
 
-        _logger.i('Visicooler encontrado: ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo']}');
-        _mostrarSnackBar('Visicooler encontrado: ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo']}', Colors.green);
+        _logger.i('Visicooler encontrado: ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']}');
+        _mostrarSnackBar('Visicooler encontrado: ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']}', Colors.green);
 
       } else {
         _logger.w('Visicooler no encontrado con código: $codigo');
@@ -115,12 +158,16 @@ class _FormsScreenState extends State<FormsScreen> {
 
     } catch (e, stackTrace) {
       _logger.e('Error buscando visicooler: $e', stackTrace: stackTrace);
-      _limpiarDatosAutocompletados();
-      _mostrarSnackBar('Error al consultar la base de datos', Colors.red);
+      if (mounted) {
+        _limpiarDatosAutocompletados();
+        _mostrarSnackBar('Error al consultar la base de datos', Colors.red);
+      }
     }
   }
 
   Future<void> _mostrarDialogoEquipoNoEncontrado(String codigo) async {
+    if (!mounted) return;
+
     return showDialog<void>(
       context: context,
       builder: (BuildContext context) {
@@ -132,13 +179,13 @@ class _FormsScreenState extends State<FormsScreen> {
             children: [
               Icon(
                 Icons.search_off,
-                color: Colors.orange[600],
+                color: Colors.grey[600],
                 size: 28,
               ),
               const SizedBox(width: 12),
               const Expanded(
                 child: Text(
-                  'Visicooler no encontrado',
+                  'Equipo no encontrado',
                   style: TextStyle(fontSize: 18),
                 ),
               ),
@@ -196,7 +243,7 @@ class _FormsScreenState extends State<FormsScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text('Limpiar'),
+              child: const Text('Registrar nuevo equipo'),
             ),
           ],
         );
@@ -207,6 +254,9 @@ class _FormsScreenState extends State<FormsScreen> {
   void _onCodigoChanged(String codigo) {
     if (codigo.isEmpty) {
       _limpiarDatosAutocompletados();
+      setState(() {
+        _isRegistered = false;
+      });
     }
   }
 
@@ -218,10 +268,25 @@ class _FormsScreenState extends State<FormsScreen> {
     }
   }
 
+  void _habilitarModoNuevoEquipo() {
+    if (!mounted) return;
+
+    setState(() {
+      _isRegistered = false;  // Cambiar a modo nuevo equipo
+      _modeloController.clear();
+      _numeroSerieController.clear();
+      _logoSeleccionado = null;
+    });
+
+    _mostrarSnackBar('Complete los datos del nuevo equipo', Colors.blue);
+  }
+
   Future<void> _continuarAPreview() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
+
+    if (!mounted) return;
 
     setState(() {
       _isLoading = true;
@@ -234,11 +299,14 @@ class _FormsScreenState extends State<FormsScreen> {
       final ubicacion = await _obtenerUbicacion();
       _logger.i('Ubicación obtenida: ${ubicacion['latitud']}, ${ubicacion['longitud']}');
 
+      if (!mounted) return;
+
       final datosCompletos = {
         'cliente': widget.cliente,
         'codigo_barras': _codigoBarrasController.text.trim(),
         'modelo': _modeloController.text.trim(),
-        'logo': _logoController.text.trim(),
+        'logo_id': _logoSeleccionado,
+        'logo': _logos.firstWhere((logo) => logo['id'] == _logoSeleccionado, orElse: () => {'nombre': ''})['nombre'],
         'numero_serie': _numeroSerieController.text.trim(),
         'latitud': ubicacion['latitud'],
         'longitud': ubicacion['longitud'],
@@ -253,14 +321,15 @@ class _FormsScreenState extends State<FormsScreen> {
         ),
       );
 
-      if (result == true) {
+      if (mounted && result == true) {
         Navigator.of(context).pop(true);
       }
 
     } catch (e) {
       _logger.e('Error obteniendo ubicación: $e');
-      await _mostrarDialogoErrorGPS(e.toString());
-
+      if (mounted) {
+        await _mostrarDialogoErrorGPS(e.toString());
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -274,13 +343,11 @@ class _FormsScreenState extends State<FormsScreen> {
     try {
       _logger.i('Iniciando obtención de ubicación GPS...');
 
-      // Verificar si el servicio de ubicación está habilitado
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         throw 'El servicio de ubicación está deshabilitado. Active el GPS para continuar.';
       }
 
-      // Verificar permisos
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -293,7 +360,6 @@ class _FormsScreenState extends State<FormsScreen> {
         throw 'Permisos de ubicación denegados permanentemente. Vaya a configuración y habilite la ubicación.';
       }
 
-      // Obtener posición con alta precisión
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 30),
@@ -314,6 +380,8 @@ class _FormsScreenState extends State<FormsScreen> {
   }
 
   Future<void> _mostrarDialogoErrorGPS(String error) async {
+    if (!mounted) return;
+
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -355,22 +423,22 @@ class _FormsScreenState extends State<FormsScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange[50],
+                  color: Colors.grey[100],
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange[200]!),
+                  border: Border.all(color: Colors.grey[300]!),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.warning_amber, color: Colors.orange[600], size: 20),
+                        Icon(Icons.warning_amber, color: Colors.grey[600], size: 20),
                         const SizedBox(width: 8),
                         Text(
                           'Ubicación Requerida',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            color: Colors.orange[800],
+                            color: Colors.grey[700],
                           ),
                         ),
                       ],
@@ -380,7 +448,7 @@ class _FormsScreenState extends State<FormsScreen> {
                       'La ubicación GPS es obligatoria para registrar visicoolers. Asegúrese de estar en la ubicación exacta del equipo.',
                       style: TextStyle(
                         fontSize: 13,
-                        color: Colors.orange[700],
+                        color: Colors.grey[600],
                       ),
                     ),
                   ],
@@ -399,7 +467,7 @@ class _FormsScreenState extends State<FormsScreen> {
                 _continuarAPreview();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue[600],
+                backgroundColor: Colors.grey[600],
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -429,12 +497,21 @@ class _FormsScreenState extends State<FormsScreen> {
   void _limpiarFormulario() {
     _codigoBarrasController.clear();
     _limpiarDatosAutocompletados();
+    if (mounted) {
+      setState(() {
+        _isRegistered = false;
+      });
+    }
   }
 
   void _limpiarDatosAutocompletados() {
     _modeloController.clear();
-    _logoController.clear();
     _numeroSerieController.clear();
+    if (mounted) {
+      setState(() {
+        _logoSeleccionado = null;
+      });
+    }
   }
 
   // ===============================
@@ -458,8 +535,8 @@ class _FormsScreenState extends State<FormsScreen> {
     return null;
   }
 
-  String? _validarLogo(String? value) {
-    if (value == null || value.trim().isEmpty) {
+  String? _validarLogo(int? value) {
+    if (value == null) {
       return 'El logo es requerido';
     }
     return null;
@@ -489,7 +566,7 @@ class _FormsScreenState extends State<FormsScreen> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      title: const Text('Censo de Visicoolers'),
+      title: Text(!_isRegistered ? 'Agregar Nuevo Equipo' : 'Censo de Equipos'),
       backgroundColor: Colors.grey[600],
       foregroundColor: Colors.white,
       elevation: 2,
@@ -542,19 +619,11 @@ class _FormsScreenState extends State<FormsScreen> {
               hint: 'Se completará automáticamente...',
               icon: Icons.devices,
               validator: _validarModelo,
-              enabled: false,
-              backgroundColor: Colors.grey[50],
+              enabled: !_isRegistered,
+              backgroundColor: _isRegistered ? Colors.grey[50] : null,
             ),
             const SizedBox(height: 16),
-            _buildTextField(
-              controller: _logoController,
-              label: 'Logo:',
-              hint: 'Se completará automáticamente...',
-              icon: Icons.branding_watermark,
-              validator: _validarLogo,
-              enabled: false,
-              backgroundColor: Colors.grey[50],
-            ),
+            _buildLogoDropdown(),
             const SizedBox(height: 16),
             _buildTextField(
               controller: _numeroSerieController,
@@ -562,8 +631,8 @@ class _FormsScreenState extends State<FormsScreen> {
               hint: 'Se completará automáticamente...',
               icon: Icons.confirmation_number,
               validator: _validarNumeroSerie,
-              enabled: false,
-              backgroundColor: Colors.grey[50],
+              enabled: !_isRegistered,
+              backgroundColor: _isRegistered ? Colors.grey[50] : null,
             ),
           ],
         ),
@@ -621,7 +690,7 @@ class _FormsScreenState extends State<FormsScreen> {
             Container(
               height: 56,
               decoration: BoxDecoration(
-                color: Colors.orange[600],
+                color: Colors.grey[600],
                 borderRadius: BorderRadius.circular(8),
               ),
               child: IconButton(
@@ -690,7 +759,7 @@ class _FormsScreenState extends State<FormsScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.orange[600]!),
+              borderSide: BorderSide(color: Colors.grey[600]!),
             ),
             disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -749,7 +818,7 @@ class _FormsScreenState extends State<FormsScreen> {
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _continuarAPreview,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange[600],
+                  backgroundColor: Colors.grey[600],
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
@@ -786,6 +855,80 @@ class _FormsScreenState extends State<FormsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLogoDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Logo:',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Envuelve el dropdown en un Container con constraints
+        Container(
+          width: double.infinity, // Ocupa todo el ancho disponible
+          child: DropdownButtonFormField<int>(
+            value: _logos.any((logo) => logo['id'] == _logoSeleccionado)
+                ? _logoSeleccionado
+                : null,
+
+            isExpanded: true, // Hace que el dropdown use todo el ancho disponible
+
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.branding_watermark),
+              fillColor: _isRegistered ? Colors.grey[50] : null,
+              filled: _isRegistered,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey[600]!),
+              ),
+              // ✅ Reduce el padding interno si es necesario
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            ),
+
+            hint: Text(
+              _isRegistered ? 'Se completará automáticamente' : 'Seleccionar',
+              // ✅ Evita overflow en el hint text
+              overflow: TextOverflow.ellipsis,
+            ),
+
+            items: _logos.map((logo) {
+              return DropdownMenuItem<int>(
+                value: logo['id'] is int ? logo['id'] : int.tryParse(logo['id'].toString()),
+                child: Container(
+                  width: double.infinity,
+                  child: Text(
+                    logo['nombre'],
+                    // ✅ Manejo de texto largo en los items
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              );
+            }).toList(),
+
+            onChanged: _isRegistered ? null : (value) {
+              setState(() {
+                _logoSeleccionado = value;
+              });
+            },
+            validator: _validarLogo,
+          ),
+        ),
+      ],
     );
   }
 }
