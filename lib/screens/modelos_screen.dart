@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cliente_app/repositories/models_repository.dart';
+import 'package:ada_app/repositories/models_repository.dart';
 import 'package:logger/logger.dart';
 
 final _logger = Logger();

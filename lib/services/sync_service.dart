@@ -1,13 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:cliente_app/repositories/cliente_repository.dart';
-import 'package:cliente_app/repositories/equipo_repository.dart';
-import 'package:cliente_app/repositories/equipo_cliente_repository.dart';
-import 'package:cliente_app/repositories/marca_repository.dart';
-import 'package:cliente_app/repositories/logo_repository.dart';
-import 'package:cliente_app/services/database_helper.dart';
+import 'package:ada_app/repositories/cliente_repository.dart';
+import 'package:ada_app/repositories/equipo_repository.dart';
+import 'package:ada_app/repositories/equipo_cliente_repository.dart';
+import 'package:ada_app/repositories/marca_repository.dart';
+import 'package:ada_app/repositories/logo_repository.dart';
+import 'package:ada_app/services/database_helper.dart';
 import 'package:http/http.dart' as http;
-import 'package:cliente_app/models/cliente.dart';
+import 'package:ada_app/models/cliente.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
 

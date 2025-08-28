@@ -1,5 +1,5 @@
-import 'package:cliente_app/services/database_helper.dart';
-import 'package:cliente_app/services/sync_service.dart';
+import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/sync_service.dart';
 import 'package:logger/logger.dart';
 
 final _logger = Logger();

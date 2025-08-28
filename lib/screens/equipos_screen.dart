@@ -1,4 +1,4 @@
-import 'package:cliente_app/repositories/equipo_repository.dart';
+import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:flutter/material.dart';
 import '../models/equipos.dart';
 import '../services/sync_service.dart';

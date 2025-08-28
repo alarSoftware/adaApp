@@ -1,5 +1,5 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:cliente_app/models/equipos.dart';
+import 'package:ada_app/models/equipos.dart';
 import '../repositories/base_repository.dart';
 
 class EquipoRepository extends BaseRepository<Equipo> {

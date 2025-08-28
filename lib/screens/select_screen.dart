@@ -1,12 +1,12 @@
-import 'package:cliente_app/repositories/cliente_repository.dart';
-import 'package:cliente_app/repositories/equipo_repository.dart';
-import 'package:cliente_app/screens/equipos_screen.dart';
+import 'package:ada_app/repositories/cliente_repository.dart';
+import 'package:ada_app/repositories/equipo_repository.dart';
+import 'package:ada_app/screens/equipos_screen.dart';
 import 'package:flutter/material.dart';
 import '../services/sync_service.dart';
 import '../services/api_service.dart';
 import 'package:logger/logger.dart';
-import 'package:cliente_app/screens/modelos_screen.dart';
-import 'package:cliente_app/screens/logo_screen.dart';
+import 'package:ada_app/screens/modelos_screen.dart';
+import 'package:ada_app/screens/logo_screen.dart';
 import '../repositories/models_repository.dart';
 import '../repositories/logo_repository.dart';
 import 'dart:async';
