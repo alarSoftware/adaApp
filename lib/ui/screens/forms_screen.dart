@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../models/cliente.dart';
-import '../repositories/equipo_repository.dart';
-import '../repositories/logo_repository.dart';
+import 'package:ada_app/models/cliente.dart';
+import 'package:ada_app/repositories/equipo_repository.dart';
+import 'package:ada_app/repositories/logo_repository.dart';
 import 'preview_screen.dart';
 import 'package:logger/logger.dart';
 import 'package:geolocator/geolocator.dart';
@@ -28,10 +28,13 @@ class _FormsScreenState extends State<FormsScreen> {
   // Controladores de texto
   final _codigoBarrasController = TextEditingController();
   final _modeloController = TextEditingController();
-  bool _isRegistered = false;
+  final _numeroSerieController = TextEditingController();
+
+  // ✅ CAMBIO PRINCIPAL: Inicializa en modo CENSO (campos bloqueados)
+  bool _isCensoMode = true; // true = censo (campos bloqueados), false = nuevo equipo (campos habilitados)
+
   List<Map<String, dynamic>> _logos = [];
   int? _logoSeleccionado;
-  final _numeroSerieController = TextEditingController();
 
   // Estado
   bool _isLoading = false;
@@ -74,7 +77,7 @@ class _FormsScreenState extends State<FormsScreen> {
   }
 
   // ===============================
-  // FUNCIONALIDAD REAL
+  // FUNCIONALIDAD CORREGIDA
   // ===============================
 
   Future<void> _escanearCodigoBarras() async {
@@ -138,10 +141,11 @@ class _FormsScreenState extends State<FormsScreen> {
       if (!mounted) return;
 
       if (equiposCompletos.isNotEmpty) {
+        // ✅ EQUIPO ENCONTRADO: Modo censo (campos bloqueados y autocompletados)
         final equipoCompleto = equiposCompletos.first;
 
         setState(() {
-          _isRegistered = true;  // Es un equipo existente (modo censo)
+          _isCensoMode = true;  // Mantener en modo censo
           _modeloController.text = equipoCompleto['modelo_nombre'] ?? '';
           _logoSeleccionado = equipoCompleto['logo_id'];
           _numeroSerieController.text = equipoCompleto['numero_serie'] ?? 'Sin número de serie';
@@ -151,6 +155,7 @@ class _FormsScreenState extends State<FormsScreen> {
         _mostrarSnackBar('Visicooler encontrado: ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']}', Colors.green);
 
       } else {
+        // ✅ EQUIPO NO ENCONTRADO: Mostrar diálogo
         _logger.w('Visicooler no encontrado con código: $codigo');
         _limpiarDatosAutocompletados();
         _mostrarDialogoEquipoNoEncontrado(codigo);
@@ -210,16 +215,16 @@ class _FormsScreenState extends State<FormsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Posibles causas:',
+                      '¿Desea registrar un nuevo equipo?',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: Colors.grey[700],
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text('• El visicooler no está registrado en el sistema'),
-                    const Text('• Error en el código escaneado o ingresado'),
-                    const Text('• Los datos no están sincronizados con el servidor'),
+                    const Text('• Complete manualmente los datos del equipo'),
+                    const Text('• El código actual se mantendrá'),
+                    const Text('• Podrá corregir el código si es necesario'),
                   ],
                 ),
               ),
@@ -227,17 +232,22 @@ class _FormsScreenState extends State<FormsScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () {
+                Navigator.of(context).pop();
+                // ✅ Mantener en modo censo y limpiar el código para que puedan corregirlo
+                _codigoBarrasController.clear();
+                _limpiarDatosAutocompletados();
+              },
               child: const Text('Corregir código'),
             ),
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _codigoBarrasController.clear();
-                _limpiarDatosAutocompletados();
+                // ✅ CAMBIAR A MODO NUEVO EQUIPO
+                _habilitarModoNuevoEquipo();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey[700],
+                backgroundColor: Colors.grey[600],
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -254,8 +264,9 @@ class _FormsScreenState extends State<FormsScreen> {
   void _onCodigoChanged(String codigo) {
     if (codigo.isEmpty) {
       _limpiarDatosAutocompletados();
+      // ✅ Si borra el código, volver a modo censo
       setState(() {
-        _isRegistered = false;
+        _isCensoMode = true;
       });
     }
   }
@@ -272,13 +283,14 @@ class _FormsScreenState extends State<FormsScreen> {
     if (!mounted) return;
 
     setState(() {
-      _isRegistered = false;  // Cambiar a modo nuevo equipo
+      _isCensoMode = false;  // ✅ Cambiar a modo nuevo equipo (campos habilitados)
+      // No limpiar el código de barras - mantenerlo
       _modeloController.clear();
       _numeroSerieController.clear();
       _logoSeleccionado = null;
     });
 
-    _mostrarSnackBar('Complete los datos del nuevo equipo', Colors.blue);
+    _mostrarSnackBar('Modo: Registrar nuevo equipo. Complete todos los campos', Colors.blue);
   }
 
   Future<void> _continuarAPreview() async {
@@ -312,6 +324,8 @@ class _FormsScreenState extends State<FormsScreen> {
         'longitud': ubicacion['longitud'],
         'fecha_registro': DateTime.now().toIso8601String(),
         'timestamp_gps': DateTime.now().millisecondsSinceEpoch,
+        // ✅ Agregar información del modo
+        'es_censo': _isCensoMode,
       };
 
       final result = await Navigator.push(
@@ -494,15 +508,6 @@ class _FormsScreenState extends State<FormsScreen> {
     );
   }
 
-  void _limpiarFormulario() {
-    _codigoBarrasController.clear();
-    _limpiarDatosAutocompletados();
-    if (mounted) {
-      setState(() {
-        _isRegistered = false;
-      });
-    }
-  }
 
   void _limpiarDatosAutocompletados() {
     _modeloController.clear();
@@ -566,17 +571,11 @@ class _FormsScreenState extends State<FormsScreen> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      title: Text(!_isRegistered ? 'Agregar Nuevo Equipo' : 'Censo de Equipos'),
+      // ✅ El título cambia según el modo, pero colores neutros
+      title: Text(_isCensoMode ? 'Censo de Equipos' : 'Agregar Nuevo Equipo'),
       backgroundColor: Colors.grey[600],
       foregroundColor: Colors.white,
       elevation: 2,
-      actions: [
-        IconButton(
-          onPressed: _isLoading ? null : _limpiarFormulario,
-          icon: const Icon(Icons.clear_all),
-          tooltip: 'Limpiar formulario',
-        ),
-      ],
     );
   }
 
@@ -593,9 +592,58 @@ class _FormsScreenState extends State<FormsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ✅ Agregar indicador de modo
+            _buildModeIndicator(),
+            const SizedBox(height: 16),
             _buildFormulario(),
           ],
         ),
+      ),
+    );
+  }
+
+  // ✅ Widget para mostrar el modo actual - colores neutros
+  Widget _buildModeIndicator() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        border: Border.all(
+          color: Colors.grey[300]!,
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            _isCensoMode ? Icons.inventory : Icons.add_box,
+            color: Colors.grey[600],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _isCensoMode ? 'Modo: Censo de Equipos' : 'Modo: Registro Nuevo Equipo',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                Text(
+                  _isCensoMode
+                      ? 'Escanee o ingrese un código para buscar equipos existentes'
+                      : 'Complete manualmente todos los campos del nuevo equipo',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -616,11 +664,11 @@ class _FormsScreenState extends State<FormsScreen> {
             _buildTextField(
               controller: _modeloController,
               label: 'Modelo:',
-              hint: 'Se completará automáticamente...',
+              hint: _isCensoMode ? 'Se completará automáticamente...' : 'Ingrese el modelo del equipo',
               icon: Icons.devices,
               validator: _validarModelo,
-              enabled: !_isRegistered,
-              backgroundColor: _isRegistered ? Colors.grey[50] : null,
+              enabled: !_isCensoMode, // ✅ Bloqueado en modo censo
+              backgroundColor: _isCensoMode ? Colors.grey[50] : null,
             ),
             const SizedBox(height: 16),
             _buildLogoDropdown(),
@@ -628,11 +676,11 @@ class _FormsScreenState extends State<FormsScreen> {
             _buildTextField(
               controller: _numeroSerieController,
               label: 'Serie:',
-              hint: 'Se completará automáticamente...',
+              hint: _isCensoMode ? 'Se completará automáticamente...' : 'Ingrese el número de serie',
               icon: Icons.confirmation_number,
               validator: _validarNumeroSerie,
-              enabled: !_isRegistered,
-              backgroundColor: _isRegistered ? Colors.grey[50] : null,
+              enabled: !_isCensoMode, // ✅ Bloqueado en modo censo
+              backgroundColor: _isCensoMode ? Colors.grey[50] : null,
             ),
           ],
         ),
@@ -663,13 +711,18 @@ class _FormsScreenState extends State<FormsScreen> {
                 onFieldSubmitted: _onCodigoSubmitted,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
-                  hintText: 'Escanea o ingresa y presiona Enter',
+                  hintText: _isCensoMode
+                      ? 'Escanea o ingresa y presiona Enter'
+                      : 'Código del nuevo equipo',
                   prefixIcon: const Icon(Icons.qr_code),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.clear),
                     onPressed: () {
                       _codigoBarrasController.clear();
                       _limpiarDatosAutocompletados();
+                      setState(() {
+                        _isCensoMode = true; // Volver a modo censo al limpiar
+                      });
                     },
                   ),
                   border: OutlineInputBorder(
@@ -842,12 +895,15 @@ class _FormsScreenState extends State<FormsScreen> {
                     Text('Procesando...'),
                   ],
                 )
-                    : const Row(
+                    : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.arrow_forward, size: 20),
-                    SizedBox(width: 8),
-                    Text('Continuar'),
+                    Icon(
+                      _isCensoMode ? Icons.assignment : Icons.add_box,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(_isCensoMode ? 'Registrar Censo' : 'Registrar Nuevo'),
                   ],
                 ),
               ),
@@ -871,21 +927,17 @@ class _FormsScreenState extends State<FormsScreen> {
           ),
         ),
         const SizedBox(height: 8),
-
-        // Envuelve el dropdown en un Container con constraints
         Container(
-          width: double.infinity, // Ocupa todo el ancho disponible
+          width: double.infinity,
           child: DropdownButtonFormField<int>(
             value: _logos.any((logo) => logo['id'] == _logoSeleccionado)
                 ? _logoSeleccionado
                 : null,
-
-            isExpanded: true, // Hace que el dropdown use todo el ancho disponible
-
+            isExpanded: true,
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.branding_watermark),
-              fillColor: _isRegistered ? Colors.grey[50] : null,
-              filled: _isRegistered,
+              fillColor: _isCensoMode ? Colors.grey[50] : null,
+              filled: _isCensoMode,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -895,16 +947,12 @@ class _FormsScreenState extends State<FormsScreen> {
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(color: Colors.grey[600]!),
               ),
-              // ✅ Reduce el padding interno si es necesario
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
             ),
-
             hint: Text(
-              _isRegistered ? 'Se completará automáticamente' : 'Seleccionar',
-              // ✅ Evita overflow en el hint text
+              _isCensoMode ? 'Se completará automáticamente' : 'Seleccionar logo',
               overflow: TextOverflow.ellipsis,
             ),
-
             items: _logos.map((logo) {
               return DropdownMenuItem<int>(
                 value: logo['id'] is int ? logo['id'] : int.tryParse(logo['id'].toString()),
@@ -912,15 +960,13 @@ class _FormsScreenState extends State<FormsScreen> {
                   width: double.infinity,
                   child: Text(
                     logo['nombre'],
-                    // ✅ Manejo de texto largo en los items
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
                 ),
               );
             }).toList(),
-
-            onChanged: _isRegistered ? null : (value) {
+            onChanged: _isCensoMode ? null : (value) {
               setState(() {
                 _logoSeleccionado = value;
               });

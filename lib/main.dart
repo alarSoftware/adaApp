@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
-import 'screens/login_screen.dart';
-import 'screens/clients_screen.dart';
-import 'screens/select_screen.dart';
-import 'screens/equipos_screen.dart';
-import 'screens/cliente_detail_screen.dart';
+import 'ui/screens/login_screen.dart';
+import 'ui/screens/clients_screen.dart';
+import 'ui/screens/select_screen.dart';
+import 'ui/screens/equipos_screen.dart';
+import 'ui/screens/cliente_detail_screen.dart';
 import 'models/cliente.dart';  // ✅ AGREGA ESTA IMPORTACIÓN
 
 var logger = Logger();

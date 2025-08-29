@@ -1,12 +1,10 @@
+// ui/screens/cliente_detail_screen.dart
 import 'package:flutter/material.dart';
-import '../models/cliente.dart';
-import '../models/equipos_cliente.dart';
-import '../repositories/equipo_cliente_repository.dart';
+import 'package:ada_app/models/cliente.dart';
+import 'package:ada_app/viewmodels/cliente_detail_screen_viewmodel.dart';
 import 'equipos_clientes_detail_screen.dart';
 import 'forms_screen.dart';
-import 'package:logger/logger.dart';
-
-final _logger = Logger();
+import 'dart:async';
 
 class ClienteDetailScreen extends StatefulWidget {
   final Cliente cliente;
@@ -21,102 +19,59 @@ class ClienteDetailScreen extends StatefulWidget {
 }
 
 class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
-  List<EquipoCliente> _equiposAsignados = [];
-  List<Map<String, dynamic>> _equiposCompletos = []; // Datos completos del repositorio
-  bool _isLoading = true;
-  String? _errorMessage;
+  late ClienteDetailScreenViewModel _viewModel;
+  late StreamSubscription<ClienteDetailUIEvent> _eventSubscription;
 
   @override
   void initState() {
     super.initState();
-    _cargarEquiposAsignados();
+    _viewModel = ClienteDetailScreenViewModel();
+    _setupEventListener();
+    _viewModel.initialize(widget.cliente);
   }
 
-  // ===============================
-  // MÉTODOS DE DATOS
-  // ===============================
+  @override
+  void dispose() {
+    _eventSubscription.cancel();
+    _viewModel.dispose();
+    super.dispose();
+  }
 
-  Future<void> _cargarEquiposAsignados() async {
-    if (!mounted) return;
+  void _setupEventListener() {
+    _eventSubscription = _viewModel.uiEvents.listen((event) {
+      if (!mounted) return;
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
+      if (event is ShowErrorEvent) {
+        _showError(event.message);
+      } else if (event is NavigateToFormsEvent) {
+        _navigateToForms(event.cliente);
+      } else if (event is NavigateToEquipoDetailEvent) {
+        _navigateToEquipoDetail(event.equipoCliente);
+      }
     });
-
-    try {
-      if (widget.cliente.id == null) {
-        _setEquiposVacios();
-        return;
-      }
-
-      final equipoClienteRepo = EquipoClienteRepository();
-      final equiposDelCliente = await equipoClienteRepo.obtenerPorClienteCompleto(
-          widget.cliente.id!,
-          soloActivos: true
-      );
-
-      if (mounted) {
-        setState(() {
-          // Guardar los datos completos del repositorio
-          _equiposCompletos = equiposDelCliente;
-
-          // Convertir los Map a objetos EquipoCliente para compatibilidad
-          _equiposAsignados = equiposDelCliente.map((equipoData) {
-            return EquipoCliente.fromMap(equipoData);
-          }).toList();
-
-          _isLoading = false;
-        });
-      }
-    } catch (e, stackTrace) {
-      _logger.e('Error cargando equipos del cliente', error: e, stackTrace: stackTrace);
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Error cargando equipos: ${e.toString()}';
-        });
-      }
-    }
   }
 
-  void _setEquiposVacios() {
-    if (mounted) {
-      setState(() {
-        _equiposAsignados = [];
-        _equiposCompletos = [];
-        _isLoading = false;
-      });
-    }
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('❌ $message'),
+        backgroundColor: Colors.red,
+        duration: Duration(seconds: 4),
+      ),
+    );
   }
 
-  Future<void> _refreshData() async {
-    await _cargarEquiposAsignados();
-  }
-
-  // ===============================
-  // MÉTODOS DE NAVEGACIÓN
-  // ===============================
-
-  Future<void> _asignarNuevoEquipo() async {
-    if (!mounted) return;
-
+  Future<void> _navigateToForms(Cliente cliente) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => FormsScreen(
-          cliente: widget.cliente,
-        ),
+        builder: (context) => FormsScreen(cliente: cliente),
       ),
     );
-
-    // Si se asignó un equipo exitosamente, recargar los datos
-    if (result == true) {
-      _cargarEquiposAsignados();
-    }
+    _viewModel.onNavigationResult(result);
   }
 
-  void _navegarADetalleEquipo(EquipoCliente equipoCliente) {
+  void _navigateToEquipoDetail(equipoCliente) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -124,25 +79,8 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
           equipoCliente: equipoCliente,
         ),
       ),
-    ).then((_) {
-      // Recargar datos al volver de la pantalla de detalle
-      _refreshData();
-    });
+    ).then((_) => _viewModel.refresh());
   }
-
-  // ===============================
-  // MÉTODOS DE UI
-  // ===============================
-
-  String _formatearFecha(DateTime fecha) {
-    return '${fecha.day.toString().padLeft(2, '0')}/'
-        '${fecha.month.toString().padLeft(2, '0')}/'
-        '${fecha.year}';
-  }
-
-  // ===============================
-  // WIDGETS
-  // ===============================
 
   @override
   Widget build(BuildContext context) {
@@ -150,14 +88,14 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
       appBar: _buildAppBar(),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: _cargarEquiposAsignados,
+          onRefresh: _viewModel.refresh,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.only(
               left: 16.0,
               right: 16.0,
               top: 16.0,
-              bottom: 16.0 + MediaQuery.of(context).padding.bottom, // Espacio extra para barras de navegación
+              bottom: 16.0 + MediaQuery.of(context).padding.bottom,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,7 +119,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
       elevation: 2,
       actions: [
         IconButton(
-          onPressed: _asignarNuevoEquipo,
+          onPressed: _viewModel.navegarAAsignarEquipo,
           icon: const Icon(Icons.add),
           tooltip: 'Realizar censo de equipo',
         ),
@@ -200,7 +138,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header con nombre
             Row(
               children: [
                 Expanded(
@@ -215,16 +152,15 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
               ],
             ),
             const SizedBox(height: 20),
-            // Información del cliente
             _buildInfoRow(Icons.email_outlined, 'Email', widget.cliente.email),
-            if (widget.cliente.telefono?.isNotEmpty == true)
-              _buildInfoRow(Icons.phone_outlined, 'Teléfono', widget.cliente.telefono!),
-            if (widget.cliente.direccion?.isNotEmpty == true)
-              _buildInfoRow(Icons.location_on_outlined, 'Dirección', widget.cliente.direccion!),
+            if (_viewModel.shouldShowPhone())
+              _buildInfoRow(Icons.phone_outlined, 'Teléfono', _viewModel.getClientePhone()),
+            if (_viewModel.shouldShowAddress())
+              _buildInfoRow(Icons.location_on_outlined, 'Dirección', _viewModel.getClienteAddress()),
             _buildInfoRow(
-                Icons.access_time_outlined,
-                'Fecha de creación',
-                _formatearFecha(widget.cliente.fechaCreacion)
+              Icons.access_time_outlined,
+              'Fecha de creación',
+              _viewModel.getClienteCreationDate(),
             ),
           ],
         ),
@@ -244,11 +180,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
               color: Colors.grey.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              icon,
-              size: 20,
-              color: Colors.grey[600],
-            ),
+            child: Icon(icon, size: 20, color: Colors.grey[600]),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -282,66 +214,71 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
   }
 
   Widget _buildEquiposSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, child) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.kitchen_outlined,
-                color: Colors.orange[700],
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Equipos Asignados',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange[700],
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.kitchen_outlined,
+                    color: Colors.orange[700],
+                    size: 24,
+                  ),
                 ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                '${_equiposCompletos.length}', // Usar _equiposCompletos para el contador
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange[700],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Equipos Asignados',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange[700],
+                    ),
+                  ),
                 ),
-              ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    '${_viewModel.equiposCount}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange[700],
+                    ),
+                  ),
+                ),
+              ],
             ),
+            const SizedBox(height: 16),
+            _buildEquiposContent(),
           ],
-        ),
-        const SizedBox(height: 16),
-        _buildEquiposContent(),
-      ],
+        );
+      },
     );
   }
 
   Widget _buildEquiposContent() {
-    if (_isLoading) {
+    if (_viewModel.isLoading) {
       return _buildLoadingState();
     }
 
-    if (_errorMessage != null) {
+    if (_viewModel.hasError) {
       return _buildErrorState();
     }
 
-    if (_equiposCompletos.isEmpty) {
+    if (_viewModel.isEmpty) {
       return _buildEmptyState();
     }
 
@@ -360,11 +297,8 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Cargando equipos...',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 16,
-              ),
+              _viewModel.getLoadingMessage(),
+              style: TextStyle(color: Colors.grey[600], fontSize: 16),
             ),
           ],
         ),
@@ -383,14 +317,10 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
       ),
       child: Column(
         children: [
-          Icon(
-            Icons.error_outline,
-            size: 48,
-            color: Colors.red[400],
-          ),
+          Icon(Icons.error_outline, size: 48, color: Colors.red[400]),
           const SizedBox(height: 12),
           Text(
-            'Error al cargar equipos',
+            _viewModel.getErrorStateTitle(),
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -399,16 +329,13 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            _errorMessage!,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.red[600],
-            ),
+            _viewModel.errorMessage!,
+            style: TextStyle(fontSize: 14, color: Colors.red[600]),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
-            onPressed: _cargarEquiposAsignados,
+            onPressed: _viewModel.cargarEquiposAsignados,
             icon: const Icon(Icons.refresh),
             label: const Text('Reintentar'),
             style: ElevatedButton.styleFrom(
@@ -432,14 +359,10 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
       ),
       child: Column(
         children: [
-          Icon(
-            Icons.kitchen_outlined,
-            size: 64,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.kitchen_outlined, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
-            'Sin equipos censados',
+            _viewModel.getEmptyStateTitle(),
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -448,16 +371,13 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Este cliente no tiene equipos censados actualmente',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
+            _viewModel.getEmptyStateSubtitle(),
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
           OutlinedButton.icon(
-            onPressed: _asignarNuevoEquipo,
+            onPressed: _viewModel.navegarAAsignarEquipo,
             icon: const Icon(Icons.qr_code_scanner),
             label: const Text('Realizar Censo'),
             style: OutlinedButton.styleFrom(
@@ -472,7 +392,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
 
   Widget _buildEquiposList() {
     return Column(
-      children: _equiposCompletos.map((equipoData) {
+      children: _viewModel.equiposCompletos.map((equipoData) {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           child: Card(
@@ -481,17 +401,12 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: InkWell(
-              onTap: () {
-                // Convertir a EquipoCliente para navegación
-                final equipoCliente = EquipoCliente.fromMap(equipoData);
-                _navegarADetalleEquipo(equipoCliente);
-              },
+              onTap: () => _viewModel.navegarADetalleEquipo(equipoData),
               borderRadius: BorderRadius.circular(12),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    // Avatar del equipo
                     Container(
                       width: 56,
                       height: 56,
@@ -506,13 +421,12 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    // Información del equipo
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${equipoData['marca_nombre'] ?? 'Sin marca'} ${equipoData['modelo_nombre'] ?? 'Sin modelo'}',
+                            _viewModel.getEquipoTitle(equipoData),
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -522,9 +436,9 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
-                          if (equipoData['equipo_cod_barras']?.toString().isNotEmpty == true)
+                          if (_viewModel.getEquipoBarcode(equipoData) != null)
                             Text(
-                              equipoData['equipo_cod_barras'].toString(),
+                              _viewModel.getEquipoBarcode(equipoData)!,
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[600],
@@ -533,10 +447,10 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          if (equipoData['logo_nombre']?.toString().isNotEmpty == true) ...[
+                          if (_viewModel.getEquipoLogo(equipoData) != null) ...[
                             const SizedBox(height: 2),
                             Text(
-                              'Logo: ${equipoData['logo_nombre']}',
+                              'Logo: ${_viewModel.getEquipoLogo(equipoData)}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[500],
@@ -548,30 +462,18 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                           const SizedBox(height: 6),
                           Row(
                             children: [
-                              Icon(
-                                Icons.access_time,
-                                size: 14,
-                                color: Colors.grey[500],
-                              ),
+                              Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
                               const SizedBox(width: 4),
                               Text(
-                                'Censado: ${_formatearFecha(DateTime.parse(equipoData['fecha_asignacion']))}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[500],
-                                ),
+                                _viewModel.getEquipoFechaCensado(equipoData),
+                                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                               ),
                             ],
                           ),
                         ],
                       ),
                     ),
-                    // Flecha
-                    Icon(
-                      Icons.arrow_forward_ios,
-                      size: 16,
-                      color: Colors.grey[400],
-                    ),
+                    Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
                   ],
                 ),
               ),

@@ -197,8 +197,8 @@ let usuarios = [
 
 let equipoCliente = [
   // Cliente 1
-  { id: 1, equipo_id: 1, cliente_id: 1, fecha_asignacion: new Date().toISOString(), activo: true },
   { id: 2, equipo_id: 2, cliente_id: 1, fecha_asignacion: new Date().toISOString(), activo: true },
+  { id: 1, equipo_id: 1, cliente_id: 1, fecha_asignacion: new Date().toISOString(), activo: true },
   { id: 3, equipo_id: 3, cliente_id: 1, fecha_asignacion: new Date().toISOString(), activo: false },
 
   // Cliente 2
@@ -215,6 +215,7 @@ let equipoCliente = [
   { id: 10, equipo_id: 10, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: true },
   { id: 11, equipo_id: 11, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: true },
   { id: 12, equipo_id: 12, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: false },
+  { id: 51, equipo_id: 7, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: false },
 
   // Cliente 5
   { id: 13, equipo_id: 13, cliente_id: 5, fecha_asignacion: new Date().toISOString(), activo: true },
@@ -241,7 +242,7 @@ let equipoCliente = [
   { id: 24, equipo_id: 24, cliente_id: 10, fecha_asignacion: new Date().toISOString(),  activo: true },
 
   // Cliente 11
-  { id: 25, equipo_id: 25, cliente_id: 11, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 25, equipo_id: 25, cliente_id: 11, fecha_asignacion: new Date().toISOString(), activo: true },
   { id: 26, equipo_id: 26, cliente_id: 11, fecha_asignacion: new Date().toISOString(), activo: true },
 
   // Cliente 12
@@ -261,22 +262,22 @@ let equipoCliente = [
   { id: 34, equipo_id: 34, cliente_id: 15, fecha_asignacion: new Date().toISOString(),  activo: true }
 ];
 
-let estadoEquipo = [
-    { id: 1, equipo_id: 1, cliente_id: 1, usuario_id: 1, funcionando: true, estado_general: 'Funcionando correctamente', temperatura_actual: 4.2, temperatura_freezer: -18.5, latitud: -25.2637, longitud: -57.5759, fecha_revision: new Date().toISOString() },
-    { id: 2, equipo_id: 2, cliente_id: 2, usuario_id: 2, funcionando: false, estado_general: 'Problema de temperatura', temperatura_actual: 8.5, temperatura_freezer: -12.0, latitud: -25.2800, longitud: -57.6300, fecha_revision: new Date().toISOString() },
-    { id: 3, equipo_id: 3, cliente_id: 3, usuario_id: 3, funcionando: true, estado_general: 'Óptimas condiciones', temperatura_actual: 3.9, temperatura_freezer: -19.1, latitud: -25.3100, longitud: -57.6000, fecha_revision: new Date().toISOString() },
-    { id: 4, equipo_id: 4, cliente_id: 4, usuario_id: 4, funcionando: true, estado_general: 'Funcionando estable', temperatura_actual: 5.0, temperatura_freezer: -17.0, latitud: -25.2950, longitud: -57.5800, fecha_revision: new Date().toISOString() },
-    { id: 5, equipo_id: 5, cliente_id: 5, usuario_id: 5, funcionando: false, estado_general: 'Apagado por cliente', temperatura_actual: null, temperatura_freezer: null, latitud: -25.3200, longitud: -57.6100, fecha_revision: new Date().toISOString() },
-    { id: 6, equipo_id: 6, cliente_id: 6, usuario_id: 6, funcionando: true, estado_general: 'Sin anomalías', temperatura_actual: 4.5, temperatura_freezer: -18.2, latitud: -25.2805, longitud: -57.5990, fecha_revision: new Date().toISOString() },
-    { id: 7, equipo_id: 7, cliente_id: 7, usuario_id: 7, funcionando: true, estado_general: 'Correcto funcionamiento', temperatura_actual: 4.0, temperatura_freezer: -18.0, latitud: -25.2700, longitud: -57.5900, fecha_revision: new Date().toISOString() },
-    { id: 8, equipo_id: 8, cliente_id: 8, usuario_id: 8, funcionando: false, estado_general: 'Compresor con fallas', temperatura_actual: 10.0, temperatura_freezer: -8.0, latitud: -25.2650, longitud: -57.5850, fecha_revision: new Date().toISOString() },
-    { id: 9, equipo_id: 9, cliente_id: 9, usuario_id: 9, funcionando: true, estado_general: 'Revisión completa', temperatura_actual: 3.5, temperatura_freezer: -19.0, latitud: -25.2750, longitud: -57.5950, fecha_revision: new Date().toISOString() },
-    { id: 10, equipo_id: 10, cliente_id: 10, usuario_id: 10, funcionando: true, estado_general: 'Operativo', temperatura_actual: 4.1, temperatura_freezer: -18.4, latitud: -25.2600, longitud: -57.5700, fecha_revision: new Date().toISOString() },
-    { id: 11, equipo_id: 11, cliente_id: 11, usuario_id: 11, funcionando: false, estado_general: 'Falla eléctrica', temperatura_actual: null, temperatura_freezer: null, latitud: -25.2850, longitud: -57.6000, fecha_revision: new Date().toISOString() },
-    { id: 12, equipo_id: 12, cliente_id: 12, usuario_id: 12, funcionando: true, estado_general: 'Sistema normal', temperatura_actual: 3.8, temperatura_freezer: -19.2, latitud: -25.2955, longitud: -57.6020, fecha_revision: new Date().toISOString() },
-    { id: 13, equipo_id: 13, cliente_id: 13, usuario_id: 13, funcionando: true, estado_general: 'Temperatura estable', temperatura_actual: 4.3, temperatura_freezer: -18.3, latitud: -25.2990, longitud: -57.6050, fecha_revision: new Date().toISOString() },
-    { id: 14, equipo_id: 14, cliente_id: 14, usuario_id: 14, funcionando: false, estado_general: 'Pérdida de gas refrigerante', temperatura_actual: 12.0, temperatura_freezer: -5.0, latitud: -25.3010, longitud: -57.6070, fecha_revision: new Date().toISOString() },
-    { id: 15, equipo_id: 15, cliente_id: 15, usuario_id: 15, funcionando: true, estado_general: 'Sin observaciones', temperatura_actual: 4.0, temperatura_freezer: -18.0, latitud: -25.3050, longitud: -57.6090, fecha_revision: new Date().toISOString() }
+let censoEquipo = [
+    { id: 1, equipo_id: 1, cliente_id: 1, usuario_id: 1, funcionando: true, estado_general: 'Funcionando correctamente', latitud: -25.2637, longitud: -57.5759, fecha_revision: new Date().toISOString() },
+    { id: 2, equipo_id: 2, cliente_id: 2, usuario_id: 2, funcionando: false, estado_general: 'Problema de temperatura', latitud: -25.2800, longitud: -57.6300, fecha_revision: new Date().toISOString() },
+    { id: 3, equipo_id: 3, cliente_id: 3, usuario_id: 3, funcionando: true, estado_general: 'Óptimas condiciones', latitud: -25.3100, longitud: -57.6000, fecha_revision: new Date().toISOString() },
+    { id: 4, equipo_id: 4, cliente_id: 4, usuario_id: 4, funcionando: true, estado_general: 'Funcionando estable', latitud: -25.2950, longitud: -57.5800, fecha_revision: new Date().toISOString() },
+    { id: 5, equipo_id: 5, cliente_id: 5, usuario_id: 5, funcionando: false, estado_general: 'Apagado por cliente',latitud: -25.3200, longitud: -57.6100, fecha_revision: new Date().toISOString() },
+    { id: 6, equipo_id: 6, cliente_id: 6, usuario_id: 6, funcionando: true, estado_general: 'Sin anomalías', latitud: -25.2805, longitud: -57.5990, fecha_revision: new Date().toISOString() },
+    { id: 7, equipo_id: 7, cliente_id: 7, usuario_id: 7, funcionando: true, estado_general: 'Correcto funcionamiento', latitud: -25.2700, longitud: -57.5900, fecha_revision: new Date().toISOString() },
+    { id: 8, equipo_id: 8, cliente_id: 8, usuario_id: 8, funcionando: false, estado_general: 'Compresor con fallas', latitud: -25.2650, longitud: -57.5850, fecha_revision: new Date().toISOString() },
+    { id: 9, equipo_id: 9, cliente_id: 9, usuario_id: 9, funcionando: true, estado_general: 'Revisión completa',latitud: -25.2750, longitud: -57.5950, fecha_revision: new Date().toISOString() },
+    { id: 10, equipo_id: 10, cliente_id: 10, usuario_id: 10, funcionando: true, estado_general: 'Operativo', latitud: -25.2600, longitud: -57.5700, fecha_revision: new Date().toISOString() },
+    { id: 11, equipo_id: 11, cliente_id: 11, usuario_id: 11, funcionando: false, estado_general: 'Falla eléctrica', latitud: -25.2850, longitud: -57.6000, fecha_revision: new Date().toISOString() },
+    { id: 12, equipo_id: 12, cliente_id: 12, usuario_id: 12, funcionando: true, estado_general: 'Sistema normal', latitud: -25.2955, longitud: -57.6020, fecha_revision: new Date().toISOString() },
+    { id: 13, equipo_id: 13, cliente_id: 13, usuario_id: 13, funcionando: true, estado_general: 'Temperatura estable', latitud: -25.2990, longitud: -57.6050, fecha_revision: new Date().toISOString() },
+    { id: 14, equipo_id: 14, cliente_id: 14, usuario_id: 14, funcionando: false, estado_general: 'Pérdida de gas refrigerante',latitud: -25.3010, longitud: -57.6070, fecha_revision: new Date().toISOString() },
+    { id: 15, equipo_id: 15, cliente_id: 15, usuario_id: 15, funcionando: true, estado_general: 'Sin observaciones',latitud: -25.3050, longitud: -57.6090, fecha_revision: new Date().toISOString() }
 ];
 
 // ENDPOINTS SIMPLES (estilo original)
@@ -671,6 +672,6 @@ app.listen(PORT, HOST, () => {
     console.log(`   🔧 ${equipos.length} equipos`);
     console.log(`   👥 ${usuarios.length} usuarios`);
     console.log(`   🔗 ${equipoCliente.length} asignaciones`);
-    console.log(`   📈 ${estadoEquipo.length} estados`);
+    //console.log(`   📈 ${estadoEquipo.length} estados`);
     console.log('✅ Servidor listo para peticiones con logging detallado\n');
 });
