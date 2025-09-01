@@ -1,6 +1,5 @@
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:flutter/material.dart';
-import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/services/sync_service.dart';
 import 'package:logger/logger.dart';
 import 'dart:async';

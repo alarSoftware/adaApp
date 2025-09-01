@@ -739,32 +739,35 @@ class _FormsScreenState extends State<FormsScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            Container(
-              height: 56,
-              decoration: BoxDecoration(
-                color: Colors.grey[600],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: IconButton(
-                onPressed: _isLoading || _isScanning ? null : _escanearCodigoBarras,
-                icon: _isScanning
-                    ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-                    : const Icon(
-                  Icons.camera_alt,
-                  color: Colors.white,
-                  size: 24,
+            // ✅ Solo mostrar cámara en modo censo
+            if (_isCensoMode) ...[
+              const SizedBox(width: 12),
+              Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.grey[600],
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                tooltip: 'Escanear código',
+                child: IconButton(
+                  onPressed: _isLoading || _isScanning ? null : _escanearCodigoBarras,
+                  icon: _isScanning
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                      : const Icon(
+                    Icons.camera_alt,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                  tooltip: 'Escanear código',
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ],

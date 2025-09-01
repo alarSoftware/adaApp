@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/ui/screens/equipos_screen.dart';
 import 'package:ada_app/ui/screens/modelos_screen.dart';
 import 'package:ada_app/ui/screens/logo_screen.dart';
+import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/select_screen_viewmodel.dart';
 import 'dart:async';
 
@@ -63,54 +64,82 @@ class _SelectScreenState extends State<SelectScreen> {
     }
   }
 
-  // DIÁLOGOS - EXACTAMENTE IGUALES A LOS ORIGINALES
+  // DIÁLOGOS - Actualizados con sistema de colores
   Future<bool?> _mostrarDialogoSincronizacion() async {
     return showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: AppColors.surface,
           title: Row(
             children: [
-              Icon(Icons.sync, color: Colors.grey[700]),
+              Icon(Icons.sync, color: AppColors.neutral700),
               SizedBox(width: 8),
-              Text('Sincronizar Datos'),
+              Text(
+                'Sincronizar Datos',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Esta acción descargará todos los datos del servidor:'),
+              Text(
+                'Esta acción descargará todos los datos del servidor:',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
               SizedBox(height: 12),
               Container(
                 padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: AppColors.surfaceVariant,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('• 👥 Clientes del servidor'),
-                    Text('• 🔧 Equipos y refrigeradores'),
-                    Text('• 📊 Estados y asignaciones'),
+                    Text(
+                      '• Clientes del servidor',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                    Text(
+                      '• Equipos y refrigeradores',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                    Text(
+                      '• Estados y asignaciones',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
                   ],
                 ),
               ),
               SizedBox(height: 12),
-              Text('Los datos locales serán actualizados.',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                'Los datos locales serán actualizados.',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancelar'),
+              child: Text(
+                'Cancelar',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.info,
+                foregroundColor: AppColors.onPrimary,
+              ),
               child: Text('Sincronizar Todo'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
             ),
           ],
         );
@@ -123,11 +152,18 @@ class _SelectScreenState extends State<SelectScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: AppColors.surface,
           title: Row(
             children: [
-              Icon(Icons.delete_forever, color: Colors.red),
+              Icon(Icons.delete_forever, color: AppColors.error),
               SizedBox(width: 8),
-              Text('Borrar Base de Datos', style: TextStyle(fontSize: 20)),
+              Text(
+                'Borrar Base de Datos',
+                style: TextStyle(
+                  fontSize: 20,
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ],
           ),
           content: Column(
@@ -138,33 +174,45 @@ class _SelectScreenState extends State<SelectScreen> {
                 '¡ATENCIÓN!',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Colors.red,
+                  color: AppColors.error,
                   fontSize: 16,
                 ),
               ),
               SizedBox(height: 12),
-              Text('Esta acción borrará TODOS los datos locales:'),
+              Text(
+                'Esta acción borrará TODOS los datos locales:',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
               SizedBox(height: 8),
-              Text('• Todos los clientes'),
-              Text('• Todos los equipos'),
-              Text('• Configuraciones locales'),
-              Text('• Datos de sincronización'),
+              Text('• Todos los clientes', style: TextStyle(color: AppColors.textSecondary)),
+              Text('• Todos los equipos', style: TextStyle(color: AppColors.textSecondary)),
+              Text('• Configuraciones locales', style: TextStyle(color: AppColors.textSecondary)),
+              Text('• Datos de sincronización', style: TextStyle(color: AppColors.textSecondary)),
               SizedBox(height: 16),
-              Text('¿Estás seguro?', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                '¿Estás seguro?',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancelar'),
+              child: Text(
+                'Cancelar',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text('Sí, Borrar Todo'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
+                backgroundColor: AppColors.error,
+                foregroundColor: AppColors.onPrimary,
               ),
+              child: Text('Sí, Borrar Todo'),
             ),
           ],
         );
@@ -172,13 +220,15 @@ class _SelectScreenState extends State<SelectScreen> {
     );
   }
 
-  // MENSAJES - EXACTAMENTE IGUALES
+  // MENSAJES - Actualizados con sistema de colores
   void _mostrarError(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('❌ $mensaje'),
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         duration: Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -187,13 +237,14 @@ class _SelectScreenState extends State<SelectScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('✅ $mensaje'),
-        backgroundColor: Colors.green,
+        backgroundColor: AppColors.success,
         duration: Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
 
-  // WIDGETS - EXACTAMENTE IGUALES
   Widget _buildMenuButton(
       BuildContext context, {
         required String label,
@@ -218,28 +269,32 @@ class _SelectScreenState extends State<SelectScreen> {
         width: 120,
         height: 120,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
+              color: AppColors.shadowLight,
               spreadRadius: 2,
               blurRadius: 8,
               offset: Offset(0, 2),
             ),
           ],
+          border: Border.all(
+            color: AppColors.border,
+            width: 0.5,
+          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 40, color: color),
+            Icon(icon, size: 40, color: color ?? AppColors.primary),
             SizedBox(height: 8),
             Text(
               label,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: color,
+                color: color ?? AppColors.primary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -260,15 +315,15 @@ class _SelectScreenState extends State<SelectScreen> {
 
         if (!status.hasInternet) {
           icon = Icons.wifi_off;
-          color = Colors.red;
+          color = AppColors.error;
           text = 'Sin Internet';
         } else if (!status.hasApiConnection) {
           icon = Icons.cloud_off;
-          color = Colors.orange;
+          color = AppColors.warning;
           text = 'API Desconectada';
         } else {
           icon = Icons.cloud_done;
-          color = Colors.green;
+          color = AppColors.success;
           text = 'Conectado';
         }
 
@@ -278,7 +333,13 @@ class _SelectScreenState extends State<SelectScreen> {
             children: [
               Icon(icon, color: color, size: 20),
               SizedBox(width: 4),
-              Text(text, style: TextStyle(fontSize: 12)),
+              Text(
+                text,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textOnDark,
+                ),
+              ),
             ],
           ),
         );
@@ -290,9 +351,12 @@ class _SelectScreenState extends State<SelectScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Panel Principal'),
-        backgroundColor: Colors.grey[800],
-        foregroundColor: Colors.white,
+        title: Text(
+          'Panel Principal',
+          style: TextStyle(color: AppColors.onPrimary),
+        ),
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.onPrimary,
         actions: [
           // Botón de sync - usa ViewModel
           ListenableBuilder(
@@ -306,10 +370,10 @@ class _SelectScreenState extends State<SelectScreen> {
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.onPrimary),
                   ),
                 )
-                    : Icon(Icons.sync),
+                    : Icon(Icons.sync, color: AppColors.onPrimary),
                 tooltip: _viewModel.isSyncing ? 'Sincronizando...' : 'Sincronizar datos',
               );
             },
@@ -318,7 +382,7 @@ class _SelectScreenState extends State<SelectScreen> {
           // Estado de conexión
           _buildConnectionStatus(),
 
-          // Menu de opciones - SIN test API
+          // Menu de opciones
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {
@@ -339,9 +403,12 @@ class _SelectScreenState extends State<SelectScreen> {
                     enabled: !_viewModel.isSyncing,
                     child: Row(
                       children: [
-                        Icon(Icons.wifi_find, color: Colors.green),
+                        Icon(Icons.wifi_find, color: AppColors.success),
                         SizedBox(width: 8),
-                        Text('Probar Conexión'),
+                        Text(
+                          'Probar Conexión',
+                          style: TextStyle(color: AppColors.textPrimary),
+                        ),
                       ],
                     ),
                   ),
@@ -350,9 +417,12 @@ class _SelectScreenState extends State<SelectScreen> {
                     enabled: !_viewModel.isSyncing,
                     child: Row(
                       children: [
-                        Icon(Icons.delete_forever, color: Colors.red),
+                        Icon(Icons.delete_forever, color: AppColors.error),
                         SizedBox(width: 8),
-                        Text('Borrar Base de Datos'),
+                        Text(
+                          'Borrar Base de Datos',
+                          style: TextStyle(color: AppColors.textPrimary),
+                        ),
                       ],
                     ),
                   ),
@@ -370,8 +440,8 @@ class _SelectScreenState extends State<SelectScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.grey.shade50,
-              Colors.white,
+              AppColors.backgroundSecondary,
+              AppColors.background,
             ],
           ),
         ),
@@ -391,14 +461,14 @@ class _SelectScreenState extends State<SelectScreen> {
                             context,
                             label: 'Clientes',
                             icon: Icons.people,
-                            color: Colors.grey[700],
+                            color: AppColors.primary,
                             routeName: '/clienteLista',
                           ),
                           _buildMenuButton(
                             context,
                             label: 'Equipos',
                             icon: Icons.devices,
-                            color: Colors.grey[600],
+                            color: AppColors.primary,
                             page: const EquipoListScreen(),
                           ),
                         ],
@@ -411,14 +481,14 @@ class _SelectScreenState extends State<SelectScreen> {
                             context,
                             label: 'Modelos',
                             icon: Icons.branding_watermark,
-                            color: Colors.grey[600],
+                            color: AppColors.primary,
                             page: const ModelosScreen(),
                           ),
                           _buildMenuButton(
                             context,
                             label: 'Logos',
                             icon: Icons.newspaper,
-                            color: Colors.grey[600],
+                            color: AppColors.primary,
                             page: const LogosScreen(),
                           ),
                         ],
@@ -428,19 +498,22 @@ class _SelectScreenState extends State<SelectScreen> {
                 ],
               ),
             ),
-            TextButton.icon(
-              onPressed: () {
-                Navigator.pushReplacementNamed(context, '/login');
-              },
-              icon: Icon(Icons.logout, color: Colors.grey[600]),
-              label: Text(
-                'Cerrar Sesión',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 16,
+            SafeArea(
+              child: TextButton.icon(
+                onPressed: () {
+                  Navigator.pushReplacementNamed(context, '/login');
+                },
+                icon: Icon(Icons.logout, color: AppColors.textSecondary),
+                label: Text(
+                  'Cerrar Sesión',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 16,
+                  ),
                 ),
               ),
-            ),
+            )
+
           ],
         ),
       ),

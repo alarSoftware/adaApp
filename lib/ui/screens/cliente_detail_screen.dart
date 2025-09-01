@@ -5,6 +5,7 @@ import 'package:ada_app/viewmodels/cliente_detail_screen_viewmodel.dart';
 import 'equipos_clientes_detail_screen.dart';
 import 'forms_screen.dart';
 import 'dart:async';
+import 'package:ada_app/ui/theme/colors.dart';
 
 class ClienteDetailScreen extends StatefulWidget {
   final Cliente cliente;
@@ -177,7 +178,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.1),
+              color: AppColors.neutral300,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, size: 20, color: Colors.grey[600]),
@@ -225,12 +226,12 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
+                    color: AppColors.neutral50,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     Icons.kitchen_outlined,
-                    color: Colors.orange[700],
+                    color: AppColors.primaryDark,
                     size: 24,
                   ),
                 ),
@@ -247,7 +248,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
+                    color: AppColors.surface,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
@@ -311,7 +312,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
+        color: AppColors.error,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.red.withOpacity(0.3)),
       ),

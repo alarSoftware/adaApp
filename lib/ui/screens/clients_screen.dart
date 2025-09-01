@@ -1,6 +1,7 @@
 // ui/screens/clients_screen.dart
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/screens/cliente_detail_screen.dart';
+import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/client_screen_viewmodel.dart';
 import 'package:ada_app/ui/widgets/app_snackbar.dart';
 import 'package:ada_app/ui/widgets/app_loading.dart';
@@ -81,64 +82,60 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: _buildReactiveAppBar(),
-      body: Column(
-        children: [
-          // Barra de búsqueda
-          AppSearchBar(
-            controller: _searchController,
-            hintText: 'Buscar cliente por nombre, email o teléfono...',
-            onClear: _onClearSearch,
-          ),
-
-          // Contenido principal
-          Expanded(
-            child: ListenableBuilder(
-              listenable: _viewModel,
-              builder: (context, child) {
-                // Estado de carga inicial
-                if (_viewModel.isLoading) {
-                  return AppLoading(message: 'Cargando clientes...');
-                }
-
-                // Estado vacío
-                if (_viewModel.isEmpty) {
-                  return AppEmptyState(
-                    icon: Icons.people_outline,
-                    title: _viewModel.getEmptyStateTitle(),
-                    subtitle: _viewModel.getEmptyStateSubtitle(),
-                  );
-                }
-
-                // Lista con datos
-                return NotificationListener<ScrollNotification>(
-                  onNotification: _onScrollNotification,
-                  child: RefreshIndicator(
-                    onRefresh: _onRefresh,
-                    color: Colors.grey[700],
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      itemCount: _viewModel.displayedClientes.length +
-                          (_viewModel.hasMoreData ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        // Indicador de carga para más elementos
-                        if (index == _viewModel.displayedClientes.length) {
-                          return const AppLoadingMore();
-                        }
-
-                        final cliente = _viewModel.displayedClientes[index];
-                        return _buildClienteCard(cliente);
-                      },
-                    ),
-                  ),
-                );
-              },
+      body: SafeArea(
+        child: Column(
+          children: [
+            AppSearchBar(
+              controller: _searchController,
+              hintText: 'Buscar cliente por nombre, email o teléfono...',
+              onClear: _onClearSearch,
             ),
-          ),
-        ],
+            Expanded(
+              child: ListenableBuilder(
+                listenable: _viewModel,
+                builder: (context, child) {
+                  if (_viewModel.isLoading) {
+                    return AppLoading(message: 'Cargando clientes...');
+                  }
+
+                  if (_viewModel.isEmpty) {
+                    return AppEmptyState(
+                      icon: Icons.people_outline,
+                      title: _viewModel.getEmptyStateTitle(),
+                      subtitle: _viewModel.getEmptyStateSubtitle(),
+                    );
+                  }
+
+                  return NotificationListener<ScrollNotification>(
+                    onNotification: _onScrollNotification,
+                    child: RefreshIndicator(
+                      onRefresh: _onRefresh,
+                      color: AppColors.primary,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        itemCount: _viewModel.displayedClientes.length +
+                            (_viewModel.hasMoreData ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == _viewModel.displayedClientes.length) {
+                            return const AppLoadingMore();
+                          }
+
+                          final cliente = _viewModel.displayedClientes[index];
+                          return _buildClienteCard(cliente);
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -147,31 +144,43 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
       elevation: 2,
+      color: AppColors.surface,
+      shadowColor: AppColors.shadowLight,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: AppColors.border,
+          width: 0.5,
+        ),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 8,
+          vertical: 12,
         ),
-        leading: CircleAvatar(
-          radius: 24,
-          backgroundColor: Colors.grey[700],
-          foregroundColor: Colors.white,
-          child: Text(
-            _viewModel.getInitials(cliente),
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+        leading: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.2),
+              width: 1,
             ),
+          ),
+          child: Icon(
+            Icons.person,
+            color: AppColors.primary,
+            size: 24,
           ),
         ),
         title: Text(
           cliente.nombre,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
           ),
           overflow: TextOverflow.ellipsis,
           maxLines: 1,
@@ -186,7 +195,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                 cliente.email,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey[700],
+                  color: AppColors.textSecondary,
                 ),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
@@ -198,7 +207,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                     cliente.telefono!,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[500],
+                      color: AppColors.textTertiary,
                     ),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
@@ -207,15 +216,10 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
             ],
           ),
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Colors.grey[400],
-            ),
-          ],
+        trailing: Icon(
+          Icons.chevron_right,
+          size: 20,
+          color: AppColors.textTertiary,
         ),
         onTap: () => _viewModel.navigateToClienteDetail(cliente),
       ),
@@ -229,14 +233,21 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
         listenable: _viewModel,
         builder: (context, child) {
           return AppBar(
-            title: Text('Lista de Clientes (${_viewModel.displayedClientes.length})'),
-            backgroundColor: Colors.grey[800],
-            foregroundColor: Colors.white,
+            title: Text(
+              'Lista de Clientes (${_viewModel.displayedClientes.length})',
+              style: TextStyle(color: AppColors.onPrimary),
+            ),
+            backgroundColor: AppColors.primary,
+            foregroundColor: AppColors.onPrimary,
             elevation: 2,
+            shadowColor: AppColors.shadowLight,
             actions: [
               IconButton(
                 onPressed: _onRefresh,
-                icon: const Icon(Icons.refresh),
+                icon: Icon(
+                  Icons.refresh,
+                  color: AppColors.onPrimary,
+                ),
                 tooltip: 'Actualizar lista',
               ),
             ],

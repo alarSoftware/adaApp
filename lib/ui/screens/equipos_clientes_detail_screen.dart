@@ -1,6 +1,7 @@
 // ui/screens/equipos_clientes_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:ada_app/models/equipos_cliente.dart';
+import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/equipos_clientes_detail_screen_viewmodel.dart';
 import 'dart:async';
 
@@ -52,19 +53,19 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
 
     switch (type) {
       case MessageType.error:
-        backgroundColor = Colors.red;
+        backgroundColor = AppColors.error;
         icon = Icons.error;
         break;
       case MessageType.success:
-        backgroundColor = Colors.green;
+        backgroundColor = AppColors.success;
         icon = Icons.check_circle;
         break;
       case MessageType.info:
-        backgroundColor = Colors.blue;
+        backgroundColor = AppColors.info;
         icon = Icons.info;
         break;
       case MessageType.warning:
-        backgroundColor = Colors.orange;
+        backgroundColor = AppColors.warning;
         icon = Icons.warning;
         break;
     }
@@ -73,13 +74,15 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
       SnackBar(
         content: Row(
           children: [
-            Icon(icon, color: Colors.white),
+            Icon(icon, color: AppColors.onPrimary),
             SizedBox(width: 8),
             Text(message),
           ],
         ),
         backgroundColor: backgroundColor,
         duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -91,32 +94,49 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: AppColors.surface,
           title: Row(
             children: [
-              Icon(Icons.warning, color: Colors.red),
+              Icon(Icons.warning, color: AppColors.error),
               SizedBox(width: 8),
-              Text('Retirar Equipo'),
+              Text(
+                'Retirar Equipo',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('¿Estás seguro de que quieres retirar este equipo?'),
+              Text(
+                '¿Estás seguro de que quieres retirar este equipo?',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
               SizedBox(height: 12),
               Container(
                 padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: AppColors.errorContainer,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.borderError),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(dialogData['equipoNombre']!),
+                    Text(
+                      dialogData['equipoNombre']!,
+                      style: TextStyle(color: AppColors.textPrimary),
+                    ),
                     if (dialogData['equipoCodigo']! != 'Sin código')
-                      Text('Código: ${dialogData['equipoCodigo']}'),
-                    Text('Cliente: ${dialogData['clienteNombre']}'),
+                      Text(
+                        'Código: ${dialogData['equipoCodigo']}',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    Text(
+                      'Cliente: ${dialogData['clienteNombre']}',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
                   ],
                 ),
               ),
@@ -125,7 +145,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                 'Esta acción marcará el equipo como retirado y ya no estará asignado a este cliente.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: AppColors.textTertiary,
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -134,12 +154,18 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancelar'),
+              child: Text(
+                'Cancelar',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: AppColors.onPrimary,
+              ),
               child: Text('Retirar'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             ),
           ],
         );
@@ -154,10 +180,14 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('Detalle del Equipo'),
-        backgroundColor: Colors.grey[800],
-        foregroundColor: Colors.white,
+        title: Text(
+          'Detalle del Equipo',
+          style: TextStyle(color: AppColors.onPrimary),
+        ),
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.onPrimary,
         actions: [
           ListenableBuilder(
             listenable: _viewModel,
@@ -170,10 +200,10 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.onPrimary),
                   ),
                 )
-                    : Icon(Icons.report),
+                    : Icon(Icons.report, color: AppColors.onPrimary),
                 tooltip: 'Reportar estado',
               );
             },
@@ -194,7 +224,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
               _buildSectionHeader(
                 icon: Icons.kitchen,
                 title: 'EQUIPO ASIGNADO',
-                color: Colors.orange,
+                color: AppColors.secondary,
               ),
               SizedBox(height: 12),
               _buildEquipoInfo(),
@@ -217,9 +247,9 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
       width: double.infinity,
       padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -230,7 +260,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: color.withOpacity(0.8),
+              color: color.withValues(alpha: 0.8),
             ),
           ),
         ],
@@ -245,7 +275,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
           icon: Icons.kitchen,
           title: 'Equipo',
           content: _viewModel.getNombreCompletoEquipo(),
-          color: Colors.orange,
+          color: AppColors.secondary,
         ),
 
         if (_viewModel.shouldShowMarca())
@@ -253,7 +283,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
             icon: Icons.business,
             title: 'Marca',
             content: _viewModel.getMarcaText(),
-            color: Colors.indigo,
+            color: AppColors.info,
           ),
 
         if (_viewModel.shouldShowModelo())
@@ -261,7 +291,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
             icon: Icons.category,
             title: 'Modelo',
             content: _viewModel.getModeloText(),
-            color: Colors.teal,
+            color: AppColors.primary,
           ),
 
         if (_viewModel.shouldShowCodBarras())
@@ -269,21 +299,21 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
             icon: Icons.qr_code,
             title: 'Código de Barras',
             content: _viewModel.getCodBarrasText(),
-            color: Colors.purple,
+            color: AppColors.neutral700,
           ),
 
         _buildInfoCard(
           icon: Icons.calendar_today,
           title: 'Fecha de Asignación',
           content: _viewModel.getFechaAsignacionText(),
-          color: Colors.teal,
+          color: AppColors.success,
         ),
 
         _buildInfoCard(
           icon: Icons.access_time,
           title: 'Tiempo Asignado',
           content: _viewModel.getTiempoAsignadoText(),
-          color: Colors.indigo,
+          color: AppColors.info,
         ),
 
         if (_viewModel.shouldShowFechaRetiro())
@@ -291,14 +321,14 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
             icon: Icons.event_busy,
             title: 'Fecha de Retiro',
             content: _viewModel.getFechaRetiroText(),
-            color: Colors.red,
+            color: AppColors.error,
           ),
 
         _buildInfoCard(
           icon: _viewModel.equipoCliente.asignacionActiva ? Icons.check_circle : Icons.cancel,
           title: 'Estado',
           content: _viewModel.getEstadoText(),
-          color: _viewModel.equipoCliente.colorEstado,
+          color: _viewModel.equipoCliente.asignacionActiva ? AppColors.success : AppColors.error,
         ),
       ],
     );
@@ -313,8 +343,14 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
     return Card(
       margin: EdgeInsets.symmetric(vertical: 6),
       elevation: 2,
+      color: AppColors.surface,
+      shadowColor: AppColors.shadowLight,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: AppColors.border,
+          width: 0.5,
+        ),
       ),
       child: Padding(
         padding: EdgeInsets.all(16),
@@ -325,8 +361,12 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
               height: 50,
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: color.withValues(alpha: 0.2),
+                  width: 1,
+                ),
               ),
               child: Icon(icon, color: color, size: 26),
             ),
@@ -340,7 +380,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                     title,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[600],
+                      color: AppColors.textSecondary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -350,6 +390,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ],
@@ -372,7 +413,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                 onPressed: _viewModel.isProcessing ? null : _viewModel.verificarEquipo,
                 icon: Icons.camera_alt,
                 label: 'Verificar Este Equipo',
-                backgroundColor: Colors.blue[700]!,
+                backgroundColor: AppColors.info,
                 isElevated: true,
               ),
               SizedBox(height: 12),
@@ -380,7 +421,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                 onPressed: _viewModel.isProcessing ? null : _viewModel.reportarEstado,
                 icon: Icons.report,
                 label: 'Reportar Estado',
-                backgroundColor: Colors.orange[700]!,
+                backgroundColor: AppColors.warning,
                 isElevated: true,
               ),
               SizedBox(height: 12),
@@ -388,7 +429,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                 onPressed: _viewModel.isProcessing ? null : _viewModel.cambiarCliente,
                 icon: Icons.swap_horiz,
                 label: 'Cambiar Cliente',
-                foregroundColor: Colors.purple[700]!,
+                foregroundColor: AppColors.secondary,
                 isElevated: false,
               ),
               SizedBox(height: 12),
@@ -396,7 +437,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                 onPressed: _viewModel.isProcessing ? null : _viewModel.solicitarRetiroEquipo,
                 icon: Icons.remove_circle,
                 label: 'Retirar Equipo',
-                foregroundColor: Colors.red[700]!,
+                foregroundColor: AppColors.error,
                 isElevated: false,
               ),
             ],
@@ -425,7 +466,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
         label: Text(label),
         style: ElevatedButton.styleFrom(
           backgroundColor: backgroundColor,
-          foregroundColor: Colors.white,
+          foregroundColor: AppColors.onPrimary,
           padding: EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -461,20 +502,20 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
       width: double.infinity,
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
+        color: AppColors.errorContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.withOpacity(0.3)),
+        border: Border.all(color: AppColors.borderError),
       ),
       child: Column(
         children: [
-          Icon(Icons.info_outline, size: 40, color: Colors.red[600]),
+          Icon(Icons.info_outline, size: 40, color: AppColors.error),
           SizedBox(height: 8),
           Text(
             _viewModel.getInactiveEquipoTitle(),
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.red[600],
+              color: AppColors.error,
             ),
           ),
           SizedBox(height: 4),
@@ -482,7 +523,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
             _viewModel.getInactiveEquipoSubtitle(),
             style: TextStyle(
               fontSize: 14,
-              color: Colors.red[600],
+              color: AppColors.error,
             ),
             textAlign: TextAlign.center,
           ),
