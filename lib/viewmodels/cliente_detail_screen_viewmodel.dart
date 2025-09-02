@@ -159,11 +159,42 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
     }
   }
 
+// En ClienteDetailScreenViewModel.dart
+// Reemplaza el método navegarADetalleEquipo existente con este:
+
   void navegarADetalleEquipo(Map<String, dynamic> equipoData) {
-    final equipoCliente = EquipoCliente.fromMap(equipoData);
+    // Crear una copia del map con los campos mapeados correctamente
+    final equipoDataCorregido = Map<String, dynamic>.from(equipoData);
+
+    // Mapear los campos que vienen con nombres diferentes
+    if (equipoData.containsKey('marca_nombre')) {
+      equipoDataCorregido['equipo_marca'] = equipoData['marca_nombre'];
+    }
+
+    if (equipoData.containsKey('modelo_nombre')) {
+      equipoDataCorregido['equipo_modelo'] = equipoData['modelo_nombre'];
+    }
+
+    // También mapear otros campos que podrían tener nombres diferentes
+    if (equipoData.containsKey('equipo_nombre') && !equipoDataCorregido.containsKey('equipo_nombre')) {
+      equipoDataCorregido['equipo_nombre'] = equipoData['equipo_nombre'];
+    }
+
+    // Log para debug
+    _logger.i('Navegando a detalle con datos corregidos:');
+    _logger.i('- marca_nombre: ${equipoData['marca_nombre']} → equipo_marca: ${equipoDataCorregido['equipo_marca']}');
+    _logger.i('- modelo_nombre: ${equipoData['modelo_nombre']} → equipo_modelo: ${equipoDataCorregido['equipo_modelo']}');
+
+    final equipoCliente = EquipoCliente.fromMap(equipoDataCorregido);
+
+    // Log adicional para verificar que el mapeo funcionó
+    _logger.i('EquipoCliente creado:');
+    _logger.i('- equipoMarca: ${equipoCliente.equipoMarca}');
+    _logger.i('- equipoModelo: ${equipoCliente.equipoModelo}');
+    _logger.i('- equipoNombreCompleto: ${equipoCliente.equipoNombreCompleto}');
+
     _eventController.add(NavigateToEquipoDetailEvent(equipoCliente));
   }
-
   // ========== UTILIDADES PARA LA UI ==========
   String formatearFecha(DateTime fecha) {
     return '${fecha.day.toString().padLeft(2, '0')}/'

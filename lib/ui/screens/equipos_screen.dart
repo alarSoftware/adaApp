@@ -1,278 +1,88 @@
-import 'package:ada_app/repositories/equipo_repository.dart';
+// ui/screens/equipo_list_screen.dart
 import 'package:flutter/material.dart';
-import 'package:ada_app/services/sync_service.dart';
-import 'package:logger/logger.dart';
 import 'dart:async';
-
-var logger = Logger();
+import 'package:ada_app/viewmodels/equipos_screen_viewmodel.dart';
+import 'package:ada_app/ui/theme/colors.dart';
 
 class EquipoListScreen extends StatefulWidget {
   const EquipoListScreen({super.key});
 
   @override
-  _EquipoListScreenState createState() => _EquipoListScreenState();
+  State<EquipoListScreen> createState() => _EquipoListScreenState();
 }
 
 class _EquipoListScreenState extends State<EquipoListScreen> {
-  List<Map<String, dynamic>> equipos = [];
-  List<Map<String, dynamic>> equiposFiltrados = [];
-  List<Map<String, dynamic>> equiposMostrados = [];
-  TextEditingController searchController = TextEditingController();
-  EquipoRepository equipoRepository = EquipoRepository();
-  bool isLoading = true;
-
-  static const int equiposPorPagina = 10;
-  int paginaActual = 0;
-  bool hayMasDatos = true;
-  bool cargandoMas = false;
-
-  final ScrollController _scrollController = ScrollController();
-  Timer? _debounceTimer;
+  late EquipoListScreenViewModel _viewModel;
+  late StreamSubscription<EquipoListUIEvent> _eventSubscription;
 
   @override
   void initState() {
     super.initState();
-    _cargarEquipos();
-    searchController.addListener(_onSearchChanged);
-    _scrollController.addListener(_onScroll);
+    _viewModel = EquipoListScreenViewModel();
+    _setupEventListener();
+    _viewModel.initialize();
   }
 
   @override
   void dispose() {
-    searchController.dispose();
-    _scrollController.dispose();
-    _debounceTimer?.cancel();
+    _eventSubscription.cancel();
+    _viewModel.dispose();
     super.dispose();
   }
 
-  void _onSearchChanged() {
-    if (_debounceTimer?.isActive ?? false) _debounceTimer?.cancel();
-
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      _filtrarEquipos();
-    });
-  }
-
-  Future<void> _cargarEquipos() async {
-    if (!mounted) return;
-
-    setState(() {
-      isLoading = true;
-      paginaActual = 0;
-      equiposMostrados.clear();
-    });
-
-    try {
-      final equiposDB = await equipoRepository.obtenerCompletos(soloActivos: true);
-
+  void _setupEventListener() {
+    _eventSubscription = _viewModel.uiEvents.listen((event) {
       if (!mounted) return;
 
-      setState(() {
-        equipos = equiposDB;
-        equiposFiltrados = equiposDB;
-        isLoading = false;
-        hayMasDatos = equiposFiltrados.length > equiposPorPagina;
-      });
-
-      _cargarSiguientePagina();
-
-    } catch (e) {
-      logger.e('Error cargando equipos: $e');
-
-      if (!mounted) return;
-
-      setState(() {
-        isLoading = false;
-      });
-
-      _mostrarError('Error cargando equipos: $e');
-    }
-  }
-
-  Future<void> _refrescarDatos() async {
-    try {
-      final resultado = await SyncService.sincronizarEquipos();
-
-      if (resultado.exito) {
-        await _cargarEquipos();
-        if (mounted) {
-          _mostrarExito('Equipos actualizados: ${resultado.itemsSincronizados}');
-        }
-      } else {
-        throw Exception(resultado.mensaje);
+      if (event is ShowSnackBarEvent) {
+        _showSnackBar(event.message, event.color, event.durationSeconds);
+      } else if (event is ShowEquipoDetailsEvent) {
+        _showEquipoDetails(event.equipo);
       }
-    } catch (e) {
-      logger.e('Error refrescando datos: $e');
-      if (mounted) {
-        _mostrarError('Error al actualizar: $e');
-      }
-    }
-  }
-
-  void _cargarSiguientePagina() {
-    if (cargandoMas || !hayMasDatos) return;
-
-    setState(() {
-      cargandoMas = true;
     });
-
-    final startIndex = paginaActual * equiposPorPagina;
-    final endIndex = (startIndex + equiposPorPagina).clamp(0, equiposFiltrados.length);
-
-    if (startIndex < equiposFiltrados.length) {
-      final nuevosEquipos = equiposFiltrados.sublist(startIndex, endIndex);
-
-      setState(() {
-        equiposMostrados.addAll(nuevosEquipos);
-        paginaActual++;
-        hayMasDatos = endIndex < equiposFiltrados.length;
-        cargandoMas = false;
-      });
-    } else {
-      setState(() {
-        hayMasDatos = false;
-        cargandoMas = false;
-      });
-    }
   }
 
-  void _filtrarEquipos() {
-    if (!mounted) return;
-
-    final query = searchController.text.toLowerCase().trim();
-
-    setState(() {
-      if (query.isEmpty) {
-        equiposFiltrados = List.from(equipos);
-      } else {
-        equiposFiltrados = equipos.where((equipo) {
-          final codBarras = equipo['cod_barras']?.toString().toLowerCase() ?? '';
-          final marcaNombre = equipo['marca_nombre']?.toString().toLowerCase() ?? '';
-          final modeloNombre = equipo['modelo_nombre']?.toString().toLowerCase() ?? '';
-          final estadoAsignacion = equipo['estado_asignacion']?.toString().toLowerCase()?? '';
-          final logoNombre = equipo['logo_nombre']?.toString().toLowerCase() ?? '';
-
-          return codBarras.contains(query) ||
-              marcaNombre.contains(query) ||
-              modeloNombre.contains(query) ||
-              estadoAsignacion.contains(query) ||
-              logoNombre.contains(query);
-        }).toList();
-      }
-
-      paginaActual = 0;
-      equiposMostrados.clear();
-      hayMasDatos = equiposFiltrados.isNotEmpty;
-    });
-
-    _cargarSiguientePagina();
-  }
-
-  void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      _cargarSiguientePagina();
-    }
-  }
-
-  Color _getColorByLogo(String? logoNombre) {
-    if (logoNombre == null) return Colors.grey;
-
-    final logo = logoNombre.toLowerCase();
-
-    switch (logo) {
-      case 'pepsi':
-        return Colors.blue;
-      case 'pulp':
-        return Colors.orange;
-      case 'paso de los toros':
-        return Colors.green;
-      case 'mirinda':
-        return Colors.deepOrange;
-      case '7up':
-        return Colors.lightGreen;
-      case 'gatorade':
-        return Colors.blue[800]!;
-      case 'red bull':
-        return Colors.red;
-      default:
-        return Colors.grey[600]!;
-    }
-  }
-
-  IconData _getIconByLogo(String? logoNombre) {
-    if (logoNombre == null) return Icons.kitchen;
-
-    final logo = logoNombre.toLowerCase();
-
-    switch (logo.toLowerCase()) {
-      case 'pepsi':
-      case 'mirinda':
-      case '7up':
-      case 'paso de los toros':
-      case 'gatorade':
-      case 'red bull':
-      case 'aquafina':
-      case 'puro sol':
-      case 'split':
-      case 'watts':
-      case 'la fuente':
-      case 'pulp':
-      case 'rockstar':
-        return Icons.kitchen; // Visicooler para bebidas/productos refrigerados
-      default:
-        return Icons.kitchen_outlined; // Heladera/refrigerador general
-    }
-  }
-
-  void _mostrarError(String mensaje) {
-    if (!mounted) return;
-
+  void _showSnackBar(String message, Color color, int durationSeconds) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(mensaje),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 3),
+        content: Text(message),
+        backgroundColor: color,
+        duration: Duration(seconds: durationSeconds),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
 
-  void _mostrarExito(String mensaje) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(mensaje),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _mostrarDetallesEquipo(Map<String, dynamic> equipo) {
-    final marcaNombre = equipo['marca_nombre'] ?? 'Sin marca';
-    final modeloNombre = equipo['modelo_nombre'] ?? 'Sin modelo';
-    final nombreCompleto = '$marcaNombre $modeloNombre';
+  void _showEquipoDetails(Map<String, dynamic> equipo) {
+    final nombreCompleto = _viewModel.getEquipoNombreCompleto(equipo);
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
         title: Text(
           nombreCompleto,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildDetalleRow('Código', equipo['cod_barras'] ?? 'N/A'),
-            _buildDetalleRow('Marca', marcaNombre),
-            _buildDetalleRow('Modelo', modeloNombre), // CORREGIDO
+            _buildDetalleRow('Marca', equipo['marca_nombre'] ?? 'Sin marca'),
+            _buildDetalleRow('Modelo', equipo['modelo_nombre'] ?? 'Sin modelo'),
             _buildDetalleRow('Logo', equipo['logo_nombre'] ?? 'Sin logo'),
             if (equipo['numero_serie'] != null)
               _buildDetalleRow('Número de Serie', equipo['numero_serie']),
             _buildDetalleRow('Estado Local', (equipo['estado_local'] == 1) ? "Activo" : "Inactivo"),
-            _buildDetalleRow('Estado Asignación', equipo['estado_asignacion'] ?? 'Disponible'),
+            _buildDetalleRow('Estado Asignación', _viewModel.getEstadoAsignacion(equipo)),
             if (equipo['cliente_nombre'] != null)
               _buildDetalleRow('Asignado a', equipo['cliente_nombre']),
           ],
@@ -280,6 +90,9 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primary,
+            ),
             child: const Text('Cerrar'),
           ),
         ],
@@ -297,11 +110,17 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
             width: 100,
             child: Text(
               '$label:',
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           Expanded(
-            child: Text(value),
+            child: Text(
+              value,
+              style: TextStyle(color: AppColors.textPrimary),
+            ),
           ),
         ],
       ),
@@ -311,80 +130,109 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Equipos (${equiposFiltrados.length}/${equipos.length})'),
-        backgroundColor: Colors.grey[800],
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            onPressed: _refrescarDatos,
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Actualizar equipos',
-          ),
-        ],
+      backgroundColor: AppColors.background,
+      appBar: _buildAppBar(),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildSearchBar(),
+            Expanded(child: _buildBody()),
+          ],
+        ),
       ),
-      body: Column(
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: ListenableBuilder(
+        listenable: _viewModel,
+        builder: (context, child) {
+          return Text(_viewModel.appBarTitle);
+        },
+      ),
+      backgroundColor: AppColors.primary,
+      foregroundColor: AppColors.onPrimary,
+      elevation: 2,
+      shadowColor: AppColors.shadowLight,
+      actions: [
+        IconButton(
+          onPressed: _viewModel.refrescarDatos,
+          icon: const Icon(Icons.refresh),
+          tooltip: 'Actualizar equipos',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      color: AppColors.surface,
+      child: ListenableBuilder(
+        listenable: _viewModel,
+        builder: (context, child) {
+          return TextField(
+            controller: _viewModel.searchController,
+            decoration: InputDecoration(
+              hintText: _viewModel.searchHint,
+              hintStyle: TextStyle(color: AppColors.textTertiary),
+              prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
+              suffixIcon: _viewModel.shouldShowClearButton
+                  ? IconButton(
+                icon: Icon(Icons.clear, color: AppColors.textSecondary),
+                onPressed: _viewModel.limpiarBusqueda,
+              )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.focus, width: 2),
+              ),
+              filled: true,
+              fillColor: AppColors.surfaceVariant,
+            ),
+            style: TextStyle(color: AppColors.textPrimary),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, child) {
+        if (_viewModel.isLoading) {
+          return _buildLoadingState();
+        }
+
+        if (_viewModel.equiposMostrados.isEmpty) {
+          return _buildEmptyState();
+        }
+
+        return _buildEquiposList();
+      },
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: searchController,
-              decoration: InputDecoration(
-                hintText: 'Buscar por código, marca, modelo o logo...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: searchController.text.isNotEmpty
-                    ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    searchController.clear();
-                    _filtrarEquipos();
-                  },
-                )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.grey[50],
-              ),
-            ),
-          ),
-
-          Expanded(
-            child: isLoading
-                ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: Colors.grey[700]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Cargando equipos...',
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            )
-                : equiposMostrados.isEmpty
-                ? _buildEmptyState()
-                : RefreshIndicator(
-              onRefresh: _refrescarDatos,
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                itemCount: equiposMostrados.length + (cargandoMas ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index == equiposMostrados.length) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-
-                  return _buildEquipoCard(equiposMostrados[index]);
-                },
-              ),
-            ),
+          CircularProgressIndicator(color: AppColors.primary),
+          const SizedBox(height: 16),
+          Text(
+            _viewModel.loadingMessage,
+            style: TextStyle(color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -392,74 +240,109 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
   }
 
   Widget _buildEmptyState() {
-    final isSearching = searchController.text.isNotEmpty;
-
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            isSearching ? Icons.search_off : Icons.devices,
+            _viewModel.isSearching ? Icons.search_off : Icons.devices,
             size: 80,
-            color: Colors.grey[400],
+            color: AppColors.textTertiary,
           ),
           const SizedBox(height: 16),
           Text(
-            isSearching
-                ? 'No se encontraron equipos\ncon "${searchController.text}"'
-                : 'No hay equipos disponibles',
+            _viewModel.emptyStateTitle,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey[600],
+              color: AppColors.textSecondary,
             ),
           ),
-          if (!isSearching) ...[
+          if (_viewModel.shouldShowRefreshButton) ...[
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: _refrescarDatos,
+              onPressed: _viewModel.refrescarDatos,
               icon: const Icon(Icons.refresh),
               label: const Text('Actualizar equipos'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey[700],
-                foregroundColor: Colors.white,
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
-          ]
+          ],
         ],
       ),
     );
   }
 
+  Widget _buildEquiposList() {
+    return SafeArea(
+      top: false, // El AppBar ya maneja el top
+      child: RefreshIndicator(
+        onRefresh: _viewModel.refrescarDatos,
+        color: AppColors.primary,
+        child: ListView.builder(
+          controller: _viewModel.scrollController,
+          padding: EdgeInsets.only(
+            left: 8.0,
+            right: 8.0,
+            bottom: MediaQuery.of(context).padding.bottom,
+          ),
+          itemCount: _viewModel.equiposMostrados.length + (_viewModel.cargandoMas ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index == _viewModel.equiposMostrados.length) {
+              return Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
+              );
+            }
+
+            return _buildEquipoCard(_viewModel.equiposMostrados[index]);
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _buildEquipoCard(Map<String, dynamic> equipo) {
-    final marcaNombre = equipo['marca_nombre'] ?? 'Sin marca';
-    final modeloNombre = equipo['modelo_nombre'] ?? 'Sin modelo';
-    final nombreCompleto = '$marcaNombre $modeloNombre';
+    final nombreCompleto = _viewModel.getEquipoNombreCompleto(equipo);
     final logoNombre = equipo['logo_nombre'];
-    final estadoAsignacion = equipo['estado_asignacion'] ?? 'Disponible';
+    final estadoAsignacion = _viewModel.getEstadoAsignacion(equipo);
     final clienteNombre = equipo['cliente_nombre'];
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       elevation: 2,
+      color: AppColors.surface,
+      shadowColor: AppColors.shadowLight,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: AppColors.border,
+          width: 0.5,
+        ),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         leading: CircleAvatar(
-          backgroundColor: _getColorByLogo(logoNombre),
+          backgroundColor: _viewModel.getColorByLogo(logoNombre),
           child: Icon(
-            _getIconByLogo(logoNombre),
-            color: Colors.white,
+            _viewModel.getIconByLogo(logoNombre),
+            color: AppColors.onPrimary,
             size: 20,
           ),
         ),
         title: Text(
           nombreCompleto,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
+            color: AppColors.textPrimary,
           ),
         ),
         subtitle: Column(
@@ -469,14 +352,14 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
             Text(
               'Logo: ${logoNombre ?? 'Sin logo'}',
               style: TextStyle(
-                color: Colors.grey[600],
+                color: AppColors.textSecondary,
                 fontSize: 14,
               ),
             ),
             Text(
               'Código: ${equipo['cod_barras'] ?? 'N/A'}',
               style: TextStyle(
-                color: Colors.grey[500],
+                color: AppColors.textTertiary,
                 fontSize: 12,
               ),
             ),
@@ -484,22 +367,23 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
               Text(
                 'Serie: ${equipo['numero_serie']}',
                 style: TextStyle(
-                  color: Colors.grey[500],
+                  color: AppColors.textTertiary,
                   fontSize: 12,
                 ),
               ),
+            const SizedBox(height: 4),
             Row(
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: estadoAsignacion == 'Disponible' ? Colors.green : Colors.orange,
+                    color: _viewModel.getEstadoColor(estadoAsignacion),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     estadoAsignacion,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: AppColors.onPrimary,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
@@ -507,12 +391,15 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
                 ),
                 if (clienteNombre != null) ...[
                   const SizedBox(width: 8),
-                  Text(
-                    clienteNombre,
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 11,
-                      fontStyle: FontStyle.italic,
+                  Flexible(
+                    child: Text(
+                      clienteNombre,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -520,8 +407,12 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
             ),
           ],
         ),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-        onTap: () => _mostrarDetallesEquipo(equipo),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: 14,
+          color: AppColors.textTertiary,
+        ),
+        onTap: () => _viewModel.mostrarDetallesEquipo(equipo),
       ),
     );
   }

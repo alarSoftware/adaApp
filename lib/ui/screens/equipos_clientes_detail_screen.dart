@@ -9,9 +9,9 @@ class EquiposClientesDetailScreen extends StatefulWidget {
   final EquipoCliente equipoCliente;
 
   const EquiposClientesDetailScreen({
-    Key? key,
+    super.key,
     required this.equipoCliente,
-  }) : super(key: key);
+  });
 
   @override
   State<EquiposClientesDetailScreen> createState() => _EquiposClientesDetailScreenState();
@@ -38,143 +38,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
   void _setupEventListener() {
     _eventSubscription = _viewModel.uiEvents.listen((event) {
       if (!mounted) return;
-
-      if (event is ShowMessageEvent) {
-        _showMessage(event.message, event.type);
-      } else if (event is ShowRetireConfirmationDialogEvent) {
-        _showRetireConfirmationDialog(event.equipoCliente);
-      }
     });
-  }
-
-  void _showMessage(String message, MessageType type) {
-    Color backgroundColor;
-    IconData icon;
-
-    switch (type) {
-      case MessageType.error:
-        backgroundColor = AppColors.error;
-        icon = Icons.error;
-        break;
-      case MessageType.success:
-        backgroundColor = AppColors.success;
-        icon = Icons.check_circle;
-        break;
-      case MessageType.info:
-        backgroundColor = AppColors.info;
-        icon = Icons.info;
-        break;
-      case MessageType.warning:
-        backgroundColor = AppColors.warning;
-        icon = Icons.warning;
-        break;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(icon, color: AppColors.onPrimary),
-            SizedBox(width: 8),
-            Text(message),
-          ],
-        ),
-        backgroundColor: backgroundColor,
-        duration: Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-  }
-
-  Future<void> _showRetireConfirmationDialog(EquipoCliente equipoCliente) async {
-    final dialogData = _viewModel.getRetireDialogData();
-
-    final bool? confirmar = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppColors.surface,
-          title: Row(
-            children: [
-              Icon(Icons.warning, color: AppColors.error),
-              SizedBox(width: 8),
-              Text(
-                'Retirar Equipo',
-                style: TextStyle(color: AppColors.textPrimary),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '¿Estás seguro de que quieres retirar este equipo?',
-                style: TextStyle(color: AppColors.textPrimary),
-              ),
-              SizedBox(height: 12),
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.errorContainer,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.borderError),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      dialogData['equipoNombre']!,
-                      style: TextStyle(color: AppColors.textPrimary),
-                    ),
-                    if (dialogData['equipoCodigo']! != 'Sin código')
-                      Text(
-                        'Código: ${dialogData['equipoCodigo']}',
-                        style: TextStyle(color: AppColors.textSecondary),
-                      ),
-                    Text(
-                      'Cliente: ${dialogData['clienteNombre']}',
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Esta acción marcará el equipo como retirado y ya no estará asignado a este cliente.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textTertiary,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(
-                'Cancelar',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
-                foregroundColor: AppColors.onPrimary,
-              ),
-              child: Text('Retirar'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmar == true) {
-      _viewModel.confirmarRetiroEquipo();
-    }
   }
 
   @override
@@ -188,27 +52,6 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
         ),
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.onPrimary,
-        actions: [
-          ListenableBuilder(
-            listenable: _viewModel,
-            builder: (context, child) {
-              return IconButton(
-                onPressed: _viewModel.isProcessing ? null : _viewModel.reportarEstado,
-                icon: _viewModel.isProcessing
-                    ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.onPrimary),
-                  ),
-                )
-                    : Icon(Icons.report, color: AppColors.onPrimary),
-                tooltip: 'Reportar estado',
-              );
-            },
-          ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -268,136 +111,214 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
     );
   }
 
+// En equipos_clientes_detail_screen.dart
+// Reemplaza completamente el método _buildEquipoInfo() existente con este código:
+
   Widget _buildEquipoInfo() {
-    return Column(
-      children: [
-        _buildInfoCard(
-          icon: Icons.kitchen,
-          title: 'Equipo',
-          content: _viewModel.getNombreCompletoEquipo(),
-          color: AppColors.secondary,
-        ),
-
-        if (_viewModel.shouldShowMarca())
-          _buildInfoCard(
-            icon: Icons.business,
-            title: 'Marca',
-            content: _viewModel.getMarcaText(),
-            color: AppColors.info,
-          ),
-
-        if (_viewModel.shouldShowModelo())
-          _buildInfoCard(
-            icon: Icons.category,
-            title: 'Modelo',
-            content: _viewModel.getModeloText(),
-            color: AppColors.primary,
-          ),
-
-        if (_viewModel.shouldShowCodBarras())
-          _buildInfoCard(
-            icon: Icons.qr_code,
-            title: 'Código de Barras',
-            content: _viewModel.getCodBarrasText(),
-            color: AppColors.neutral700,
-          ),
-
-        _buildInfoCard(
-          icon: Icons.calendar_today,
-          title: 'Fecha de Asignación',
-          content: _viewModel.getFechaAsignacionText(),
-          color: AppColors.success,
-        ),
-
-        _buildInfoCard(
-          icon: Icons.access_time,
-          title: 'Tiempo Asignado',
-          content: _viewModel.getTiempoAsignadoText(),
-          color: AppColors.info,
-        ),
-
-        if (_viewModel.shouldShowFechaRetiro())
-          _buildInfoCard(
-            icon: Icons.event_busy,
-            title: 'Fecha de Retiro',
-            content: _viewModel.getFechaRetiroText(),
-            color: AppColors.error,
-          ),
-
-        _buildInfoCard(
-          icon: _viewModel.equipoCliente.asignacionActiva ? Icons.check_circle : Icons.cancel,
-          title: 'Estado',
-          content: _viewModel.getEstadoText(),
-          color: _viewModel.equipoCliente.asignacionActiva ? AppColors.success : AppColors.error,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoCard({
-    required IconData icon,
-    required String title,
-    required String content,
-    required Color color,
-  }) {
     return Card(
-      margin: EdgeInsets.symmetric(vertical: 6),
-      elevation: 2,
+      elevation: 3,
       color: AppColors.surface,
       shadowColor: AppColors.shadowLight,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(
           color: AppColors.border,
           width: 0.5,
         ),
       ),
       child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Row(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 50,
-              height: 50,
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: color.withValues(alpha: 0.2),
-                  width: 1,
+            // Header del equipo
+            Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.secondary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.kitchen,
+                    color: AppColors.secondary,
+                    size: 28,
+                  ),
                 ),
-              ),
-              child: Icon(icon, color: color, size: 26),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _viewModel.getNombreCompletoEquipo(),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _viewModel.equipoCliente.asignacionActiva
+                              ? AppColors.success.withValues(alpha: 0.1)
+                              : AppColors.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _viewModel.equipoCliente.asignacionActiva
+                                ? AppColors.success.withValues(alpha: 0.3)
+                                : AppColors.error.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Text(
+                          _viewModel.getEstadoText(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _viewModel.equipoCliente.asignacionActiva
+                                ? AppColors.success
+                                : AppColors.error,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 4),
-                  Text(
-                    content,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
+
+            SizedBox(height: 20),
+
+            // Información del equipo en grid
+            _buildInfoGrid(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildInfoGrid() {
+    final infoItems = <Map<String, String>>[];
+
+    // Agregar campos solo si tienen datos
+    if (_viewModel.shouldShowMarca()) {
+      infoItems.add({
+        'label': 'Marca',
+        'value': _viewModel.getMarcaText(),
+      });
+    }
+
+    if (_viewModel.shouldShowModelo()) {
+      infoItems.add({
+        'label': 'Modelo',
+        'value': _viewModel.getModeloText(),
+      });
+    }
+
+    if (_viewModel.shouldShowCodBarras()) {
+      infoItems.add({
+        'label': 'Código de Barras',
+        'value': _viewModel.getCodBarrasText(),
+      });
+    }
+
+    infoItems.addAll([
+      {
+        'label': 'Fecha de Asignación',
+        'value': _viewModel.getFechaAsignacionText(),
+      },
+      {
+        'label': 'Tiempo Asignado',
+        'value': _viewModel.getTiempoAsignadoText(),
+      },
+    ]);
+
+    if (_viewModel.shouldShowFechaRetiro()) {
+      infoItems.add({
+        'label': 'Fecha de Retiro',
+        'value': _viewModel.getFechaRetiroText(),
+      });
+    }
+
+    return Column(
+      children: [
+        // Construir filas de 2 elementos cada una
+        for (int i = 0; i < infoItems.length; i += 2)
+          Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildCompactInfoItem(
+                    label: infoItems[i]['label']!,
+                    value: infoItems[i]['value']!,
+                  ),
+                ),
+                if (i + 1 < infoItems.length) ...[
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: _buildCompactInfoItem(
+                      label: infoItems[i + 1]['label']!,
+                      value: infoItems[i + 1]['value']!,
+                    ),
+                  ),
+                ] else
+                  Expanded(child: SizedBox()), // Espacio vacío si es impar
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildCompactInfoItem({
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.border,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.3,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          SizedBox(height: 6),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }
@@ -409,37 +330,8 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
         if (_viewModel.isEquipoActivo) {
           return Column(
             children: [
-              _buildActionButton(
-                onPressed: _viewModel.isProcessing ? null : _viewModel.verificarEquipo,
-                icon: Icons.camera_alt,
-                label: 'Verificar Este Equipo',
-                backgroundColor: AppColors.info,
-                isElevated: true,
-              ),
-              SizedBox(height: 12),
-              _buildActionButton(
-                onPressed: _viewModel.isProcessing ? null : _viewModel.reportarEstado,
-                icon: Icons.report,
-                label: 'Reportar Estado',
-                backgroundColor: AppColors.warning,
-                isElevated: true,
-              ),
-              SizedBox(height: 12),
-              _buildActionButton(
-                onPressed: _viewModel.isProcessing ? null : _viewModel.cambiarCliente,
-                icon: Icons.swap_horiz,
-                label: 'Cambiar Cliente',
-                foregroundColor: AppColors.secondary,
-                isElevated: false,
-              ),
-              SizedBox(height: 12),
-              _buildActionButton(
-                onPressed: _viewModel.isProcessing ? null : _viewModel.solicitarRetiroEquipo,
-                icon: Icons.remove_circle,
-                label: 'Retirar Equipo',
-                foregroundColor: AppColors.error,
-                isElevated: false,
-              ),
+              // Control de ubicación del equipo
+              _buildLocationControlCard(),
             ],
           );
         } else {
@@ -449,51 +341,134 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
     );
   }
 
-  Widget _buildActionButton({
-    required VoidCallback? onPressed,
-    required IconData icon,
-    required String label,
-    Color? backgroundColor,
-    Color? foregroundColor,
-    required bool isElevated,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      child: isElevated
-          ? ElevatedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon),
-        label: Text(label),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor,
-          foregroundColor: AppColors.onPrimary,
-          padding: EdgeInsets.symmetric(vertical: 16),
+  Widget _buildLocationControlCard() {
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, child) {
+        final isEnLocal = _viewModel.isEquipoEnLocal;
+        final statusColor = isEnLocal ? AppColors.success : AppColors.neutral500;
+
+        return Card(
+          elevation: 3,
+          color: AppColors.surface,
+          shadowColor: AppColors.shadowLight,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: statusColor.withValues(alpha: 0.3),
+              width: 1.5,
+            ),
           ),
-          textStyle: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+          child: Container(
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  statusColor.withValues(alpha: 0.08),
+                  statusColor.withValues(alpha: 0.03),
+                ],
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Título de la sección
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.store,
+                        color: statusColor,
+                        size: 20,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Ubicación del Equipo',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: 16),
+
+                // Control switch
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isEnLocal ? Icons.store : Icons.location_off,
+                        color: statusColor,
+                        size: 24,
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'El equipo está en el local',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              isEnLocal
+                                  ? 'Físicamente presente en nuestras instalaciones'
+                                  : 'No se encuentra en el local actualmente',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Transform.scale(
+                        scale: 1.2,
+                        child: Switch(
+                          value: isEnLocal,
+                          onChanged: _viewModel.toggleEquipoEnLocal,
+                          activeColor: AppColors.success,
+                          inactiveThumbColor: AppColors.neutral400,
+                          inactiveTrackColor: AppColors.neutral300,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      )
-          : OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon),
-        label: Text(label),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: foregroundColor,
-          side: BorderSide(color: foregroundColor!),
-          padding: EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          textStyle: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 

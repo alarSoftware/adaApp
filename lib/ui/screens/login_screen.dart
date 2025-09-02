@@ -201,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            color: AppColors.surface,
+            color: AppColors.cardBackground,
             child: Padding(
               padding: const EdgeInsets.all(32.0),
               child: Form(
@@ -271,7 +271,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           borderSide: BorderSide(color: AppColors.error, width: 1),
         ),
         filled: true,
-        fillColor: AppColors.inputFill,
+        fillColor: AppColors.inputBackground,
         contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 16
@@ -347,7 +347,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           borderSide: BorderSide(color: AppColors.error, width: 1),
         ),
         filled: true,
-        fillColor: AppColors.inputFill,
+        fillColor: AppColors.inputBackground,
         contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 16

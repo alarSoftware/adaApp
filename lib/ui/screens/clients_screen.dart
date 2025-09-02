@@ -112,7 +112,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                     onNotification: _onScrollNotification,
                     child: RefreshIndicator(
                       onRefresh: _onRefresh,
-                      color: AppColors.primary,
+                      color: AppColors.buttonPrimary,
                       child: ListView.builder(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -144,7 +144,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
       elevation: 2,
-      color: AppColors.surface,
+      color: AppColors.cardBackground,
       shadowColor: AppColors.shadowLight,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -235,10 +235,10 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
           return AppBar(
             title: Text(
               'Lista de Clientes (${_viewModel.displayedClientes.length})',
-              style: TextStyle(color: AppColors.onPrimary),
+              style: TextStyle(color: AppColors.appBarForeground),
             ),
-            backgroundColor: AppColors.primary,
-            foregroundColor: AppColors.onPrimary,
+            backgroundColor: AppColors.appBarBackground,
+            foregroundColor: AppColors.appBarForeground,
             elevation: 2,
             shadowColor: AppColors.shadowLight,
             actions: [
@@ -246,7 +246,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                 onPressed: _onRefresh,
                 icon: Icon(
                   Icons.refresh,
-                  color: AppColors.onPrimary,
+                  color: AppColors.appBarForeground,
                 ),
                 tooltip: 'Actualizar lista',
               ),

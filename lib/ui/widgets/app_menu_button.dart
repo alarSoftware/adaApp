@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ada_app/ui/theme/colors.dart';
 
 class AppMenuButton extends StatelessWidget {
   final String label;
@@ -16,7 +17,7 @@ class AppMenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final buttonColor = color ?? Colors.grey[700];
+    final buttonColor = color ?? AppColors.primary;
 
     return GestureDetector(
       onTap: onTap,
@@ -24,14 +25,18 @@ class AppMenuButton extends StatelessWidget {
         width: 120,
         height: 120,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.border,
+            width: 0.5,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
+              color: AppColors.shadowLight,
               spreadRadius: 2,
               blurRadius: 8,
-              offset: Offset(0, 2),
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -39,13 +44,13 @@ class AppMenuButton extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 40, color: buttonColor),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               label,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: buttonColor,
+                color: AppColors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),

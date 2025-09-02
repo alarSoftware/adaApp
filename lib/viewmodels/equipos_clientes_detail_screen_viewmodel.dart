@@ -24,19 +24,23 @@ enum MessageType { error, success, info, warning }
 class EquiposClienteDetailState {
   final EquipoCliente equipoCliente;
   final bool isProcessing;
+  final bool equipoEnLocal;
 
   EquiposClienteDetailState({
     required this.equipoCliente,
     this.isProcessing = false,
-  });
+    bool? equipoEnLocal,
+  }) : equipoEnLocal = equipoEnLocal ?? (equipoCliente.enLocal ?? false);
 
   EquiposClienteDetailState copyWith({
     EquipoCliente? equipoCliente,
     bool? isProcessing,
+    bool? equipoEnLocal,
   }) {
     return EquiposClienteDetailState(
       equipoCliente: equipoCliente ?? this.equipoCliente,
       isProcessing: isProcessing ?? this.isProcessing,
+      equipoEnLocal: equipoEnLocal ?? this.equipoEnLocal,
     );
   }
 }
@@ -71,89 +75,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     super.dispose();
   }
 
-  // ========== ACCIONES PRINCIPALES ==========
-
-  Future<void> verificarEquipo() async {
-    if (equipoCliente.equipoCodBarras?.isNotEmpty == true) {
-      // TODO: Implementar navegación a pantalla de cámara para verificar
-      _eventController.add(ShowMessageEvent(
-        'Verificando equipo ${equipoCliente.equipoCodBarras}',
-        MessageType.info,
-      ));
-      _logger.i('Verificando equipo: ${equipoCliente.equipoCodBarras}');
-    } else {
-      _eventController.add(ShowMessageEvent(
-        'No hay código de barras para verificar',
-        MessageType.error,
-      ));
-    }
-  }
-
-  Future<void> reportarEstado() async {
-    _setProcessing(true);
-
-    try {
-      // TODO: Implementar lógica real de reporte de estado
-      await Future.delayed(Duration(milliseconds: 500)); // Simular operación
-
-      _eventController.add(ShowMessageEvent(
-        'Reportando estado del equipo...',
-        MessageType.warning,
-      ));
-
-      _logger.i('Reportando estado del equipo: ${equipoCliente.id}');
-    } finally {
-      _setProcessing(false);
-    }
-  }
-
-  Future<void> cambiarCliente() async {
-    _setProcessing(true);
-
-    try {
-      // TODO: Implementar lógica real de cambio de cliente
-      await Future.delayed(Duration(milliseconds: 500)); // Simular operación
-
-      _eventController.add(ShowMessageEvent(
-        'Función de cambio de cliente...',
-        MessageType.info,
-      ));
-
-      _logger.i('Cambiando cliente del equipo: ${equipoCliente.id}');
-    } finally {
-      _setProcessing(false);
-    }
-  }
-
-  Future<void> solicitarRetiroEquipo() async {
-    _eventController.add(ShowRetireConfirmationDialogEvent(equipoCliente));
-  }
-
-  Future<void> confirmarRetiroEquipo() async {
-    _setProcessing(true);
-
-    try {
-      // TODO: Implementar lógica real de retiro
-      await Future.delayed(Duration(seconds: 1)); // Simular operación
-
-      _eventController.add(ShowMessageEvent(
-        'Retirando equipo...',
-        MessageType.error,
-      ));
-
-      _logger.i('Retirando equipo: ${equipoCliente.id}');
-
-      // En una implementación real, aquí actualizarías el estado del equipo
-      // y notificarías el cambio
-    } catch (e) {
-      _eventController.add(ShowMessageEvent(
-        'Error al retirar equipo: $e',
-        MessageType.error,
-      ));
-    } finally {
-      _setProcessing(false);
-    }
-  }
 
   // ========== UTILIDADES PARA LA UI ==========
 
@@ -170,9 +91,57 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   String getNombreCompletoEquipo() {
-    final marca = equipoCliente.equipoMarca ?? 'Sin marca';
-    final modelo = equipoCliente.equipoModelo ?? 'Sin modelo';
-    return '$marca $modelo';
+    // Usar el getter del modelo que ya maneja esta lógica correctamente
+    return equipoCliente.equipoNombreCompleto;
+  }
+
+  // ========== ESTADO DEL EQUIPO EN LOCAL ==========
+
+  bool get isEquipoEnLocal {
+    return _state.equipoEnLocal;
+  }
+
+  Future<void> toggleEquipoEnLocal(bool value) async {
+    // Actualizar el estado local inmediatamente para mejor UX
+    _state = _state.copyWith(equipoEnLocal: value);
+    notifyListeners();
+
+    try {
+      _logger.i('Cambiando estado de equipo en local: $value para equipo ${equipoCliente.id}');
+
+      // TODO: Aquí deberías implementar la llamada real a tu servicio/API
+      // Ejemplo de cómo podría ser:
+      // await _equiposService.updateEquipoEnLocal(equipoCliente.id, value);
+
+      // Simular una operación asíncrona
+      await Future.delayed(Duration(milliseconds: 300));
+
+      // Si la operación es exitosa, mostrar mensaje de confirmación
+      _eventController.add(ShowMessageEvent(
+        value
+            ? 'Equipo marcado como presente en el local'
+            : 'Equipo marcado como no presente en el local',
+        MessageType.success,
+      ));
+
+      // En una implementación real, aquí actualizarías el objeto equipoCliente
+      // con los datos actualizados del servidor
+      // final updatedEquipo = await _equiposService.getEquipoById(equipoCliente.id);
+      // _state = _state.copyWith(equipoCliente: updatedEquipo);
+      // notifyListeners();
+
+    } catch (e) {
+      _logger.e('Error al cambiar estado del equipo en local: $e');
+
+      // Si hay error, revertir el estado local
+      _state = _state.copyWith(equipoEnLocal: !value);
+      notifyListeners();
+
+      _eventController.add(ShowMessageEvent(
+        'Error al actualizar el estado del equipo',
+        MessageType.error,
+      ));
+    }
   }
 
   // ========== INFORMACIÓN DEL EQUIPO ==========
@@ -230,7 +199,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
   Map<String, String> getRetireDialogData() {
     return {
-      'equipoNombre': getNombreCompletoEquipo(),
+      'equipoNombre': equipoCliente.equipoNombreCompleto,
       'equipoCodigo': equipoCliente.equipoCodBarras ?? 'Sin código',
       'clienteNombre': equipoCliente.clienteNombreCompleto,
     };
@@ -248,28 +217,28 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
   // ========== MÉTODO PRIVADO ==========
 
-  void _setProcessing(bool processing) {
-    _state = _state.copyWith(isProcessing: processing);
-    notifyListeners();
-  }
-
   void _logDebugInfo() {
-    _logger.i('DEBUG - Marca: ${equipoCliente.equipoMarca}');
-    _logger.i('DEBUG - Modelo: ${equipoCliente.equipoModelo}');
-    _logger.i('DEBUG - Nombre completo: ${equipoCliente.equipoNombreCompleto}');
+    _logger.i('DEBUG - Equipo Marca: ${equipoCliente.equipoMarca}');
+    _logger.i('DEBUG - Equipo Modelo: ${equipoCliente.equipoModelo}');
+    _logger.i('DEBUG - Equipo Nombre: ${equipoCliente.equipoNombre}');
+    _logger.i('DEBUG - Nombre completo calculado: ${equipoCliente.equipoNombreCompleto}');
+    _logger.i('DEBUG - En local: ${_state.equipoEnLocal}');
   }
 
   // ========== DEBUG INFO ==========
 
   Map<String, dynamic> getDebugInfo() {
     return {
-      'equipo_id': equipoCliente.id,
+      'equipo_id': equipoCliente.equipoId,
+      'cliente_id': equipoCliente.clienteId,
       'equipo_marca': equipoCliente.equipoMarca,
       'equipo_modelo': equipoCliente.equipoModelo,
+      'equipo_nombre': equipoCliente.equipoNombre,
       'codigo_barras': equipoCliente.equipoCodBarras,
       'asignacion_activa': equipoCliente.asignacionActiva,
       'cliente_nombre': equipoCliente.clienteNombreCompleto,
       'is_processing': _state.isProcessing,
+      'equipo_en_local': _state.equipoEnLocal,
     };
   }
 

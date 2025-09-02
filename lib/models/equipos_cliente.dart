@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 class EquipoCliente {
   final int? id;
   final int equipoId;
@@ -9,6 +10,7 @@ class EquipoCliente {
   final DateTime fechaCreacion;
   final DateTime? fechaActualizacion;
   final bool estaSincronizado;
+  final bool? enLocal; // Campo agregado para control de ubicación
 
   // Propiedades opcionales para datos relacionados (cuando se hace JOIN)
   final String? equipoNombre;
@@ -29,6 +31,7 @@ class EquipoCliente {
     required this.fechaCreacion,
     this.fechaActualizacion,
     this.estaSincronizado = false,
+    this.enLocal, // Campo agregado
     // Datos relacionados opcionales
     this.equipoNombre,
     this.equipoMarca,
@@ -50,12 +53,18 @@ class EquipoCliente {
       equipoId: map['equipo_id'] as int,
       clienteId: map['cliente_id'] as int,
       fechaAsignacion: DateTime.parse(map['fecha_asignacion'] as String),
+      fechaRetiro: map['fecha_retiro'] != null
+          ? DateTime.parse(map['fecha_retiro'] as String)
+          : null,
       estaActivo: (map['activo'] as int?) == 1,
       fechaCreacion: DateTime.parse(map['fecha_creacion'] as String),
       fechaActualizacion: map['fecha_actualizacion'] != null
           ? DateTime.parse(map['fecha_actualizacion'] as String)
           : null,
       estaSincronizado: (map['sincronizado'] as int?) == 1,
+      enLocal: map['en_local'] != null
+          ? (map['en_local'] as int?) == 1
+          : null,
       // Datos relacionados (para JOINs)
       equipoNombre: map['equipo_nombre'] as String?,
       equipoMarca: map['equipo_marca'] as String?,
@@ -85,6 +94,7 @@ class EquipoCliente {
           ? DateTime.parse(json['fecha_actualizacion'] as String)
           : null,
       estaSincronizado: json['sincronizado'] as bool? ?? true, // Viene de API = sincronizado
+      enLocal: json['en_local'] as bool?,
       // Datos relacionados del JSON
       equipoNombre: json['equipo_nombre'] as String?,
       equipoMarca: json['equipo_marca'] as String?,
@@ -112,6 +122,7 @@ class EquipoCliente {
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
       'sincronizado': estaSincronizado ? 1 : 0,
+      'en_local': enLocal != null ? (enLocal! ? 1 : 0) : null,
     };
   }
 
@@ -126,6 +137,7 @@ class EquipoCliente {
       'activo': estaActivo,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
+      'en_local': enLocal,
     };
   }
 
@@ -144,6 +156,7 @@ class EquipoCliente {
     DateTime? fechaCreacion,
     DateTime? fechaActualizacion,
     bool? estaSincronizado,
+    bool? enLocal,
     String? equipoNombre,
     String? equipoMarca,
     String? equipoModelo,
@@ -162,6 +175,7 @@ class EquipoCliente {
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
       estaSincronizado: estaSincronizado ?? this.estaSincronizado,
+      enLocal: enLocal ?? this.enLocal,
       equipoNombre: equipoNombre ?? this.equipoNombre,
       equipoMarca: equipoMarca ?? this.equipoMarca,
       equipoModelo: equipoModelo ?? this.equipoModelo,
@@ -207,6 +221,12 @@ class EquipoCliente {
     return 'Activa';
   }
 
+  /// Estado de ubicación como texto
+  String get ubicacionTexto {
+    if (enLocal == null) return 'No especificado';
+    return enLocal! ? 'En local' : 'Fuera del local';
+  }
+
   /// Color según el estado
   /// Útil para mostrar en la UI
   Color get colorEstado {
@@ -215,10 +235,24 @@ class EquipoCliente {
     return const Color(0xFF4CAF50); // Verde
   }
 
+  /// Color según la ubicación
+  /// Útil para mostrar en la UI
+  Color get colorUbicacion {
+    if (enLocal == null) return const Color(0xFF9E9E9E); // Gris para no especificado
+    return enLocal!
+        ? const Color(0xFF4CAF50) // Verde para en local
+        : const Color(0xFFFFC107); // Amarillo para fuera del local
+  }
+
+  /// Verificar si el equipo está disponible para operaciones
+  bool get estaDisponible {
+    return asignacionActiva && (enLocal ?? false);
+  }
+
   @override
   String toString() {
     return 'EquipoCliente(id: $id, equipoId: $equipoId, clienteId: $clienteId, '
-        'fechaAsignacion: $fechaAsignacion, activo: $estaActivo, '
+        'fechaAsignacion: $fechaAsignacion, activo: $estaActivo, enLocal: $enLocal, '
         'equipo: $equipoNombreCompleto, cliente: $clienteNombreCompleto)';
   }
 
@@ -276,7 +310,8 @@ final jsonData = {
   "cliente_id": 3,
   "fecha_asignacion": "2024-08-20T18:30:00.000Z",
   "fecha_retiro": null,
-  "activo": true
+  "activo": true,
+  "en_local": true
 };
 
 final asignacion = EquipoCliente.fromJson(jsonData);
@@ -284,8 +319,10 @@ final asignacion = EquipoCliente.fromJson(jsonData);
 // Usar las propiedades
 print(asignacion.equipoNombreCompleto); // "Equipo #14"
 print(asignacion.estadoTexto); // "Activa"
+print(asignacion.ubicacionTexto); // "En local"
 print(asignacion.diasDesdeAsignacion); // Número de días
 print(asignacion.asignacionActiva); // true
+print(asignacion.estaDisponible); // true (activo y en local)
 
 // Convertir para la base de datos
 final mapParaBD = asignacion.toMap();
@@ -295,4 +332,7 @@ final asignacionRetirada = asignacion.copyWith(
   fechaRetiro: DateTime.now(),
   estaActivo: false,
 );
+
+// Cambiar ubicación
+final asignacionFueraLocal = asignacion.copyWith(enLocal: false);
 */

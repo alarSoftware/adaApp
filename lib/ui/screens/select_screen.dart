@@ -337,7 +337,7 @@ class _SelectScreenState extends State<SelectScreen> {
                 text,
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.textOnDark,
+                  color: AppColors.appBarForeground,
                 ),
               ),
             ],
@@ -440,7 +440,7 @@ class _SelectScreenState extends State<SelectScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              AppColors.backgroundSecondary,
+              AppColors.containerBackground,
               AppColors.background,
             ],
           ),

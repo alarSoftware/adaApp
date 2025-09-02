@@ -3,8 +3,6 @@ import 'dart:io';
 import 'package:ada_app/repositories/cliente_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/repositories/equipo_cliente_repository.dart';
-import 'package:ada_app/repositories/marca_repository.dart';
-import 'package:ada_app/repositories/logo_repository.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/models/cliente.dart';
@@ -26,8 +24,7 @@ class SyncService {
   static final _clienteRepo = ClienteRepository();
   static final _equipoRepo = EquipoRepository();
   static final _equipoClienteRepo = EquipoClienteRepository();
-  static final _marcaRepo = MarcaRepository();
-  static final _logoRepo = LogoRepository();
+
 
   static Future<SyncResultUnificado> sincronizarTodosLosDatos() async {
     final resultado = SyncResultUnificado();
