@@ -52,6 +52,24 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
         ),
         backgroundColor: AppColors.appBarBackground,
         foregroundColor: AppColors.appBarForeground,
+          actions: [
+            TextButton.icon(
+              onPressed: _handleSave,
+              icon: Icon(
+                Icons.save,
+                color: AppColors.onPrimary,
+                size: 20,
+              ),
+              label: Text(
+                'Guardar',
+                style: TextStyle(
+                  color: AppColors.onPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            SizedBox(width: 8),
+          ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -76,6 +94,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
       ),
     );
   }
+
   Widget _buildClienteInfo() {
     return Container(
       width: double.infinity,
@@ -248,27 +267,27 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
           Padding(
             padding: EdgeInsets.only(bottom: 12),
             child: IntrinsicHeight(
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildCompactInfoItem(
-                    label: infoItems[i]['label']!,
-                    value: infoItems[i]['value']!,
-                  ),
-                ),
-                if (i + 1 < infoItems.length) ...[
-                  SizedBox(width: 12),
+              child: Row(
+                children: [
                   Expanded(
                     child: _buildCompactInfoItem(
-                      label: infoItems[i + 1]['label']!,
-                      value: infoItems[i + 1]['value']!,
+                      label: infoItems[i]['label']!,
+                      value: infoItems[i]['value']!,
                     ),
                   ),
-                ] else
-                  Expanded(child: SizedBox()), // Espacio vacío si es impar
-              ],
+                  if (i + 1 < infoItems.length) ...[
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: _buildCompactInfoItem(
+                        label: infoItems[i + 1]['label']!,
+                        value: infoItems[i + 1]['value']!,
+                      ),
+                    ),
+                  ] else
+                    Expanded(child: SizedBox()), // Espacio vacío si es impar
+                ],
+              ),
             ),
-          ),
           )],
     );
   }
@@ -368,100 +387,100 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
               ),
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Título de la sección
-                Row(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.store,
-                        color: statusColor,
-                        size: 20,
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Ubicación del Equipo',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                SizedBox(height: 16),
-
-                // Control switch
-                Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: statusColor.withValues(alpha: 0.2),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isEnLocal ? Icons.store : Icons.location_off,
-                        color: statusColor,
-                        size: 24,
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'El equipo está en el local',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              isEnLocal
-                                  ? 'Físicamente presente en nuestras instalaciones'
-                                  : 'No se encuentra en el local actualmente',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(width: 12),
-                      Transform.scale(
-                        scale: 1.2,
-                        child: Switch(
-                          value: isEnLocal,
-                          onChanged: _viewModel.toggleEquipoEnLocal,
-                          activeColor: AppColors.success,
-                          inactiveThumbColor: AppColors.neutral400,
-                          inactiveTrackColor: AppColors.neutral300,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+            // Título de la sección
+            Row(
+            children: [
+            Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.store,
+              color: statusColor,
+              size: 20,
             ),
           ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Ubicación del Equipo',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          ],
+        ),
+
+        SizedBox(height: 16),
+
+        // Control switch
+        Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+        color: statusColor.withValues(alpha: 0.2),
+        ),
+        ),
+        child: Row(
+        children: [
+        Icon(
+        isEnLocal ? Icons.store : Icons.location_off,
+        color: statusColor,
+        size: 24,
+        ),
+        SizedBox(width: 12),
+        Expanded(
+        child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+        Text(
+        'El equipo está en el local',
+        style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+        ),
+        ),
+        SizedBox(height: 4),
+        Text(
+        isEnLocal
+        ? 'Físicamente presente en nuestras instalaciones'
+            : 'No se encuentra en el local actualmente',
+        style: TextStyle(
+        fontSize: 13,
+        color: AppColors.textSecondary,
+        ),
+        ),
+        ],
+        ),
+        ),
+        SizedBox(width: 12),
+        Transform.scale(
+        scale: 1.2,
+        child: Switch(
+        value: isEnLocal,
+        onChanged: _viewModel.toggleEquipoEnLocal,
+        activeThumbColor: AppColors.success,
+        inactiveThumbColor: AppColors.neutral400,
+        inactiveTrackColor: AppColors.neutral300,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        ),
+        ],
+        ),
+        ),
+        ],
+        ),
+        ),
         );
       },
     );
@@ -498,6 +517,22 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
             textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+  }
+
+  void _handleSave() {
+    _viewModel.saveAllChanges();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Cambios guardados correctamente'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
       ),
     );
   }

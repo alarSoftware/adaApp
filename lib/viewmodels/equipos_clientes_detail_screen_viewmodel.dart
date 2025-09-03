@@ -101,6 +101,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     return _state.equipoEnLocal;
   }
 
+
   Future<void> toggleEquipoEnLocal(bool value) async {
     // Actualizar el estado local inmediatamente para mejor UX
     _state = _state.copyWith(equipoEnLocal: value);
@@ -141,6 +142,34 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         'Error al actualizar el estado del equipo',
         MessageType.error,
       ));
+    }
+  }
+
+  Future<void> saveAllChanges() async {
+    _state = _state.copyWith(isProcessing: true);
+    notifyListeners();
+
+    try {
+      // Aquí implementas la llamada real a tu API/servicio
+      // await _equiposService.updateEquipoEnLocal(equipoCliente.id, _state.equipoEnLocal);
+
+      // Por ahora simular
+      await Future.delayed(Duration(milliseconds: 500));
+
+      _eventController.add(ShowMessageEvent(
+        'Todos los cambios guardados correctamente',
+        MessageType.success,
+      ));
+
+    } catch (e) {
+      _logger.e('Error al guardar cambios: $e');
+      _eventController.add(ShowMessageEvent(
+        'Error al guardar los cambios',
+        MessageType.error,
+      ));
+    } finally {
+      _state = _state.copyWith(isProcessing: false);
+      notifyListeners();
     }
   }
 
