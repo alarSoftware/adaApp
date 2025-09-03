@@ -159,9 +159,6 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
     }
   }
 
-// En ClienteDetailScreenViewModel.dart
-// Reemplaza el método navegarADetalleEquipo existente con este:
-
   void navegarADetalleEquipo(Map<String, dynamic> equipoData) {
     // Crear una copia del map con los campos mapeados correctamente
     final equipoDataCorregido = Map<String, dynamic>.from(equipoData);
@@ -196,6 +193,10 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
     _eventController.add(NavigateToEquipoDetailEvent(equipoCliente));
   }
   // ========== UTILIDADES PARA LA UI ==========
+  String getNombreCliente() {
+    return _cliente?.nombre ?? 'Cliente no especificado';
+  }
+
   String formatearFecha(DateTime fecha) {
     return '${fecha.day.toString().padLeft(2, '0')}/'
         '${fecha.month.toString().padLeft(2, '0')}/'
@@ -228,6 +229,9 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   // ========== INFORMACIÓN DEL CLIENTE ==========
+  bool shouldShowCliente() {
+    return _cliente?.nombre.isNotEmpty == true;
+  }
   bool shouldShowPhone() {
     return _cliente?.telefono?.isNotEmpty == true;
   }

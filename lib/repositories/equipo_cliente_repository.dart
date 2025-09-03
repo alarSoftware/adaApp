@@ -175,6 +175,7 @@ class EquipoClienteRepository extends BaseRepository<EquipoCliente> {
   }
 
   /// Obtener estadísticas de asignaciones
+  @override
   Future<Map<String, dynamic>> obtenerEstadisticas() async {
     final sql = '''
     SELECT 

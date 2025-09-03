@@ -101,22 +101,12 @@ class AppColors {
   // ==================== ELEMENTOS FUNCIONALES ====================
   /// Borde estándar para elementos de UI
   static const Color border = Color(0xFFE0E0E0);
-  /// Color base para sombras (se usa con opacidad)
+  /// Borde muy claro para elementos sutiles
+  static const Color borderLight = Color(0xFFF5F5F5);
+  /// Color base para sombras (se usa con transparencia)
   static const Color shadow = Color(0xFF000000);
   /// Color para elementos en foco
   static const Color focus = Color(0xFF3498DB);
-
-  /// Obtiene el color apropiado para iconos según el estado de validación
-  static Color getValidationIconColor(bool isValid, bool hasContent) {
-    if (!hasContent) return neutral500;
-    return isValid ? success : error;
-  }
-
-  /// Obtiene el color de borde según el estado de validación
-  static Color getValidationBorderColor(bool isValid, bool hasContent) {
-    if (!hasContent) return border;
-    return isValid ? borderSuccess : borderError;
-  }
 
   // ==================== COLORES CON TRANSPARENCIA PREDEFINIDA ====================
   /// Sombra ligera para elevación sutil
@@ -140,55 +130,88 @@ class AppColors {
   /// Borde para elementos en estado de error
   static Color borderError = error.withValues(alpha: 0.3);
 
-  // ==================== COLORES POR COMPONENTE ====================
+  // ==================== COLORES POR COMPONENTE - INDEPENDIENTES ====================
 
   // BOTONES
   /// Color de fondo para botones primarios
-  static const Color buttonPrimary = primary;
+  static const Color buttonPrimary = Color(0xFF2C3E50);
+
   /// Color de fondo para botones secundarios
-  static const Color buttonSecondary = secondary;
+  static const Color buttonSecondary = Color(0xFF3498DB);
   /// Color para botones deshabilitados
-  static const Color buttonDisabled = neutral400;
+  static const Color buttonDisabled = Color(0xFFBDBDBD);
   /// Color de texto en botones primarios
-  static const Color buttonTextPrimary = onPrimary;
+  static const Color buttonTextPrimary = Color(0xFFFFFFFF);
   /// Color de texto en botones secundarios
-  static const Color buttonTextSecondary = onSecondary;
+  static const Color buttonTextSecondary = Color(0xFFFFFFFF);
 
   // APPBAR
   /// Color de fondo del AppBar
-  static const Color appBarBackground = primary;
+  static const Color appBarBackground = Color(0xFF2C3E50);
   /// Color de texto e iconos en el AppBar
-  static const Color appBarForeground = onPrimary;
+  static const Color appBarForeground = Color(0xFFFFFFFF);
 
   // CARDS Y CONTENEDORES
   /// Color de fondo para cards
-  static const Color cardBackground = surface;
+  static const Color cardBackground = Color(0xFFFFFFFF);
   /// Color de fondo para contenedores principales
-  static const Color containerBackground = surfaceContainer;
+  static const Color containerBackground = Color(0xFFECF0F1);
   /// Color de sombra para cards
-  static Color cardShadow = shadowLight;
+  static Color cardShadow = Color(0xFF000000).withValues(alpha: 0.1);
 
   // CAMPOS DE ENTRADA
   /// Color de borde para inputs en estado normal
-  static const Color inputBorder = border;
+  static const Color inputBorder = Color(0xFFE0E0E0);
   /// Color de borde para inputs enfocados
-  static const Color inputFocused = focus;
+  static const Color inputFocused = Color(0xFF3498DB);
   /// Color de fondo para inputs
-  static const Color inputBackground = surfaceVariant;
+  static const Color inputBackground = Color(0xFFF8F9FA);
 
   // NAVEGACIÓN
   /// Color de fondo para bottom navigation
-  static const Color bottomNavBackground = surface;
+  static const Color bottomNavBackground = Color(0xFFFFFFFF);
   /// Color para items seleccionados en navegación
-  static const Color bottomNavSelected = primary;
+  static const Color bottomNavSelected = Color(0xFF2C3E50);
   /// Color para items no seleccionados en navegación
-  static const Color bottomNavUnselected = neutral600;
+  static const Color bottomNavUnselected = Color(0xFF7F8C8D);
 
   // DIVISORES Y SEPARADORES
   /// Color para líneas divisoras
-  static Color divider = neutral300.withValues(alpha: 0.4);
+  static Color divider = Color(0xFFE0E0E0).withValues(alpha: 0.4);
+
+  // SNACKBARS Y MENSAJES
+  /// Color de fondo para mensajes de éxito
+  static const Color snackbarSuccess = Color(0xFF27AE60);
+  /// Color de fondo para mensajes de error
+  static const Color snackbarError = Color(0xFFE74C3C);
+  /// Color de fondo para mensajes informativos
+  static const Color snackbarInfo = Color(0xFF3498DB);
+  /// Color de fondo para mensajes de advertencia
+  static const Color snackbarWarning = Color(0xFFE67E22);
+
+  // DIÁLOGOS
+  /// Color de fondo para diálogos
+  static const Color dialogBackground = Color(0xFFFFFFFF);
+  /// Color de texto en títulos de diálogos
+  static const Color dialogTitleText = Color(0xFF2C3E50);
+  /// Color de texto en contenido de diálogos
+  static const Color dialogContentText = Color(0xFF2C3E50);
 
   // ==================== MÉTODOS HELPER ====================
+
+  /// Obtiene el color apropiado para iconos según el estado de validación
+  static Color getValidationIconColor(bool isValid, bool hasContent) {
+    if (!hasContent) return neutral500;
+    return isValid ? success : error;
+  }
+
+  /// Obtiene el color de borde según el estado de validación
+  ///
+  /// Útil para campos de formulario y elementos de validación
+  static Color getValidationBorderColor(bool isValid, bool hasContent) {
+    if (!hasContent) return border;
+    return isValid ? borderSuccess : borderError;
+  }
 
   /// Obtiene el color de estado según el tipo
   ///
@@ -222,8 +245,6 @@ class AppColors {
       default: return surface;
     }
   }
-
-
 
   // ==================== GRADIENTES PREDEFINIDOS ====================
 

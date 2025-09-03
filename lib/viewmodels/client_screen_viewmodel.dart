@@ -105,8 +105,13 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     await loadClientes();
   }
 
-  // ========== CARGA DE DATOS ==========
+// ========== CARGA DE DATOS ==========
   Future<void> loadClientes() async {
+    _logger.i('=== INICIANDO loadClientes ===');
+    _logger.i('Estado inicial - displayedClientes.length: ${_state.displayedClientes.length}');
+    _logger.i('Estado inicial - currentPage: ${_state.currentPage}');
+    _logger.i('Estado inicial - hasMoreData: ${_state.hasMoreData}');
+
     _updateState(_state.copyWith(
       isLoading: true,
       currentPage: 0,
@@ -114,10 +119,17 @@ class ClienteListScreenViewModel extends ChangeNotifier {
       error: null,
     ));
 
+    _logger.i('Después de actualizar estado inicial:');
+    _logger.i('- isLoading: ${_state.isLoading}');
+    _logger.i('- currentPage: ${_state.currentPage}');
+    _logger.i('- displayedClientes.length: ${_state.displayedClientes.length}');
+
     try {
       _logger.i('Cargando clientes desde la base de datos...');
 
       final clientesDB = await _repository.buscar('');
+
+      _logger.i('Clientes obtenidos de BD: ${clientesDB.length}');
 
       _allClientes = clientesDB;
       _filteredClientes = clientesDB;
@@ -125,10 +137,22 @@ class ClienteListScreenViewModel extends ChangeNotifier {
       _updateState(_state.copyWith(
         isLoading: false,
         totalCount: clientesDB.length,
+        hasMoreData: true,
       ));
+
+      _logger.i('Estado antes de _loadNextPage:');
+      _logger.i('- isLoading: ${_state.isLoading}');
+      _logger.i('- currentPage: ${_state.currentPage}');
+      _logger.i('- displayedClientes.length: ${_state.displayedClientes.length}');
+      _logger.i('- hasMoreData: ${_state.hasMoreData}');
+      _logger.i('- _filteredClientes.length: ${_filteredClientes.length}');
 
       await _loadNextPage();
 
+      _logger.i('Estado final después de _loadNextPage:');
+      _logger.i('- displayedClientes.length: ${_state.displayedClientes.length}');
+      _logger.i('- currentPage: ${_state.currentPage}');
+      _logger.i('- hasMoreData: ${_state.hasMoreData}');
       _logger.i('Clientes cargados: ${clientesDB.length}');
     } catch (e, stackTrace) {
       _logger.e('Error al cargar clientes', error: e, stackTrace: stackTrace);
@@ -140,11 +164,23 @@ class ClienteListScreenViewModel extends ChangeNotifier {
 
       _eventController.add(ShowErrorEvent('Error al cargar clientes: $e'));
     }
+
+    _logger.i('=== FINALIZANDO loadClientes ===');
   }
 
-  // ========== PAGINACIÓN ==========
+// ========== PAGINACIÓN ==========
   Future<void> _loadNextPage() async {
-    if (!_state.hasMoreData || _state.isLoadingMore) return;
+    _logger.d('=== INICIANDO _loadNextPage ===');
+    _logger.d('hasMoreData: ${_state.hasMoreData}');
+    _logger.d('isLoadingMore: ${_state.isLoadingMore}');
+    _logger.d('currentPage: ${_state.currentPage}');
+    _logger.d('displayedClientes.length actual: ${_state.displayedClientes.length}');
+    _logger.d('_filteredClientes.length: ${_filteredClientes.length}');
+
+    if (!_state.hasMoreData || _state.isLoadingMore) {
+      _logger.w('Saliendo temprano de _loadNextPage - hasMoreData: ${_state.hasMoreData}, isLoadingMore: ${_state.isLoadingMore}');
+      return;
+    }
 
     _updateState(_state.copyWith(isLoadingMore: true));
 
@@ -154,30 +190,56 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     final startIndex = _state.currentPage * clientesPorPagina;
     final endIndex = startIndex + clientesPorPagina;
 
+    _logger.d('Cálculos de paginación:');
+    _logger.d('- startIndex: $startIndex');
+    _logger.d('- endIndex: $endIndex');
+    _logger.d('- clientesPorPagina: $clientesPorPagina');
+
     if (startIndex < _filteredClientes.length) {
       final nuevosClientes = _filteredClientes
           .skip(startIndex)
           .take(clientesPorPagina)
           .toList();
 
+      _logger.d('nuevosClientes.length: ${nuevosClientes.length}');
+
       final updatedDisplayedClientes = List<Cliente>.from(_state.displayedClientes)
         ..addAll(nuevosClientes);
 
+      _logger.d('displayedClientes antes de agregar: ${_state.displayedClientes.length}');
+      _logger.d('displayedClientes después de agregar: ${updatedDisplayedClientes.length}');
+
+      final newHasMoreData = endIndex < _filteredClientes.length;
+      final newCurrentPage = _state.currentPage + 1;
+
+      _logger.d('Actualizando estado:');
+      _logger.d('- newCurrentPage: $newCurrentPage');
+      _logger.d('- newHasMoreData: $newHasMoreData');
+
       _updateState(_state.copyWith(
         displayedClientes: updatedDisplayedClientes,
-        currentPage: _state.currentPage + 1,
-        hasMoreData: endIndex < _filteredClientes.length,
+        currentPage: newCurrentPage,
+        hasMoreData: newHasMoreData,
         isLoadingMore: false,
       ));
+
+      _logger.d('Estado final después de _updateState:');
+      _logger.d('- currentPage: ${_state.currentPage}');
+      _logger.d('- displayedClientes.length: ${_state.displayedClientes.length}');
+      _logger.d('- hasMoreData: ${_state.hasMoreData}');
     } else {
+      _logger.w('startIndex ($startIndex) >= _filteredClientes.length (${_filteredClientes.length}) - No hay más datos');
       _updateState(_state.copyWith(
         hasMoreData: false,
         isLoadingMore: false,
       ));
     }
+
+    _logger.d('=== FINALIZANDO _loadNextPage ===');
   }
 
   Future<void> loadMoreClientes() async {
+    _logger.d('loadMoreClientes llamado');
     await _loadNextPage();
   }
 

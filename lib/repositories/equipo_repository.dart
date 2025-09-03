@@ -466,6 +466,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
   }
 
   /// Obtener equipos no sincronizados
+  @override
   Future<List<Equipo>> obtenerNoSincronizados() async {
     final maps = await dbHelper.consultar(
       tableName,

@@ -248,7 +248,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           viewModel.usernameValid
               ? Icons.check_circle_outline
               : Icons.error_outline,
-          color: AppColors.getValidationIconColor(viewModel.usernameValid, hasContent),
+          color: AppColors.getValidationIconColor(viewModel.usernameValid, hasContent) ,
           size: 20,
         )
             : null,
@@ -279,7 +279,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       ),
       style: TextStyle(
         fontSize: 16,
-        color: AppColors.onSurface,
+        color: AppColors.textPrimary,
       ),
       validator: viewModel.validateUsername,
       textInputAction: TextInputAction.next,
@@ -355,7 +355,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       ),
       style: TextStyle(
         fontSize: 16,
-        color: AppColors.onSurface,
+        color: AppColors.textPrimary,
       ),
       validator: viewModel.validatePassword,
       textInputAction: TextInputAction.done,
@@ -416,8 +416,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         child: ElevatedButton(
           onPressed: viewModel.isLoading ? null : () => _handleLogin(viewModel),
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: AppColors.onPrimary,
+            backgroundColor: AppColors.buttonPrimary,
+            foregroundColor: AppColors.buttonTextPrimary,
             disabledBackgroundColor: AppColors.buttonDisabled,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
@@ -431,7 +431,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             height: 20,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.onPrimary),
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.buttonTextPrimary),
             ),
           )
               : const Text(

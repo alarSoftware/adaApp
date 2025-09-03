@@ -115,8 +115,8 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       title: const Text('Detalle de Cliente'),
-      backgroundColor: Colors.grey[800],
-      foregroundColor: Colors.white,
+      backgroundColor: AppColors.appBarBackground,
+      foregroundColor: AppColors.appBarForeground,
       elevation: 2,
       actions: [
         IconButton(

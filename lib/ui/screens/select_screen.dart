@@ -355,8 +355,8 @@ class _SelectScreenState extends State<SelectScreen> {
           'Panel Principal',
           style: TextStyle(color: AppColors.onPrimary),
         ),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.onPrimary,
+        backgroundColor: AppColors.appBarBackground,
+        foregroundColor: AppColors.appBarForeground,
         actions: [
           // Botón de sync - usa ViewModel
           ListenableBuilder(

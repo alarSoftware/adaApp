@@ -50,8 +50,8 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
           'Detalle del Equipo',
           style: TextStyle(color: AppColors.onPrimary),
         ),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.onPrimary,
+        backgroundColor: AppColors.appBarBackground,
+        foregroundColor: AppColors.appBarForeground,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -64,12 +64,8 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionHeader(
-                icon: Icons.kitchen,
-                title: 'EQUIPO ASIGNADO',
-                color: AppColors.secondary,
-              ),
-              SizedBox(height: 12),
+              _buildClienteInfo(),
+              SizedBox(height: 32),
               _buildEquipoInfo(),
               SizedBox(height: 32),
               _buildActionButtons(),
@@ -80,39 +76,41 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
       ),
     );
   }
-
-  Widget _buildSectionHeader({
-    required IconData icon,
-    required String title,
-    required Color color,
-  }) {
+  Widget _buildClienteInfo() {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.2),
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 22),
           SizedBox(width: 12),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: color.withValues(alpha: 0.8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Equipo asignado a: ${widget.equipoCliente.clienteNombreCompleto}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+                SizedBox(height: 2),
+              ],
             ),
           ),
         ],
       ),
     );
   }
-
-// En equipos_clientes_detail_screen.dart
-// Reemplaza completamente el método _buildEquipoInfo() existente con este código:
 
   Widget _buildEquipoInfo() {
     return Card(
@@ -234,10 +232,6 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
         'label': 'Fecha de Asignación',
         'value': _viewModel.getFechaAsignacionText(),
       },
-      {
-        'label': 'Tiempo Asignado',
-        'value': _viewModel.getTiempoAsignadoText(),
-      },
     ]);
 
     if (_viewModel.shouldShowFechaRetiro()) {
@@ -253,6 +247,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
         for (int i = 0; i < infoItems.length; i += 2)
           Padding(
             padding: EdgeInsets.only(bottom: 12),
+            child: IntrinsicHeight(
             child: Row(
               children: [
                 Expanded(
@@ -274,7 +269,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
               ],
             ),
           ),
-      ],
+          )],
     );
   }
 

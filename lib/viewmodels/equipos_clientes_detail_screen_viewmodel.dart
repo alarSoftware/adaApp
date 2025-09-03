@@ -178,7 +178,10 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   String getFechaAsignacionText() {
-    return formatearFechaHora(equipoCliente.fechaAsignacion);
+      final fecha = equipoCliente.fechaAsignacion;
+      return '${fecha.day.toString().padLeft(2, '0')}/'
+          '${fecha.month.toString().padLeft(2, '0')}/'
+          '${fecha.year}';
   }
 
   String getTiempoAsignadoText() {
