@@ -16,25 +16,25 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
   @override
   String getBuscarWhere() =>
-      'activo = ? AND (LOWER(nombre) LIKE ? OR LOWER(email) LIKE ? OR telefono LIKE ?)';
+      'LOWER(nombre) LIKE ? OR LOWER(propietario) LIKE ? OR LOWER(ruc_ci) LIKE ? OR LOWER(telefono) LIKE ? OR LOWER(direccion) LIKE ?';
 
   @override
   List<dynamic> getBuscarArgs(String query) {
     final searchTerm = '%${query.toLowerCase()}%';
-    return [1, searchTerm, searchTerm, searchTerm];
+    return [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm];
   }
 
   @override
   String getEntityName() => 'Cliente';
 
-  // Métodos específicos de Cliente
-  Future<Cliente?> obtenerPorEmail(String email) async {
-    final clientes = await buscar(email); // Usa método genérico
+  // Métodos específicos de Cliente (actualizados para el nuevo modelo)
+  Future<Cliente?> obtenerPorRucCi(String rucCi) async {
+    final clientes = await buscar(rucCi);
     return clientes.isNotEmpty ? clientes.first : null;
   }
 
-  Future<bool> existeEmail(String email) async {
-    final clientes = await buscar(email);
+  Future<bool> existeRucCi(String rucCi) async {
+    final clientes = await buscar(rucCi);
     return clientes.isNotEmpty;
   }
 }

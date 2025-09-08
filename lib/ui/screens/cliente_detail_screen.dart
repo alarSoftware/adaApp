@@ -153,22 +153,16 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
               ],
             ),
             const SizedBox(height: 20),
-            _buildInfoRow(Icons.email_outlined, 'Email', widget.cliente.email),
+            _buildInfoRow(Icons.person_outline, 'Propietario', widget.cliente.propietario),
             if (_viewModel.shouldShowPhone())
               _buildInfoRow(Icons.phone_outlined, 'Teléfono', _viewModel.getClientePhone()),
             if (_viewModel.shouldShowAddress())
               _buildInfoRow(Icons.location_on_outlined, 'Dirección', _viewModel.getClienteAddress()),
-            _buildInfoRow(
-              Icons.access_time_outlined,
-              'Fecha de creación',
-              _viewModel.getClienteCreationDate(),
-            ),
           ],
         ),
       ),
     );
   }
-
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),

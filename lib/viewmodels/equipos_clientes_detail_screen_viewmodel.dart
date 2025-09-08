@@ -1,8 +1,8 @@
-// viewmodels/equipos_cliente_detail_screen_viewmodel.dart
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
 import '../models/equipos_cliente.dart';
+import '../repositories/estado_equipo_repository.dart';
 
 // ========== EVENTOS PARA LA UI ==========
 abstract class EquiposClienteDetailUIEvent {}
@@ -48,6 +48,7 @@ class EquiposClienteDetailState {
 // ========== VIEWMODEL LIMPIO ==========
 class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
+  final EstadoEquipoRepository _estadoEquipoRepository;
 
   // ========== ESTADO INTERNO ==========
   EquiposClienteDetailState _state;
@@ -58,9 +59,24 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   Stream<EquiposClienteDetailUIEvent> get uiEvents => _eventController.stream;
 
   // ========== CONSTRUCTOR ==========
-  EquiposClienteDetailScreenViewModel(EquipoCliente equipoCliente)
-      : _state = EquiposClienteDetailState(equipoCliente: equipoCliente) {
+  EquiposClienteDetailScreenViewModel(
+      EquipoCliente equipoCliente,
+      this._estadoEquipoRepository,
+      ) : _state = EquiposClienteDetailState(equipoCliente: equipoCliente) {
+    _loadInitialState();
     _logDebugInfo();
+  }
+
+  Future<void> _loadInitialState() async {
+    final estado = await _estadoEquipoRepository.obtenerPorEquipoYCliente(
+        equipoCliente.equipoId,
+        equipoCliente.clienteId
+    );
+
+    if (estado != null) {
+      _state = _state.copyWith(equipoEnLocal: estado.enLocal);
+      notifyListeners();
+    }
   }
 
   // ========== GETTERS PÚBLICOS ==========
@@ -74,7 +90,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     _eventController.close();
     super.dispose();
   }
-
 
   // ========== UTILIDADES PARA LA UI ==========
 
@@ -101,7 +116,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     return _state.equipoEnLocal;
   }
 
-
   Future<void> toggleEquipoEnLocal(bool value) async {
     // Actualizar el estado local inmediatamente para mejor UX
     _state = _state.copyWith(equipoEnLocal: value);
@@ -118,12 +132,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       await Future.delayed(Duration(milliseconds: 300));
 
       // Si la operación es exitosa, mostrar mensaje de confirmación
-      _eventController.add(ShowMessageEvent(
-        value
-            ? 'Equipo marcado como presente en el local'
-            : 'Equipo marcado como no presente en el local',
-        MessageType.success,
-      ));
 
       // En una implementación real, aquí actualizarías el objeto equipoCliente
       // con los datos actualizados del servidor
@@ -145,22 +153,24 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     }
   }
 
+
+
   Future<void> saveAllChanges() async {
     _state = _state.copyWith(isProcessing: true);
     notifyListeners();
 
     try {
-      // Aquí implementas la llamada real a tu API/servicio
-      // await _equiposService.updateEquipoEnLocal(equipoCliente.id, _state.equipoEnLocal);
+      // Guardar estado de ubicación
+      await _estadoEquipoRepository.actualizarEstadoEquipo(
+        equipoCliente.equipoId,
+        equipoCliente.clienteId,
+        _state.equipoEnLocal,
+      );
 
-      // Por ahora simular
-      await Future.delayed(Duration(milliseconds: 500));
-
-      _eventController.add(ShowMessageEvent(
+     /* _eventController.add(ShowMessageEvent(
         'Todos los cambios guardados correctamente',
         MessageType.success,
-      ));
-
+      ));*/
     } catch (e) {
       _logger.e('Error al guardar cambios: $e');
       _eventController.add(ShowMessageEvent(
@@ -207,10 +217,10 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   String getFechaAsignacionText() {
-      final fecha = equipoCliente.fechaAsignacion;
-      return '${fecha.day.toString().padLeft(2, '0')}/'
-          '${fecha.month.toString().padLeft(2, '0')}/'
-          '${fecha.year}';
+    final fecha = equipoCliente.fechaAsignacion;
+    return '${fecha.day.toString().padLeft(2, '0')}/'
+        '${fecha.month.toString().padLeft(2, '0')}/'
+        '${fecha.year}';
   }
 
   String getTiempoAsignadoText() {
@@ -256,6 +266,8 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     _logger.i('DEBUG - Nombre completo calculado: ${equipoCliente.equipoNombreCompleto}');
     _logger.i('DEBUG - En local: ${_state.equipoEnLocal}');
   }
+
+
 
   // ========== DEBUG INFO ==========
 

@@ -217,22 +217,27 @@ class FormsScreenViewModel extends ChangeNotifier {
   void _mostrarDialogoEquipoNoEncontrado(String codigo) {
     final actions = [
       DialogAction(
-        text: 'Corregir código',
-        onPressed: () {
-          codigoBarrasController.clear();
-          _limpiarDatosAutocompletados();
-        },
-      ),
-      DialogAction(
         text: 'Registrar nuevo equipo',
         onPressed: habilitarModoNuevoEquipo,
-        isDefault: true,
+        isDefault: false,  // Botón secundario
+      ),
+      DialogAction(
+        text: 'Corregir código',
+        onPressed: () {
+          // Seleccionar todo el texto para facilitar la edición
+          codigoBarrasController.selection = TextSelection(
+            baseOffset: 0,
+            extentOffset: codigoBarrasController.text.length,
+          );
+          _limpiarDatosAutocompletados();
+        },
+        isDefault: true,   // Botón primario - más prominente
       ),
     ];
 
     _eventController.add(ShowDialogEvent(
       'Equipo no encontrado',
-      'El código "$codigo" no se encuentra en el sistema.\n\n¿Desea registrar un nuevo equipo?',
+      'El código "$codigo" no se encuentra en el sistema.',
       actions,
     ));
   }

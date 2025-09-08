@@ -18,7 +18,6 @@ class EquipoCliente {
   final String? equipoModelo;
   final String? equipoCodBarras;
   final String? clienteNombre;
-  final String? clienteEmail;
   final String? clienteTelefono;
 
   EquipoCliente({
@@ -38,7 +37,6 @@ class EquipoCliente {
     this.equipoModelo,
     this.equipoCodBarras,
     this.clienteNombre,
-    this.clienteEmail,
     this.clienteTelefono,
   });
 
@@ -71,7 +69,6 @@ class EquipoCliente {
       equipoModelo: map['equipo_modelo'] as String?,
       equipoCodBarras: map['equipo_cod_barras'] as String?,
       clienteNombre: map['cliente_nombre'] as String?,
-      clienteEmail: map['cliente_email'] as String?,
       clienteTelefono: map['cliente_telefono'] as String?,
     );
   }
@@ -101,7 +98,6 @@ class EquipoCliente {
       equipoModelo: json['equipo_modelo'] as String?,
       equipoCodBarras: json['equipo_cod_barras'] as String?,
       clienteNombre: json['cliente_nombre'] as String?,
-      clienteEmail: json['cliente_email'] as String?,
       clienteTelefono: json['cliente_telefono'] as String?,
     );
   }
@@ -162,7 +158,6 @@ class EquipoCliente {
     String? equipoModelo,
     String? equipoCodBarras,
     String? clienteNombre,
-    String? clienteEmail,
     String? clienteTelefono,
   }) {
     return EquipoCliente(
@@ -181,7 +176,6 @@ class EquipoCliente {
       equipoModelo: equipoModelo ?? this.equipoModelo,
       equipoCodBarras: equipoCodBarras ?? this.equipoCodBarras,
       clienteNombre: clienteNombre ?? this.clienteNombre,
-      clienteEmail: clienteEmail ?? this.clienteEmail,
       clienteTelefono: clienteTelefono ?? this.clienteTelefono,
     );
   }

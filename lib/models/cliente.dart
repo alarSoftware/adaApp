@@ -1,105 +1,136 @@
-
-
 class Cliente {
   final int? id;
   final String nombre;
-  final String email;
-  final String? telefono;
-  final String? direccion;
-  final DateTime fechaCreacion;
+  final String telefono;
+  final String direccion;
+  final String rucCi;
+  final String propietario;
 
-  Cliente({
+  const Cliente({
     this.id,
     required this.nombre,
-    required this.email,
-    this.telefono,
-    this.direccion,
-    DateTime? fechaCreacion,
-  }) : fechaCreacion = fechaCreacion ?? DateTime.now();
+    required this.telefono,
+    required this.direccion,
+    required this.rucCi,
+    required this.propietario,
+  });
 
-  // Convertir de Map (base de datos) a Cliente
+  // Factory constructor desde Map/JSON (API response)
+  factory Cliente.fromJson(Map<String, dynamic> json) {
+    return Cliente(
+      id: json['id'] as int?,
+      nombre: _parseString(json['nombre']) ?? '',
+      telefono: _parseString(json['telefono']) ?? '',
+      direccion: _parseString(json['direccion']) ?? '',
+      rucCi: _parseString(json['ruc_ci']) ?? '',
+      propietario: _parseString(json['propietario']) ?? '',
+    );
+  }
+
+  // Factory constructor desde Map (base de datos local)
   factory Cliente.fromMap(Map<String, dynamic> map) {
     return Cliente(
-      id: map['id'],
-      nombre: map['nombre'],
-      email: map['email'],
-      telefono: map['telefono'],
-      direccion: map['direccion'],
-      fechaCreacion: DateTime.parse(map['fecha_creacion']),
+      id: map['id'] as int?,
+      nombre: map['nombre'] as String? ?? '',
+      telefono: map['telefono'] as String? ?? '',
+      direccion: map['direccion'] as String? ?? '',
+      rucCi: map['ruc_ci'] as String? ?? '',
+      propietario: map['propietario'] as String? ?? '',
     );
   }
 
-  // Constructor desde JSON (para API)
-  factory Cliente.fromJson(Map<String, dynamic> json) {
-    DateTime fechaCreacion;
-    try {
-      if (json['fecha_creacion'] != null) {
-        fechaCreacion = DateTime.parse(json['fecha_creacion']);
-      } else if (json['fechaCreacion'] != null) {
-        fechaCreacion = DateTime.parse(json['fechaCreacion']);
-      } else {
-        fechaCreacion = DateTime.now();
-      }
-    } catch (e) {
-      fechaCreacion = DateTime.now();
-    }
-
-    return Cliente(
-      id: json['id'],
-      nombre: json['nombre'] ?? '',
-      email: json['email'] ?? '',
-      telefono: json['telefono'],
-      direccion: json['direccion'],
-      fechaCreacion: fechaCreacion,
-    );
-  }
-
-  // Convertir de Cliente a Map (para guardar en base de datos)
+  // Convertir a Map para base de datos local
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'nombre': nombre,
-      'email': email,
       'telefono': telefono,
       'direccion': direccion,
-      'fecha_creacion': fechaCreacion.toIso8601String(),
+      'ruc_ci': rucCi,
+      'propietario': propietario,
     };
   }
 
-  // Convertir a JSON para enviar al API
+  // Convertir a JSON para enviar a la API
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final json = <String, dynamic>{
       'nombre': nombre,
-      'email': email,
-      'telefono': telefono ?? '',
-      'direccion': direccion ?? '',
-      'fecha_creacion': fechaCreacion.toIso8601String(),
+      'telefono': telefono,
+      'direccion': direccion,
+      'ruc_ci': rucCi,
+      'propietario': propietario,
     };
+
+    // Solo incluir ID si existe (para updates)
+    if (id != null) json['id'] = id;
+
+    return json;
   }
 
-  // Método para crear una copia con cambios
+  // Método copyWith para crear copias con cambios
   Cliente copyWith({
     int? id,
     String? nombre,
-    String? email,
     String? telefono,
     String? direccion,
-    DateTime? fechaCreacion,
+    String? rucCi,
+    String? propietario,
   }) {
     return Cliente(
       id: id ?? this.id,
       nombre: nombre ?? this.nombre,
-      email: email ?? this.email,
       telefono: telefono ?? this.telefono,
       direccion: direccion ?? this.direccion,
-      fechaCreacion: fechaCreacion ?? this.fechaCreacion,
+      rucCi: rucCi ?? this.rucCi,
+      propietario: propietario ?? this.propietario,
     );
   }
 
-  @override
-  String toString() {
-    return 'Cliente{id: $id, nombre: $nombre, email: $email}';
+  // Validación básica de campos requeridos
+  bool get isValid =>
+      nombre.isNotEmpty &&
+          telefono.isNotEmpty &&
+          direccion.isNotEmpty &&
+          rucCi.isNotEmpty &&
+          propietario.isNotEmpty;
+
+  // Detectar tipo de documento de forma simple
+  String get tipoDocumento {
+    final clean = rucCi.replaceAll(RegExp(r'[\s\-]'), '');
+
+    if (clean.startsWith('80') && clean.length == 10) {
+      return 'RUC';
+    } else if (RegExp(r'^\d+$').hasMatch(clean)) {
+      return 'CI';
+    } else {
+      return 'Documento';
+    }
+  }
+
+  // Getters simples sin formateo automático
+  bool get esRuc => tipoDocumento == 'RUC';
+  bool get esCi => tipoDocumento == 'CI';
+
+  // Validación básica de teléfono paraguayo
+  bool get hasValidPhone => _isValidParaguayanPhone(telefono);
+
+  // Métodos de utilidad privados
+  static String? _parseString(dynamic value) {
+    if (value == null) return null;
+    final str = value.toString().trim();
+    return str.isEmpty ? null : str;
+  }
+
+  bool _isValidParaguayanPhone(String phone) {
+    // Formatos válidos: 0981-123456, 0981123456, +595981123456
+    final cleanPhone = phone.replaceAll(RegExp(r'[\s\-+]'), '');
+
+    if (cleanPhone.startsWith('595')) {
+      return cleanPhone.length == 12 && cleanPhone.substring(3).startsWith('9');
+    } else if (cleanPhone.startsWith('09')) {
+      return cleanPhone.length == 10;
+    }
+    return false;
   }
 
   @override
@@ -109,8 +140,22 @@ class Cliente {
               runtimeType == other.runtimeType &&
               id == other.id &&
               nombre == other.nombre &&
-              email == other.email;
+              telefono == other.telefono &&
+              direccion == other.direccion &&
+              rucCi == other.rucCi &&
+              propietario == other.propietario;
 
   @override
-  int get hashCode => id.hashCode ^ nombre.hashCode ^ email.hashCode;
+  int get hashCode =>
+      id.hashCode ^
+      nombre.hashCode ^
+      telefono.hashCode ^
+      direccion.hashCode ^
+      rucCi.hashCode ^
+      propietario.hashCode;
+
+  @override
+  String toString() {
+    return 'Cliente{id: $id, nombre: $nombre, tipo: $tipoDocumento, ruc_ci: $rucCi}';
+  }
 }

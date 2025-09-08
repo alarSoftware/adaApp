@@ -12,7 +12,7 @@ class DatabaseHelper {
   static Database? _database;
 
   static const String _databaseName = 'AdaAapp.db';
-  static const int _databaseVersion = 6; // Incrementado para tabla modelos
+  static const int _databaseVersion = 1; //incrementar cuando haya actualizacion
 
   DatabaseHelper._internal();
 
@@ -78,18 +78,15 @@ class DatabaseHelper {
 
     // Tabla clientes
     await db.execute('''
-      CREATE TABLE clientes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT NOT NULL,
-        email TEXT UNIQUE,
-        telefono TEXT,
-        direccion TEXT,
-        activo INTEGER DEFAULT 1,
-        sincronizado INTEGER DEFAULT 0,
-        fecha_creacion TEXT NOT NULL,
-        fecha_actualizacion TEXT NOT NULL
-      )
-    ''');
+  CREATE TABLE clientes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL,
+    telefono TEXT NOT NULL,
+    direccion TEXT NOT NULL,
+    ruc_ci TEXT NOT NULL,
+    propietario TEXT NOT NULL
+  )
+''');
 
     // Tabla equipos CORREGIDA
     await db.execute('''
@@ -185,6 +182,23 @@ class DatabaseHelper {
         FOREIGN KEY (logo_id) REFERENCES logo (id)
       )
     ''');
+//Tabla Estado_Equipo
+    await db.execute('''
+  CREATE TABLE Estado_Equipo (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    equipo_id INTEGER NOT NULL,
+    id_clientes INTEGER NOT NULL,
+    en_local INTEGER NOT NULL DEFAULT 0,
+    latitud REAL,
+    longitud REAL,
+    fecha_revision TEXT NOT NULL,
+    fecha_creacion TEXT NOT NULL,
+    fecha_actualizacion TEXT,
+    sincronizado INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (equipo_id) REFERENCES equipos (id),
+    FOREIGN KEY (id_clientes) REFERENCES clientes (id)
+  )
+''');
 
     // Crear índices para mejorar rendimiento
     await _crearIndices(db);
@@ -197,8 +211,9 @@ class DatabaseHelper {
 
   Future<void> _crearIndices(Database db) async {
     // Índices para clientes
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_email ON clientes (email)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_activo ON clientes (activo)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_nombre ON clientes (nombre)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_ruc_ci ON clientes (ruc_ci)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_propietario ON clientes (propietario)');
 
     // Índices para equipos
     await db.execute('CREATE INDEX IF NOT EXISTS idx_equipos_cod_barras ON equipos (cod_barras)');
@@ -286,113 +301,6 @@ class DatabaseHelper {
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     logger.i('Actualizando base de datos de v$oldVersion a v$newVersion');
-
-    if (oldVersion < 5) {
-      // Crear nuevas tablas si no existen
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS marcas (
-          id INTEGER PRIMARY KEY,
-          nombre TEXT NOT NULL UNIQUE,
-          activo INTEGER DEFAULT 1,
-          fecha_creacion TEXT NOT NULL
-        )
-      ''');
-
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS logo (
-          id INTEGER PRIMARY KEY,
-          nombre TEXT NOT NULL UNIQUE,
-          activo INTEGER DEFAULT 1,
-          fecha_creacion TEXT NOT NULL
-        )
-      ''');
-
-      // Actualizar tabla equipos
-      try {
-        // Renombrar tabla equipos existente
-        await db.execute('ALTER TABLE equipos RENAME TO equipos_old');
-
-        // Crear nueva tabla equipos
-        await db.execute('''
-          CREATE TABLE equipos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            cod_barras TEXT UNIQUE NOT NULL,
-            marca_id INTEGER NOT NULL,
-            modelo_id INTEGER NOT NULL,
-            numero_serie TEXT UNIQUE,
-            logo_id INTEGER NOT NULL,
-            estado_local INTEGER DEFAULT 1,
-            activo INTEGER DEFAULT 1,
-            sincronizado INTEGER DEFAULT 0,
-            fecha_creacion TEXT NOT NULL,
-            fecha_actualizacion TEXT NOT NULL,
-            FOREIGN KEY (marca_id) REFERENCES marcas (id),
-            FOREIGN KEY (modelo_id) REFERENCES modelos (id),
-            FOREIGN KEY (logo_id) REFERENCES logo (id)
-          )
-        ''');
-
-        // Insertar datos iniciales antes de migrar
-        await _insertarDatosIniciales(db);
-
-        // Migrar datos existentes (si existen)
-        final equiposExistentes = await db.rawQuery('SELECT * FROM equipos_old WHERE activo = 1');
-        for (final equipo in equiposExistentes) {
-          // Mapear marca texto a marca_id (buscar en tabla marcas)
-          final marcaTexto = equipo['marca'] as String?;
-          int marcaId = 1; // Default Samsung
-          if (marcaTexto != null) {
-            final marcaResult = await db.query(
-                'marcas',
-                where: 'LOWER(nombre) = LOWER(?)',
-                whereArgs: [marcaTexto]
-            );
-            if (marcaResult.isNotEmpty) {
-              marcaId = marcaResult.first['id'] as int;
-            }
-          }
-
-          await db.insert('equipos', {
-            'id': equipo['id'],
-            'cod_barras': equipo['cod_barras'] ?? 'REF${equipo['id']?.toString().padLeft(3, '0')}',
-            'marca_id': marcaId,
-            'modelo_id': 1, // Default - ajustar según necesidades
-            'numero_serie': equipo['numero_serie'],
-            'logo_id': 1, // Default Pulp
-            'estado_local': 1,
-            'activo': equipo['activo'] ?? 1,
-            'sincronizado': 0,
-            'fecha_creacion': equipo['fecha_creacion'] ?? DateTime.now().toIso8601String(),
-            'fecha_actualizacion': DateTime.now().toIso8601String(),
-          });
-        }
-
-        // Eliminar tabla antigua
-        await db.execute('DROP TABLE IF EXISTS equipos_old');
-
-      } catch (e) {
-        logger.w('Error en migración de equipos: $e. Creando tabla limpia.');
-      }
-
-      // Crear nuevos índices
-      await _crearIndices(db);
-    }
-
-    // Nueva migración para tabla modelos
-    if (oldVersion < 6) {
-      // Crear tabla modelos si no existe
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS modelos (
-          id INTEGER PRIMARY KEY,
-          nombre TEXT NOT NULL UNIQUE
-        )
-      ''');
-
-      // Agregar índice para modelos
-      await db.execute('CREATE INDEX IF NOT EXISTS idx_modelos_nombre ON modelos(nombre)');
-
-      logger.i('Tabla modelos creada en migración v6');
-    }
   }
 
   // ================================================================
@@ -530,8 +438,8 @@ class DatabaseHelper {
 
   // Método auxiliar para saber si una tabla requiere campos de fecha
   Future<bool> _tablaRequiereFechas(String tableName) async {
-    // La tabla modelos no tiene campos de fecha
-    if (tableName == 'modelos') return false;
+    // clientes Y modelos no tienen campos de fecha
+    if (tableName == 'clientes' || tableName == 'modelos') return false;
     return true;
   }
 
@@ -565,7 +473,6 @@ class DatabaseHelper {
         COUNT(ec.equipo_id) as total_equipos
       FROM clientes c
       LEFT JOIN equipo_cliente ec ON c.id = ec.cliente_id AND ec.activo = 1
-      WHERE c.activo = 1
       GROUP BY c.id
       ORDER BY c.nombre
     ''';
@@ -619,7 +526,7 @@ class DatabaseHelper {
       SELECT 
         ec.*,
         c.nombre as cliente_nombre,
-        c.email as cliente_email,
+        c.ruc_ci as cliente_ruc_ci,
         e.numero_serie,
         m.nombre as marca_nombre,
         mo.nombre as modelo_nombre,

@@ -69,103 +69,256 @@ class _FormsScreenState extends State<FormsScreen> {
   Future<void> _showDialog(String title, String message, List<DialogAction> actions) async {
     return showDialog<void>(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
           ),
-          backgroundColor: AppColors.cardBackground,
+          backgroundColor: AppColors.dialogBackground,
+          elevation: 8,
+          titlePadding: const EdgeInsets.all(20),
+          contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+          actionsPadding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+
           title: Row(
             children: [
-              Icon(
-                Icons.search_off,
-                color: AppColors.textSecondary,
-                size: 28,
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: _getIconBackgroundColor(title),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(
+                  _getIconForTitle(title),
+                  color: _getIconColor(title),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                message,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              if (title == 'Equipo no encontrado') ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.dialogTitleText,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    if (_getSubtitle(title).isNotEmpty) ...[
+                      const SizedBox(height: 2),
                       Text(
-                        '¿Desea registrar un nuevo equipo?',
+                        _getSubtitle(title),
                         style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          color: AppColors.textSecondary,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text('• Complete manualmente los datos del equipo',
-                          style: TextStyle(color: AppColors.textSecondary)),
-                      Text('• El código actual se mantendrá',
-                          style: TextStyle(color: AppColors.textSecondary)),
-                      Text('• Podrá corregir el código si es necesario',
-                          style: TextStyle(color: AppColors.textSecondary)),
                     ],
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ],
           ),
-          actions: actions.map((action) {
-            return action.isDefault
-                ? ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                action.onPressed();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.buttonPrimary,
-                foregroundColor: AppColors.buttonTextPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.5,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 4),
+                  Text(
+                    message,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.4,
+                      color: AppColors.dialogContentText,
+                    ),
+                  ),
+
+                  // Información adicional según el contexto
+                  if (_shouldShowAdditionalInfo(title)) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.infoContainer,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: AppColors.info,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _getAdditionalInfo(title),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          actions: [
+            ...actions.reversed.map((action) {
+              final bool isPrimary = action.isDefault;
+
+              return Container(
+                margin: const EdgeInsets.only(left: 6),
+                child: isPrimary
+                    ? ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    action.onPressed();
+                  },
+                  icon: Icon(_getButtonIcon(action.text), size: 16),
+                  label: Text(action.text),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.buttonPrimary,
+                    foregroundColor: AppColors.buttonTextPrimary,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    elevation: 2,
+                    textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                )
+                    : OutlinedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    action.onPressed();
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    side: BorderSide(color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  child: Text(action.text),
                 ),
-              ),
-              child: Text(action.text),
-            )
-                : TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                action.onPressed();
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.textSecondary,
-              ),
-              child: Text(action.text),
-            );
-          }).toList(),
+              );
+            }).toList(),
+          ],
         );
       },
     );
+  }
+
+// Métodos auxiliares para personalización
+  IconData _getIconForTitle(String title) {
+    switch (title.toLowerCase()) {
+      case 'equipo no encontrado':
+        return Icons.search_off_outlined;
+      case 'error':
+        return Icons.error_outline;
+      case 'confirmación':
+        return Icons.check_circle_outline;
+      case 'advertencia':
+        return Icons.warning_amber_outlined;
+      default:
+        return Icons.info_outline;
+    }
+  }
+
+  Color _getIconColor(String title) {
+    switch (title.toLowerCase()) {
+      case 'equipo no encontrado':
+        return AppColors.warning;
+      case 'error':
+        return AppColors.error;
+      case 'confirmación':
+        return AppColors.success;
+      case 'advertencia':
+        return AppColors.warning;
+      default:
+        return AppColors.primary;
+    }
+  }
+
+  Color _getIconBackgroundColor(String title) {
+    return _getIconColor(title).withValues(alpha: 0.1);
+  }
+
+  String _getSubtitle(String title) {
+    switch (title.toLowerCase()) {
+      case 'equipo no encontrado':
+        return 'Sistema de Inventario';
+      case 'error':
+        return 'Se requiere atención';
+      case 'confirmación':
+        return 'Operación completada';
+      default:
+        return '';
+    }
+  }
+
+  bool _shouldShowAdditionalInfo(String title) {
+    return ['equipo no encontrado', 'error'].contains(title.toLowerCase());
+  }
+
+  String _getAdditionalInfo(String title) {
+    switch (title.toLowerCase()) {
+      case 'equipo no encontrado':
+        return 'Contacte al administrador si el problema persiste.';
+      case 'error':
+        return 'Verifique su conexión e intente nuevamente.';
+      default:
+        return '';
+    }
+  }
+
+  IconData _getButtonIcon(String buttonText) {
+    switch (buttonText.toLowerCase()) {
+      case 'corregir código':
+      case 'corregir':
+      case 'editar código':
+        return Icons.edit;
+      case 'registrar':
+      case 'crear':
+      case 'agregar':
+      case 'registrar nuevo':
+      case 'registrar nuevo equipo': // Agregar esta línea
+        return Icons.add_circle_outline;
+      case 'reintentar':
+        return Icons.refresh;
+      case 'continuar':
+        return Icons.arrow_forward;
+      case 'guardar':
+        return Icons.save;
+      case 'cancelar':
+        return Icons.close;
+      case 'aceptar':
+      case 'ok':
+        return Icons.check;
+      default:
+        return Icons.check;
+    }
   }
 
   Future<void> _navigateToPreview(Map<String, dynamic> datos) async {
@@ -553,7 +706,7 @@ class _FormsScreenState extends State<FormsScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: AppColors.containerBackground.withValues(alpha: 0.78),
+            color: AppColors.shadowLight,
               spreadRadius: 1,
               blurRadius: 5,
               offset: const Offset(0, -2),

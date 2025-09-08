@@ -192,7 +192,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                cliente.email,
+                cliente.rucCi,
                 style: TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary,
@@ -204,7 +204,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
                   child: Text(
-                    cliente.telefono!,
+                    cliente.telefono,
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textTertiary,

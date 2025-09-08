@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/models/equipos_cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/equipos_clientes_detail_screen_viewmodel.dart';
+import 'package:ada_app/repositories/estado_equipo_repository.dart';
+import 'package:ada_app/services/database_helper.dart';
 import 'dart:async';
 
 class EquiposClientesDetailScreen extends StatefulWidget {
@@ -20,14 +22,33 @@ class EquiposClientesDetailScreen extends StatefulWidget {
 class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScreen> {
   late EquiposClienteDetailScreenViewModel _viewModel;
   late StreamSubscription<EquiposClienteDetailUIEvent> _eventSubscription;
-
   @override
   void initState() {
     super.initState();
-    _viewModel = EquiposClienteDetailScreenViewModel(widget.equipoCliente);
+    _checkDatabase(); // ← Agregar esta línea
+    _viewModel = EquiposClienteDetailScreenViewModel(
+      widget.equipoCliente,
+      EstadoEquipoRepository(), // ← Agregar esta línea
+    );
     _setupEventListener();
   }
 
+  void _checkDatabase() async {
+    final db = DatabaseHelper();
+    try {
+      final tablas = await db.obtenerNombresTablas();
+      print('Tablas disponibles: $tablas');
+
+      if (tablas.contains('Estado_Equipo')) {
+        final esquema = await db.obtenerEsquemaTabla('Estado_Equipo');
+        print('Esquema Estado_Equipo: $esquema');
+      } else {
+        print('Tabla Estado_Equipo NO existe');
+      }
+    } catch (e) {
+      print('Error verificando DB: $e');
+    }
+  }
   @override
   void dispose() {
     _eventSubscription.cancel();
@@ -38,9 +59,33 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
   void _setupEventListener() {
     _eventSubscription = _viewModel.uiEvents.listen((event) {
       if (!mounted) return;
+
+      if (event is ShowMessageEvent) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(event.message),
+            backgroundColor: _getMessageColor(event.type),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
     });
   }
 
+  Color _getMessageColor(MessageType type) {
+    switch (type) {
+      case MessageType.success:
+        return AppColors.success;
+      case MessageType.error:
+        return AppColors.error;
+      default:
+        return AppColors.primary;
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,7 +99,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
         foregroundColor: AppColors.appBarForeground,
           actions: [
             TextButton.icon(
-              onPressed: _handleSave,
+              onPressed: _showSaveConfirmation,
               icon: Icon(
                 Icons.save,
                 color: AppColors.onPrimary,
@@ -523,16 +568,26 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
 
   void _handleSave() {
     _viewModel.saveAllChanges();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Cambios guardados correctamente'),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+  }
+  void _showSaveConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Confirmar guardado'),
+        content: Text('¿Estás seguro de que quieres guardar los cambios realizados?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _viewModel.saveAllChanges();
+            },
+            child: Text('Guardar'),
+          ),
+        ],
       ),
     );
   }

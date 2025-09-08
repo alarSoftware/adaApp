@@ -19,22 +19,24 @@ app.use((req, res, next) => {
 
 // DATOS DE EJEMPLO 
 let clientes = [
-    { id: 1, nombre: 'Juan Pérez', email: 'juan@email.com', telefono: '0981-123456', direccion: 'Asunción', activo: true, fecha_creacion: new Date().toISOString() },
-    { id: 2, nombre: 'María García', email: 'maria@email.com', telefono: '0984-654321', direccion: 'Luque', activo: true, fecha_creacion: new Date().toISOString() },
-    { id: 3, nombre: 'Carlos López', email: 'carlos@email.com', telefono: '0985-789123', direccion: 'San Lorenzo', activo: true, fecha_creacion: new Date().toISOString() },
-    { id: 4, nombre: 'Ana Torres', email: 'ana@email.com', telefono: '0971-222333', direccion: 'Fernando de la Mora', activo: true, fecha_creacion: new Date().toISOString() },
-    { id: 5, nombre: 'Luis González', email: 'luis@email.com', telefono: '0972-444555', direccion: 'Lambaré', activo: false, fecha_creacion: new Date().toISOString() },
-    { id: 6, nombre: 'Marta Rivas', email: 'marta@email.com', telefono: '0961-666777', direccion: 'Encarnación', activo: true, fecha_creacion: new Date().toISOString() },
-    { id: 7, nombre: 'Diego Silva', email: 'diego@email.com', telefono: '0962-888999', direccion: 'Capiatá', activo: true, fecha_creacion: new Date().toISOString() },
-    { id: 8, nombre: 'Lucía Benítez', email: 'lucia@email.com', telefono: '0983-121314', direccion: 'Itauguá', activo: true, fecha_creacion: new Date().toISOString() },
-    { id: 9, nombre: 'Pedro Duarte', email: 'pedro@email.com', telefono: '0986-151617', direccion: 'Villa Elisa', activo: true, fecha_creacion: new Date().toISOString() },
-    { id: 10, nombre: 'Gabriela Fernández', email: 'gaby@email.com', telefono: '0973-181920', direccion: 'Ñemby', activo: true, fecha_creacion: new Date().toISOString() },
-    { id: 11, nombre: 'Rodrigo Medina', email: 'rodrigo@email.com', telefono: '0963-212223', direccion: 'Caacupé', activo: false, fecha_creacion: new Date().toISOString() },
-    { id: 12, nombre: 'Camila Ortiz', email: 'camila@email.com', telefono: '0974-242526', direccion: 'Coronel Oviedo', activo: true, fecha_creacion: new Date().toISOString() },
-    { id: 13, nombre: 'Santiago Cabrera', email: 'santiago@email.com', telefono: '0964-272829', direccion: 'Paraguarí', activo: true, fecha_creacion: new Date().toISOString() },
-    { id: 14, nombre: 'Patricia Villalba', email: 'patricia@email.com', telefono: '0987-303132', direccion: 'Ciudad del Este', activo: true, fecha_creacion: new Date().toISOString() },
-    { id: 15, nombre: 'Hugo Ramírez', email: 'hugo@email.com', telefono: '0975-333444', direccion: 'Areguá', activo: true, fecha_creacion: new Date().toISOString() }
+  { id: 1, nombre: 'Juan Pérez', telefono: '0981-123456', direccion: 'Asunción', ruc_ci: '1234567-8', propietario: 'Juan Pérez' },
+  { id: 2, nombre: 'María García', telefono: '0984-654321', direccion: 'Luque', ruc_ci: '80012345-6', propietario: 'María García' },
+  { id: 3, nombre: 'Carlos López', telefono: '0985-789123', direccion: 'San Lorenzo', ruc_ci: '2345678-9', propietario: 'Carlos López'},
+  { id: 4, nombre: 'Ana Torres', telefono: '0971-222333', direccion: 'Fernando de la Mora', ruc_ci: '80123456-7', propietario: 'Ana Torres'},
+  { id: 5, nombre: 'Luis González', telefono: '0972-444555', direccion: 'Lambaré', ruc_ci: '3456789-0', propietario: 'Luis González' },
+  { id: 6, nombre: 'Marta Rivas', telefono: '0961-666777', direccion: 'Encarnación', ruc_ci: '80234567-8', propietario: 'Marta Rivas'},
+  { id: 7, nombre: 'Diego Silva', telefono: '0962-888999', direccion: 'Capiatá', ruc_ci: '4567890-1', propietario: 'Diego Silva'},
+  { id: 8, nombre: 'Lucía Benítez', telefono: '0983-121314', direccion: 'Itauguá', ruc_ci: '80345678-9', propietario: 'Lucía Benítez' },
+  { id: 9, nombre: 'Pedro Duarte', telefono: '0986-151617', direccion: 'Villa Elisa', ruc_ci: '5678901-2', propietario: 'Pedro Duarte'},
+  { id: 10, nombre: 'Gabriela Fernández', telefono: '0973-181920', direccion: 'Ñemby', ruc_ci: '80456789-0', propietario: 'Gabriela Fernández'},
+  { id: 11, nombre: 'Rodrigo Medina', telefono: '0963-212223', direccion: 'Caacupé', ruc_ci: '6789012-3', propietario: 'Rodrigo Medina'},
+  { id: 12, nombre: 'Camila Ortiz', telefono: '0974-242526', direccion: 'Coronel Oviedo', ruc_ci: '80567890-1', propietario: 'Camila Ortiz'},
+  { id: 13, nombre: 'Santiago Cabrera', telefono: '0964-272829', direccion: 'Paraguarí', ruc_ci: '7890123-4', propietario: 'Santiago Cabrera'},
+  { id: 14, nombre: 'Patricia Villalba', telefono: '0987-303132', direccion: 'Ciudad del Este', ruc_ci: '80678901-2', propietario: 'Patricia Villalba'},
+  { id: 15, nombre: 'Hugo Ramírez', telefono: '0975-333444', direccion: 'Areguá', ruc_ci: '8901234-5', propietario: 'Hugo Ramírez',},
+  { id: 16, nombre: 'Ronaldo Rebollo', telefono: '0991-836615', direccion: 'J. Augusto Saldivar', ruc_ci: '5407966', propietario: 'Ronaldo'}
 ];
+
 
 
 let logo = [

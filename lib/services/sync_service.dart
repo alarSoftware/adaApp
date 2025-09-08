@@ -220,15 +220,22 @@ class SyncService {
 
   static Future<SyncResult> sincronizarClientes() async {
     try {
+      _logger.i('🔄 Iniciando sincronización de clientes...');
+
       final response = await http.get(
         Uri.parse('$baseUrl/clientes'),
         headers: _headers,
       ).timeout(timeout);
 
+      _logger.i('📡 Respuesta del servidor: ${response.statusCode}');
+
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final List<dynamic> clientesData = _parseResponse(response.body);
 
+        _logger.i('📊 Datos parseados: ${clientesData.length} clientes del servidor');
+
         if (clientesData.isEmpty) {
+          _logger.w('⚠️ No se encontraron clientes en el servidor');
           return SyncResult(
             exito: false,
             mensaje: 'No se encontraron clientes en el servidor',
@@ -237,12 +244,22 @@ class SyncService {
         }
 
         final clientes = <Cliente>[];
+        int procesados = 0;
+        int fallidos = 0;
+
         for (var clienteJson in clientesData) {
+          procesados++;
           final cliente = _crearClienteDesdeAPI(clienteJson);
           if (cliente != null) {
             clientes.add(cliente);
+            _logger.d('✅ Cliente procesado: ${cliente.nombre}');
+          } else {
+            fallidos++;
+            _logger.w('❌ Cliente fallido: $clienteJson');
           }
         }
+
+        _logger.i('📈 Procesamiento: $procesados total, ${clientes.length} exitosos, $fallidos fallidos');
 
         if (clientes.isEmpty) {
           return SyncResult(
@@ -252,7 +269,9 @@ class SyncService {
           );
         }
 
+        _logger.i('💾 Guardando ${clientes.length} clientes en base de datos...');
         await _clienteRepo.limpiarYSincronizar(clientes.cast<dynamic>());
+        _logger.i('✅ Clientes sincronizados exitosamente');
 
         return SyncResult(
           exito: true,
@@ -262,6 +281,7 @@ class SyncService {
         );
       } else {
         final mensaje = _extraerMensajeError(response);
+        _logger.e('❌ Error del servidor: $mensaje');
         return SyncResult(
           exito: false,
           mensaje: mensaje,
@@ -269,6 +289,7 @@ class SyncService {
         );
       }
     } catch (e) {
+      _logger.e('💥 Error en sincronización de clientes: $e');
       return SyncResult(
         exito: false,
         mensaje: _getErrorMessage(e),
@@ -276,7 +297,6 @@ class SyncService {
       );
     }
   }
-
   // ✅ MÉTODO CORREGIDO - Cambié 'modelo' por 'modelo_id'
   static Future<SyncResult> sincronizarEquipos() async {
     try {
@@ -524,9 +544,10 @@ class SyncService {
     try {
       final clienteData = {
         'nombre': cliente.nombre,
-        'email': cliente.email,
-        'telefono': cliente.telefono ?? '',
-        'direccion': cliente.direccion ?? '',
+        'telefono': cliente.telefono,
+        'direccion': cliente.direccion,
+        'ruc_ci': cliente.rucCi,
+        'propietario': cliente.propietario,
       };
 
       final response = await http.post(
@@ -735,43 +756,18 @@ class SyncService {
         return null;
       }
 
-      if (data['email'] == null || data['email'].toString().trim().isEmpty) {
-        return null;
-      }
-
       return Cliente(
         id: data['id'] is int ? data['id'] : null,
         nombre: data['nombre'].toString().trim(),
-        email: data['email'].toString().trim(),
-        telefono: data['telefono']?.toString().trim(),
-        direccion: data['direccion']?.toString().trim(),
-        fechaCreacion: _parsearFecha(data['fecha_creacion']) ?? DateTime.now(),
+        telefono: data['telefono']?.toString().trim() ?? '',
+        direccion: data['direccion']?.toString().trim() ?? '',
+        rucCi: data['ruc_ci']?.toString().trim() ?? '',
+        propietario: data['propietario']?.toString().trim() ?? '',
       );
     } catch (e) {
       return null;
     }
   }
-
-  static DateTime? _parsearFecha(dynamic fechaString) {
-    if (fechaString == null) return null;
-
-    try {
-      final fechaStr = fechaString.toString();
-
-      if (fechaStr.contains('T') || fechaStr.contains('Z')) {
-        return DateTime.parse(fechaStr);
-      }
-
-      if (fechaStr.contains('-')) {
-        return DateTime.parse(fechaStr);
-      }
-
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-
   static String _extraerMensajeError(http.Response response) {
     try {
       if (response.body.trim().isEmpty) {

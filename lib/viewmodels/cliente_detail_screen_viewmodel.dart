@@ -247,11 +247,6 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
   String getClienteAddress() {
     return _cliente?.direccion ?? '';
   }
-
-  String getClienteCreationDate() {
-    return _cliente != null ? formatearFecha(_cliente!.fechaCreacion) : '';
-  }
-
   // ========== MENSAJES PARA ESTADOS ==========
   String getEmptyStateTitle() {
     return 'Sin equipos censados';
