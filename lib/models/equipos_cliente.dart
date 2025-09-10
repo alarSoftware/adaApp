@@ -118,7 +118,7 @@ class EquipoCliente {
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
       'sincronizado': estaSincronizado ? 1 : 0,
-      'en_local': enLocal != null ? (enLocal! ? 1 : 0) : null,
+      //'en_local': enLocal != null ? (enLocal! ? 1 : 0) : null,
     };
   }
 

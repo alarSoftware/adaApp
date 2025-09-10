@@ -185,18 +185,19 @@ class DatabaseHelper {
 //Tabla Estado_Equipo
     await db.execute('''
   CREATE TABLE Estado_Equipo (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    equipo_id INTEGER NOT NULL,
-    id_clientes INTEGER NOT NULL,
-    en_local INTEGER NOT NULL DEFAULT 0,
-    latitud REAL,
-    longitud REAL,
-    fecha_revision TEXT NOT NULL,
-    fecha_creacion TEXT NOT NULL,
-    fecha_actualizacion TEXT,
-    sincronizado INTEGER NOT NULL DEFAULT 0,
-    FOREIGN KEY (equipo_id) REFERENCES equipos (id),
-    FOREIGN KEY (id_clientes) REFERENCES clientes (id)
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  equipo_id INTEGER NOT NULL,
+  id_clientes INTEGER NOT NULL,
+  en_local INTEGER NOT NULL DEFAULT 0,
+  latitud REAL,
+  longitud REAL,
+  fecha_revision TEXT NOT NULL,
+  fecha_creacion TEXT NOT NULL,
+  fecha_actualizacion TEXT,
+  sincronizado INTEGER NOT NULL DEFAULT 0,
+  estado TEXT NOT NULL DEFAULT 'PENDIENTE',  -- 👈 agrega esta columna
+  FOREIGN KEY (equipo_id) REFERENCES equipos (id),
+  FOREIGN KEY (id_clientes) REFERENCES clientes (id)
   )
 ''');
 

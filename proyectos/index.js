@@ -199,69 +199,69 @@ let usuarios = [
 
 let equipoCliente = [
   // Cliente 1
-  { id: 2, equipo_id: 2, cliente_id: 1, fecha_asignacion: new Date().toISOString(), activo: true },
-  { id: 1, equipo_id: 1, cliente_id: 1, fecha_asignacion: new Date().toISOString(), activo: true },
-  { id: 3, equipo_id: 3, cliente_id: 1, fecha_asignacion: new Date().toISOString(), activo: false },
+  { id: 2, equipo_id: 2, cliente_id: 1, fecha_asignacion: new Date().toISOString(), activo: true, estado: 'asignado'},
+  { id: 1, equipo_id: 1, cliente_id: 1, fecha_asignacion: new Date().toISOString(), activo: true , estado: 'asignado'},
+  { id: 3, equipo_id: 3, cliente_id: 1, fecha_asignacion: new Date().toISOString(), activo: false, estado: 'asignado' },
 
   // Cliente 2
-  { id: 4, equipo_id: 4, cliente_id: 2, fecha_asignacion: new Date().toISOString(),  activo: true },
-  { id: 5, equipo_id: 5, cliente_id: 2, fecha_asignacion: new Date().toISOString(),  activo: true },
-  { id: 6, equipo_id: 6, cliente_id: 2, fecha_asignacion: new Date().toISOString(),  activo: false },
+  { id: 4, equipo_id: 4, cliente_id: 2, fecha_asignacion: new Date().toISOString(),  activo: true, estado: 'asignado' },
+  { id: 5, equipo_id: 5, cliente_id: 2, fecha_asignacion: new Date().toISOString(),  activo: true, estado: 'asignado' },
+  { id: 6, equipo_id: 6, cliente_id: 2, fecha_asignacion: new Date().toISOString(),  activo: false, estado: 'asignado' },
 
   // Cliente 3
-  { id: 7, equipo_id: 7, cliente_id: 3, fecha_asignacion: new Date().toISOString(),  activo: true },
-  { id: 8, equipo_id: 8, cliente_id: 3, fecha_asignacion: new Date().toISOString(),  activo: true },
-  { id: 9, equipo_id: 9, cliente_id: 3, fecha_asignacion: new Date().toISOString(),  activo: false },
+  { id: 7, equipo_id: 7, cliente_id: 3, fecha_asignacion: new Date().toISOString(),  activo: true, estado: 'asignado' },
+  { id: 8, equipo_id: 8, cliente_id: 3, fecha_asignacion: new Date().toISOString(),  activo: true, estado: 'asignado' },
+  { id: 9, equipo_id: 9, cliente_id: 3, fecha_asignacion: new Date().toISOString(),  activo: false, estado: 'asignado' },
 
   // Cliente 4
-  { id: 10, equipo_id: 10, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: true },
-  { id: 11, equipo_id: 11, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: true },
-  { id: 12, equipo_id: 12, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: false },
-  { id: 51, equipo_id: 7, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: false },
+  { id: 10, equipo_id: 10, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: true, estado: 'asignado' },
+  { id: 11, equipo_id: 11, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: true, estado: 'asignado' },
+  { id: 12, equipo_id: 12, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: false, estado: 'asignado' },
+  { id: 51, equipo_id: 7, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: false, estado: 'asignado' },
 
   // Cliente 5
-  { id: 13, equipo_id: 13, cliente_id: 5, fecha_asignacion: new Date().toISOString(), activo: true },
-  { id: 14, equipo_id: 14, cliente_id: 5, fecha_asignacion: new Date().toISOString(), activo: true },
+  { id: 13, equipo_id: 13, cliente_id: 5, fecha_asignacion: new Date().toISOString(), activo: true, estado: 'asignado' },
+  { id: 14, equipo_id: 14, cliente_id: 5, fecha_asignacion: new Date().toISOString(), activo: true, estado: 'asignado' },
 
   // Cliente 6
-  { id: 15, equipo_id: 15, cliente_id: 6, fecha_asignacion: new Date().toISOString(),  activo: true },
-  { id: 16, equipo_id: 16, cliente_id: 6, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 15, equipo_id: 15, cliente_id: 6, fecha_asignacion: new Date().toISOString(),  activo: true, estado: 'asignado' },
+  { id: 16, equipo_id: 16, cliente_id: 6, fecha_asignacion: new Date().toISOString(),  activo: true, estado: 'asignado' },
 
   // Cliente 7
-  { id: 17, equipo_id: 17, cliente_id: 7, fecha_asignacion: new Date().toISOString(), activo: true },
-  { id: 18, equipo_id: 18, cliente_id: 7, fecha_asignacion: new Date().toISOString(), activo: true },
+  { id: 17, equipo_id: 17, cliente_id: 7, fecha_asignacion: new Date().toISOString(), activo: true, estado: 'asignado' },
+  { id: 18, equipo_id: 18, cliente_id: 7, fecha_asignacion: new Date().toISOString(), activo: true, estado: 'asignado' },
 
   // Cliente 8
-  { id: 19, equipo_id: 19, cliente_id: 8, fecha_asignacion: new Date().toISOString(),  activo: true },
-  { id: 20, equipo_id: 20, cliente_id: 8, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 19, equipo_id: 19, cliente_id: 8, fecha_asignacion: new Date().toISOString(),  activo: true, estado: 'asignado' },
+  { id: 20, equipo_id: 20, cliente_id: 8, fecha_asignacion: new Date().toISOString(),  activo: true, estado: 'asignado' },
 
   // Cliente 9
-  { id: 21, equipo_id: 21, cliente_id: 9, fecha_asignacion: new Date().toISOString(),  activo: true },
-  { id: 22, equipo_id: 22, cliente_id: 9, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 21, equipo_id: 21, cliente_id: 9, fecha_asignacion: new Date().toISOString(),  activo: true, estado: 'asignado'},
+  { id: 22, equipo_id: 22, cliente_id: 9, fecha_asignacion: new Date().toISOString(),  activo: true, estado: 'asignado' },
 
   // Cliente 10
-  { id: 23, equipo_id: 23, cliente_id: 10, fecha_asignacion: new Date().toISOString(),  activo: true },
-  { id: 24, equipo_id: 24, cliente_id: 10, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 23, equipo_id: 23, cliente_id: 10, fecha_asignacion: new Date().toISOString(),  activo: true, estado: 'asignado' },
+  { id: 24, equipo_id: 24, cliente_id: 10, fecha_asignacion: new Date().toISOString(),  activo: true, estado: 'asignado' },
 
   // Cliente 11
-  { id: 25, equipo_id: 25, cliente_id: 11, fecha_asignacion: new Date().toISOString(), activo: true },
-  { id: 26, equipo_id: 26, cliente_id: 11, fecha_asignacion: new Date().toISOString(), activo: true },
+  { id: 25, equipo_id: 25, cliente_id: 11, fecha_asignacion: new Date().toISOString(), activo: true, estado: 'asignado' },
+  { id: 26, equipo_id: 26, cliente_id: 11, fecha_asignacion: new Date().toISOString(), activo: true, estado: 'asignado' },
 
   // Cliente 12
-  { id: 27, equipo_id: 27, cliente_id: 12, fecha_asignacion: new Date().toISOString(), activo: true },
+  { id: 27, equipo_id: 27, cliente_id: 12, fecha_asignacion: new Date().toISOString(), activo: true, estado: 'asignado' },
   { id: 28, equipo_id: 28, cliente_id: 12, fecha_asignacion: new Date().toISOString(), activo: true },
 
   // Cliente 13
-  { id: 29, equipo_id: 29, cliente_id: 13, fecha_asignacion: new Date().toISOString(),  activo: true },
-  { id: 30, equipo_id: 30, cliente_id: 13, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 29, equipo_id: 29, cliente_id: 13, fecha_asignacion: new Date().toISOString(),  activo: true, estado: 'asignado' },
+  { id: 30, equipo_id: 30, cliente_id: 13, fecha_asignacion: new Date().toISOString(),  activo: true, estado: 'asignado' },
 
   // Cliente 14
-  { id: 31, equipo_id: 31, cliente_id: 14, fecha_asignacion: new Date().toISOString(),  activo: true },
-  { id: 32, equipo_id: 32, cliente_id: 14, fecha_asignacion: new Date().toISOString(),  activo: true },
+  { id: 31, equipo_id: 31, cliente_id: 14, fecha_asignacion: new Date().toISOString(),  activo: true , estado: 'asignado'},
+  { id: 32, equipo_id: 32, cliente_id: 14, fecha_asignacion: new Date().toISOString(),  activo: true, estado: 'asignado' },
 
   // Cliente 15
-  { id: 33, equipo_id: 33, cliente_id: 15, fecha_asignacion: new Date().toISOString(), activo: true },
-  { id: 34, equipo_id: 34, cliente_id: 15, fecha_asignacion: new Date().toISOString(),  activo: true }
+  { id: 33, equipo_id: 33, cliente_id: 15, fecha_asignacion: new Date().toISOString(), activo: true, estado: 'asignado' },
+  { id: 34, equipo_id: 34, cliente_id: 15, fecha_asignacion: new Date().toISOString(),  activo: true , estado: 'asignado'}
 ];
 
 let censoEquipo = [
@@ -479,6 +479,12 @@ app.get('/asignaciones', (req, res) => {
     
     // Enviar solo datos básicos sin enriquecer (para que funcione con Flutter)
     res.json(equipoCliente);
+});
+
+app.get('/sync/asignaciones', (req, res) => {
+    const activas = equipoCliente.filter(ec => ec.activo && !ec.fecha_retiro);
+    console.log(`📤 Enviando ${activas.length} asignaciones activas para sincronización`);
+    res.json(activas);
 });
 
 app.post('/asignaciones', (req, res) => {

@@ -8,6 +8,9 @@ import 'package:ada_app/repositories/logo_repository.dart';
 import 'package:logger/logger.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:barcode_scan2/barcode_scan2.dart';
+import 'package:ada_app/repositories/estado_equipo_repository.dart';
+import 'package:ada_app/services/location_service.dart';
+import 'package:ada_app/repositories/equipo_cliente_repository.dart';
 
 // Eventos UI
 abstract class FormsUIEvent {}
@@ -53,7 +56,10 @@ class DialogAction {
 
 class FormsScreenViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
+  final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
+  final LocationService _locationService = LocationService();
   late final StreamController<FormsUIEvent> _eventController;
+  final EquipoClienteRepository _equipoClienteRepository = EquipoClienteRepository();
 
   // Controladores de texto
   final TextEditingController codigoBarrasController = TextEditingController();
@@ -84,7 +90,11 @@ class FormsScreenViewModel extends ChangeNotifier {
   // Inicialización
   Future<void> initialize(Cliente cliente) async {
     _cliente = cliente;
+    _logger.i('Inicializando FormsScreenViewModel para cliente: ${cliente.nombre}');
+
+    // IMPORTANTE: Cargar logos PRIMERO y esperar a que termine
     await _cargarLogos();
+    _logger.i('Inicialización completa. Logos cargados: ${_logos.length}');
   }
 
   @override
@@ -100,8 +110,10 @@ class FormsScreenViewModel extends ChangeNotifier {
   // LÓGICA DE NEGOCIO - LOGOS
   // ===============================
 
+  // MEJORAR CARGA DE LOGOS
   Future<void> _cargarLogos() async {
     try {
+      _logger.i('Iniciando carga de logos...');
       final logoRepo = LogoRepository();
       final logos = await logoRepo.obtenerTodos();
 
@@ -110,7 +122,9 @@ class FormsScreenViewModel extends ChangeNotifier {
         'nombre': logo.nombre,
       }).toList();
 
-      _logger.i('Logos cargados ${_logos.length}');
+      _logger.i('Logos cargados exitosamente: ${_logos.length}');
+      _logos.forEach((logo) => _logger.i('Logo: ${logo['id']} - ${logo['nombre']}'));
+
       notifyListeners();
     } catch (e) {
       _logger.e('Error cargando logos: $e');
@@ -118,6 +132,57 @@ class FormsScreenViewModel extends ChangeNotifier {
     }
   }
 
+  // CORREGIR PROCESAMIENTO DE EQUIPO ASIGNADO
+  Future<void> _procesarEquipoAsignado(Map<String, dynamic> equipoCompleto) async {
+    _logger.i('=== PROCESANDO EQUIPO ASIGNADO ===');
+    _logger.i('Equipo: ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']}');
+    _logger.i('Logo ID del equipo: ${equipoCompleto['logo_id']}');
+    _logger.i('Logos disponibles: ${_logos.length}');
+
+    // MANTENER en modo censo
+    _isCensoMode = true;
+
+    // RELLENAR CAMPOS
+    final modeloNombre = equipoCompleto['modelo_nombre']?.toString() ?? '';
+    final numeroSerie = equipoCompleto['numero_serie']?.toString() ?? '';
+    final logoId = equipoCompleto['logo_id'];
+
+    _logger.i('Estableciendo modelo: "$modeloNombre"');
+    _logger.i('Estableciendo serie: "$numeroSerie"');
+    _logger.i('Estableciendo logo: $logoId');
+
+    modeloController.text = modeloNombre;
+    numeroSerieController.text = numeroSerie;
+
+    // ESTABLECER LOGO CON VALIDACIÓN
+    if (logoId != null) {
+      final logoExists = _logos.any((logo) => logo['id'] == logoId);
+      if (logoExists) {
+        _logoSeleccionado = logoId as int?;
+        _logger.i('✅ Logo encontrado y establecido: $_logoSeleccionado');
+      } else {
+        _logoSeleccionado = null;
+        _logger.w('❌ Logo ID $logoId no existe en la lista de logos disponibles');
+        _logger.i('Logos disponibles: ${_logos.map((l) => l['id']).toList()}');
+      }
+    } else {
+      _logoSeleccionado = null;
+      _logger.w('❌ Logo ID es null en el equipo');
+    }
+
+    // Registrar escaneo
+    //await _registrarEscaneo(equipoCompleto, 'ASIGNADO');
+
+    // NOTIFICAR CAMBIOS
+    notifyListeners();
+
+    _logger.i('=== ESTADO FINAL ===');
+    _logger.i('Modelo controller: "${modeloController.text}"');
+    _logger.i('Serie controller: "${numeroSerieController.text}"');
+    _logger.i('Logo seleccionado: $_logoSeleccionado');
+    _logger.i('Es modo censo: $_isCensoMode');
+    _logger.i('Campos habilitados: $areFieldsEnabled');
+  }
   void setLogoSeleccionado(int? logoId) {
     _logoSeleccionado = logoId;
     notifyListeners();
@@ -193,19 +258,81 @@ class FormsScreenViewModel extends ChangeNotifier {
     }
   }
 
-  void _procesarEquipoEncontrado(Map<String, dynamic> equipoCompleto) {
-    _isCensoMode = true;
-    modeloController.text = equipoCompleto['modelo_nombre'] ?? '';
-    _logoSeleccionado = equipoCompleto['logo_id'];
-    numeroSerieController.text = equipoCompleto['numero_serie'] ?? 'Sin número de serie';
-
+  void _procesarEquipoEncontrado(Map<String, dynamic> equipoCompleto) async {
     _logger.i('Visicooler encontrado: ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']}');
-    _eventController.add(ShowSnackBarEvent(
-        'Visicooler encontrado: ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']}',
-        Colors.green
-    ));
+
+    // Verificar si el equipo está asignado al cliente actual
+    bool estaAsignado = await _equipoClienteRepository.verificarAsignacionEquipoCliente(
+        equipoCompleto['id'],
+        _cliente!.id!
+    );
+
+    if (estaAsignado) {
+      await _procesarEquipoAsignado(equipoCompleto);
+    } else {
+      await _procesarEquipoPendiente(equipoCompleto);
+    }
+  }
+
+  Future<void> _procesarEquipoPendiente(Map<String, dynamic> equipoCompleto) async {
+    _logger.i('Procesando equipo PENDIENTE');
+
+    // Crear asignación
+    try {
+      await _equipoClienteRepository.crearAsignacion(
+        equipoId: equipoCompleto['id'],
+        clienteId: _cliente!.id!,
+        enLocal: true,
+      );
+    } catch (e) {
+      _logger.w('Error creando asignación: $e');
+    }
+
+    // Rellenar campos
+    _isCensoMode = true;
+    modeloController.text = equipoCompleto['modelo_nombre']?.toString() ?? '';
+    numeroSerieController.text = equipoCompleto['numero_serie']?.toString() ?? '';
+
+    if (equipoCompleto['logo_id'] != null) {
+      _logoSeleccionado = equipoCompleto['logo_id'] as int?;
+    }
+
+    // SÍ registrar escaneo como PENDIENTE
+    await _registrarEscaneo(equipoCompleto, 'PENDIENTE');
 
     notifyListeners();
+  }
+  Future<void> _registrarEscaneo(Map<String, dynamic> equipoCompleto, String tipo) async {
+    try {
+      final position = await _locationService.getCurrentLocationRequired();
+
+      await _estadoEquipoRepository.crearNuevoEstado(
+        equipoId: equipoCompleto['id'],
+        clienteId: _cliente!.id!,
+        enLocal: true,
+        fechaRevision: DateTime.now(),
+        estado: tipo, // 'PENDIENTE' o 'ASIGNADO'
+        latitud: position.latitude,
+        longitud: position.longitude,
+      );
+
+
+      _logger.i('Escaneo registrado en Estado_Equipo como $tipo');
+
+      if (tipo == 'ASIGNADO') {
+        _eventController.add(ShowSnackBarEvent(
+            'Equipo ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']} encontrado y registrado',
+            Colors.green
+        ));
+      }
+
+    } catch (e) {
+      _logger.e('Error registrando escaneo: $e');
+      _eventController.add(ShowSnackBarEvent(
+          'Error registrando ubicación GPS del equipo',
+          Colors.red
+      ));
+    }
   }
 
   void _procesarEquipoNoEncontrado(String codigo) {
@@ -254,7 +381,11 @@ class FormsScreenViewModel extends ChangeNotifier {
     }
   }
 
+  // AGREGAR MÉTODO DE DEBUG TEMPORAL
+
+
   void onCodigoSubmitted(String codigo) {
+    _logger.i('Código submitted: "$codigo"');
     if (codigo.length >= 3) {
       buscarEquipoPorCodigo(codigo);
     } else if (codigo.isNotEmpty) {

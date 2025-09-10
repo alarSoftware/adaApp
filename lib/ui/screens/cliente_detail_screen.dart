@@ -56,7 +56,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('❌ $message'),
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         duration: Duration(seconds: 4),
       ),
     );
@@ -131,6 +131,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
   Widget _buildClienteInfoCard() {
     return Card(
       elevation: 3,
+      color: AppColors.cardBackground,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -146,7 +147,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                     widget.cliente.nombre,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey[800],
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -163,6 +164,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
       ),
     );
   }
+
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -175,7 +177,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
               color: AppColors.neutral300,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, size: 20, color: Colors.grey[600]),
+            child: Icon(icon, size: 20, color: AppColors.textSecondary),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -187,17 +189,17 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: Colors.grey[600],
+                    color: AppColors.textSecondary,
                     letterSpacing: 0.5,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ],
@@ -212,188 +214,123 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
     return ListenableBuilder(
       listenable: _viewModel,
       builder: (context, child) {
+        if (_viewModel.isLoading) {
+          return _buildLoadingState();
+        }
+
+        if (_viewModel.hasError) {
+          return _buildErrorState();
+        }
+
+        if (_viewModel.noTieneEquipos) {
+          return _buildEmptyState();
+        }
+
+        // NUEVA ESTRUCTURA: Secciones separadas
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.neutral50,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.kitchen_outlined,
-                    color: AppColors.primaryDark,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Equipos Asignados',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orange[700],
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    '${_viewModel.equiposCount}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orange[700],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildEquiposContent(),
+            // Sección de Equipos Asignados
+            if (_viewModel.tieneEquiposAsignados) ...[
+              _buildEquiposSectionHeader(
+                title: 'Equipos Asignados',
+                count: _viewModel.equiposAsignadosCount,
+                icon: Icons.check_circle_outline,
+                isAsignado: true,
+              ),
+              const SizedBox(height: 16),
+              _buildEquiposList(_viewModel.equiposAsignadosList, isAsignado: true),
+              const SizedBox(height: 24),
+            ],
+
+            // Sección de Equipos Pendientes
+            if (_viewModel.tieneEquiposPendientes) ...[
+              _buildEquiposSectionHeader(
+                title: 'Equipos Pendientes',
+                count: _viewModel.equiposPendientesCount,
+                icon: Icons.pending_outlined,
+                isAsignado: false,
+              ),
+              const SizedBox(height: 16),
+              _buildEquiposList(_viewModel.equiposPendientesList, isAsignado: false),
+            ],
           ],
         );
       },
     );
   }
 
-  Widget _buildEquiposContent() {
-    if (_viewModel.isLoading) {
-      return _buildLoadingState();
-    }
+  Widget _buildEquiposSectionHeader({
+    required String title,
+    required int count,
+    required IconData icon,
+    required bool isAsignado,
+  }) {
+    final headerColor = isAsignado ? AppColors.success : AppColors.warning;
+    final backgroundColor = isAsignado ? AppColors.successContainer : AppColors.warningContainer;
 
-    if (_viewModel.hasError) {
-      return _buildErrorState();
-    }
-
-    if (_viewModel.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    return _buildEquiposList();
-  }
-
-  Widget _buildLoadingState() {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      child: Center(
-        child: Column(
-          children: [
-            CircularProgressIndicator(
-              color: Colors.orange[700],
-              strokeWidth: 3,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _viewModel.getLoadingMessage(),
-              style: TextStyle(color: Colors.grey[600], fontSize: 16),
-            ),
-          ],
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: headerColor,
+            size: 24,
+          ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.error,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.error_outline, size: 48, color: Colors.red[400]),
-          const SizedBox(height: 12),
-          Text(
-            _viewModel.getErrorStateTitle(),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: headerColor,
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: headerColor.withOpacity(0.3)),
+          ),
+          child: Text(
+            '$count',
             style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.red[700],
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: headerColor,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            _viewModel.errorMessage!,
-            style: TextStyle(fontSize: 14, color: Colors.red[600]),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: _viewModel.cargarEquiposAsignados,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Reintentar'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red[600],
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildEmptyState() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.kitchen_outlined, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            _viewModel.getEmptyStateTitle(),
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _viewModel.getEmptyStateSubtitle(),
-            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
-          OutlinedButton.icon(
-            onPressed: _viewModel.navegarAAsignarEquipo,
-            icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('Realizar Censo'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.orange[700],
-              side: BorderSide(color: Colors.orange[700]!),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildEquiposList(List<Map<String, dynamic>> equipos, {required bool isAsignado}) {
+    final equipoColor = isAsignado ? AppColors.success : AppColors.warning;
+    final borderColor = isAsignado ? AppColors.borderSuccess : AppColors.borderWarning;
+    final backgroundColor = isAsignado ? AppColors.successContainer : AppColors.warningContainer;
 
-  Widget _buildEquiposList() {
     return Column(
-      children: _viewModel.equiposCompletos.map((equipoData) {
+      children: equipos.map((equipoData) {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           child: Card(
             elevation: 2,
+            color: AppColors.cardBackground,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: borderColor,
+                width: 1,
+              ),
             ),
             child: InkWell(
               onTap: () => _viewModel.navegarADetalleEquipo(equipoData),
@@ -406,12 +343,12 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: Colors.orange[700],
+                        color: equipoColor,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
-                        Icons.kitchen,
-                        color: Colors.white,
+                      child: Icon(
+                        isAsignado ? Icons.check_circle : Icons.pending,
+                        color: AppColors.onPrimary,
                         size: 28,
                       ),
                     ),
@@ -420,15 +357,37 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            _viewModel.getEquipoTitle(equipoData),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _viewModel.getEquipoTitle(equipoData),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: backgroundColor,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: borderColor),
+                                ),
+                                child: Text(
+                                  isAsignado ? 'ASIGNADO' : 'PENDIENTE',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: equipoColor,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 4),
                           if (_viewModel.getEquipoBarcode(equipoData) != null)
@@ -436,7 +395,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                               _viewModel.getEquipoBarcode(equipoData)!,
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.grey[600],
+                                color: AppColors.textSecondary,
                                 fontFamily: 'monospace',
                               ),
                               maxLines: 1,
@@ -448,27 +407,29 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                               'Logo: ${_viewModel.getEquipoLogo(equipoData)}',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey[500],
+                                color: AppColors.textTertiary,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
-                              const SizedBox(width: 4),
-                              Text(
-                                _viewModel.getEquipoFechaCensado(equipoData),
-                                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                              ),
-                            ],
-                          ),
+                          if (isAsignado) ...[
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Icon(Icons.access_time, size: 14, color: AppColors.textTertiary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _viewModel.getEquipoFechaCensado(equipoData),
+                                  style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),
-                    Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+                    Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textTertiary),
                   ],
                 ),
               ),
@@ -476,6 +437,111 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: Column(
+          children: [
+            CircularProgressIndicator(
+              color: AppColors.primary,
+              strokeWidth: 3,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _viewModel.getLoadingMessage(),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.errorContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderError),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.error_outline, size: 48, color: AppColors.error),
+          const SizedBox(height: 12),
+          Text(
+            _viewModel.getErrorStateTitle(),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.error,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _viewModel.errorMessage!,
+            style: TextStyle(fontSize: 14, color: AppColors.error),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _viewModel.cargarEquiposAsignados,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Reintentar'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: AppColors.onPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: AppColors.neutral100,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.kitchen_outlined, size: 64, color: AppColors.neutral400),
+          const SizedBox(height: 16),
+          Text(
+            _viewModel.getEmptyStateTitle(),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _viewModel.getEmptyStateSubtitle(),
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          OutlinedButton.icon(
+            onPressed: _viewModel.navegarAAsignarEquipo,
+            icon: const Icon(Icons.qr_code_scanner),
+            label: const Text('Realizar Censo'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: BorderSide(color: AppColors.primary),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

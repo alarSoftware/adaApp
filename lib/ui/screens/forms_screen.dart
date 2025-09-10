@@ -647,7 +647,10 @@ class _FormsScreenState extends State<FormsScreen> {
             SizedBox(
               width: double.infinity,
               child: DropdownButtonFormField<int>(
-                value: _viewModel.logos.any((logo) => logo['id'] == _viewModel.logoSeleccionado)
+                // CORREGIR LA VALIDACIÓN DEL VALUE
+                value: _viewModel.logos.isNotEmpty &&
+                    _viewModel.logoSeleccionado != null &&
+                    _viewModel.logos.any((logo) => logo['id'] == _viewModel.logoSeleccionado)
                     ? _viewModel.logoSeleccionado
                     : null,
                 isExpanded: true,
@@ -670,21 +673,32 @@ class _FormsScreenState extends State<FormsScreen> {
                   _viewModel.logoHint,
                   overflow: TextOverflow.ellipsis,
                 ),
+                // MEJORAR LA CONSTRUCCIÓN DE ITEMS
                 items: _viewModel.logos.map((logo) {
+                  final logoId = logo['id'] is int ? logo['id'] : int.tryParse(logo['id'].toString());
                   return DropdownMenuItem<int>(
-                    value: logo['id'] is int ? logo['id'] : int.tryParse(logo['id'].toString()),
+                    value: logoId,
                     child: SizedBox(
                       width: double.infinity,
                       child: Text(
-                        logo['nombre'],
+                        '${logo['nombre']} (ID: $logoId)', // TEMPORAL - mostrar ID para debug
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
                       ),
                     ),
                   );
                 }).toList(),
-                onChanged: _viewModel.areFieldsEnabled ? _viewModel.setLogoSeleccionado : null,
-                validator: _viewModel.validarLogo,
+                onChanged: _viewModel.areFieldsEnabled
+                    ? (value) {
+                  print('Dropdown onChanged: $value'); // DEBUG TEMPORAL
+                  _viewModel.setLogoSeleccionado(value);
+                }
+                    : null,
+                validator: (value) {
+                  final result = _viewModel.validarLogo(value);
+                  print('Dropdown validation: $value -> $result'); // DEBUG TEMPORAL
+                  return result;
+                },
               ),
             ),
           ],

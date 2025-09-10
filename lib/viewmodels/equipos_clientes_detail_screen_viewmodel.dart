@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:logger/logger.dart';
 import '../models/equipos_cliente.dart';
 import '../repositories/estado_equipo_repository.dart';
+import '../models/estado_equipo.dart';
+import '../services/location_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 // ========== EVENTOS PARA LA UI ==========
 abstract class EquiposClienteDetailUIEvent {}
@@ -25,22 +28,30 @@ class EquiposClienteDetailState {
   final EquipoCliente equipoCliente;
   final bool isProcessing;
   final bool equipoEnLocal;
+  final List<EstadoEquipo> historialCambios; // Historial completo
+  final List<EstadoEquipo> historialUltimos5; // Solo últimos 5 para UI
 
   EquiposClienteDetailState({
     required this.equipoCliente,
     this.isProcessing = false,
     bool? equipoEnLocal,
+    this.historialCambios = const [],
+    this.historialUltimos5 = const [],
   }) : equipoEnLocal = equipoEnLocal ?? (equipoCliente.enLocal ?? false);
 
   EquiposClienteDetailState copyWith({
     EquipoCliente? equipoCliente,
     bool? isProcessing,
     bool? equipoEnLocal,
+    List<EstadoEquipo>? historialCambios,
+    List<EstadoEquipo>? historialUltimos5,
   }) {
     return EquiposClienteDetailState(
       equipoCliente: equipoCliente ?? this.equipoCliente,
       isProcessing: isProcessing ?? this.isProcessing,
       equipoEnLocal: equipoEnLocal ?? this.equipoEnLocal,
+      historialCambios: historialCambios ?? this.historialCambios,
+      historialUltimos5: historialUltimos5 ?? this.historialUltimos5,
     );
   }
 }
@@ -49,6 +60,7 @@ class EquiposClienteDetailState {
 class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
   final EstadoEquipoRepository _estadoEquipoRepository;
+  final LocationService _locationService = LocationService();
 
   // ========== ESTADO INTERNO ==========
   EquiposClienteDetailState _state;
@@ -67,15 +79,36 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     _logDebugInfo();
   }
 
+  // CARGAR ESTADO INICIAL Y HISTORIAL
   Future<void> _loadInitialState() async {
-    final estado = await _estadoEquipoRepository.obtenerPorEquipoYCliente(
-        equipoCliente.equipoId,
-        equipoCliente.clienteId
-    );
+    try {
+      // Cargar el estado más reciente
+      final estadoActual = await _estadoEquipoRepository.obtenerPorEquipoYCliente(
+          equipoCliente.equipoId,
+          equipoCliente.clienteId
+      );
 
-    if (estado != null) {
-      _state = _state.copyWith(equipoEnLocal: estado.enLocal);
+      // Cargar TODOS los registros de historial
+      final historialCompleto = await _estadoEquipoRepository.obtenerHistorialCompleto(
+          equipoCliente.equipoId,
+          equipoCliente.clienteId
+      );
+
+      // Tomar solo los últimos 5 para la UI
+      final ultimos5 = historialCompleto.take(5).toList();
+
+      _state = _state.copyWith(
+        equipoEnLocal: estadoActual?.enLocal ?? false,
+        historialCambios: historialCompleto,
+        historialUltimos5: ultimos5,
+      );
+
       notifyListeners();
+
+      _logger.i('✅ Historial cargado: ${historialCompleto.length} registros totales, mostrando ${ultimos5.length}');
+
+    } catch (e) {
+      _logger.e('❌ Error cargando estado inicial: $e');
     }
   }
 
@@ -85,10 +118,126 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   bool get isProcessing => _state.isProcessing;
   bool get isEquipoActivo => _state.equipoCliente.asignacionActiva;
 
+  // 🆕 GETTERS PARA HISTORIAL
+  List<EstadoEquipo> get historialUltimos5 => _state.historialUltimos5;
+  List<EstadoEquipo> get historialCompleto => _state.historialCambios;
+  int get totalCambios => _state.historialCambios.length;
+
   @override
   void dispose() {
     _eventController.close();
     super.dispose();
+  }
+
+  // ========== CAMBIO DE ESTADO ==========
+
+  Future<void> toggleEquipoEnLocal(bool value) async {
+    _state = _state.copyWith(equipoEnLocal: value);
+    notifyListeners();
+
+    _logger.i('🔄 Switch cambiado a: $value (pendiente de guardar)');
+  }
+
+  // 🆕 MÉTODO PARA RECARGAR HISTORIAL COMPLETO
+  Future<void> recargarHistorial() async {
+    try {
+      _logger.i('🔄 Recargando historial completo...');
+
+      final historialCompleto = await _estadoEquipoRepository.obtenerHistorialCompleto(
+          equipoCliente.equipoId,
+          equipoCliente.clienteId
+      );
+
+      final ultimos5 = historialCompleto.take(5).toList();
+
+      _state = _state.copyWith(
+        historialCambios: historialCompleto,
+        historialUltimos5: ultimos5,
+      );
+
+      notifyListeners();
+
+      _logger.i('✅ Historial recargado: ${historialCompleto.length} registros');
+
+    } catch (e) {
+      _logger.e('❌ Error recargando historial: $e');
+    }
+  }
+
+  // ========== GUARDAR CAMBIOS - IMPLEMENTACIÓN REAL CON GPS ==========
+
+  Future<void> saveAllChanges() async {
+    _state = _state.copyWith(isProcessing: true);
+    notifyListeners();
+
+    try {
+      _logger.i('Guardando cambios: enLocal=${_state.equipoEnLocal}');
+
+      // GPS OBLIGATORIO
+      late final Position position;
+      try {
+        position = await _locationService.getCurrentLocationRequired(
+          timeout: Duration(seconds: 15),
+        );
+
+        _logger.i('Ubicación GPS obtenida: ${_locationService.formatCoordinates(position)}');
+
+      } on LocationException catch (e) {
+        _state = _state.copyWith(isProcessing: false);
+        notifyListeners();
+
+        _eventController.add(ShowMessageEvent(
+          'GPS requerido: ${e.message}',
+          MessageType.error,
+        ));
+
+        return; // No continuar sin GPS
+      }
+
+      // Crear registro con GPS obligatorio
+      final nuevoEstado = await _estadoEquipoRepository.crearNuevoEstado(
+        equipoId: equipoCliente.equipoId,
+        clienteId: equipoCliente.clienteId,
+        enLocal: _state.equipoEnLocal,
+        fechaRevision: DateTime.now(),
+        latitud: position.latitude,
+        longitud: position.longitude,
+      );
+
+      // Actualizar historial local
+      final historialActualizado = [nuevoEstado, ..._state.historialCambios];
+      final ultimos5Actualizado = historialActualizado.take(5).toList();
+
+      _state = _state.copyWith(
+        historialCambios: historialActualizado,
+        historialUltimos5: ultimos5Actualizado,
+        isProcessing: false,
+      );
+
+      notifyListeners();
+
+      _eventController.add(ShowMessageEvent(
+        'Cambios guardados con ubicación GPS',
+        MessageType.success,
+      ));
+
+    } catch (e) {
+      _logger.e('Error al guardar cambios: $e');
+
+      _state = _state.copyWith(isProcessing: false);
+      notifyListeners();
+
+      _eventController.add(ShowMessageEvent(
+        'Error al guardar los cambios',
+        MessageType.error,
+      ));
+    }
+  }
+
+  // ========== GETTERS PARA ESTADO LOCAL ==========
+
+  bool get isEquipoEnLocal {
+    return _state.equipoEnLocal;
   }
 
   // ========== UTILIDADES PARA LA UI ==========
@@ -105,82 +254,26 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         '${fecha.minute.toString().padLeft(2, '0')}';
   }
 
+  // 🆕 FORMATEO ESPECÍFICO PARA HISTORIAL
+  String formatearFechaHistorial(DateTime fecha) {
+    final ahora = DateTime.now();
+    final diferencia = ahora.difference(fecha);
+
+    if (diferencia.inMinutes < 1) {
+      return 'Hace un momento';
+    } else if (diferencia.inMinutes < 60) {
+      return 'Hace ${diferencia.inMinutes} min';
+    } else if (diferencia.inHours < 24) {
+      return 'Hace ${diferencia.inHours}h';
+    } else if (diferencia.inDays < 7) {
+      return 'Hace ${diferencia.inDays} días';
+    } else {
+      return formatearFechaHora(fecha);
+    }
+  }
+
   String getNombreCompletoEquipo() {
-    // Usar el getter del modelo que ya maneja esta lógica correctamente
     return equipoCliente.equipoNombreCompleto;
-  }
-
-  // ========== ESTADO DEL EQUIPO EN LOCAL ==========
-
-  bool get isEquipoEnLocal {
-    return _state.equipoEnLocal;
-  }
-
-  Future<void> toggleEquipoEnLocal(bool value) async {
-    // Actualizar el estado local inmediatamente para mejor UX
-    _state = _state.copyWith(equipoEnLocal: value);
-    notifyListeners();
-
-    try {
-      _logger.i('Cambiando estado de equipo en local: $value para equipo ${equipoCliente.id}');
-
-      // TODO: Aquí deberías implementar la llamada real a tu servicio/API
-      // Ejemplo de cómo podría ser:
-      // await _equiposService.updateEquipoEnLocal(equipoCliente.id, value);
-
-      // Simular una operación asíncrona
-      await Future.delayed(Duration(milliseconds: 300));
-
-      // Si la operación es exitosa, mostrar mensaje de confirmación
-
-      // En una implementación real, aquí actualizarías el objeto equipoCliente
-      // con los datos actualizados del servidor
-      // final updatedEquipo = await _equiposService.getEquipoById(equipoCliente.id);
-      // _state = _state.copyWith(equipoCliente: updatedEquipo);
-      // notifyListeners();
-
-    } catch (e) {
-      _logger.e('Error al cambiar estado del equipo en local: $e');
-
-      // Si hay error, revertir el estado local
-      _state = _state.copyWith(equipoEnLocal: !value);
-      notifyListeners();
-
-      _eventController.add(ShowMessageEvent(
-        'Error al actualizar el estado del equipo',
-        MessageType.error,
-      ));
-    }
-  }
-
-
-
-  Future<void> saveAllChanges() async {
-    _state = _state.copyWith(isProcessing: true);
-    notifyListeners();
-
-    try {
-      // Guardar estado de ubicación
-      await _estadoEquipoRepository.actualizarEstadoEquipo(
-        equipoCliente.equipoId,
-        equipoCliente.clienteId,
-        _state.equipoEnLocal,
-      );
-
-     /* _eventController.add(ShowMessageEvent(
-        'Todos los cambios guardados correctamente',
-        MessageType.success,
-      ));*/
-    } catch (e) {
-      _logger.e('Error al guardar cambios: $e');
-      _eventController.add(ShowMessageEvent(
-        'Error al guardar los cambios',
-        MessageType.error,
-      ));
-    } finally {
-      _state = _state.copyWith(isProcessing: false);
-      notifyListeners();
-    }
   }
 
   // ========== INFORMACIÓN DEL EQUIPO ==========
@@ -267,8 +360,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     _logger.i('DEBUG - En local: ${_state.equipoEnLocal}');
   }
 
-
-
   // ========== DEBUG INFO ==========
 
   Map<String, dynamic> getDebugInfo() {
@@ -283,6 +374,8 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       'cliente_nombre': equipoCliente.clienteNombreCompleto,
       'is_processing': _state.isProcessing,
       'equipo_en_local': _state.equipoEnLocal,
+      'total_cambios_historial': _state.historialCambios.length,
+      'ultimos_5_cambios': _state.historialUltimos5.length,
     };
   }
 

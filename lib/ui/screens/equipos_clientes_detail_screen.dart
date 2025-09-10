@@ -1,4 +1,3 @@
-// ui/screens/equipos_clientes_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:ada_app/models/equipos_cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
@@ -22,13 +21,14 @@ class EquiposClientesDetailScreen extends StatefulWidget {
 class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScreen> {
   late EquiposClienteDetailScreenViewModel _viewModel;
   late StreamSubscription<EquiposClienteDetailUIEvent> _eventSubscription;
+
   @override
   void initState() {
     super.initState();
-    _checkDatabase(); // ← Agregar esta línea
+    _checkDatabase();
     _viewModel = EquiposClienteDetailScreenViewModel(
       widget.equipoCliente,
-      EstadoEquipoRepository(), // ← Agregar esta línea
+      EstadoEquipoRepository(),
     );
     _setupEventListener();
   }
@@ -49,6 +49,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
       print('Error verificando DB: $e');
     }
   }
+
   @override
   void dispose() {
     _eventSubscription.cancel();
@@ -86,6 +87,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
         return AppColors.primary;
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -97,24 +99,24 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
         ),
         backgroundColor: AppColors.appBarBackground,
         foregroundColor: AppColors.appBarForeground,
-          actions: [
-            TextButton.icon(
-              onPressed: _showSaveConfirmation,
-              icon: Icon(
-                Icons.save,
+        actions: [
+          TextButton.icon(
+            onPressed: _showSaveConfirmation,
+            icon: Icon(
+              Icons.save,
+              color: AppColors.onPrimary,
+              size: 20,
+            ),
+            label: Text(
+              'Guardar',
+              style: TextStyle(
                 color: AppColors.onPrimary,
-                size: 20,
-              ),
-              label: Text(
-                'Guardar',
-                style: TextStyle(
-                  color: AppColors.onPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
+                fontWeight: FontWeight.w600,
               ),
             ),
-            SizedBox(width: 8),
-          ],
+          ),
+          SizedBox(width: 8),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -391,6 +393,10 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
             children: [
               // Control de ubicación del equipo
               _buildLocationControlCard(),
+
+              // SECCIÓN DEL HISTORIAL
+              SizedBox(height: 20),
+              _buildHistorialCard(),
             ],
           );
         } else {
@@ -432,102 +438,416 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
               ),
             ),
             child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-            // Título de la sección
-            Row(
-            children: [
-            Container(
-            padding: EdgeInsets.all(8),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Título de la sección
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.store,
+                        color: statusColor,
+                        size: 20,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Ubicación del Equipo',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: 16),
+
+                // Control switch
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isEnLocal ? Icons.store : Icons.location_off,
+                        color: statusColor,
+                        size: 24,
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'El equipo está en el local',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              isEnLocal
+                                  ? 'Físicamente presente en nuestras instalaciones'
+                                  : 'No se encuentra en el local actualmente',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Transform.scale(
+                        scale: 1.2,
+                        child: Switch(
+                          value: isEnLocal,
+                          onChanged: _viewModel.toggleEquipoEnLocal,
+                          activeThumbColor: AppColors.success,
+                          inactiveThumbColor: AppColors.neutral400,
+                          inactiveTrackColor: AppColors.neutral300,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // NUEVA SECCIÓN DEL HISTORIAL
+  Widget _buildHistorialCard() {
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, child) {
+        final historial = _viewModel.historialUltimos5;
+        final totalCambios = _viewModel.totalCambios;
+
+        return Card(
+          elevation: 3,
+          color: AppColors.surface,
+          shadowColor: AppColors.shadowLight,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: AppColors.primary.withValues(alpha: 0.2),
+              width: 1,
+            ),
+          ),
+          child: Container(
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primary.withValues(alpha: 0.05),
+                  AppColors.primary.withValues(alpha: 0.02),
+                ],
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header del historial
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.history,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Historial de Cambios',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          if (totalCambios > 0)
+                            Text(
+                              '${totalCambios} cambio${totalCambios == 1 ? '' : 's'} en total',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (historial.isNotEmpty)
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Últimos ${historial.length}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+
+                SizedBox(height: 16),
+
+                // Lista del historial
+                if (historial.isEmpty)
+                  _buildEmptyHistorial()
+                else
+                  _buildHistorialList(historial),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyHistorial() {
+    return Container(
+      padding: EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.neutral100.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.neutral300,
+          style: BorderStyle.solid,
+        ),
+      ),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(
+              Icons.history_toggle_off,
+              size: 40,
+              color: AppColors.neutral400,
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Sin cambios registrados',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.neutral600,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Los cambios de ubicación aparecerán aquí',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.neutral500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistorialList(List<dynamic> historial) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.border,
+        ),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: NeverScrollableScrollPhysics(),
+        itemCount: historial.length,
+        separatorBuilder: (context, index) => Divider(
+          height: 1,
+          color: AppColors.border,
+        ),
+        itemBuilder: (context, index) {
+          final cambio = historial[index];
+          final isFirst = index == 0;
+
+          return _buildHistorialItem(cambio, isFirst);
+        },
+      ),
+    );
+  }
+
+  Widget _buildHistorialItem(dynamic cambio, bool isFirst) {
+    final enLocal = cambio.enLocal;
+    final fecha = cambio.fechaRevision;
+    final statusColor = enLocal ? AppColors.success : AppColors.neutral500;
+    final statusIcon = enLocal ? Icons.store : Icons.location_off;
+    final statusText = enLocal ? 'EN LOCAL' : 'FUERA DEL LOCAL';
+
+    // Información de ubicación GPS
+    final tieneUbicacion = cambio.latitud != null && cambio.longitud != null;
+
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isFirst
+            ? statusColor.withValues(alpha: 0.08)
+            : Colors.transparent,
+      ),
+      child: Row(
+        children: [
+          // Indicador visual
+          Container(
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: statusColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
+              border: isFirst
+                  ? Border.all(color: statusColor, width: 2)
+                  : null,
             ),
             child: Icon(
-              Icons.store,
+              statusIcon,
               color: statusColor,
               size: 20,
             ),
           ),
+
           SizedBox(width: 12),
+
+          // Información del cambio
           Expanded(
-            child: Text(
-              'Ubicación del Equipo',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      statusText,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: statusColor,
+                      ),
+                    ),
+                    if (isFirst) ...[
+                      SizedBox(width: 8),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'ACTUAL',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                SizedBox(height: 4),
+                Text(
+                  _viewModel.formatearFechaHistorial(fecha),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                // Mostrar información GPS si está disponible
+                if (tieneUbicacion) ...[
+                  SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        size: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'GPS: ${cambio.latitud!.toStringAsFixed(4)}, ${cambio.longitud!.toStringAsFixed(4)}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
             ),
           ),
-          ],
-        ),
 
-        SizedBox(height: 16),
-
-        // Control switch
-        Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-        color: statusColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-        color: statusColor.withValues(alpha: 0.2),
-        ),
-        ),
-        child: Row(
-        children: [
-        Icon(
-        isEnLocal ? Icons.store : Icons.location_off,
-        color: statusColor,
-        size: 24,
-        ),
-        SizedBox(width: 12),
-        Expanded(
-        child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-        Text(
-        'El equipo está en el local',
-        style: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
-        ),
-        ),
-        SizedBox(height: 4),
-        Text(
-        isEnLocal
-        ? 'Físicamente presente en nuestras instalaciones'
-            : 'No se encuentra en el local actualmente',
-        style: TextStyle(
-        fontSize: 13,
-        color: AppColors.textSecondary,
-        ),
-        ),
+          // Indicadores en columna
+          Column(
+            children: [
+              // Indicador de sincronización
+              if (!cambio.estaSincronizado)
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: AppColors.warning,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              // Indicador GPS
+              if (tieneUbicacion) ...[
+                SizedBox(height: 4),
+                Icon(
+                  Icons.gps_fixed,
+                  size: 14,
+                  color: AppColors.success,
+                ),
+              ],
+            ],
+          ),
         ],
-        ),
-        ),
-        SizedBox(width: 12),
-        Transform.scale(
-        scale: 1.2,
-        child: Switch(
-        value: isEnLocal,
-        onChanged: _viewModel.toggleEquipoEnLocal,
-        activeThumbColor: AppColors.success,
-        inactiveThumbColor: AppColors.neutral400,
-        inactiveTrackColor: AppColors.neutral300,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-        ),
-        ],
-        ),
-        ),
-        ],
-        ),
-        ),
-        );
-      },
+      ),
     );
   }
 
@@ -566,9 +886,6 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
     );
   }
 
-  void _handleSave() {
-    _viewModel.saveAllChanges();
-  }
   void _showSaveConfirmation() {
     showDialog(
       context: context,

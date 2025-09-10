@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 class EstadoEquipo {
   final int? id;
   final int equipoId;
@@ -11,6 +9,7 @@ class EstadoEquipo {
   final DateTime fechaCreacion;
   final DateTime? fechaActualizacion;
   final bool estaSincronizado;
+  final String estado;
 
   EstadoEquipo({
     this.id,
@@ -23,6 +22,7 @@ class EstadoEquipo {
     required this.fechaCreacion,
     this.fechaActualizacion,
     this.estaSincronizado = false,
+    this.estado = 'pendiente'
   });
 
   factory EstadoEquipo.fromMap(Map<String, dynamic> map) {
@@ -39,25 +39,7 @@ class EstadoEquipo {
           ? DateTime.parse(map['fecha_actualizacion'] as String)
           : null,
       estaSincronizado: (map['sincronizado'] as int?) == 1,
-    );
-  }
-
-  factory EstadoEquipo.fromJson(Map<String, dynamic> json) {
-    return EstadoEquipo(
-      id: json['id'] as int?,
-      equipoId: json['equipo_id'] as int,
-      clienteId: json['id_clientes'] as int,
-      enLocal: json['en_local'] as bool,
-      latitud: json['latitud'] as double?,
-      longitud: json['longitud'] as double?,
-      fechaRevision: DateTime.parse(json['fecha_revision'] as String),
-      fechaCreacion: json['fecha_creacion'] != null
-          ? DateTime.parse(json['fecha_creacion'] as String)
-          : DateTime.now(),
-      fechaActualizacion: json['fecha_actualizacion'] != null
-          ? DateTime.parse(json['fecha_actualizacion'] as String)
-          : null,
-      estaSincronizado: json['sincronizado'] as bool? ?? true,
+      estado: map['estado'] as String? ?? 'pendiente', // Agregar esto
     );
   }
 
@@ -73,6 +55,7 @@ class EstadoEquipo {
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
       'sincronizado': estaSincronizado ? 1 : 0,
+      'estado': estado,
     };
   }
 
@@ -87,6 +70,8 @@ class EstadoEquipo {
       'fecha_revision': fechaRevision.toIso8601String(),
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
+      'sincronizado': estaSincronizado,
+      'estado': estado,
     };
   }
 
@@ -101,6 +86,7 @@ class EstadoEquipo {
     DateTime? fechaCreacion,
     DateTime? fechaActualizacion,
     bool? estaSincronizado,
+    String? estado, // Agregar esto
   }) {
     return EstadoEquipo(
       id: id ?? this.id,
@@ -113,15 +99,7 @@ class EstadoEquipo {
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
       estaSincronizado: estaSincronizado ?? this.estaSincronizado,
+      estado: estado ?? this.estado, // Agregar esto
     );
-  }
-
-  String get ubicacionTexto => enLocal ? 'En local' : 'Fuera del local';
-
-  Color get colorUbicacion => enLocal ? const Color(0xFF4CAF50) : const Color(0xFFFFC107);
-
-  @override
-  String toString() {
-    return 'EstadoEquipo(id: $id, equipoId: $equipoId, clienteId: $clienteId, enLocal: $enLocal)';
   }
 }
