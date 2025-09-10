@@ -143,50 +143,39 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
 
       _logger.i('Cargando equipos para cliente: ${_cliente!.id}');
 
-      final equiposDelCliente = await _repository.obtenerPorClienteCompleto(
-        _cliente!.id!,
-        soloActivos: true,
-      );
+      // USAR LOS NUEVOS MÉTODOS SEPARADOS DEL REPOSITORIO
+      final equiposAsignadosList = await _repository.obtenerEquiposAsignados(_cliente!.id!);
+      final equiposPendientesList = await _repository.obtenerEquiposPendientes(_cliente!.id!);
 
-      // DEBUG: Agregar esto
-      _logger.i('=== DEBUG CARGA EQUIPOS ===');
-      _logger.i('Cliente ID: ${_cliente!.id}');
-      _logger.i('Equipos encontrados: ${equiposDelCliente.length}');
-      equiposDelCliente.forEach((equipo) {
-        _logger.i('Equipo: ID=${equipo['equipo_id']}, Codigo=${equipo['equipo_cod_barras']}');
-      });
+      // DEBUG LOGS
+      _logger.i('=== DEBUG SEPARACIÓN ===');
+      _logger.i('Equipos ASIGNADOS obtenidos: ${equiposAsignadosList.length}');
+      equiposAsignadosList.forEach((eq) => _logger.i('  - Asignado: ${eq['equipo_cod_barras']} | Estado: ${eq['estado']}'));
 
-      // SEPARAR EQUIPOS POR ESTADO
-      List<Map<String, dynamic>> equiposAsignadosList = [];
-      List<Map<String, dynamic>> equiposPendientesList = [];
+      _logger.i('Equipos PENDIENTES obtenidos: ${equiposPendientesList.length}');
+      equiposPendientesList.forEach((eq) => _logger.i('  - Pendiente: ${eq['equipo_cod_barras']} | Estado: ${eq['estado']}'));
 
-      for (var equipo in equiposDelCliente) {
-        final estado = await _determinarEstadoEquipo(equipo);
+      // Combinar ambas listas para compatibilidad con código existente
+      final equiposCompletos = [...equiposAsignadosList, ...equiposPendientesList];
 
-        if (estado == 'ASIGNADO') {
-          equiposAsignadosList.add(equipo);
-        } else {
-          equiposPendientesList.add(equipo);
-        }
-      }
-
-      // Convertir los Map a objetos EquipoCliente para compatibilidad
-      final equiposAsignados = equiposDelCliente.map((equipoData) {
+      // Convertir a objetos EquipoCliente para compatibilidad
+      final equiposAsignados = equiposCompletos.map((equipoData) {
         return EquipoCliente.fromMap(equipoData);
       }).toList();
 
       _updateState(_state.copyWith(
         isLoading: false,
-        equiposCompletos: equiposDelCliente,
+        equiposCompletos: equiposCompletos,
         equiposAsignados: equiposAsignados,
         equiposAsignadosList: equiposAsignadosList,
         equiposPendientesList: equiposPendientesList,
       ));
 
-      _logger.i('Equipos cargados - Total: ${equiposDelCliente.length}, Asignados: ${equiposAsignadosList.length}, Pendientes: ${equiposPendientesList.length}');
+      _logger.i('✅ Equipos cargados exitosamente');
+      _logger.i('Total: ${equiposCompletos.length}, Asignados: ${equiposAsignadosList.length}, Pendientes: ${equiposPendientesList.length}');
 
     } catch (e, stackTrace) {
-      _logger.e('Error cargando equipos del cliente', error: e, stackTrace: stackTrace);
+      _logger.e('❌ Error cargando equipos del cliente', error: e, stackTrace: stackTrace);
 
       _updateState(_state.copyWith(
         isLoading: false,
@@ -194,36 +183,6 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
       ));
 
       _eventController.add(ShowErrorEvent('Error cargando equipos: ${e.toString()}'));
-    }
-  }
-
-  Future<String> _determinarEstadoEquipo(Map<String, dynamic> equipo) async {
-    try {
-      int equipoId;
-      if (equipo.containsKey('equipo_id')) {
-        equipoId = equipo['equipo_id'];
-      } else {
-        return 'ASIGNADO';
-      }
-
-      // Obtener el último estado escaneado de este equipo por este cliente
-      final ultimoEstado = await _estadoEquipoRepository.obtenerUltimoEstadoPorEquipoCliente(
-          equipoId,
-          _cliente!.id!
-      );
-
-      if (ultimoEstado != null) {
-        // USAR EL CAMPO ESTADO DIRECTAMENTE
-        _logger.i('Estado encontrado en BD: ${ultimoEstado.estado}');
-        return ultimoEstado.estado.toUpperCase(); // 'pendiente' -> 'PENDIENTE'
-      }
-
-      // Si no hay estados registrados, está asignado por defecto
-      return 'ASIGNADO';
-
-    } catch (e) {
-      _logger.e('Error al determinar estado: $e');
-      return 'ASIGNADO';
     }
   }
 

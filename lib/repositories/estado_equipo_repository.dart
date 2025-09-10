@@ -37,7 +37,6 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     required int clienteId,
     required bool enLocal,
     required DateTime fechaRevision,
-    String estado = 'ASIGNADO', // AGREGAR PARÁMETRO
     double? latitud,
     double? longitud,
   }) async {
@@ -49,7 +48,6 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       fechaCreacion: DateTime.now(),
       fechaActualizacion: DateTime.now(),
       estaSincronizado: false,
-      estado: estado, // USAR EL PARÁMETRO
       latitud: latitud,
       longitud: longitud,
     );

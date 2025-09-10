@@ -74,6 +74,10 @@ class FormsScreenViewModel extends ChangeNotifier {
   int? _logoSeleccionado;
   Cliente? _cliente;
 
+  // VARIABLES PARA PASAR AL PREVIEW
+  Map<String, dynamic>? _equipoCompleto;
+  bool _equipoYaAsignado = false;
+
   // Getters públicos
   bool get isCensoMode => _isCensoMode;
   bool get isLoading => _isLoading;
@@ -92,7 +96,6 @@ class FormsScreenViewModel extends ChangeNotifier {
     _cliente = cliente;
     _logger.i('Inicializando FormsScreenViewModel para cliente: ${cliente.nombre}');
 
-    // IMPORTANTE: Cargar logos PRIMERO y esperar a que termine
     await _cargarLogos();
     _logger.i('Inicialización completa. Logos cargados: ${_logos.length}');
   }
@@ -110,7 +113,6 @@ class FormsScreenViewModel extends ChangeNotifier {
   // LÓGICA DE NEGOCIO - LOGOS
   // ===============================
 
-  // MEJORAR CARGA DE LOGOS
   Future<void> _cargarLogos() async {
     try {
       _logger.i('Iniciando carga de logos...');
@@ -123,7 +125,9 @@ class FormsScreenViewModel extends ChangeNotifier {
       }).toList();
 
       _logger.i('Logos cargados exitosamente: ${_logos.length}');
-      _logos.forEach((logo) => _logger.i('Logo: ${logo['id']} - ${logo['nombre']}'));
+      for (final logo in _logos) {
+        _logger.i('Logo: ${logo['id']} - ${logo['nombre']}');
+      }
 
       notifyListeners();
     } catch (e) {
@@ -132,57 +136,6 @@ class FormsScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // CORREGIR PROCESAMIENTO DE EQUIPO ASIGNADO
-  Future<void> _procesarEquipoAsignado(Map<String, dynamic> equipoCompleto) async {
-    _logger.i('=== PROCESANDO EQUIPO ASIGNADO ===');
-    _logger.i('Equipo: ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']}');
-    _logger.i('Logo ID del equipo: ${equipoCompleto['logo_id']}');
-    _logger.i('Logos disponibles: ${_logos.length}');
-
-    // MANTENER en modo censo
-    _isCensoMode = true;
-
-    // RELLENAR CAMPOS
-    final modeloNombre = equipoCompleto['modelo_nombre']?.toString() ?? '';
-    final numeroSerie = equipoCompleto['numero_serie']?.toString() ?? '';
-    final logoId = equipoCompleto['logo_id'];
-
-    _logger.i('Estableciendo modelo: "$modeloNombre"');
-    _logger.i('Estableciendo serie: "$numeroSerie"');
-    _logger.i('Estableciendo logo: $logoId');
-
-    modeloController.text = modeloNombre;
-    numeroSerieController.text = numeroSerie;
-
-    // ESTABLECER LOGO CON VALIDACIÓN
-    if (logoId != null) {
-      final logoExists = _logos.any((logo) => logo['id'] == logoId);
-      if (logoExists) {
-        _logoSeleccionado = logoId as int?;
-        _logger.i('✅ Logo encontrado y establecido: $_logoSeleccionado');
-      } else {
-        _logoSeleccionado = null;
-        _logger.w('❌ Logo ID $logoId no existe en la lista de logos disponibles');
-        _logger.i('Logos disponibles: ${_logos.map((l) => l['id']).toList()}');
-      }
-    } else {
-      _logoSeleccionado = null;
-      _logger.w('❌ Logo ID es null en el equipo');
-    }
-
-    // Registrar escaneo
-    //await _registrarEscaneo(equipoCompleto, 'ASIGNADO');
-
-    // NOTIFICAR CAMBIOS
-    notifyListeners();
-
-    _logger.i('=== ESTADO FINAL ===');
-    _logger.i('Modelo controller: "${modeloController.text}"');
-    _logger.i('Serie controller: "${numeroSerieController.text}"');
-    _logger.i('Logo seleccionado: $_logoSeleccionado');
-    _logger.i('Es modo censo: $_isCensoMode');
-    _logger.i('Campos habilitados: $areFieldsEnabled');
-  }
   void setLogoSeleccionado(int? logoId) {
     _logoSeleccionado = logoId;
     notifyListeners();
@@ -246,7 +199,7 @@ class FormsScreenViewModel extends ChangeNotifier {
       );
 
       if (equiposCompletos.isNotEmpty) {
-        _procesarEquipoEncontrado(equiposCompletos.first);
+        await _procesarEquipoEncontrado(equiposCompletos.first);
       } else {
         _procesarEquipoNoEncontrado(codigo);
       }
@@ -258,51 +211,68 @@ class FormsScreenViewModel extends ChangeNotifier {
     }
   }
 
-  void _procesarEquipoEncontrado(Map<String, dynamic> equipoCompleto) async {
-    _logger.i('Visicooler encontrado: ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']}');
+  // MÉTODO PRINCIPAL - Volver al comportamiento original funcional
+  Future<void> _procesarEquipoEncontrado(Map<String, dynamic> equipoCompleto) async {
+    _logger.i('=== PROCESANDO EQUIPO ENCONTRADO ===');
+    _logger.i('Equipo: ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']}');
 
-    // Verificar si el equipo está asignado al cliente actual
-    bool estaAsignado = await _equipoClienteRepository.verificarAsignacionEquipoCliente(
-        equipoCompleto['id'],
-        _cliente!.id!
-    );
-
-    if (estaAsignado) {
-      await _procesarEquipoAsignado(equipoCompleto);
-    } else {
-      await _procesarEquipoPendiente(equipoCompleto);
-    }
-  }
-
-  Future<void> _procesarEquipoPendiente(Map<String, dynamic> equipoCompleto) async {
-    _logger.i('Procesando equipo PENDIENTE');
-
-    // Crear asignación
     try {
-      await _equipoClienteRepository.crearAsignacion(
-        equipoId: equipoCompleto['id'],
-        clienteId: _cliente!.id!,
-        enLocal: true,
+      // Verificar si el equipo está asignado al cliente actual
+      bool estaAsignado = await _equipoClienteRepository.verificarAsignacionEquipoCliente(
+          equipoCompleto['id'],
+          _cliente!.id!
       );
+
+      // Rellenar campos en la UI
+      _isCensoMode = true;
+      modeloController.text = equipoCompleto['modelo_nombre']?.toString() ?? '';
+      numeroSerieController.text = equipoCompleto['numero_serie']?.toString() ?? '';
+
+      if (equipoCompleto['logo_id'] != null) {
+        final logoExists = _logos.any((logo) => logo['id'] == equipoCompleto['logo_id']);
+        if (logoExists) {
+          _logoSeleccionado = equipoCompleto['logo_id'] as int?;
+        } else {
+          _logoSeleccionado = null;
+        }
+      }
+
+      // GUARDAR DATOS PARA EL PREVIEW
+      _equipoCompleto = equipoCompleto;
+      _equipoYaAsignado = estaAsignado;
+
+      if (estaAsignado) {
+        // Ya asignado - solo mostrar mensaje
+        _eventController.add(ShowSnackBarEvent(
+          'Equipo ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']} - YA ASIGNADO ✓',
+          Colors.green,
+        ));
+      } else {
+        // No asignado - crear asignación y registrar en historial
+        await _equipoClienteRepository.crearAsignacion(
+          equipoId: equipoCompleto['id'],
+          clienteId: _cliente!.id!,
+          enLocal: true,
+        );
+
+        await _registrarEscaneoEnHistorial(equipoCompleto, false);
+
+        _eventController.add(ShowSnackBarEvent(
+          'Equipo ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']} - REGISTRADO COMO PENDIENTE',
+          Colors.orange,
+        ));
+      }
+
+      notifyListeners();
+
     } catch (e) {
-      _logger.w('Error creando asignación: $e');
+      _logger.e('Error procesando equipo: $e');
+      _eventController.add(ShowSnackBarEvent('Error procesando equipo: $e', Colors.red));
     }
-
-    // Rellenar campos
-    _isCensoMode = true;
-    modeloController.text = equipoCompleto['modelo_nombre']?.toString() ?? '';
-    numeroSerieController.text = equipoCompleto['numero_serie']?.toString() ?? '';
-
-    if (equipoCompleto['logo_id'] != null) {
-      _logoSeleccionado = equipoCompleto['logo_id'] as int?;
-    }
-
-    // SÍ registrar escaneo como PENDIENTE
-    await _registrarEscaneo(equipoCompleto, 'PENDIENTE');
-
-    notifyListeners();
   }
-  Future<void> _registrarEscaneo(Map<String, dynamic> equipoCompleto, String tipo) async {
+
+  // Método para registrar en historial
+  Future<void> _registrarEscaneoEnHistorial(Map<String, dynamic> equipoCompleto, bool equipoYaAsignado) async {
     try {
       final position = await _locationService.getCurrentLocationRequired();
 
@@ -311,27 +281,14 @@ class FormsScreenViewModel extends ChangeNotifier {
         clienteId: _cliente!.id!,
         enLocal: true,
         fechaRevision: DateTime.now(),
-        estado: tipo, // 'PENDIENTE' o 'ASIGNADO'
         latitud: position.latitude,
         longitud: position.longitude,
       );
 
-
-      _logger.i('Escaneo registrado en Estado_Equipo como $tipo');
-
-      if (tipo == 'ASIGNADO') {
-        _eventController.add(ShowSnackBarEvent(
-            'Equipo ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']} encontrado y registrado',
-            Colors.green
-        ));
-      }
+      _logger.i('✅ Evento registrado en historial (Estado_Equipo)');
 
     } catch (e) {
-      _logger.e('Error registrando escaneo: $e');
-      _eventController.add(ShowSnackBarEvent(
-          'Error registrando ubicación GPS del equipo',
-          Colors.red
-      ));
+      _logger.e('❌ Error registrando en historial: $e');
     }
   }
 
@@ -346,19 +303,18 @@ class FormsScreenViewModel extends ChangeNotifier {
       DialogAction(
         text: 'Registrar nuevo equipo',
         onPressed: habilitarModoNuevoEquipo,
-        isDefault: false,  // Botón secundario
+        isDefault: false,
       ),
       DialogAction(
         text: 'Corregir código',
         onPressed: () {
-          // Seleccionar todo el texto para facilitar la edición
           codigoBarrasController.selection = TextSelection(
             baseOffset: 0,
             extentOffset: codigoBarrasController.text.length,
           );
           _limpiarDatosAutocompletados();
         },
-        isDefault: true,   // Botón primario - más prominente
+        isDefault: true,
       ),
     ];
 
@@ -380,9 +336,6 @@ class FormsScreenViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
-
-  // AGREGAR MÉTODO DE DEBUG TEMPORAL
-
 
   void onCodigoSubmitted(String codigo) {
     _logger.i('Código submitted: "$codigo"');
@@ -503,6 +456,9 @@ class FormsScreenViewModel extends ChangeNotifier {
       'fecha_registro': DateTime.now().toIso8601String(),
       'timestamp_gps': DateTime.now().millisecondsSinceEpoch,
       'es_censo': _isCensoMode,
+      // DATOS PARA EL PREVIEW
+      'equipo_completo': _equipoCompleto,
+      'ya_asignado': _equipoYaAsignado,
     };
   }
 

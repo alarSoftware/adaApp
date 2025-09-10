@@ -56,7 +56,7 @@ let logo = [
 ];
 
 let equipos = [
-  { id: 1, cod_barras: 'REF001', marca_id: 7, modelo_id: 23, fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234567', logo_id: 9, estado_local: true },
+  { id: 1, cod_barras: '740617310894', marca_id: 7, modelo_id: 23, fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234567', logo_id: 9, estado_local: true },
   { id: 2, cod_barras: 'REF002', marca_id: 12, modelo_id: 5, fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234568', logo_id: 3, estado_local: true },
   { id: 3, cod_barras: 'REF003', marca_id: 3, modelo_id: 41, fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234569', logo_id: 11, estado_local: true },
   { id: 4, cod_barras: 'REF004', marca_id: 15, modelo_id: 16, fecha_creacion: new Date().toISOString(), numero_serie: 'SN001234570', logo_id: 7, estado_local: true },

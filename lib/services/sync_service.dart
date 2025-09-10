@@ -12,7 +12,7 @@ import 'package:logger/logger.dart';
 final _logger = Logger();
 
 class SyncService {
-  static const String baseUrl = 'http://192.168.100.128:3000';
+  static const String baseUrl = 'http://192.168.1.185:3000';
   static const Duration timeout = Duration(seconds: 30);
 
   static Map<String, String> get _headers => {
@@ -377,6 +377,7 @@ class SyncService {
             'id': asignacion['id'],
             'equipo_id': asignacion['equipo_id'],
             'cliente_id': asignacion['cliente_id'],
+            'estado': asignacion['estado'] ?? 'asignado',
             'fecha_asignacion': asignacion['fecha_asignacion'],
             'fecha_retiro': asignacion['fecha_retiro'],
             'activo': asignacion['activo'] ?? 1,

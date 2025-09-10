@@ -9,7 +9,6 @@ class EstadoEquipo {
   final DateTime fechaCreacion;
   final DateTime? fechaActualizacion;
   final bool estaSincronizado;
-  final String estado;
 
   EstadoEquipo({
     this.id,
@@ -22,7 +21,6 @@ class EstadoEquipo {
     required this.fechaCreacion,
     this.fechaActualizacion,
     this.estaSincronizado = false,
-    this.estado = 'pendiente'
   });
 
   factory EstadoEquipo.fromMap(Map<String, dynamic> map) {
@@ -39,7 +37,6 @@ class EstadoEquipo {
           ? DateTime.parse(map['fecha_actualizacion'] as String)
           : null,
       estaSincronizado: (map['sincronizado'] as int?) == 1,
-      estado: map['estado'] as String? ?? 'pendiente', // Agregar esto
     );
   }
 
@@ -55,7 +52,6 @@ class EstadoEquipo {
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
       'sincronizado': estaSincronizado ? 1 : 0,
-      'estado': estado,
     };
   }
 
@@ -71,7 +67,6 @@ class EstadoEquipo {
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
       'sincronizado': estaSincronizado,
-      'estado': estado,
     };
   }
 
@@ -99,7 +94,6 @@ class EstadoEquipo {
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
       estaSincronizado: estaSincronizado ?? this.estaSincronizado,
-      estado: estado ?? this.estado, // Agregar esto
     );
   }
 }

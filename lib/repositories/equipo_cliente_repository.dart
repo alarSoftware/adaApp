@@ -201,6 +201,98 @@ class EquipoClienteRepository extends BaseRepository<EquipoCliente> {
       rethrow;
     }
   }
+  // ================================
+// MÉTODOS ESPECÍFICOS PARA ESTADOS
+// ================================
+
+  /// MÉTODO PRINCIPAL: Verificar si existe relación activa equipo-cliente
+  Future<bool> existeRelacionActivaEquipoCliente(int equipoId, int clienteId) async {
+    try {
+      final result = await dbHelper.consultar(
+        tableName,
+        where: 'equipo_id = ? AND cliente_id = ? AND activo = 1 AND fecha_retiro IS NULL',
+        whereArgs: [equipoId, clienteId],
+        limit: 1,
+      );
+
+      final existe = result.isNotEmpty;
+      _logger.d('Relación activa equipo $equipoId - cliente $clienteId: ${existe ? "SÍ EXISTS" : "NO existe"}');
+      return existe;
+    } catch (e) {
+      _logger.e('Error verificando relación activa equipo $equipoId - cliente $clienteId: $e');
+      return false;
+    }
+  }
+
+  /// Obtener equipos PENDIENTES de un cliente
+  Future<List<Map<String, dynamic>>> obtenerEquiposPendientes(int clienteId) async {
+    try {
+      final sql = '''
+      SELECT 
+        ec.*,
+        e.id as equipo_id,
+        e.cod_barras as equipo_cod_barras,
+        e.numero_serie as equipo_numero_serie,
+        m.nombre as marca_nombre,
+        mo.nombre as modelo_nombre,
+        l.nombre as logo_nombre,
+        c.nombre as cliente_nombre
+      FROM equipo_cliente ec
+      INNER JOIN equipos e ON ec.equipo_id = e.id
+      INNER JOIN marcas m ON e.marca_id = m.id
+      INNER JOIN modelos mo ON e.modelo_id = mo.id
+      INNER JOIN logo l ON e.logo_id = l.id
+      INNER JOIN clientes c ON ec.cliente_id = c.id
+      WHERE ec.cliente_id = ? 
+        AND ec.estado = 'pendiente' 
+        AND ec.activo = 1 
+        AND ec.fecha_retiro IS NULL
+      ORDER BY ec.fecha_asignacion DESC
+    ''';
+
+      final result = await dbHelper.consultarPersonalizada(sql, [clienteId]);
+      _logger.i('Equipos PENDIENTES para cliente $clienteId: ${result.length}');
+      return result;
+    } catch (e) {
+      _logger.e('Error obteniendo equipos pendientes del cliente $clienteId: $e');
+      rethrow;
+    }
+  }
+
+  /// Obtener equipos ASIGNADOS de un cliente
+  Future<List<Map<String, dynamic>>> obtenerEquiposAsignados(int clienteId) async {
+    try {
+      final sql = '''
+      SELECT 
+        ec.*,
+        e.id as equipo_id,
+        e.cod_barras as equipo_cod_barras,
+        e.numero_serie as equipo_numero_serie,
+        m.nombre as marca_nombre,
+        mo.nombre as modelo_nombre,
+        l.nombre as logo_nombre,
+        c.nombre as cliente_nombre
+      FROM equipo_cliente ec
+      INNER JOIN equipos e ON ec.equipo_id = e.id
+      INNER JOIN marcas m ON e.marca_id = m.id
+      INNER JOIN modelos mo ON e.modelo_id = mo.id
+      INNER JOIN logo l ON e.logo_id = l.id
+      INNER JOIN clientes c ON ec.cliente_id = c.id
+      WHERE ec.cliente_id = ? 
+        AND ec.estado = 'asignado' 
+        AND ec.activo = 1 
+        AND ec.fecha_retiro IS NULL
+      ORDER BY ec.fecha_asignacion DESC
+    ''';
+
+      final result = await dbHelper.consultarPersonalizada(sql, [clienteId]);
+      _logger.i('Equipos ASIGNADOS para cliente $clienteId: ${result.length}');
+      return result;
+    } catch (e) {
+      _logger.e('Error obteniendo equipos asignados del cliente $clienteId: $e');
+      rethrow;
+    }
+  }
 
   /// Finalizar asignación (marcar como retirada)
   Future<int> finalizarAsignacion(int equipoId, int clienteId) async {
@@ -295,6 +387,62 @@ class EquipoClienteRepository extends BaseRepository<EquipoCliente> {
     }
   }
 
+
+  /// MÉTODO PARA EL FLUJO DE CENSO: Procesar escaneo de equipo
+  Future<EquipoCliente> procesarEscaneoCenso({
+    required int equipoId,
+    required int clienteId,
+  }) async {
+    try {
+      final now = DateTime.now();
+
+      // Verificar si ya existe la relación
+      final yaExiste = await existeRelacionActivaEquipoCliente(equipoId, clienteId);
+
+      if (yaExiste) {
+        // Ya existe - mantener como asignado, solo actualizar fecha
+        await dbHelper.actualizar(
+          tableName,
+          {
+            'fecha_actualizacion': now.toIso8601String(),
+            'sincronizado': 0,
+          },
+          where: 'equipo_id = ? AND cliente_id = ? AND activo = 1',
+          whereArgs: [equipoId, clienteId],
+        );
+
+        // Obtener el registro existente
+        final result = await dbHelper.consultar(
+          tableName,
+          where: 'equipo_id = ? AND cliente_id = ? AND activo = 1',
+          whereArgs: [equipoId, clienteId],
+          limit: 1,
+        );
+
+        _logger.i('Equipo $equipoId ya asignado al cliente $clienteId - actualizado');
+        return EquipoCliente.fromMap(result.first);
+      } else {
+        // No existe - crear nuevo registro como PENDIENTE
+        final nuevoRegistro = EquipoCliente(
+          equipoId: equipoId,
+          clienteId: clienteId,
+          estado: EstadoEquipoCliente.pendiente,
+          fechaAsignacion: now,
+          estaActivo: true,
+          fechaCreacion: now,
+          estaSincronizado: false,
+        );
+
+        final id = await insertar(nuevoRegistro);
+        _logger.i('Nueva asignación PENDIENTE creada: Equipo $equipoId → Cliente $clienteId (ID: $id)');
+
+        return nuevoRegistro.copyWith(id: id);
+      }
+    } catch (e) {
+      _logger.e('Error procesando escaneo de censo: $e');
+      rethrow;
+    }
+  }
   /// Obtener resumen para dashboard
   Future<Map<String, dynamic>> obtenerResumenDashboard() async {
     try {

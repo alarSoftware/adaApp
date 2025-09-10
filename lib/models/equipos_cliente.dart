@@ -1,9 +1,26 @@
 import 'package:flutter/material.dart';
 
+enum EstadoEquipoCliente {
+  pendiente('pendiente'),
+  asignado('asignado');
+
+  const EstadoEquipoCliente(this.valor);
+  final String valor;
+
+  static EstadoEquipoCliente fromString(String valor) {
+    return EstadoEquipoCliente.values.firstWhere(
+          (estado) => estado.valor == valor,
+      orElse: () => throw Exception('Estado desconocido: $valor'),
+    );
+  }
+
+}
+
 class EquipoCliente {
   final int? id;
   final int equipoId;
   final int clienteId;
+  final EstadoEquipoCliente estado; // NUEVO CAMPO
   final DateTime fechaAsignacion;
   final DateTime? fechaRetiro;
   final bool estaActivo;
@@ -24,6 +41,7 @@ class EquipoCliente {
     this.id,
     required this.equipoId,
     required this.clienteId,
+    this.estado = EstadoEquipoCliente.pendiente, // DEFAULT pendiente
     required this.fechaAsignacion,
     this.fechaRetiro,
     this.estaActivo = true,
@@ -50,6 +68,7 @@ class EquipoCliente {
       id: map['id'] as int?,
       equipoId: map['equipo_id'] as int,
       clienteId: map['cliente_id'] as int,
+      estado: EstadoEquipoCliente.fromString(map['estado'] as String? ?? 'pendiente'),
       fechaAsignacion: DateTime.parse(map['fecha_asignacion'] as String),
       fechaRetiro: map['fecha_retiro'] != null
           ? DateTime.parse(map['fecha_retiro'] as String)
@@ -79,6 +98,7 @@ class EquipoCliente {
       id: json['id'] as int?,
       equipoId: json['equipo_id'] as int,
       clienteId: json['cliente_id'] as int,
+      estado: EstadoEquipoCliente.fromString(json['estado'] as String? ?? 'pendiente'), // NUEVO
       fechaAsignacion: DateTime.parse(json['fecha_asignacion'] as String),
       fechaRetiro: json['fecha_retiro'] != null
           ? DateTime.parse(json['fecha_retiro'] as String)
@@ -112,6 +132,7 @@ class EquipoCliente {
       'id': id,
       'equipo_id': equipoId,
       'cliente_id': clienteId,
+      'estado': estado.valor, // NUEVO
       'fecha_asignacion': fechaAsignacion.toIso8601String(),
       'fecha_retiro': fechaRetiro?.toIso8601String(),
       'activo': estaActivo ? 1 : 0,
@@ -128,6 +149,7 @@ class EquipoCliente {
       'id': id,
       'equipo_id': equipoId,
       'cliente_id': clienteId,
+      'estado': estado.valor, // NUEVO
       'fecha_asignacion': fechaAsignacion.toIso8601String(),
       'fecha_retiro': fechaRetiro?.toIso8601String(),
       'activo': estaActivo,
@@ -146,6 +168,7 @@ class EquipoCliente {
     int? id,
     int? equipoId,
     int? clienteId,
+    EstadoEquipoCliente? estado, // NUEVO
     DateTime? fechaAsignacion,
     DateTime? fechaRetiro,
     bool? estaActivo,
@@ -164,6 +187,7 @@ class EquipoCliente {
       id: id ?? this.id,
       equipoId: equipoId ?? this.equipoId,
       clienteId: clienteId ?? this.clienteId,
+      estado: estado ?? this.estado, // NUEVO
       fechaAsignacion: fechaAsignacion ?? this.fechaAsignacion,
       fechaRetiro: fechaRetiro ?? this.fechaRetiro,
       estaActivo: estaActivo ?? this.estaActivo,
@@ -182,6 +206,12 @@ class EquipoCliente {
 
   /// Verificar si la asignación está activa
   bool get asignacionActiva => estaActivo && fechaRetiro == null;
+
+  /// Verificar si el equipo está pendiente
+  bool get estaPendiente => estado == EstadoEquipoCliente.pendiente;
+
+  /// Verificar si el equipo está asignado
+  bool get estaAsignado => estado == EstadoEquipoCliente.asignado;
 
   /// Obtener duración de la asignación
   Duration get duracionAsignacion {
@@ -212,7 +242,7 @@ class EquipoCliente {
   String get estadoTexto {
     if (!estaActivo) return 'Inactiva';
     if (fechaRetiro != null) return 'Retirada';
-    return 'Activa';
+    return estado == EstadoEquipoCliente.asignado ? 'Asignado' : 'Pendiente';
   }
 
   /// Estado de ubicación como texto
@@ -221,16 +251,21 @@ class EquipoCliente {
     return enLocal! ? 'En local' : 'Fuera del local';
   }
 
-  /// Color según el estado
-  /// Útil para mostrar en la UI
+  /// Color según el estado ACTUALIZADO
   Color get colorEstado {
     if (!estaActivo) return const Color(0xFF9E9E9E); // Gris
     if (fechaRetiro != null) return const Color(0xFFFF9800); // Naranja
-    return const Color(0xFF4CAF50); // Verde
+
+    // Colores según el nuevo estado
+    switch (estado) {
+      case EstadoEquipoCliente.asignado:
+        return const Color(0xFF4CAF50); // Verde para asignado
+      case EstadoEquipoCliente.pendiente:
+        return const Color(0xFFFFC107); // Amarillo para pendiente
+    }
   }
 
   /// Color según la ubicación
-  /// Útil para mostrar en la UI
   Color get colorUbicacion {
     if (enLocal == null) return const Color(0xFF9E9E9E); // Gris para no especificado
     return enLocal!
@@ -240,13 +275,13 @@ class EquipoCliente {
 
   /// Verificar si el equipo está disponible para operaciones
   bool get estaDisponible {
-    return asignacionActiva && (enLocal ?? false);
+    return asignacionActiva && estaAsignado && (enLocal ?? false);
   }
 
   @override
   String toString() {
     return 'EquipoCliente(id: $id, equipoId: $equipoId, clienteId: $clienteId, '
-        'fechaAsignacion: $fechaAsignacion, activo: $estaActivo, enLocal: $enLocal, '
+        'estado: ${estado.valor}, fechaAsignacion: $fechaAsignacion, activo: $estaActivo, enLocal: $enLocal, '
         'equipo: $equipoNombreCompleto, cliente: $clienteNombreCompleto)';
   }
 
@@ -263,33 +298,5 @@ class EquipoCliente {
   @override
   int get hashCode {
     return Object.hash(id, equipoId, clienteId, fechaAsignacion);
-  }
-}
-
-// CLASE PARA RESPUESTAS DE LA API
-
-class BusquedaResponseEquipoCliente {
-  final bool exito;
-  final String mensaje;
-  final List<EquipoCliente> asignaciones;
-  final int total;
-  final int pagina;
-  final int totalPaginas;
-  final int? codigoEstado;
-
-  BusquedaResponseEquipoCliente({
-    required this.exito,
-    required this.mensaje,
-    required this.asignaciones,
-    this.total = 0,
-    this.pagina = 1,
-    this.totalPaginas = 1,
-    this.codigoEstado,
-  });
-
-  @override
-  String toString() {
-    return 'BusquedaResponseEquipoCliente{exito: $exito, mensaje: $mensaje, '
-        'asignaciones: ${asignaciones.length}, total: $total}';
   }
 }

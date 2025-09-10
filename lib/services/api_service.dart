@@ -550,6 +550,31 @@ class ApiResponse {
     return 'ApiResponse{exito: $exito, mensaje: $mensaje, codigoEstado: $codigoEstado}';
   }
 
+}
 
+// Clase específica para manejar respuestas de asignaciones equipo-cliente
+class BusquedaResponseEquipoCliente {
+  final bool exito;
+  final String mensaje;
+  final List<EquipoCliente> asignaciones;
+  final int total;
+  final int pagina;
+  final int totalPaginas;
+  final int? codigoEstado;
 
+  BusquedaResponseEquipoCliente({
+    required this.exito,
+    required this.mensaje,
+    required this.asignaciones,
+    this.total = 0,
+    this.pagina = 1,
+    this.totalPaginas = 1,
+    this.codigoEstado,
+  });
+
+  @override
+  String toString() {
+    return 'BusquedaResponseEquipoCliente{exito: $exito, mensaje: $mensaje, '
+        'asignaciones: ${asignaciones.length}, total: $total}';
+  }
 }

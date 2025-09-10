@@ -110,22 +110,23 @@ class DatabaseHelper {
 
     // Tabla equipo_cliente
     await db.execute('''
-      CREATE TABLE equipo_cliente (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        equipo_id INTEGER NOT NULL,
-        cliente_id INTEGER NOT NULL,
-        fecha_asignacion TEXT NOT NULL,
-        fecha_retiro TEXT,
-        activo INTEGER DEFAULT 1,
-        sincronizado INTEGER DEFAULT 0,
-        fecha_creacion TEXT NOT NULL,
-        fecha_actualizacion TEXT NOT NULL,
-        FOREIGN KEY (equipo_id) REFERENCES equipos (id) ON DELETE CASCADE,
-        FOREIGN KEY (cliente_id) REFERENCES clientes (id) ON DELETE CASCADE,
-        UNIQUE(equipo_id, cliente_id, fecha_asignacion)
-      )
-    ''');
-
+  CREATE TABLE equipo_cliente (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    equipo_id INTEGER NOT NULL,
+    cliente_id INTEGER NOT NULL,
+    estado TEXT NOT NULL,
+    fecha_asignacion TEXT NOT NULL,
+    fecha_retiro TEXT,
+    activo INTEGER DEFAULT 1,
+    sincronizado INTEGER DEFAULT 0,
+    fecha_creacion TEXT NOT NULL,
+    fecha_actualizacion TEXT NOT NULL,
+    FOREIGN KEY (equipo_id) REFERENCES equipos (id) ON DELETE CASCADE,
+    FOREIGN KEY (cliente_id) REFERENCES clientes (id) ON DELETE CASCADE,
+    UNIQUE(equipo_id, cliente_id, fecha_asignacion),
+    CHECK (estado IN ('pendiente', 'asignado'))
+  )
+''');
     // Tabla usuarios
     await db.execute('''
       CREATE TABLE usuarios (
@@ -137,49 +138,6 @@ class DatabaseHelper {
         sincronizado INTEGER DEFAULT 0,
         fecha_creacion TEXT NOT NULL,
         fecha_actualizacion TEXT NOT NULL
-      )
-    ''');
-
-    // TABLA registros_equipos (para sincronización con /estados)
-    await db.execute('''
-      CREATE TABLE registros_equipos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        id_local INTEGER UNIQUE NOT NULL,
-        servidor_id INTEGER,
-        estado_sincronizacion TEXT NOT NULL DEFAULT 'pendiente',
-        
-        cliente_id INTEGER NOT NULL,
-        cliente_nombre TEXT,
-        cliente_direccion TEXT,
-        cliente_telefono TEXT,
-        
-        equipo_id INTEGER,
-        codigo_barras TEXT,
-        modelo TEXT,
-        marca_id INTEGER,
-        numero_serie TEXT,
-        logo_id INTEGER,
-        observaciones TEXT,
-        
-        latitud REAL,
-        longitud REAL,
-        fecha_registro TEXT,
-        timestamp_gps TEXT,
-        
-        funcionando INTEGER DEFAULT 1,
-        estado_general TEXT DEFAULT 'Revisión pendiente',
-        temperatura_actual REAL,
-        temperatura_freezer REAL,
-        
-        version_app TEXT,
-        dispositivo TEXT,
-        fecha_creacion TEXT NOT NULL,
-        fecha_actualizacion TEXT NOT NULL,
-        
-        FOREIGN KEY (cliente_id) REFERENCES clientes (id) ON DELETE CASCADE,
-        FOREIGN KEY (equipo_id) REFERENCES equipos (id) ON DELETE SET NULL,
-        FOREIGN KEY (marca_id) REFERENCES marcas (id),
-        FOREIGN KEY (logo_id) REFERENCES logo (id)
       )
     ''');
 //Tabla Estado_Equipo
@@ -195,18 +153,12 @@ class DatabaseHelper {
   fecha_creacion TEXT NOT NULL,
   fecha_actualizacion TEXT,
   sincronizado INTEGER NOT NULL DEFAULT 0,
-  estado TEXT NOT NULL DEFAULT 'PENDIENTE',  -- 👈 agrega esta columna
   FOREIGN KEY (equipo_id) REFERENCES equipos (id),
   FOREIGN KEY (id_clientes) REFERENCES clientes (id)
   )
 ''');
-
     // Crear índices para mejorar rendimiento
     await _crearIndices(db);
-
-    // Insertar datos iniciales
-    await _insertarDatosIniciales(db);
-
     logger.i('Todas las tablas, índices y datos iniciales creados exitosamente');
   }
 
@@ -228,13 +180,7 @@ class DatabaseHelper {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_equipo_cliente_equipo_id ON equipo_cliente (equipo_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_equipo_cliente_cliente_id ON equipo_cliente (cliente_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_equipo_cliente_activo ON equipo_cliente (activo)');
-
-    // Índices para registros_equipos
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_registros_estado_sincronizacion ON registros_equipos(estado_sincronizacion)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_registros_cliente_id ON registros_equipos(cliente_id)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_registros_codigo_barras ON registros_equipos(codigo_barras)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_registros_id_local ON registros_equipos(id_local)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_registros_fecha_registro ON registros_equipos(fecha_registro)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_equipo_cliente_estado ON equipo_cliente (estado)');
 
     // Índices para marcas, modelos y logo
     await db.execute('CREATE INDEX IF NOT EXISTS idx_marcas_nombre ON marcas (nombre)');
@@ -242,63 +188,7 @@ class DatabaseHelper {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_logo_nombre ON logo (nombre)');
   }
 
-  Future<void> _insertarDatosIniciales(Database db) async {
-    final now = DateTime.now().toIso8601String();
 
-    // Insertar marcas iniciales (coincidentes con tu API)
-    final marcas = [
-      {'id': 1, 'nombre': 'Samsung'},
-      {'id': 2, 'nombre': 'LG'},
-      {'id': 3, 'nombre': 'Whirlpool'},
-      {'id': 4, 'nombre': 'Electrolux'},
-      {'id': 5, 'nombre': 'Panasonic'},
-      {'id': 6, 'nombre': 'Midea'},
-      {'id': 7, 'nombre': 'Bosch'},
-      {'id': 8, 'nombre': 'Daewoo'},
-      {'id': 9, 'nombre': 'GE'},
-      {'id': 10, 'nombre': 'Sharp'},
-      {'id': 11, 'nombre': 'Frigidaire'},
-      {'id': 12, 'nombre': 'Hisense'},
-      {'id': 13, 'nombre': 'Philco'},
-      {'id': 14, 'nombre': 'Beko'},
-      {'id': 15, 'nombre': 'Koblenz'},
-    ];
-
-    // Insertar logos iniciales (coincidentes con tu API)
-    final logos = [
-      {'id': 1, 'nombre': 'Pulp'},
-      {'id': 2, 'nombre': 'Pepsi'},
-      {'id': 3, 'nombre': 'Paso de los Toros'},
-      {'id': 4, 'nombre': 'Mirinda'},
-      {'id': 5, 'nombre': '7Up'},
-      {'id': 6, 'nombre': 'Split'},
-      {'id': 7, 'nombre': 'Watts'},
-      {'id': 8, 'nombre': 'Puro Sol'},
-      {'id': 9, 'nombre': 'La Fuente'},
-      {'id': 10, 'nombre': 'Aquafina'},
-      {'id': 11, 'nombre': 'Gatorade'},
-      {'id': 12, 'nombre': 'Red Bull'},
-      {'id': 13, 'nombre': 'Rockstar'},
-    ];
-
-    for (final marca in marcas) {
-      await db.insert('marcas', {
-        ...marca,
-        'activo': 1,
-        'fecha_creacion': now,
-      });
-    }
-
-    for (final logo in logos) {
-      await db.insert('logo', {
-        ...logo,
-        'activo': 1,
-        'fecha_creacion': now,
-      });
-    }
-
-    logger.i('Datos iniciales insertados: ${marcas.length} marcas, ${logos.length} logos');
-  }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     logger.i('Actualizando base de datos de v$oldVersion a v$newVersion');
