@@ -5,6 +5,8 @@ import 'package:ada_app/viewmodels/equipos_clientes_detail_screen_viewmodel.dart
 import 'package:ada_app/repositories/estado_equipo_repository.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'dart:async';
+import '../widgets/gps_navigation_widget.dart';
+import 'package:flutter/services.dart';
 
 class EquiposClientesDetailScreen extends StatefulWidget {
   final EquipoCliente equipoCliente;
@@ -729,7 +731,6 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
       ),
     );
   }
-
   Widget _buildHistorialItem(dynamic cambio, bool isFirst) {
     final enLocal = cambio.enLocal;
     final fecha = cambio.fechaRevision;
@@ -739,104 +740,169 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
 
     // Información de ubicación GPS
     final tieneUbicacion = cambio.latitud != null && cambio.longitud != null;
+    final latitud = cambio.latitud;
+    final longitud = cambio.longitud;
 
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isFirst
-            ? statusColor.withValues(alpha: 0.08)
-            : Colors.transparent,
-      ),
-      child: Row(
-        children: [
-          // Indicador visual
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-              border: isFirst
-                  ? Border.all(color: statusColor, width: 2)
-                  : null,
+    return GestureDetector(
+      onTap: tieneUbicacion ? () => GPSNavigationWidget.abrirUbicacionEnMapa(context, latitud!, longitud!) : null,
+      child: Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isFirst
+              ? statusColor.withValues(alpha: 0.08)
+              : Colors.transparent,
+        ),
+        child: Row(
+          children: [
+            // Indicador visual
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: isFirst
+                    ? Border.all(color: statusColor, width: 2)
+                    : null,
+              ),
+              child: Icon(
+                statusIcon,
+                color: statusColor,
+                size: 20,
+              ),
             ),
-            child: Icon(
-              statusIcon,
-              color: statusColor,
-              size: 20,
-            ),
-          ),
 
-          SizedBox(width: 12),
+            SizedBox(width: 12),
 
-          // Información del cambio
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible( // Agregar aquí
-                      child: Text(
-                        statusText,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: statusColor,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (isFirst) ...[
-                      SizedBox(width: 8),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+            // Información del cambio
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
                         child: Text(
-                          'ACTUAL',
+                          statusText,
                           style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: statusColor,
                           ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isFirst) ...[
+                        SizedBox(width: 8),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'ACTUAL',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        _viewModel.formatearFechaHistorial(fecha),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ],
+                  ),
+                  // Indicador de ubicación clickeable
+                  if (tieneUbicacion) ...[
+                    SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Toca para ver ubicación',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w500,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
-                ),
-                // resto del código...
+                ],
+              ),
+            ),
+
+            // Indicadores en columna
+            Column(
+              children: [
+                // Indicador de sincronización
+                if (!cambio.estaSincronizado)
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: AppColors.warning,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                // Indicador GPS mejorado
+                if (tieneUbicacion) ...[
+                  SizedBox(height: 4),
+                  Container(
+                    padding: EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: AppColors.success.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.gps_fixed,
+                      size: 12,
+                      color: AppColors.success,
+                    ),
+                  ),
+                ],
               ],
             ),
-          ),
 
-          // Indicadores en columna
-          Column(
-            children: [
-              // Indicador de sincronización
-              if (!cambio.estaSincronizado)
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: AppColors.warning,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              // Indicador GPS
-              if (tieneUbicacion) ...[
-                SizedBox(height: 4),
-                Icon(
-                  Icons.gps_fixed,
-                  size: 14,
-                  color: AppColors.success,
-                ),
-              ],
+            // Flecha indicando que es clickeable
+            if (tieneUbicacion) ...[
+              SizedBox(width: 8),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: AppColors.textSecondary,
+              ),
             ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

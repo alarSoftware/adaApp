@@ -187,7 +187,6 @@ class FormsScreenViewModel extends ChangeNotifier {
   Future<void> buscarEquipoPorCodigo(String codigo) async {
     try {
       _logger.i('Buscando visicooler con código: $codigo');
-      _eventController.add(ShowSnackBarEvent('Buscando visicooler...', Colors.blue));
 
       final equipoRepo = EquipoRepository();
       final equiposCompletos = await equipoRepo.buscarConFiltros(
@@ -396,7 +395,6 @@ class FormsScreenViewModel extends ChangeNotifier {
 
     try {
       _logger.i('Obteniendo ubicación GPS del visicooler...');
-      _eventController.add(ShowSnackBarEvent('Obteniendo ubicación GPS precisa...', Colors.blue));
 
       final ubicacion = await _obtenerUbicacion();
       _logger.i('Ubicación obtenida: ${ubicacion['latitud']}, ${ubicacion['longitud']}');

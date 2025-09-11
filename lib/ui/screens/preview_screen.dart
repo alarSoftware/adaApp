@@ -62,66 +62,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeaderInfo(),
-          const SizedBox(height: 20),
           _buildClienteCard(cliente),
           const SizedBox(height: 16),
           _buildEquipoCard(),
           const SizedBox(height: 16),
           _buildUbicacionCard(),
           const SizedBox(height: 16),
-          _buildWarningCard(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeaderInfo() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.infoContainer,
-            AppColors.info.withValues(alpha: 0.1),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.info_outline,
-            color: AppColors.info,
-            size: 28,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Revisar Información',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Verifica que todos los datos sean correctos antes de confirmar el registro.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -334,64 +280,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWarningCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.successContainer,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderSuccess),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.verified_user,
-                color: AppColors.success,
-                size: 24,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Datos Protegidos',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '• La ubicación GPS fue capturada en el momento exacto del registro',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '• Los datos se guardarán localmente para evitar pérdidas',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '• Se sincronizarán automáticamente cuando haya conexión',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
             ),
           ),
         ],

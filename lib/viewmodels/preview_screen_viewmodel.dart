@@ -132,7 +132,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         _setStatusMessage(
             '📱 Registro guardado localmente. Se sincronizará cuando haya conexión.'
         );
-        return {'success': true, 'message': 'Registro guardado localmente'};
+        return {'success': true, 'message': 'Registro guardado'};
       }
 
     } catch (e) {
