@@ -49,7 +49,13 @@ class _FormsScreenState extends State<FormsScreen> {
       } else if (event is NavigateToPreviewEvent) {
         _navigateToPreview(event.datos);
       } else if (event is NavigateBackEvent) {
-        Navigator.of(context).pop(event.result);
+        if (event.result == true) {
+          // Censo completado exitosamente: regresar a ClienteDetailScreen y actualizar
+          Navigator.of(context).pop(true); // Solo un pop
+        } else {
+          // Cancelado: regresar normalmente
+          Navigator.of(context).pop(false);
+        }
       }
     });
   }

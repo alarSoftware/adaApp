@@ -51,7 +51,9 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
           MaterialPageRoute(
             builder: (context) => ClienteDetailScreen(cliente: event.cliente),
           ),
-        );
+        ).then((_) {
+          // Opcional: refrescar lista de clientes si es necesario
+        });
       }
     });
   }

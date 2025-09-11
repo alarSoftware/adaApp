@@ -531,14 +531,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
       if (resultado['success']) {
         _mostrarSnackBar(resultado['message'], AppColors.success);
         await Future.delayed(const Duration(seconds: 2));
-        Navigator.of(context).pop(true); // Volver a FormsScreen
-        Navigator.of(context).pop(true); // Volver a ClienteDetailScreen
+        Navigator.of(context).pop(true); // Solo este pop
       } else {
         await _mostrarDialogoErrorConfirmacion(resultado['error']);
       }
     }
   }
-
   Future<void> _mostrarDialogoErrorConfirmacion(String error) async {
     return showDialog<void>(
       context: context,
@@ -627,9 +625,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
           actions: [
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop(true);
-                Navigator.of(context).pop(true);
+                Navigator.of(context).pop(); // Cerrar diálogo
+                Navigator.of(context).pop(false); // Solo regresar a FormsScreen
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.info,

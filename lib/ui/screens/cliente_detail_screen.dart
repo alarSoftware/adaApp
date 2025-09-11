@@ -69,6 +69,20 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
         builder: (context) => FormsScreen(cliente: cliente),
       ),
     );
+    if (result == true) {
+      // Censo completado exitosamente: refrescar datos y mostrar mensaje
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Censo completado exitosamente'),
+          backgroundColor: AppColors.success,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      // Refrescar los equipos del cliente
+      await _viewModel.refresh();
+    }
+
+    // Notificar al ViewModel del resultado
     _viewModel.onNavigationResult(result);
   }
 

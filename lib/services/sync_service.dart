@@ -12,7 +12,7 @@ import 'package:logger/logger.dart';
 final _logger = Logger();
 
 class SyncService {
-  static const String baseUrl = 'http://192.168.1.185:3000';
+  static const String baseUrl = 'http://192.168.100.128:3000';
   static const Duration timeout = Duration(seconds: 30);
 
   static Map<String, String> get _headers => {

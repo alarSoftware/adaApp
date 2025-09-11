@@ -56,9 +56,6 @@ class DialogAction {
 
 class FormsScreenViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
-  final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
-  final LocationService _locationService = LocationService();
-  late final StreamController<FormsUIEvent> _eventController;
   final EquipoClienteRepository _equipoClienteRepository = EquipoClienteRepository();
 
   // Controladores de texto
@@ -74,7 +71,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   int? _logoSeleccionado;
   Cliente? _cliente;
 
-  // VARIABLES PARA PASAR AL PREVIEW
+  // VARIABLES PARA PASAR AL PREVIEW - AQUÍ GUARDAMOS TODO PARA EL PREVIEW
   Map<String, dynamic>? _equipoCompleto;
   bool _equipoYaAsignado = false;
 
@@ -85,6 +82,8 @@ class FormsScreenViewModel extends ChangeNotifier {
   List<Map<String, dynamic>> get logos => _logos;
   int? get logoSeleccionado => _logoSeleccionado;
   Stream<FormsUIEvent> get uiEvents => _eventController.stream;
+
+  late final StreamController<FormsUIEvent> _eventController;
 
   // Constructor
   FormsScreenViewModel() {
@@ -184,7 +183,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   // ===============================
-  // LÓGICA DE NEGOCIO - BÚSQUEDA EQUIPOS
+  // LÓGICA DE NEGOCIO - BÚSQUEDA EQUIPOS (SOLO VALIDACIÓN Y UI)
   // ===============================
 
   Future<void> buscarEquipoPorCodigo(String codigo) async {
@@ -211,9 +210,9 @@ class FormsScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // MÉTODO PRINCIPAL - Volver al comportamiento original funcional
+  // MÉTODO PRINCIPAL - SOLO VALIDACIÓN Y LLENADO DE CAMPOS (NO GUARDAR EN BD)
   Future<void> _procesarEquipoEncontrado(Map<String, dynamic> equipoCompleto) async {
-    _logger.i('=== PROCESANDO EQUIPO ENCONTRADO ===');
+    _logger.i('=== PROCESANDO EQUIPO ENCONTRADO (SOLO VALIDACIÓN) ===');
     _logger.i('Equipo: ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']}');
 
     try {
@@ -237,29 +236,20 @@ class FormsScreenViewModel extends ChangeNotifier {
         }
       }
 
-      // GUARDAR DATOS PARA EL PREVIEW
+      // ✅ GUARDAR DATOS PARA EL PREVIEW (NO GUARDAR EN BD AÚN)
       _equipoCompleto = equipoCompleto;
       _equipoYaAsignado = estaAsignado;
 
+      // ✅ SOLO MOSTRAR MENSAJES DE ESTADO (NO GUARDAR)
       if (estaAsignado) {
-        // Ya asignado - solo mostrar mensaje
         _eventController.add(ShowSnackBarEvent(
           'Equipo ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']} - YA ASIGNADO ✓',
           Colors.green,
         ));
       } else {
-        // No asignado - crear asignación y registrar en historial
-        await _equipoClienteRepository.crearAsignacion(
-          equipoId: equipoCompleto['id'],
-          clienteId: _cliente!.id!,
-          enLocal: true,
-        );
-
-        await _registrarEscaneoEnHistorial(equipoCompleto, false);
-
         _eventController.add(ShowSnackBarEvent(
-          'Equipo ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']} - REGISTRADO COMO PENDIENTE',
-          Colors.orange,
+          'Equipo ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']} - LISTO PARA REGISTRAR',
+          Colors.blue,
         ));
       }
 
@@ -268,27 +258,6 @@ class FormsScreenViewModel extends ChangeNotifier {
     } catch (e) {
       _logger.e('Error procesando equipo: $e');
       _eventController.add(ShowSnackBarEvent('Error procesando equipo: $e', Colors.red));
-    }
-  }
-
-  // Método para registrar en historial
-  Future<void> _registrarEscaneoEnHistorial(Map<String, dynamic> equipoCompleto, bool equipoYaAsignado) async {
-    try {
-      final position = await _locationService.getCurrentLocationRequired();
-
-      await _estadoEquipoRepository.crearNuevoEstado(
-        equipoId: equipoCompleto['id'],
-        clienteId: _cliente!.id!,
-        enLocal: true,
-        fechaRevision: DateTime.now(),
-        latitud: position.latitude,
-        longitud: position.longitude,
-      );
-
-      _logger.i('✅ Evento registrado en historial (Estado_Equipo)');
-
-    } catch (e) {
-      _logger.e('❌ Error registrando en historial: $e');
     }
   }
 
@@ -352,6 +321,10 @@ class FormsScreenViewModel extends ChangeNotifier {
     numeroSerieController.clear();
     _logoSeleccionado = null;
 
+    // Limpiar datos del preview ya que es modo nuevo
+    _equipoCompleto = null;
+    _equipoYaAsignado = false;
+
     _eventController.add(ShowSnackBarEvent(
         'Modo: Registrar nuevo equipo. Complete todos los campos',
         Colors.blue
@@ -371,6 +344,9 @@ class FormsScreenViewModel extends ChangeNotifier {
     modeloController.clear();
     numeroSerieController.clear();
     _logoSeleccionado = null;
+    // Limpiar datos del preview
+    _equipoCompleto = null;
+    _equipoYaAsignado = false;
     notifyListeners();
   }
 
@@ -456,7 +432,8 @@ class FormsScreenViewModel extends ChangeNotifier {
       'fecha_registro': DateTime.now().toIso8601String(),
       'timestamp_gps': DateTime.now().millisecondsSinceEpoch,
       'es_censo': _isCensoMode,
-      // DATOS PARA EL PREVIEW
+
+      // ✅ DATOS COMPLETOS PARA EL PREVIEW (INCLUIR TODO LO NECESARIO PARA GUARDAR)
       'equipo_completo': _equipoCompleto,
       'ya_asignado': _equipoYaAsignado,
     };

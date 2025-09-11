@@ -4,12 +4,19 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
 import '../../models/cliente.dart';
+import 'package:ada_app/repositories/equipo_cliente_repository.dart';
+import 'package:ada_app/repositories/estado_equipo_repository.dart';
+import 'package:ada_app/services/location_service.dart';
 
 final _logger = Logger();
 
 class PreviewScreenViewModel extends ChangeNotifier {
   bool _isLoading = false;
   String? _statusMessage;
+
+  // Repositorios para el guardado definitivo
+  final EquipoClienteRepository _equipoClienteRepository = EquipoClienteRepository();
+  final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
 
   // ⚠️ CAMBIAR ESTA IP POR LA IP DE TU SERVIDOR
   static const String _baseUrl = 'http://192.168.1.185:3000';
@@ -47,7 +54,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   // ============================================================================
-  // IMPLEMENTACIÓN DE API - CONFIGURADA PARA TU SERVIDOR
+  // AQUÍ ES DONDE OCURRE EL GUARDADO DEFINITIVO
   // ============================================================================
 
   Future<Map<String, dynamic>> confirmarRegistro(Map<String, dynamic> datos) async {
@@ -55,27 +62,63 @@ class PreviewScreenViewModel extends ChangeNotifier {
     _setStatusMessage(null);
 
     try {
-      _logger.i('📝 Confirmando registro con datos completos...');
+      _logger.i('📝 CONFIRMANDO REGISTRO - GUARDADO DEFINITIVO EN BD');
 
-      // Preparar datos para envío
+      final cliente = datos['cliente'] as Cliente;
+      final equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
+      final yaAsignado = datos['ya_asignado'] as bool? ?? false;
+      final esCenso = datos['es_censo'] as bool? ?? true;
+
+      // ✅ PASO 1: GUARDAR ASIGNACIÓN EN BD (SOLO SI NO ESTÁ ASIGNADO AL CLIENTE ACTUAL)
+      if (esCenso && equipoCompleto != null && !yaAsignado) {
+        _setStatusMessage('💾 Registrando asignación del equipo...');
+
+        try {
+          await _equipoClienteRepository.procesarEscaneoCenso(
+            equipoId: equipoCompleto['id'],
+            clienteId: cliente.id!,
+          );
+          _logger.i('✅ Asignación equipo-cliente creada en BD');
+        } catch (e) {
+          // Si ya está asignado a otro cliente, continuar con estado "pendiente"
+          _logger.w('⚠️ Equipo ya asignado a otro cliente, creando estado pendiente: $e');
+          // Continuar el flujo normalmente - el estado se registrará como "pendiente"
+        }
+      }
+
+      // ✅ PASO 2: REGISTRAR EN HISTORIAL DE ESTADOS (AQUÍ ES DONDE SE DEBE HACER)
+      if (equipoCompleto != null) {
+        _setStatusMessage('📋 Registrando en historial de estados...');
+
+        await _estadoEquipoRepository.crearNuevoEstado(
+          equipoId: equipoCompleto['id'],
+          clienteId: cliente.id!,
+          enLocal: true,
+          fechaRevision: DateTime.now(),
+          latitud: datos['latitud'],
+          longitud: datos['longitud'],
+        );
+
+        _logger.i('✅ Estado del equipo registrado en historial');
+      }
+
+      // ✅ PASO 3: PREPARAR DATOS PARA API
+      _setStatusMessage('📤 Preparando datos para sincronización...');
       final datosCompletos = _prepararDatosParaEnvio(datos);
 
-      _logger.i('📋 Datos preparados para envío a tu API');
-
-      // PASO 1: GUARDAR LOCALMENTE (CRÍTICO - No perder datos)
-      _setStatusMessage('💾 Guardando registro localmente...');
+      // ✅ PASO 4: GUARDAR LOCALMENTE (REGISTRO MAESTRO)
+      _setStatusMessage('💾 Guardando registro local maestro...');
       await _guardarRegistroLocal(datosCompletos);
 
-      // PASO 2: INTENTAR ENVIAR AL SERVIDOR
+      // ✅ PASO 5: INTENTAR SINCRONIZAR CON SERVIDOR
       _setStatusMessage('📤 Sincronizando con servidor...');
       final respuestaServidor = await _intentarEnviarAlServidor(datosCompletos);
 
       if (respuestaServidor['exito']) {
-        // Éxito: Datos enviados y guardados
+        // Éxito total: BD local + Servidor
         await _marcarComoSincronizado(datosCompletos['id_local'] as int);
-        _setStatusMessage('✅ Estado del equipo registrado en el servidor');
+        _setStatusMessage('✅ Registro completado y sincronizado');
 
-        // Mostrar ID del servidor si lo devuelve
         if (respuestaServidor['servidor_id'] != null) {
           await _actualizarConIdServidor(
               datosCompletos['id_local'] as int,
@@ -85,7 +128,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
         return {'success': true, 'message': 'Registro completado exitosamente'};
       } else {
-        // Sin conexión o error: Solo guardado local
+        // BD local exitosa, pero sin conexión al servidor
         _setStatusMessage(
             '📱 Registro guardado localmente. Se sincronizará cuando haya conexión.'
         );
@@ -93,8 +136,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
 
     } catch (e) {
-      _logger.e('❌ Error crítico en confirmación: $e');
-      return {'success': false, 'error': e.toString()};
+      _logger.e('❌ Error crítico en confirmación de registro: $e');
+      return {'success': false, 'error': 'Error guardando registro: $e'};
     } finally {
       _setLoading(false);
     }
@@ -102,6 +145,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Map<String, dynamic> _prepararDatosParaEnvio(Map<String, dynamic> datos) {
     final cliente = datos['cliente'] as Cliente;
+    final equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
 
     return {
       // Datos locales para control
@@ -110,11 +154,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'fecha_creacion_local': DateTime.now().toIso8601String(),
 
       // Datos para API /estados (según tu esquema)
-      'equipo_id': _buscarEquipoPorCodigo(datos['codigo_barras']),
+      'equipo_id': equipoCompleto?['id'] ?? _buscarEquipoPorCodigo(datos['codigo_barras']),
       'cliente_id': cliente.id,
       'usuario_id': 1, // TODO: Obtener del usuario logueado
       'funcionando': true, // Asumimos que está funcionando al registrar
-      'estado_general': 'Equipo registrado - ${datos['observaciones'] ?? 'Sin observaciones'}',
+      'estado_general': 'Equipo registrado desde APP móvil - ${datos['observaciones'] ?? 'Sin observaciones'}',
       'temperatura_actual': null, // Se actualizará en próximas revisiones
       'temperatura_freezer': null, // Se actualizará en próximas revisiones
       'latitud': datos['latitud'],
@@ -128,6 +172,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'observaciones': datos['observaciones'],
       'fecha_registro': datos['fecha_registro'],
       'timestamp_gps': datos['timestamp_gps'],
+      'es_censo': datos['es_censo'],
+      'ya_asignado': datos['ya_asignado'],
       'version_app': '1.0.0',
       'dispositivo': Platform.operatingSystem,
     };
@@ -147,7 +193,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Future<void> _guardarRegistroLocal(Map<String, dynamic> datos) async {
     try {
-      _logger.i('💾 Guardando en base de datos local...');
+      _logger.i('💾 Guardando registro maestro en base de datos local...');
 
       // TODO: Implementar guardado en SQLite local
       // final db = await DatabaseHelper.instance.database;
@@ -156,7 +202,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       // Simulación por ahora
       await Future.delayed(const Duration(seconds: 1));
 
-      _logger.i('✅ Registro guardado localmente con ID: ${datos['id_local']}');
+      _logger.i('✅ Registro maestro guardado localmente con ID: ${datos['id_local']}');
     } catch (e) {
       _logger.e('❌ Error crítico guardando localmente: $e');
       throw 'Error guardando datos localmente. Verifica el almacenamiento del dispositivo.';
