@@ -43,6 +43,7 @@ dependencies:
   shared_preferences: ^2.2.2
   provider: ^6.1.1
   equatable: ^2.0.5
+  url_launcher: ^6.2.1
 
   # Para peticiones HTTP
   http: ^1.2.0
