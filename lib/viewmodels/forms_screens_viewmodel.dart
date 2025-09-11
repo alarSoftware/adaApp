@@ -8,8 +8,6 @@ import 'package:ada_app/repositories/logo_repository.dart';
 import 'package:logger/logger.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:barcode_scan2/barcode_scan2.dart';
-import 'package:ada_app/repositories/estado_equipo_repository.dart';
-import 'package:ada_app/services/location_service.dart';
 import 'package:ada_app/repositories/equipo_cliente_repository.dart';
 
 // Eventos UI
