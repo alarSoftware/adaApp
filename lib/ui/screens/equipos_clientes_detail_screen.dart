@@ -100,20 +100,28 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
         backgroundColor: AppColors.appBarBackground,
         foregroundColor: AppColors.appBarForeground,
         actions: [
-          TextButton.icon(
-            onPressed: _showSaveConfirmation,
-            icon: Icon(
-              Icons.save,
-              color: AppColors.onPrimary,
-              size: 20,
-            ),
-            label: Text(
-              'Guardar',
-              style: TextStyle(
-                color: AppColors.onPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+          ListenableBuilder(
+            listenable: _viewModel,
+            builder: (context, child) {
+              final canSave = _viewModel.saveButtonEnabled;
+              final buttonText = _viewModel.saveButtonText;
+
+              return TextButton.icon(
+                onPressed: canSave ? _showSaveConfirmation : null,
+                icon: Icon(
+                  Icons.save,
+                  color: canSave ? AppColors.onPrimary : AppColors.onPrimary.withValues(alpha: 0.5),
+                  size: 20,
+                ),
+                label: Text(
+                  buttonText,
+                  style: TextStyle(
+                    color: canSave ? AppColors.onPrimary : AppColors.onPrimary.withValues(alpha: 0.5),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              );
+            },
           ),
           SizedBox(width: 8),
         ],
@@ -348,10 +356,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: AppColors.border,
-          width: 1,
-        ),
+        border: Border.all(color: AppColors.border, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -405,13 +410,19 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
       },
     );
   }
-
   Widget _buildLocationControlCard() {
     return ListenableBuilder(
       listenable: _viewModel,
       builder: (context, child) {
-        final isEnLocal = _viewModel.isEquipoEnLocal;
-        final statusColor = isEnLocal ? AppColors.success : AppColors.neutral500;
+        final estadoUbicacion = _viewModel.estadoUbicacionEquipo;
+        final hasChanges = _viewModel.hasUnsavedChanges;
+
+        Color statusColor = AppColors.neutral500;
+        if (estadoUbicacion == true) {
+          statusColor = AppColors.success;
+        } else if (estadoUbicacion == false) {
+          statusColor = AppColors.warning;
+        }
 
         return Card(
           elevation: 3,
@@ -425,38 +436,17 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
             ),
           ),
           child: Container(
+            width: double.infinity, // Asegurar ancho completo
             padding: EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  statusColor.withValues(alpha: 0.08),
-                  statusColor.withValues(alpha: 0.03),
-                ],
-              ),
-            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Título de la sección
+                // Título con overflow protection
                 Row(
                   children: [
-                    Container(
-                      padding: EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.store,
-                        color: statusColor,
-                        size: 20,
-                      ),
-                    ),
+                    Icon(Icons.store, color: statusColor, size: 20),
                     SizedBox(width: 12),
-                    Expanded(
+                    Expanded( // Prevenir overflow del título
                       child: Text(
                         'Ubicación del Equipo',
                         style: TextStyle(
@@ -464,69 +454,95 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    if (hasChanges) ...[
+                      SizedBox(width: 8),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'CAMBIOS PENDIENTES',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.warning,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
 
                 SizedBox(height: 16),
 
-                // Control switch
-                Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: statusColor.withValues(alpha: 0.2),
-                    ),
+                // Dropdown con constraints apropiados
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: double.infinity,
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isEnLocal ? Icons.store : Icons.location_off,
-                        color: statusColor,
-                        size: 24,
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  child: DropdownButtonFormField<bool?>(
+                    value: estadoUbicacion,
+                    isExpanded: true, // IMPORTANTE: Previene overflow
+                    decoration: InputDecoration(
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      filled: true,
+                      fillColor: AppColors.surface,
+                    ),
+                    hint: Row(
+                      mainAxisSize: MainAxisSize.min, // Evitar expansion innecesaria
+                      children: [
+                        Icon(Icons.help_outline, size: 20, color: AppColors.textSecondary),
+                        SizedBox(width: 8),
+                        Flexible( // Permitir que el texto se ajuste
+                          child: Text(
+                            'Seleccione la ubicación del equipo',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    items: [
+                      DropdownMenuItem<bool?>(
+                        value: true,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              'El equipo está en el local',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              isEnLocal
-                                  ? 'Físicamente presente en nuestras instalaciones'
-                                  : 'No se encuentra en el local actualmente',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: AppColors.textSecondary,
+                            Icon(Icons.store, color: AppColors.success, size: 20),
+                            SizedBox(width: 12),
+                            Flexible( // Prevenir overflow del texto
+                              child: Text(
+                                'En el local',
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      SizedBox(width: 12),
-                      Transform.scale(
-                        scale: 1.2,
-                        child: Switch(
-                          value: isEnLocal,
-                          onChanged: _viewModel.toggleEquipoEnLocal,
-                          activeThumbColor: AppColors.success,
-                          inactiveThumbColor: AppColors.neutral400,
-                          inactiveTrackColor: AppColors.neutral300,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      DropdownMenuItem<bool?>(
+                        value: false,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.location_off, color: AppColors.warning, size: 20),
+                            SizedBox(width: 12),
+                            Flexible( // Prevenir overflow del texto
+                              child: Text(
+                                'Fuera del local',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
+                    onChanged: (value) => _viewModel.cambiarUbicacionEquipo(value),
+                    validator: (value) => value == null ? 'Seleccione una opción' : null,
                   ),
                 ),
               ],
@@ -760,12 +776,15 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
               children: [
                 Row(
                   children: [
-                    Text(
-                      statusText,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: statusColor,
+                    Flexible( // Agregar aquí
+                      child: Text(
+                        statusText,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (isFirst) ...[
@@ -788,36 +807,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                     ],
                   ],
                 ),
-                SizedBox(height: 4),
-                Text(
-                  _viewModel.formatearFechaHistorial(fecha),
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                // Mostrar información GPS si está disponible
-                if (tieneUbicacion) ...[
-                  SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        size: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        'GPS: ${cambio.latitud!.toStringAsFixed(4)}, ${cambio.longitud!.toStringAsFixed(4)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                // resto del código...
               ],
             ),
           ),

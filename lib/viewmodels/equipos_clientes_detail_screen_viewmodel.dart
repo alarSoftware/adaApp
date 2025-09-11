@@ -65,6 +65,10 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   // ========== ESTADO INTERNO ==========
   EquiposClienteDetailState _state;
 
+  // ========== NUEVOS CAMPOS PARA DROPDOWN ==========
+  bool? _estadoUbicacionEquipo; // null = no seleccionado, true = en local, false = fuera
+  bool _hasUnsavedChanges = false;
+
   // ========== STREAMS PARA EVENTOS ==========
   final StreamController<EquiposClienteDetailUIEvent> _eventController =
   StreamController<EquiposClienteDetailUIEvent>.broadcast();
@@ -75,8 +79,15 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       EquipoCliente equipoCliente,
       this._estadoEquipoRepository,
       ) : _state = EquiposClienteDetailState(equipoCliente: equipoCliente) {
+    _initializeState();
     _loadInitialState();
     _logDebugInfo();
+  }
+
+  // ========== INICIALIZAR ESTADO DEL DROPDOWN ==========
+  void _initializeState() {
+    _estadoUbicacionEquipo = null; // Forzar selección
+    _hasUnsavedChanges = false;
   }
 
   // CARGAR ESTADO INICIAL Y HISTORIAL
@@ -118,6 +129,17 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   bool get isProcessing => _state.isProcessing;
   bool get isEquipoActivo => _state.equipoCliente.asignacionActiva;
 
+  // ========== NUEVOS GETTERS PARA DROPDOWN ==========
+  bool? get estadoUbicacionEquipo => _estadoUbicacionEquipo;
+  bool get hasUnsavedChanges => _hasUnsavedChanges;
+  bool get saveButtonEnabled => _estadoUbicacionEquipo != null && _hasUnsavedChanges;
+
+  String get saveButtonText {
+    if (_estadoUbicacionEquipo == null) return 'Seleccione ubicación';
+    if (!_hasUnsavedChanges) return 'Sin cambios';
+    return 'Guardar cambios';
+  }
+
   // 🆕 GETTERS PARA HISTORIAL
   List<EstadoEquipo> get historialUltimos5 => _state.historialUltimos5;
   List<EstadoEquipo> get historialCompleto => _state.historialCambios;
@@ -129,13 +151,20 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     super.dispose();
   }
 
-  // ========== CAMBIO DE ESTADO ==========
+  // ========== NUEVO MÉTODO PARA DROPDOWN ==========
+  void cambiarUbicacionEquipo(bool? nuevaUbicacion) {
+    if (_estadoUbicacionEquipo != nuevaUbicacion) {
+      _estadoUbicacionEquipo = nuevaUbicacion;
+      _hasUnsavedChanges = _estadoUbicacionEquipo != equipoCliente.enLocal;
+      notifyListeners();
 
+      _logger.i('🔄 Dropdown cambiado a: $nuevaUbicacion (pendiente de guardar)');
+    }
+  }
+
+  // ========== MÉTODO LEGACY PARA COMPATIBILIDAD ==========
   Future<void> toggleEquipoEnLocal(bool value) async {
-    _state = _state.copyWith(equipoEnLocal: value);
-    notifyListeners();
-
-    _logger.i('🔄 Switch cambiado a: $value (pendiente de guardar)');
+    cambiarUbicacionEquipo(value);
   }
 
   // 🆕 MÉTODO PARA RECARGAR HISTORIAL COMPLETO
@@ -164,14 +193,30 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== GUARDAR CAMBIOS - IMPLEMENTACIÓN REAL CON GPS ==========
-
+  // ========== GUARDAR CAMBIOS ACTUALIZADO CON VALIDACIÓN ==========
   Future<void> saveAllChanges() async {
+    // VALIDACIÓN: Debe seleccionar una ubicación
+    if (_estadoUbicacionEquipo == null) {
+      _eventController.add(ShowMessageEvent(
+        'Debe seleccionar una ubicación para el equipo antes de guardar',
+        MessageType.error,
+      ));
+      return;
+    }
+
+    if (!_hasUnsavedChanges) {
+      _eventController.add(ShowMessageEvent(
+        'No hay cambios para guardar',
+        MessageType.info,
+      ));
+      return;
+    }
+
     _state = _state.copyWith(isProcessing: true);
     notifyListeners();
 
     try {
-      _logger.i('Guardando cambios: enLocal=${_state.equipoEnLocal}');
+      _logger.i('Guardando cambios: enLocal=$_estadoUbicacionEquipo');
 
       // GPS OBLIGATORIO
       late final Position position;
@@ -198,17 +243,23 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       final nuevoEstado = await _estadoEquipoRepository.crearNuevoEstado(
         equipoId: equipoCliente.equipoId,
         clienteId: equipoCliente.clienteId,
-        enLocal: _state.equipoEnLocal,
+        enLocal: _estadoUbicacionEquipo!, // Ya validado que no es null
         fechaRevision: DateTime.now(),
         latitud: position.latitude,
         longitud: position.longitude,
       );
+
+      // Actualizar estado local
+// Actualizar estado interno - NO el modelo que es inmutable
+      _state = _state.copyWith(equipoEnLocal: _estadoUbicacionEquipo!);
+      _hasUnsavedChanges = false;
 
       // Actualizar historial local
       final historialActualizado = [nuevoEstado, ..._state.historialCambios];
       final ultimos5Actualizado = historialActualizado.take(5).toList();
 
       _state = _state.copyWith(
+        equipoEnLocal: _estadoUbicacionEquipo!,
         historialCambios: historialActualizado,
         historialUltimos5: ultimos5Actualizado,
         isProcessing: false,
@@ -228,20 +279,29 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       notifyListeners();
 
       _eventController.add(ShowMessageEvent(
-        'Error al guardar los cambios',
+        'Error al guardar los cambios: $e',
         MessageType.error,
       ));
     }
   }
 
-  // ========== GETTERS PARA ESTADO LOCAL ==========
+  // ========== MÉTODOS ADICIONALES DE VALIDACIÓN ==========
+  bool canSaveChanges() {
+    return _estadoUbicacionEquipo != null && _hasUnsavedChanges;
+  }
 
+  void resetChanges() {
+    _estadoUbicacionEquipo = equipoCliente.enLocal;
+    _hasUnsavedChanges = false;
+    notifyListeners();
+  }
+
+  // ========== GETTERS PARA ESTADO LOCAL ==========
   bool get isEquipoEnLocal {
-    return _state.equipoEnLocal;
+    return _estadoUbicacionEquipo ?? _state.equipoEnLocal;
   }
 
   // ========== UTILIDADES PARA LA UI ==========
-
   String formatearFecha(DateTime fecha) {
     return '${fecha.day.toString().padLeft(2, '0')}/'
         '${fecha.month.toString().padLeft(2, '0')}/'
@@ -277,7 +337,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   // ========== INFORMACIÓN DEL EQUIPO ==========
-
   bool shouldShowMarca() {
     return equipoCliente.equipoMarca != null &&
         equipoCliente.equipoMarca!.isNotEmpty;
@@ -331,7 +390,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   // ========== DATOS PARA DIÁLOGO DE CONFIRMACIÓN ==========
-
   Map<String, String> getRetireDialogData() {
     return {
       'equipoNombre': equipoCliente.equipoNombreCompleto,
@@ -341,7 +399,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   // ========== MENSAJES PREDEFINIDOS ==========
-
   String getInactiveEquipoTitle() {
     return 'Equipo no activo';
   }
@@ -351,17 +408,16 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   // ========== MÉTODO PRIVADO ==========
-
   void _logDebugInfo() {
     _logger.i('DEBUG - Equipo Marca: ${equipoCliente.equipoMarca}');
     _logger.i('DEBUG - Equipo Modelo: ${equipoCliente.equipoModelo}');
     _logger.i('DEBUG - Equipo Nombre: ${equipoCliente.equipoNombre}');
     _logger.i('DEBUG - Nombre completo calculado: ${equipoCliente.equipoNombreCompleto}');
     _logger.i('DEBUG - En local: ${_state.equipoEnLocal}');
+    _logger.i('DEBUG - Estado dropdown: $_estadoUbicacionEquipo');
   }
 
   // ========== DEBUG INFO ==========
-
   Map<String, dynamic> getDebugInfo() {
     return {
       'equipo_id': equipoCliente.equipoId,
@@ -374,6 +430,8 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       'cliente_nombre': equipoCliente.clienteNombreCompleto,
       'is_processing': _state.isProcessing,
       'equipo_en_local': _state.equipoEnLocal,
+      'estado_dropdown': _estadoUbicacionEquipo,
+      'has_unsaved_changes': _hasUnsavedChanges,
       'total_cambios_historial': _state.historialCambios.length,
       'ultimos_5_cambios': _state.historialUltimos5.length,
     };
