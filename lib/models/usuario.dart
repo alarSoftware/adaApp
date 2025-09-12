@@ -1,7 +1,7 @@
 class Usuario {
   final int? id;
   final String nombre;
-  final String password; // Sin ñ
+  final String password;
   final String rol;
   final bool activo;
   final bool sincronizado;

@@ -78,6 +78,218 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     return nuevoEstado.copyWith(id: id);
   }
 
+  // ========== MÉTODOS PARA MANEJO DE ESTADOS DE CENSO ==========
+
+  /// Crear nuevo estado de censo con estado 'creado' por defecto
+  Future<EstadoEquipo> crearNuevoEstadoCenso({
+    required int equipoClienteId,
+    required double latitud,
+    required double longitud,
+    DateTime? fechaRevision,
+    bool enLocal = true,
+    String? observaciones,
+  }) async {
+    try {
+      final now = fechaRevision ?? DateTime.now();
+
+      final nuevoEstado = EstadoEquipo(
+        equipoClienteId: equipoClienteId,
+        enLocal: enLocal,
+        latitud: latitud,
+        longitud: longitud,
+        fechaRevision: now,
+        fechaCreacion: now,
+        fechaActualizacion: now,
+        estaSincronizado: false,
+        // ESTADO POR DEFECTO AL CREAR CENSO
+        estadoCenso: EstadoEquipoCenso.creado.valor,
+      );
+
+      final id = await insertar(nuevoEstado);
+      _logger.i('✅ Estado CREADO para equipo_cliente $equipoClienteId (ID: $id)');
+
+      return nuevoEstado.copyWith(id: id);
+    } catch (e) {
+      _logger.e('❌ Error creando estado de censo: $e');
+      rethrow;
+    }
+  }
+
+  /// Marcar estado como migrado exitosamente
+  Future<bool> marcarComoMigrado(int estadoId, {int? servidorId}) async {
+    try {
+      final datosActualizacion = <String, dynamic>{
+        'estado_censo': EstadoEquipoCenso.migrado.valor,
+        'fecha_actualizacion': DateTime.now().toIso8601String(),
+        'sincronizado': 1,
+      };
+
+      final count = await dbHelper.actualizar(
+        tableName,
+        datosActualizacion,
+        where: 'id = ?',
+        whereArgs: [estadoId],
+      );
+
+      if (count > 0) {
+        _logger.i('✅ Estado $estadoId marcado como MIGRADO');
+        return true;
+      } else {
+        _logger.w('⚠️ No se encontró el estado $estadoId para marcar como migrado');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('❌ Error marcando como migrado: $e');
+      return false;
+    }
+  }
+
+  /// Marcar estado como error en migración
+  Future<bool> marcarComoError(int estadoId, String mensajeError) async {
+    try {
+      final datosActualizacion = <String, dynamic>{
+        'estado_censo': EstadoEquipoCenso.error.valor,
+        'fecha_actualizacion': DateTime.now().toIso8601String(),
+        'sincronizado': 0, // Mantener como no sincronizado para reintentar
+      };
+
+      final count = await dbHelper.actualizar(
+        tableName,
+        datosActualizacion,
+        where: 'id = ?',
+        whereArgs: [estadoId],
+      );
+
+      if (count > 0) {
+        _logger.e('❌ Estado $estadoId marcado como ERROR: $mensajeError');
+        return true;
+      } else {
+        _logger.w('⚠️ No se encontró el estado $estadoId para marcar como error');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('❌ Error marcando como error: $e');
+      return false;
+    }
+  }
+
+  /// Obtener registros por estado de censo
+  Future<List<EstadoEquipo>> obtenerPorEstadoCenso(EstadoEquipoCenso estadoCenso) async {
+    try {
+      final maps = await dbHelper.consultar(
+        tableName,
+        where: 'estado_censo = ?',
+        whereArgs: [estadoCenso.valor],
+        orderBy: 'fecha_revision DESC',
+      );
+      return maps.map((map) => fromMap(map)).toList();
+    } catch (e) {
+      _logger.e('Error al obtener por estado censo: $e');
+      return [];
+    }
+  }
+
+  /// Obtener registros creados (pendientes de migración)
+  Future<List<EstadoEquipo>> obtenerCreados() async {
+    return await obtenerPorEstadoCenso(EstadoEquipoCenso.creado);
+  }
+
+  /// Obtener registros migrados exitosamente
+  Future<List<EstadoEquipo>> obtenerMigrados() async {
+    return await obtenerPorEstadoCenso(EstadoEquipoCenso.migrado);
+  }
+
+  /// Obtener registros con error
+  Future<List<EstadoEquipo>> obtenerConError() async {
+    return await obtenerPorEstadoCenso(EstadoEquipoCenso.error);
+  }
+
+  /// Reintentar migración de registros con error
+  Future<void> reintentarMigracion(int estadoId) async {
+    try {
+      final datosActualizacion = <String, dynamic>{
+        'estado_censo': EstadoEquipoCenso.creado.valor,
+        'fecha_actualizacion': DateTime.now().toIso8601String(),
+        'sincronizado': 0,
+      };
+
+      await dbHelper.actualizar(
+        tableName,
+        datosActualizacion,
+        where: 'id = ?',
+        whereArgs: [estadoId],
+      );
+
+      _logger.i('🔄 Estado $estadoId preparado para reintento de migración');
+    } catch (e) {
+      _logger.e('❌ Error preparando reintento: $e');
+      rethrow;
+    }
+  }
+
+  /// Contar registros por estado
+  Future<Map<String, int>> contarPorEstado() async {
+    try {
+      final creados = await obtenerCreados();
+      final migrados = await obtenerMigrados();
+      final conError = await obtenerConError();
+
+      return {
+        'creados': creados.length,
+        'migrados': migrados.length,
+        'error': conError.length,
+        'total': creados.length + migrados.length + conError.length,
+      };
+    } catch (e) {
+      _logger.e('Error contando por estado: $e');
+      return {
+        'creados': 0,
+        'migrados': 0,
+        'error': 0,
+        'total': 0,
+      };
+    }
+  }
+
+  /// Obtener estadísticas de migración
+  Future<Map<String, dynamic>> obtenerEstadisticasMigracion() async {
+    try {
+      final conteos = await contarPorEstado();
+      final total = conteos['total'] ?? 0;
+
+      if (total == 0) {
+        return {
+          'total_registros': 0,
+          'migrados': 0,
+          'pendientes': 0,
+          'errores': 0,
+          'porcentaje_migrado': 0.0,
+          'porcentaje_pendiente': 0.0,
+          'porcentaje_error': 0.0,
+        };
+      }
+
+      final migrados = conteos['migrados'] ?? 0;
+      final creados = conteos['creados'] ?? 0;
+      final errores = conteos['error'] ?? 0;
+
+      return {
+        'total_registros': total,
+        'migrados': migrados,
+        'pendientes': creados,
+        'errores': errores,
+        'porcentaje_migrado': (migrados / total * 100).toDouble(),
+        'porcentaje_pendiente': (creados / total * 100).toDouble(),
+        'porcentaje_error': (errores / total * 100).toDouble(),
+      };
+    } catch (e) {
+      _logger.e('Error obteniendo estadísticas de migración: $e');
+      return {};
+    }
+  }
+
+  // ========== MÉTODOS ORIGINALES EXISTENTES (SIN CAMBIOS) ==========
+
   /// Obtener historial completo por equipo_cliente_id
   Future<List<EstadoEquipo>> obtenerHistorialCompleto(int equipoClienteId) async {
     try {

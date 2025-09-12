@@ -563,32 +563,79 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       },
     );
   }
-
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
       actions: [
-        Padding(
-          padding: EdgeInsets.only(right: 8),
-          child: Consumer<LoginScreenViewModel>(
-            builder: (context, viewModel, child) {
-              return IconButton(
-                onPressed: viewModel.isSyncingUsers ? null : () =>
-                    _syncUsers(viewModel),
-                icon: viewModel.isSyncingUsers
-                    ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2)
-                )
-                    : Icon(
-                    Icons.cloud_sync, color: AppColors.textSecondary, size: 20),
-                tooltip: 'Sincronizar usuarios',
-              );
-            },
-          ),
+        Consumer<LoginScreenViewModel>(
+          builder: (context, viewModel, child) {
+            return PopupMenuButton<String>(
+              icon: Icon(
+                Icons.more_vert,
+                color: AppColors.textSecondary,
+                size: 24,
+              ),
+              tooltip: 'Más opciones',
+              offset: const Offset(0, 40),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              color: AppColors.cardBackground,
+              elevation: 8,
+              shadowColor: AppColors.shadowLight,
+              onSelected: (String value) {
+                switch (value) {
+                  case 'sync':
+                    if (!viewModel.isSyncingUsers) {
+                      _syncUsers(viewModel);
+                    }
+                    break;
+                }
+              },
+              itemBuilder: (BuildContext context) => [
+                PopupMenuItem<String>(
+                  value: 'sync',
+                  enabled: !viewModel.isSyncingUsers,
+                  child: Row(
+                    children: [
+                      viewModel.isSyncingUsers
+                          ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.textSecondary,
+                          ),
+                        ),
+                      )
+                          : Icon(
+                        Icons.sync,
+                        color: viewModel.isSyncingUsers
+                            ? AppColors.textSecondary.withOpacity(0.5)
+                            : AppColors.textSecondary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Sincronizar usuarios',
+                        style: TextStyle(
+                          color: viewModel.isSyncingUsers
+                              ? AppColors.textSecondary.withOpacity(0.5)
+                              : AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
+        const SizedBox(width: 8),
       ],
     );
   }
