@@ -6,7 +6,8 @@ import 'dart:io';
 import '../../models/cliente.dart';
 import 'package:ada_app/repositories/equipo_cliente_repository.dart';
 import 'package:ada_app/repositories/estado_equipo_repository.dart';
-import 'package:ada_app/services/location_service.dart';
+import 'package:ada_app/models/estado_equipo.dart'; // Agregar si no está
+import 'dart:async'; // Agregar esta línea
 
 final _logger = Logger();
 
@@ -19,7 +20,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
 
   // ⚠️ CAMBIAR ESTA IP POR LA IP DE TU SERVIDOR
-  static const String _baseUrl = 'http://192.168.1.185:3000';
+  static const String _baseUrl = 'https://ada-api-production-5d7e.up.railway.app';
   static const String _estadosEndpoint = '/estados';
   static const String _pingEndpoint = '/ping';
 
@@ -56,10 +57,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
   // ============================================================================
   // AQUÍ ES DONDE OCURRE EL GUARDADO DEFINITIVO
   // ============================================================================
-
   Future<Map<String, dynamic>> confirmarRegistro(Map<String, dynamic> datos) async {
     _setLoading(true);
     _setStatusMessage(null);
+
+    int? estadoIdActual; // Para trackear solo el registro actual
 
     try {
       _logger.i('📝 CONFIRMANDO REGISTRO - GUARDADO DEFINITIVO EN BD');
@@ -69,7 +71,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final yaAsignado = datos['ya_asignado'] as bool? ?? false;
       final esCenso = datos['es_censo'] as bool? ?? true;
 
-      // ✅ PASO 1: GUARDAR ASIGNACIÓN EN BD (SOLO SI NO ESTÁ ASIGNADO AL CLIENTE ACTUAL)
+      // ✅ PASO 1: GUARDAR ASIGNACIÓN EN BD (usando procesarEscaneoCenso)
       if (esCenso && equipoCompleto != null && !yaAsignado) {
         _setStatusMessage('💾 Registrando asignación del equipo...');
 
@@ -78,81 +80,353 @@ class PreviewScreenViewModel extends ChangeNotifier {
             equipoId: equipoCompleto['id'],
             clienteId: cliente.id!,
           );
-          _logger.i('✅ Asignación equipo-cliente creada en BD');
+          _logger.i('✅ Asignación equipo-cliente procesada');
         } catch (e) {
-          // Si ya está asignado a otro cliente, continuar con estado "pendiente"
-          _logger.w('⚠️ Equipo ya asignado a otro cliente, creando estado pendiente: $e');
-          // Continuar el flujo normalmente - el estado se registrará como "pendiente"
+          _logger.w('⚠️ Equipo ya asignado a otro cliente: $e');
         }
       }
 
-// PASO 2: REGISTRAR EN HISTORIAL DE ESTADOS
+      // ✅ PASO 2: REGISTRAR EN HISTORIAL CON ESTADO 'CREADO'
       if (equipoCompleto != null) {
-        _setStatusMessage('📋 Registrando en historial de estados...');
+        _setStatusMessage('📋 Registrando estado como CREADO...');
 
-        try {
-          // Usar método de compatibilidad
-          final nuevoEstado = await _estadoEquipoRepository.crearNuevoEstadoLegacy(
-            equipoId: equipoCompleto['id'],
-            clienteId: cliente.id!,
-            enLocal: true,
-            fechaRevision: DateTime.now(),
+        // Buscar equipoClienteId
+        final equipoClienteId = await _estadoEquipoRepository.buscarEquipoClienteId(
+          equipoCompleto['id'],
+          cliente.id!,
+        );
+
+        if (equipoClienteId != null) {
+          // Crear estado con estado "creado"
+          final estadoCreado = await _estadoEquipoRepository.crearNuevoEstadoCenso(
+            equipoClienteId: equipoClienteId,
             latitud: datos['latitud'],
             longitud: datos['longitud'],
+            fechaRevision: DateTime.now(),
+            enLocal: true,
+            observaciones: datos['observaciones']?.toString(),
           );
 
-          if (nuevoEstado == null) {
-            _logger.w('No se pudo crear estado: relación equipo_cliente no encontrada');
-            _setStatusMessage('⚠️ Advertencia: No se registró en historial de estados');
-          } else {
-            _logger.i('✅ Estado del equipo registrado en historial');
-            _setStatusMessage('✅ Estado registrado en historial');
-          }
-        } catch (e) {
-          _logger.e('❌ Error al registrar estado en historial: $e');
-          _setStatusMessage('❌ Error al registrar en historial');
-          // Decide si quieres que esto sea un error crítico o continuar
+          estadoIdActual = estadoCreado.id; // Guardar ID del registro actual
+          _logger.i('✅ Estado CREADO registrado con ID: $estadoIdActual');
+        } else {
+          _logger.w('No se encontró relación equipo_cliente');
+          _setStatusMessage('⚠️ Advertencia: No se registró en historial');
         }
       }
 
       // ✅ PASO 3: PREPARAR DATOS PARA API
-      _setStatusMessage('📤 Preparando datos para sincronización...');
+      _setStatusMessage('📤 Preparando datos para migración...');
       final datosCompletos = _prepararDatosParaEnvio(datos);
 
-      // ✅ PASO 4: GUARDAR LOCALMENTE (REGISTRO MAESTRO)
+      // ✅ PASO 4: GUARDAR REGISTRO LOCAL MAESTRO
       _setStatusMessage('💾 Guardando registro local maestro...');
       await _guardarRegistroLocal(datosCompletos);
 
-      // ✅ PASO 5: INTENTAR SINCRONIZAR CON SERVIDOR
-      _setStatusMessage('📤 Sincronizando con servidor...');
-      final respuestaServidor = await _intentarEnviarAlServidor(datosCompletos);
+      // ✅ PASO 5: INTENTAR MIGRAR SOLO EL REGISTRO ACTUAL (CON TIMEOUT CORTO)
+      _setStatusMessage('🔄 Sincronizando registro actual...');
 
-      if (respuestaServidor['exito']) {
-        // Éxito total: BD local + Servidor
-        await _marcarComoSincronizado(datosCompletos['id_local'] as int);
-        _setStatusMessage('✅ Registro completado y sincronizado');
+      String mensajeFinal;
+      bool migracionExitosa = false;
 
-        if (respuestaServidor['servidor_id'] != null) {
-          await _actualizarConIdServidor(
-              datosCompletos['id_local'] as int,
-              respuestaServidor['servidor_id']
-          );
-        }
-
-        return {'success': true, 'message': 'Registro completado exitosamente'};
-      } else {
-        // BD local exitosa, pero sin conexión al servidor
-        _setStatusMessage(
-            '📱 Registro guardado localmente. Se sincronizará cuando haya conexión.'
+      if (estadoIdActual != null) {
+        final respuestaServidor = await _intentarEnviarAlServidorConTimeout(
+            datosCompletos,
+            timeoutSegundos: 8 // Timeout corto para no bloquear UI
         );
-        return {'success': true, 'message': 'Registro guardado'};
+
+        if (respuestaServidor['exito']) {
+          // Migrar solo el registro actual
+          await _estadoEquipoRepository.marcarComoMigrado(
+            estadoIdActual,
+            servidorId: respuestaServidor['servidor_id'],
+          );
+          await _marcarComoSincronizado(datosCompletos['id_local'] as int);
+
+          mensajeFinal = 'Censo completado y sincronizado al servidor';
+          migracionExitosa = true;
+          _setStatusMessage('✅ Registro sincronizado exitosamente');
+
+        } else {
+          // El registro queda en estado "creado" para migrar después
+          mensajeFinal = 'Censo guardado localmente. Se sincronizará automáticamente';
+          _setStatusMessage('📱 Censo guardado. Sincronización automática pendiente');
+        }
+      } else {
+        mensajeFinal = 'Censo guardado localmente';
       }
 
+      // ✅ PASO 6: PROGRAMAR SINCRONIZACIÓN EN BACKGROUND PARA REGISTROS PENDIENTES
+      _programarSincronizacionBackground();
+
+      return {
+        'success': true,
+        'message': mensajeFinal,
+        'migrado_inmediatamente': migracionExitosa
+      };
+
     } catch (e) {
-      _logger.e(' Error crítico en confirmación de registro: $e');
+      _logger.e('❌ Error crítico en confirmación de registro: $e');
       return {'success': false, 'error': 'Error guardando registro: $e'};
     } finally {
       _setLoading(false);
+    }
+  }
+
+  /// Intentar envío al servidor con timeout específico
+  Future<Map<String, dynamic>> _intentarEnviarAlServidorConTimeout(
+      Map<String, dynamic> datos,
+      {int timeoutSegundos = 8}
+      ) async {
+    try {
+      // Verificar conectividad con timeout corto
+      final tieneConexion = await _verificarConectividadRapida();
+      if (!tieneConexion) {
+        _logger.w('⚠️ Sin conexión al servidor');
+        return {'exito': false, 'motivo': 'sin_conexion'};
+      }
+
+      // Preparar datos para API
+      final datosApi = _prepararDatosParaApiEstados(datos);
+
+      // Enviar con timeout específico
+      final response = await _enviarAApiEstadosConTimeout(datosApi, timeoutSegundos);
+
+      if (response['exito']) {
+        _logger.i('✅ Estado registrado inmediatamente en servidor');
+        return {
+          'exito': true,
+          'servidor_id': response['id'],
+          'mensaje': response['mensaje']
+        };
+      } else {
+        _logger.w('⚠️ Error del servidor: ${response['mensaje']}');
+        return {
+          'exito': false,
+          'motivo': 'error_servidor',
+          'detalle': response['mensaje']
+        };
+      }
+
+    } catch (e) {
+      _logger.w('⚠️ Error o timeout enviando al servidor: $e');
+      return {
+        'exito': false,
+        'motivo': 'timeout_o_error',
+        'detalle': e.toString()
+      };
+    }
+  }
+
+  /// Verificación de conectividad rápida (timeout de 3 segundos)
+  Future<bool> _verificarConectividadRapida() async {
+    try {
+      _logger.i('🌐 Verificación rápida de conectividad...');
+
+      final response = await http.get(
+        Uri.parse('$_baseUrl$_pingEndpoint'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 3)); // Timeout corto
+
+      return response.statusCode == 200;
+
+    } catch (e) {
+      _logger.w('⚠️ Conectividad rápida falló: $e');
+      return false;
+    }
+  }
+
+  /// Enviar a API con timeout específico
+  Future<Map<String, dynamic>> _enviarAApiEstadosConTimeout(
+      Map<String, dynamic> datos,
+      int timeoutSegundos
+      ) async {
+    try {
+      _logger.i('📤 Enviando con timeout de ${timeoutSegundos}s: $_baseUrl$_estadosEndpoint');
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl$_estadosEndpoint'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode(datos),
+      ).timeout(Duration(seconds: timeoutSegundos)); // Timeout configurable
+
+      _logger.i('📥 Respuesta: ${response.statusCode}');
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final responseBody = json.decode(response.body);
+
+        if (responseBody['success'] == true) {
+          return {
+            'exito': true,
+            'id': responseBody['estado']['id'],
+            'mensaje': responseBody['message'] ?? 'Estado actualizado correctamente'
+          };
+        } else {
+          return {
+            'exito': false,
+            'mensaje': responseBody['message'] ?? 'Error desconocido'
+          };
+        }
+      } else {
+        final errorBody = response.body.isNotEmpty ?
+        json.decode(response.body) : {'message': 'Error HTTP ${response.statusCode}'};
+
+        return {
+          'exito': false,
+          'mensaje': errorBody['message'] ?? 'Error del servidor: ${response.statusCode}'
+        };
+      }
+
+    } catch (e) {
+      _logger.e('❌ Timeout o excepción enviando a API: $e');
+      return {
+        'exito': false,
+        'mensaje': 'Timeout o error de conexión: $e'
+      };
+    }
+  }
+
+  /// Programar sincronización en background para registros pendientes
+  void _programarSincronizacionBackground() {
+    // Ejecutar después de un delay para que la UI responda primero
+    Timer(Duration(seconds: 3), () async {
+      try {
+        _logger.i('🔄 Iniciando sincronización background de registros pendientes');
+        await _sincronizarRegistrosPendientesEnBackground();
+      } catch (e) {
+        _logger.e('❌ Error en sincronización background: $e');
+      }
+    });
+  }
+
+  /// Sincronizar registros pendientes sin bloquear la UI
+  Future<void> _sincronizarRegistrosPendientesEnBackground() async {
+    try {
+      // Obtener registros en estado "creado" (excluyendo el que se acaba de procesar)
+      final registrosCreados = await _estadoEquipoRepository.obtenerCreados();
+
+      if (registrosCreados.isEmpty) {
+        _logger.i('✅ No hay registros pendientes para sincronizar en background');
+        return;
+      }
+
+      _logger.i('📋 Sincronizando ${registrosCreados.length} registros pendientes en background');
+
+      int migrados = 0;
+      int fallos = 0;
+
+      // Procesar de a uno con delays para no saturar el servidor
+      for (int i = 0; i < registrosCreados.length; i++) {
+        final estado = registrosCreados[i];
+
+        try {
+          // Delay entre requests para no saturar
+          if (i > 0) {
+            await Future.delayed(Duration(milliseconds: 800));
+          }
+
+          final exito = await _procesarEstadoIndividualEnBackground(estado);
+
+          if (exito) {
+            migrados++;
+            _logger.i('✅ Estado ${estado.id} migrado en background');
+          } else {
+            fallos++;
+            _logger.w('❌ Fallo migrando estado ${estado.id} en background');
+          }
+
+          // Cada 5 registros, hacer una pausa más larga
+          if ((i + 1) % 5 == 0) {
+            await Future.delayed(Duration(seconds: 2));
+          }
+
+        } catch (e) {
+          fallos++;
+          _logger.e('❌ Excepción procesando estado ${estado.id}: $e');
+        }
+      }
+
+      _logger.i('📊 Sincronización background completada: $migrados migrados, $fallos fallos');
+
+    } catch (e) {
+      _logger.e('❌ Error en sincronización background: $e');
+    }
+  }
+
+  /// Procesar un estado individual en background
+  Future<bool> _procesarEstadoIndividualEnBackground(EstadoEquipo estado) async {
+    try {
+      // Preparar datos desde el estado existente
+      final datosParaServidor = await _prepararDatosDesdeEstado(estado);
+
+      // Intentar enviar con timeout más largo en background
+      final respuesta = await _intentarEnviarAlServidorConTimeout(
+          datosParaServidor,
+          timeoutSegundos: 15
+      );
+
+      if (respuesta['exito']) {
+        // Marcar como migrado
+        await _estadoEquipoRepository.marcarComoMigrado(
+          estado.id!,
+          servidorId: respuesta['servidor_id'],
+        );
+        return true;
+      } else {
+        // Mantener en estado "creado" para reintento posterior
+        return false;
+      }
+
+    } catch (e) {
+      _logger.e('❌ Error procesando estado individual: $e');
+      return false;
+    }
+  }
+
+  /// Preparar datos desde un estado existente
+  Future<Map<String, dynamic>> _prepararDatosDesdeEstado(EstadoEquipo estado) async {
+    try {
+      // Obtener detalles completos del estado
+      final estadoConDetalles = await _estadoEquipoRepository.obtenerEstadoConDetalles(estado.equipoClienteId);
+
+      if (estadoConDetalles == null) {
+        throw 'No se encontraron detalles para el estado ${estado.id}';
+      }
+
+      return {
+        // Datos locales para control
+        'id_local': estado.id,
+        'estado_sincronizacion': 'background',
+        'fecha_creacion_local': estado.fechaCreacion.toIso8601String(),
+
+        // Datos para API
+        'equipo_id': estadoConDetalles['equipo_id'],
+        'cliente_id': estadoConDetalles['cliente_id'],
+        'usuario_id': 1,
+        'funcionando': true,
+        'estado_general': 'Censo registrado desde APP móvil - Sincronización automática',
+        'temperatura_actual': null,
+        'temperatura_freezer': null,
+        'latitud': estado.latitud,
+        'longitud': estado.longitud,
+
+        // Datos adicionales
+        'codigo_barras': estadoConDetalles['cod_barras'],
+        'numero_serie': estadoConDetalles['numero_serie'],
+        'es_censo': true,
+        'version_app': '1.0.0',
+        'dispositivo': Platform.operatingSystem,
+      };
+
+    } catch (e) {
+      _logger.e('Error preparando datos desde estado: $e');
+      rethrow;
     }
   }
 

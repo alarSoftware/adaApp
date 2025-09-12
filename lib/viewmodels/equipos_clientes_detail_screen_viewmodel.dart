@@ -234,7 +234,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       late final Position position;
       try {
         position = await _locationService.getCurrentLocationRequired(
-          timeout: Duration(seconds: 15),
+          timeout: Duration(seconds: 30),
         );
 
         _logger.i('Ubicación GPS obtenida: ${_locationService.formatCoordinates(position)}');

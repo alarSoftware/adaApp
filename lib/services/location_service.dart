@@ -167,6 +167,7 @@ class LocationService {
         throw const LocationException(
           'No hay permisos de ubicación válidos',
           LocationErrorType.permissionDenied,
+
         );
       }
 
@@ -174,6 +175,7 @@ class LocationService {
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: accuracy,
         timeLimit: timeout,
+        forceAndroidLocationManager: true,
       );
 
       _logger.i('Ubicación obtenida exitosamente: ${position.latitude}, ${position.longitude}');

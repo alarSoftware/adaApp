@@ -135,21 +135,12 @@ class SelectScreenViewModel extends ChangeNotifier {
   }
 
   void _startApiMonitoring() {
-    // Solo verificar cada 3 minutos cuando esté conectado
-    // Más frecuente cuando hay problemas
     _apiMonitorTimer = Timer.periodic(
-      _getMonitoringInterval(),
+      Duration(minutes: 10), // ← Intervalo fijo de 5 minutos
           (_) => _checkApiConnectionSilently(),
     );
   }
 
-  Duration _getMonitoringInterval() {
-    if (_connectionStatus.hasApiConnection) {
-      return Duration(minutes: 30); // Todo bien, verificar cada 3 min
-    } else {
-      return Duration(seconds: 30); // Hay problemas, verificar cada 30s
-    }
-  }
   // ========== LÓGICA DE CONECTIVIDAD ==========
   void _onConnectivityChanged(List<ConnectivityResult> results) {
     final hasInternet = results.any((r) => r != ConnectivityResult.none);
