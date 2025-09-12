@@ -10,12 +10,6 @@ import 'package:ada_app/models/usuario.dart';
 var logger = Logger();
 
 class AuthService {
-  // 🧪 Credenciales de prueba (fallback si falla todo lo demás)
-  static const Map<String, String> _credencialesPrueba = {
-    'admin': 'admin123',
-    'test': 'test123',
-    'demo': 'demo123',
-  };
 
   // Keys para SharedPreferences
   static const String _keyHasLoggedIn = 'has_logged_in_before';
@@ -85,7 +79,7 @@ class AuthService {
     }
   }
 
-  // 🔑 Login híbrido (online/offline) con soporte bcrypt + credenciales de prueba
+// 🔑 Login híbrido (online/offline) con soporte bcrypt + credenciales de prueba
   Future<AuthResult> login(String nombre, String password) async {
     logger.i('🔑 Intentando login para: $nombre');
 
@@ -103,43 +97,26 @@ class AuthService {
       return loginOffline;
     }
 
-    // 3. Como último recurso, verificar credenciales de prueba
-    final loginPrueba = await _loginConCredencialesPrueba(nombre, password);
-    if (loginPrueba.exitoso) {
-      await _saveLoginSuccess(loginPrueba.usuario!);
-    }
-
-    return loginPrueba;
-  }
-
-  // 🧪 Login con credenciales de prueba (último recurso)
-  Future<AuthResult> _loginConCredencialesPrueba(String nombre, String password) async {
-    logger.i('🧪 Verificando credenciales de prueba...');
-
-    if (_credencialesPrueba.containsKey(nombre.toLowerCase()) &&
-        _credencialesPrueba[nombre.toLowerCase()] == password) {
-
-      final usuario = UsuarioAuth(
-        id: 999, // ID temporal
-        username: nombre,
-        rol: nombre.toLowerCase() == 'admin' ? 'admin' : 'vendedor',
-      );
-
-      logger.i('✅ Login con credenciales de prueba exitoso para: $nombre');
+    // 3. Si ambos fallan, determinar el mensaje apropiado
+    if (loginOffline.mensaje.contains('Usuario no encontrado')) {
       return AuthResult(
-        exitoso: true,
-        mensaje: 'Bienvenido, $nombre (modo prueba)',
-        usuario: usuario,
-        esOnline: false,
+        exitoso: false,
+        mensaje: 'Sincroniza los datos primero para usar sin conexión',
+      );
+    } else if (loginOffline.mensaje.contains('Contraseña incorrecta') ||
+        loginOnline.mensaje.contains('Credenciales incorrectas')) {
+      return AuthResult(
+        exitoso: false,
+        mensaje: 'Credenciales incorrectas',
+      );
+    } else {
+      return AuthResult(
+        exitoso: false,
+        mensaje: 'Sin conexión. Verifica tu internet',
       );
     }
-
-    logger.w('❌ Todas las opciones de login fallaron para: $nombre');
-    return AuthResult(
-      exitoso: false,
-      mensaje: 'Credenciales incorrectas. Verifica usuario y contraseña o sincroniza datos.',
-    );
   }
+
 
   // 🌐 Intentar login online
   Future<AuthResult> _intentarLoginOnline(String nombre, String password) async {
@@ -168,7 +145,7 @@ class AuthService {
           logger.i('✅ Login online exitoso para: $nombre');
           return AuthResult(
             exitoso: true,
-            mensaje: 'Bienvenido, $nombre (online)',
+            mensaje: 'Bienvenido, $nombre',
             usuario: usuario,
             esOnline: true,
           );
@@ -176,7 +153,7 @@ class AuthService {
       } else if (response.statusCode == 401) {
         return AuthResult(
           exitoso: false,
-          mensaje: 'Credenciales incorrectas (servidor)',
+          mensaje: 'Credenciales incorrectas',
         );
       }
     } catch (e) {
@@ -186,7 +163,7 @@ class AuthService {
     return AuthResult(exitoso: false, mensaje: 'Sin conexión');
   }
 
-  // 📱 Login offline con datos sincronizados
+// 📱 Login offline con datos sincronizados
   Future<AuthResult> _loginOffline(String nombre, String password) async {
     try {
       logger.i('📱 Intentando login offline...');
@@ -202,7 +179,7 @@ class AuthService {
         logger.w('❌ Usuario no encontrado offline: $nombre');
         return AuthResult(
           exitoso: false,
-          mensaje: 'Usuario no encontrado. Sincroniza datos primero.',
+          mensaje: 'Usuario no encontrado',
         );
       }
 

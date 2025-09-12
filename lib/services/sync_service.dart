@@ -167,7 +167,7 @@ class SyncService {
         if (usuariosData.isEmpty) {
           return SyncResult(
             exito: true,
-            mensaje: 'No hay usuarios en el servidor',
+            mensaje: 'Usuarios sincronizados',
             itemsSincronizados: 0,
           );
         }
@@ -176,7 +176,7 @@ class SyncService {
 
         return SyncResult(
           exito: true,
-          mensaje: 'Usuarios sincronizados correctamente',
+          mensaje: 'Usuarios sincronizados',
           itemsSincronizados: usuariosData.length,
           totalEnAPI: usuariosData.length,
         );
