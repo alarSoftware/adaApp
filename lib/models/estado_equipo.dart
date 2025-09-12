@@ -34,8 +34,7 @@ extension EstadoEquipoCensoExtension on EstadoEquipoCenso {
 
 class EstadoEquipo {
   final int? id;
-  final int equipoId;
-  final int clienteId;
+  final int equipoClienteId;
   final bool enLocal;
   final double? latitud;
   final double? longitud;
@@ -43,12 +42,11 @@ class EstadoEquipo {
   final DateTime fechaCreacion;
   final DateTime? fechaActualizacion;
   final bool estaSincronizado;
-  final String? estadoCenso; // CAMPO AGREGADO
+  final String? estadoCenso;
 
   EstadoEquipo({
     this.id,
-    required this.equipoId,
-    required this.clienteId,
+    required this.equipoClienteId,
     required this.enLocal,
     this.latitud,
     this.longitud,
@@ -56,14 +54,13 @@ class EstadoEquipo {
     required this.fechaCreacion,
     this.fechaActualizacion,
     this.estaSincronizado = false,
-    this.estadoCenso, // PARÁMETRO AGREGADO
+    this.estadoCenso,
   });
 
   factory EstadoEquipo.fromMap(Map<String, dynamic> map) {
     return EstadoEquipo(
       id: map['id'] as int?,
-      equipoId: map['equipo_id'] as int,
-      clienteId: map['id_clientes'] as int,
+      equipoClienteId: map['equipo_cliente_id'] as int,
       enLocal: (map['en_local'] as int?) == 1,
       latitud: map['latitud'] as double?,
       longitud: map['longitud'] as double?,
@@ -73,15 +70,14 @@ class EstadoEquipo {
           ? DateTime.parse(map['fecha_actualizacion'] as String)
           : null,
       estaSincronizado: (map['sincronizado'] as int?) == 1,
-      estadoCenso: map['estado_censo'] as String?, // LÍNEA AGREGADA
+      estadoCenso: map['estado_censo'] as String?,
     );
   }
 
   Map<String, dynamic> toMap() {
     final map = {
       'id': id,
-      'equipo_id': equipoId,
-      'id_clientes': clienteId,
+      'equipo_cliente_id': equipoClienteId,
       'en_local': enLocal ? 1 : 0,
       'latitud': latitud,
       'longitud': longitud,
@@ -101,8 +97,7 @@ class EstadoEquipo {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'equipo_id': equipoId,
-      'id_clientes': clienteId,
+      'equipo_cliente_id': equipoClienteId,
       'en_local': enLocal,
       'latitud': latitud,
       'longitud': longitud,
@@ -110,14 +105,13 @@ class EstadoEquipo {
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
       'sincronizado': estaSincronizado,
-      'estado_censo': estadoCenso, // LÍNEA AGREGADA
+      'estado_censo': estadoCenso,
     };
   }
 
   EstadoEquipo copyWith({
     int? id,
-    int? equipoId,
-    int? clienteId,
+    int? equipoClienteId,
     bool? enLocal,
     double? latitud,
     double? longitud,
@@ -125,12 +119,11 @@ class EstadoEquipo {
     DateTime? fechaCreacion,
     DateTime? fechaActualizacion,
     bool? estaSincronizado,
-    String? estadoCenso, // PARÁMETRO CORREGIDO
+    String? estadoCenso,
   }) {
     return EstadoEquipo(
       id: id ?? this.id,
-      equipoId: equipoId ?? this.equipoId,
-      clienteId: clienteId ?? this.clienteId,
+      equipoClienteId: equipoClienteId ?? this.equipoClienteId,
       enLocal: enLocal ?? this.enLocal,
       latitud: latitud ?? this.latitud,
       longitud: longitud ?? this.longitud,
@@ -138,11 +131,11 @@ class EstadoEquipo {
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
       estaSincronizado: estaSincronizado ?? this.estaSincronizado,
-      estadoCenso: estadoCenso ?? this.estadoCenso, // LÍNEA AGREGADA
+      estadoCenso: estadoCenso ?? this.estadoCenso,
     );
   }
 
-  // Helpers
+  // Helpers actualizados
   EstadoEquipoCenso get estadoCensoEnum => EstadoEquipoCensoExtension.fromString(estadoCenso);
   bool get estaCreado => estadoCenso == EstadoEquipoCenso.creado.valor;
   bool get estaMigrado => estadoCenso == EstadoEquipoCenso.migrado.valor;

@@ -86,20 +86,33 @@ class PreviewScreenViewModel extends ChangeNotifier {
         }
       }
 
-      // ✅ PASO 2: REGISTRAR EN HISTORIAL DE ESTADOS (AQUÍ ES DONDE SE DEBE HACER)
+// PASO 2: REGISTRAR EN HISTORIAL DE ESTADOS
       if (equipoCompleto != null) {
         _setStatusMessage('📋 Registrando en historial de estados...');
 
-        await _estadoEquipoRepository.crearNuevoEstado(
-          equipoId: equipoCompleto['id'],
-          clienteId: cliente.id!,
-          enLocal: true,
-          fechaRevision: DateTime.now(),
-          latitud: datos['latitud'],
-          longitud: datos['longitud'],
-        );
+        try {
+          // Usar método de compatibilidad
+          final nuevoEstado = await _estadoEquipoRepository.crearNuevoEstadoLegacy(
+            equipoId: equipoCompleto['id'],
+            clienteId: cliente.id!,
+            enLocal: true,
+            fechaRevision: DateTime.now(),
+            latitud: datos['latitud'],
+            longitud: datos['longitud'],
+          );
 
-        _logger.i('✅ Estado del equipo registrado en historial');
+          if (nuevoEstado == null) {
+            _logger.w('No se pudo crear estado: relación equipo_cliente no encontrada');
+            _setStatusMessage('⚠️ Advertencia: No se registró en historial de estados');
+          } else {
+            _logger.i('✅ Estado del equipo registrado en historial');
+            _setStatusMessage('✅ Estado registrado en historial');
+          }
+        } catch (e) {
+          _logger.e('❌ Error al registrar estado en historial: $e');
+          _setStatusMessage('❌ Error al registrar en historial');
+          // Decide si quieres que esto sea un error crítico o continuar
+        }
       }
 
       // ✅ PASO 3: PREPARAR DATOS PARA API
@@ -136,7 +149,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
 
     } catch (e) {
-      _logger.e('❌ Error crítico en confirmación de registro: $e');
+      _logger.e(' Error crítico en confirmación de registro: $e');
       return {'success': false, 'error': 'Error guardando registro: $e'};
     } finally {
       _setLoading(false);

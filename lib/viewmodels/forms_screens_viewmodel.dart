@@ -189,11 +189,10 @@ class FormsScreenViewModel extends ChangeNotifier {
       _logger.i('Buscando visicooler con código: $codigo');
 
       final equipoRepo = EquipoRepository();
-      final equiposCompletos = await equipoRepo.buscarConFiltros(
+      final equiposCompletos = await equipoRepo.buscarPorCodigoExacto(
         codigoBarras: codigo.trim(),
         soloActivos: true,
       );
-
       if (equiposCompletos.isNotEmpty) {
         await _procesarEquipoEncontrado(equiposCompletos.first);
       } else {

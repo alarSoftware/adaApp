@@ -42,6 +42,7 @@ class SyncService {
       await _sincronizarMarcas();
       await _sincronizarModelos();
       await _sincronizarLogos();
+      await _sincronizarUsuarios();
 
       final resultadoClientes = await sincronizarClientes();
       resultado.clientesSincronizados = resultadoClientes.itemsSincronizados;
@@ -117,6 +118,82 @@ class SyncService {
       }
     } catch (e) {
       _logger.e('Error sincronizando modelos: $e');
+    }
+  }
+
+  // Agregar después de _sincronizarLogos()
+  static Future<void> _sincronizarUsuarios() async {
+    try {
+      _logger.i('=== INICIANDO SINCRONIZACIÓN USUARIOS ===');
+      final response = await http.get(
+        Uri.parse('$baseUrl/usuarios'),
+        headers: _headers,
+      ).timeout(timeout);
+
+      _logger.i('Status Code: ${response.statusCode}');
+      _logger.i('Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> usuariosAPI = jsonDecode(response.body);
+        _logger.i('Usuarios parseados: ${usuariosAPI.length}');
+
+        if (usuariosAPI.isNotEmpty) {
+          _logger.i('Primer usuario: ${usuariosAPI.first}');
+
+
+
+          await _dbHelper.sincronizarUsuarios(usuariosAPI);
+          _logger.i('✅ Usuarios sincronizados: ${usuariosAPI.length}');
+        } else {
+          _logger.w('⚠️ Array de usuarios vacío');
+        }
+      } else {
+        _logger.e('❌ Error response: ${response.statusCode}');
+      }
+    } catch (e) {
+      _logger.e('💥 Error sincronizando usuarios: $e');
+    }
+  }
+  static Future<SyncResult> sincronizarUsuarios() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/usuarios'),
+        headers: _headers,
+      ).timeout(timeout);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final List<dynamic> usuariosData = _parseResponse(response.body);
+
+        if (usuariosData.isEmpty) {
+          return SyncResult(
+            exito: true,
+            mensaje: 'No hay usuarios en el servidor',
+            itemsSincronizados: 0,
+          );
+        }
+
+        await _dbHelper.sincronizarUsuarios(usuariosData);
+
+        return SyncResult(
+          exito: true,
+          mensaje: 'Usuarios sincronizados correctamente',
+          itemsSincronizados: usuariosData.length,
+          totalEnAPI: usuariosData.length,
+        );
+      } else {
+        final mensaje = _extraerMensajeError(response);
+        return SyncResult(
+          exito: false,
+          mensaje: 'Error del servidor: $mensaje',
+          itemsSincronizados: 0,
+        );
+      }
+    } catch (e) {
+      return SyncResult(
+        exito: false,
+        mensaje: _getErrorMessage(e),
+        itemsSincronizados: 0,
+      );
     }
   }
 

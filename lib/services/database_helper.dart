@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:logger/logger.dart';
+import 'package:ada_app/models/usuario.dart';
 
 var logger = Logger();
 
@@ -128,33 +129,33 @@ class DatabaseHelper {
   )
 ''');
     // Tabla usuarios
+// Simplificar la tabla usuarios en _onCreate
     await db.execute('''
-      CREATE TABLE usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        rol TEXT NOT NULL,
-        activo INTEGER DEFAULT 1,
-        sincronizado INTEGER DEFAULT 0,
-        fecha_creacion TEXT NOT NULL,
-        fecha_actualizacion TEXT NOT NULL
-      )
-    ''');
+  CREATE TABLE usuarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+    rol TEXT NOT NULL DEFAULT 'vendedor',
+    activo INTEGER DEFAULT 1,
+    sincronizado INTEGER DEFAULT 0,
+    fecha_creacion TEXT NOT NULL,
+    fecha_actualizacion TEXT NOT NULL
+  )
+''');
 //Tabla Estado_Equipo
     await db.execute('''
   CREATE TABLE Estado_Equipo (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  equipo_id INTEGER NOT NULL,
-  id_clientes INTEGER NOT NULL,
-  en_local INTEGER NOT NULL DEFAULT 0,
-  latitud REAL,
-  longitud REAL,
-  fecha_revision TEXT NOT NULL,
-  fecha_creacion TEXT NOT NULL,
-  fecha_actualizacion TEXT,
-  sincronizado INTEGER NOT NULL DEFAULT 0,
-  FOREIGN KEY (equipo_id) REFERENCES equipos (id),
-  FOREIGN KEY (id_clientes) REFERENCES clientes (id)
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    equipo_cliente_id INTEGER NOT NULL,
+    en_local INTEGER NOT NULL DEFAULT 0,
+    latitud REAL,
+    longitud REAL,
+    fecha_revision TEXT NOT NULL,
+    fecha_creacion TEXT NOT NULL,
+    fecha_actualizacion TEXT,
+    sincronizado INTEGER NOT NULL DEFAULT 0,
+    estado_censo TEXT DEFAULT 'creado',
+    FOREIGN KEY (equipo_cliente_id) REFERENCES equipo_cliente (id) ON DELETE CASCADE
   )
 ''');
     // Crear índices para mejorar rendimiento
@@ -356,7 +357,62 @@ class DatabaseHelper {
   // ================================================================
   // MÉTODOS ESPECÍFICOS DEL NEGOCIO ACTUALIZADOS
   // ================================================================
+// En DatabaseHelper - Métodos de sincronización masiva
+  Future<void> sincronizarUsuarios(List<dynamic> usuariosAPI) async {
+    logger.i('=== SINCRONIZANDO EN DATABASE_HELPER ===');
+    logger.i('Usuarios recibidos: ${usuariosAPI.length}');
 
+    await ejecutarTransaccion((txn) async {
+      await txn.delete('usuarios');
+      logger.i('Usuarios existentes eliminados');
+
+      for (var data in usuariosAPI) {
+        logger.i('Insertando usuario: $data');
+        await txn.insert('usuarios', {
+          'id': data['id'],
+          'nombre': data['nombre'],
+          'password': data['password'],
+          'rol': data['rol'],
+          'activo': 1,
+          'sincronizado': 1,
+          'fecha_creacion': DateTime.now().toIso8601String(),
+          'fecha_actualizacion': DateTime.now().toIso8601String(),
+        });
+      }
+    });
+
+    logger.i('=== SINCRONIZACIÓN COMPLETADA ===');
+  }
+
+  // Agregar este método en DatabaseHelper
+// Agregar este método en DatabaseHelper
+  Future<List<Usuario>> obtenerUsuarios() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('usuarios');
+
+    return List.generate(maps.length, (i) {
+      return Usuario.fromMap(maps[i]);
+    });
+  }
+
+  Future<void> sincronizarUsuarioCliente(List<dynamic> usuarioClienteAPI) async {
+    await ejecutarTransaccion((txn) async {
+      await txn.delete('usuario_cliente');
+
+      for (var data in usuarioClienteAPI) {
+        await txn.insert('usuario_cliente', {
+          'id': data['id'],
+          'usuario_id': data['usuario_id'],
+          'cliente_id': data['cliente_id'],
+          'fecha_asignacion': data['fecha_asignacion'],
+          'activo': data['activo'] ?? 1,
+          'sincronizado': 1,
+          'fecha_creacion': data['fecha_asignacion'],
+          'fecha_actualizacion': DateTime.now().toIso8601String(),
+        });
+      }
+    });
+  }
   Future<List<Map<String, dynamic>>> obtenerClientesConEquipos() async {
     const sql = '''
       SELECT 

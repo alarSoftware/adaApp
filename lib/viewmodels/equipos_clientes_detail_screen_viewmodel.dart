@@ -93,17 +93,25 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   // CARGAR ESTADO INICIAL Y HISTORIAL
   Future<void> _loadInitialState() async {
     try {
+      // Obtener el equipoClienteId de la relación
+      final equipoClienteId = equipoCliente.id; // Asumiendo que tienes el ID de la relación
+
+      // Si no tienes el ID directamente, puedes buscarlo:
+      // final equipoClienteId = await _estadoEquipoRepository.buscarEquipoClienteId(
+      //     equipoCliente.equipoId,
+      //     equipoCliente.clienteId
+      // );
+
+      if (equipoClienteId == null) {
+        _logger.w('No se encontró relación equipo_cliente');
+        return;
+      }
+
       // Cargar el estado más reciente
-      final estadoActual = await _estadoEquipoRepository.obtenerPorEquipoYCliente(
-          equipoCliente.equipoId,
-          equipoCliente.clienteId
-      );
+      final estadoActual = await _estadoEquipoRepository.obtenerUltimoEstado(equipoClienteId);
 
       // Cargar TODOS los registros de historial
-      final historialCompleto = await _estadoEquipoRepository.obtenerHistorialCompleto(
-          equipoCliente.equipoId,
-          equipoCliente.clienteId
-      );
+      final historialCompleto = await _estadoEquipoRepository.obtenerHistorialCompleto(equipoClienteId);
 
       // Tomar solo los últimos 5 para la UI
       final ultimos5 = historialCompleto.take(5).toList();
@@ -172,9 +180,13 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     try {
       _logger.i('🔄 Recargando historial completo...');
 
+      if (equipoCliente.id == null) {
+        _logger.w('⚠️ equipoCliente.id es null, no se puede recargar historial');
+        return;
+      }
+
       final historialCompleto = await _estadoEquipoRepository.obtenerHistorialCompleto(
-          equipoCliente.equipoId,
-          equipoCliente.clienteId
+          equipoCliente.id!
       );
 
       final ultimos5 = historialCompleto.take(5).toList();
@@ -239,16 +251,20 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         return; // No continuar sin GPS
       }
 
-      // Crear registro con GPS obligatorio
+// Verificar que tenemos el equipoClienteId
+      if (equipoCliente.id == null) {
+        _logger.w('No se puede crear estado: equipoCliente.id es null');
+        return; // o manejar el error apropiadamente
+      }
+
+// Crear registro con GPS obligatorio
       final nuevoEstado = await _estadoEquipoRepository.crearNuevoEstado(
-        equipoId: equipoCliente.equipoId,
-        clienteId: equipoCliente.clienteId,
-        enLocal: _estadoUbicacionEquipo!, // Ya validado que no es null
+        equipoClienteId: equipoCliente.id!,
+        enLocal: _estadoUbicacionEquipo!,
         fechaRevision: DateTime.now(),
         latitud: position.latitude,
         longitud: position.longitude,
       );
-
       // Actualizar estado local
 // Actualizar estado interno - NO el modelo que es inmutable
       _state = _state.copyWith(equipoEnLocal: _estadoUbicacionEquipo!);

@@ -115,6 +115,40 @@ class EquipoRepository extends BaseRepository<Equipo> {
     return maps.map((map) => fromMap(map)).toList();
   }
 
+  Future<List<Map<String, dynamic>>> buscarPorCodigoExacto({
+    required String codigoBarras,
+    bool soloActivos = true,
+  }) async {
+    final condiciones = <String>[];
+    final argumentos = <dynamic>[];
+
+    // ✅ BÚSQUEDA EXACTA - No parcial
+    condiciones.add('UPPER(e.cod_barras) = ?');
+    argumentos.add(codigoBarras.toUpperCase());
+
+    if (soloActivos) {
+      condiciones.add('e.activo = 1');
+    }
+
+    final whereClause = 'WHERE ${condiciones.join(' AND ')}';
+
+    final sql = '''
+    SELECT e.*, 
+           m.nombre as marca_nombre,
+           mo.nombre as modelo_nombre,
+           l.nombre as logo_nombre
+    FROM equipos e
+    LEFT JOIN marcas m ON e.marca_id = m.id
+    LEFT JOIN modelos mo ON e.modelo_id = mo.id
+    LEFT JOIN logo l ON e.logo_id = l.id
+    $whereClause
+    ORDER BY e.fecha_creacion DESC
+    LIMIT 1
+  ''';
+
+    return await dbHelper.consultarPersonalizada(sql, argumentos);
+  }
+
   /// Buscar por código de barras
   Future<Equipo?> buscarPorCodigoBarras(String codBarras) async {
     final maps = await dbHelper.consultar(
@@ -254,12 +288,12 @@ class EquipoRepository extends BaseRepository<Equipo> {
   }
 
   /// Buscar equipos con filtros avanzados - CORREGIDO
-  Future<List<Map<String, dynamic>>> buscarConFiltros({
+  Future<List<Map<String, dynamic>>> buscarConFiltrosLike({
     int? marcaId,
-    int? modeloId, // CAMBIADO: de String modelo a int modeloId
+    int? modeloId,
     int? logoId,
     String? numeroSerie,
-    String? codigoBarras,
+    String? codigoBarras, // Esta sigue siendo búsqueda parcial para filtros
     bool? soloActivos,
     bool? soloDisponibles,
     DateTime? fechaDesde,

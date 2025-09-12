@@ -1,14 +1,20 @@
+import 'dart:convert';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:bcrypt/bcrypt.dart';
+import 'package:http/http.dart' as http;
+import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/sync_service.dart';
+import 'package:ada_app/models/usuario.dart';
 
 var logger = Logger();
 
 class AuthService {
-  // Credenciales de prueba
-  static const Map<String, String> _defaultCredentials = {
+  // 🧪 Credenciales de prueba (fallback si falla todo lo demás)
+  static const Map<String, String> _credencialesPrueba = {
     'admin': 'admin123',
-    'usuario': 'usuario123',
-    'supervisor': 'super456',
+    'test': 'test123',
+    'demo': 'demo123',
   };
 
   // Keys para SharedPreferences
@@ -22,27 +28,226 @@ class AuthService {
   AuthService._internal();
   factory AuthService() => _instance ??= AuthService._internal();
 
-  // 🔑 Login básico mejorado
-  Future<AuthResult> login(String username, String password) async {
-    logger.i('🔑 Intentando login para: $username');
+  static final _dbHelper = DatabaseHelper();
 
-    if (_defaultCredentials.containsKey(username) &&
-        _defaultCredentials[username] == password) {
+  // Agregar este método en AuthService
+  static Future<SyncResult> sincronizarSoloUsuarios() async {
+    try {
+      logger.i('🔄 Sincronizando solo usuarios...');
 
-      // Guardar que el usuario ya se logueó antes
-      await _saveLoginSuccess(username);
+      final response = await http.get(
+        Uri.parse('${SyncService.baseUrl}/usuarios'),
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'Accept': 'application/json',
+        },
+      ).timeout(Duration(seconds: 10));
 
-      logger.i('✅ Login exitoso para: $username');
+      if (response.statusCode == 200) {
+        final List<dynamic> usuariosAPI = jsonDecode(response.body);
+
+        // Procesar hashes bcrypt si es necesario
+        final usuariosProcesados = usuariosAPI.map((usuario) {
+          String password = usuario['password'].toString();
+
+          if (password.startsWith('{bcrypt}')) {
+            password = password.substring(8);
+          }
+
+          return {
+            'id': usuario['id'],
+            'nombre': usuario['nombre'],
+            'password': password,
+            'rol': usuario['rol'],
+          };
+        }).toList();
+
+        await _dbHelper.sincronizarUsuarios(usuariosProcesados);
+
+        return SyncResult(
+          exito: true,
+          mensaje: 'Usuarios sincronizados',
+          itemsSincronizados: usuariosAPI.length,
+        );
+      } else {
+        return SyncResult(
+          exito: false,
+          mensaje: 'Error del servidor: ${response.statusCode}',
+          itemsSincronizados: 0,
+        );
+      }
+    } catch (e) {
+      return SyncResult(
+        exito: false,
+        mensaje: 'Error de conexión: $e',
+        itemsSincronizados: 0,
+      );
+    }
+  }
+
+  // 🔑 Login híbrido (online/offline) con soporte bcrypt + credenciales de prueba
+  Future<AuthResult> login(String nombre, String password) async {
+    logger.i('🔑 Intentando login para: $nombre');
+
+    // 1. Intentar login online primero
+    final loginOnline = await _intentarLoginOnline(nombre, password);
+    if (loginOnline.exitoso) {
+      await _saveLoginSuccess(loginOnline.usuario!);
+      return loginOnline;
+    }
+
+    // 2. Si falla online, intentar offline con datos sincronizados
+    final loginOffline = await _loginOffline(nombre, password);
+    if (loginOffline.exitoso) {
+      await _saveLoginSuccess(loginOffline.usuario!);
+      return loginOffline;
+    }
+
+    // 3. Como último recurso, verificar credenciales de prueba
+    final loginPrueba = await _loginConCredencialesPrueba(nombre, password);
+    if (loginPrueba.exitoso) {
+      await _saveLoginSuccess(loginPrueba.usuario!);
+    }
+
+    return loginPrueba;
+  }
+
+  // 🧪 Login con credenciales de prueba (último recurso)
+  Future<AuthResult> _loginConCredencialesPrueba(String nombre, String password) async {
+    logger.i('🧪 Verificando credenciales de prueba...');
+
+    if (_credencialesPrueba.containsKey(nombre.toLowerCase()) &&
+        _credencialesPrueba[nombre.toLowerCase()] == password) {
+
+      final usuario = UsuarioAuth(
+        id: 999, // ID temporal
+        username: nombre,
+        rol: nombre.toLowerCase() == 'admin' ? 'admin' : 'vendedor',
+      );
+
+      logger.i('✅ Login con credenciales de prueba exitoso para: $nombre');
       return AuthResult(
         exitoso: true,
-        mensaje: 'Bienvenido, $username',
-        usuario: Usuario(username: username, rol: _getRolByUsername(username)),
+        mensaje: 'Bienvenido, $nombre (modo prueba)',
+        usuario: usuario,
+        esOnline: false,
       );
-    } else {
-      logger.w('❌ Credenciales incorrectas para: $username');
+    }
+
+    logger.w('❌ Todas las opciones de login fallaron para: $nombre');
+    return AuthResult(
+      exitoso: false,
+      mensaje: 'Credenciales incorrectas. Verifica usuario y contraseña o sincroniza datos.',
+    );
+  }
+
+  // 🌐 Intentar login online
+  Future<AuthResult> _intentarLoginOnline(String nombre, String password) async {
+    try {
+      logger.i('🌐 Intentando login online...');
+
+      final response = await http.post(
+        Uri.parse('${SyncService.baseUrl}/login'),
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({'nombre': nombre, 'password': password}),
+      ).timeout(Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          final usuarioData = data['usuario'];
+          final usuario = UsuarioAuth(
+            id: usuarioData['id'],
+            username: usuarioData['nombre'],
+            rol: usuarioData['rol'],
+          );
+
+          logger.i('✅ Login online exitoso para: $nombre');
+          return AuthResult(
+            exitoso: true,
+            mensaje: 'Bienvenido, $nombre (online)',
+            usuario: usuario,
+            esOnline: true,
+          );
+        }
+      } else if (response.statusCode == 401) {
+        return AuthResult(
+          exitoso: false,
+          mensaje: 'Credenciales incorrectas (servidor)',
+        );
+      }
+    } catch (e) {
+      logger.w('🌐 Error en login online: $e');
+    }
+
+    return AuthResult(exitoso: false, mensaje: 'Sin conexión');
+  }
+
+  // 📱 Login offline con datos sincronizados
+  Future<AuthResult> _loginOffline(String nombre, String password) async {
+    try {
+      logger.i('📱 Intentando login offline...');
+
+      final usuarios = await _dbHelper.obtenerUsuarios();
+
+      // Buscar usuarios que coincidan
+      final usuariosEncontrados = usuarios.where(
+            (u) => u.nombre.toLowerCase() == nombre.toLowerCase(),
+      );
+
+      if (usuariosEncontrados.isEmpty) {
+        logger.w('❌ Usuario no encontrado offline: $nombre');
+        return AuthResult(
+          exitoso: false,
+          mensaje: 'Usuario no encontrado. Sincroniza datos primero.',
+        );
+      }
+
+      final usuario = usuariosEncontrados.first;
+
+      bool passwordValido = false;
+
+      // Validar según el tipo de password
+      if (usuario.password.startsWith('{bcrypt}')) {
+        // Hash bcrypt
+        final hash = usuario.password.substring(8);
+        passwordValido = BCrypt.checkpw(password, hash);
+        logger.i('Validando con bcrypt para: $nombre');
+      } else {
+        // Password en texto plano (temporal)
+        passwordValido = usuario.password == password;
+        logger.i('Validando texto plano para: $nombre');
+      }
+
+      if (passwordValido) {
+        final usuarioAuth = UsuarioAuth(
+          id: usuario.id,
+          username: usuario.nombre,
+          rol: usuario.rol,
+        );
+
+        logger.i('Login exitoso para: $nombre');
+        return AuthResult(
+          exitoso: true,
+          mensaje: 'Bienvenido, $nombre',
+          usuario: usuarioAuth,
+          esOnline: false,
+        );
+      } else {
+        logger.w('Contraseña incorrecta offline para: $nombre');
+        return AuthResult(
+          exitoso: false,
+          mensaje: 'Contraseña incorrecta',
+        );
+      }
+    } catch (e) {
+      logger.e('❌ Error en login offline: $e');
       return AuthResult(
         exitoso: false,
-        mensaje: 'Usuario o contraseña incorrectos',
+        mensaje: 'Error en login offline: $e',
       );
     }
   }
@@ -62,23 +267,23 @@ class AuthService {
   }
 
   // 💾 Guardar estado de login exitoso
-  Future<void> _saveLoginSuccess(String username) async {
+  Future<void> _saveLoginSuccess(UsuarioAuth usuario) async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
       await prefs.setBool(_keyHasLoggedIn, true);
-      await prefs.setString(_keyCurrentUser, username);
-      await prefs.setString(_keyCurrentUserRole, _getRolByUsername(username));
+      await prefs.setString(_keyCurrentUser, usuario.username);
+      await prefs.setString(_keyCurrentUserRole, usuario.rol);
       await prefs.setString(_keyLastLoginDate, DateTime.now().toIso8601String());
 
-      logger.i('💾 Sesión guardada para: $username');
+      logger.i('💾 Sesión guardada para: ${usuario.username}');
     } catch (e) {
       logger.e('❌ Error guardando sesión: $e');
     }
   }
 
   // 👤 Obtener usuario actual (si existe sesión)
-  Future<Usuario?> getCurrentUser() async {
+  Future<UsuarioAuth?> getCurrentUser() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final username = prefs.getString(_keyCurrentUser);
@@ -86,7 +291,7 @@ class AuthService {
 
       if (username != null && role != null) {
         logger.i('👤 Usuario actual: $username ($role)');
-        return Usuario(username: username, rol: role);
+        return UsuarioAuth(id: null, username: username, rol: role);
       }
 
       logger.i('👤 No hay usuario logueado');
@@ -212,37 +417,35 @@ class AuthService {
       return {};
     }
   }
-
-  // Obtener rol (método privado existente)
-  String _getRolByUsername(String username) {
-    switch (username.toLowerCase()) {
-      case 'admin':
-        return 'Administrador';
-      case 'supervisor':
-        return 'Supervisor';
-      case 'usuario':
-      default:
-        return 'Usuario';
-    }
-  }
 }
 
-// Resultado del login
+// Resultado del login actualizado
 class AuthResult {
   final bool exitoso;
   final String mensaje;
-  final Usuario? usuario;
+  final UsuarioAuth? usuario;
+  final bool esOnline;
 
-  AuthResult({required this.exitoso, required this.mensaje, this.usuario});
+  AuthResult({
+    required this.exitoso,
+    required this.mensaje,
+    this.usuario,
+    this.esOnline = false,
+  });
 }
 
-// Usuario
-class Usuario {
+// Usuario para autenticación
+class UsuarioAuth {
+  final int? id;
   final String username;
   final String rol;
 
-  Usuario({required this.username, required this.rol});
+  UsuarioAuth({
+    this.id,
+    required this.username,
+    required this.rol,
+  });
 
   @override
-  String toString() => 'Usuario(username: $username, rol: $rol)';
+  String toString() => 'UsuarioAuth(id: $id, username: $username, rol: $rol)';
 }

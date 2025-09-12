@@ -18,31 +18,30 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   String getDefaultOrderBy() => 'fecha_revision DESC';
 
   @override
-  String getBuscarWhere() => 'CAST(equipo_id AS TEXT) LIKE ? OR CAST(id_clientes AS TEXT) LIKE ?';
+  String getBuscarWhere() => 'CAST(equipo_cliente_id AS TEXT) LIKE ?';
 
   @override
   List<dynamic> getBuscarArgs(String query) {
     final searchTerm = '%${query.toLowerCase()}%';
-    return [searchTerm, searchTerm];
+    return [searchTerm];
   }
 
   @override
   String getEntityName() => 'EstadoEquipo';
 
-  // ========== MÉTODOS ESPECÍFICOS PARA ESTADO_EQUIPO ==========
+  // ========== MÉTODOS ESPECÍFICOS PARA ESTADO_EQUIPO (NUEVA ESTRUCTURA) ==========
 
   /// Crear nuevo estado con GPS
   Future<EstadoEquipo> crearNuevoEstado({
-    required int equipoId,
-    required int clienteId,
+    required int equipoClienteId,
     required bool enLocal,
     required DateTime fechaRevision,
     double? latitud,
     double? longitud,
+    String? estadoCenso,
   }) async {
     final nuevoEstado = EstadoEquipo(
-      equipoId: equipoId,
-      clienteId: clienteId,
+      equipoClienteId: equipoClienteId,
       enLocal: enLocal,
       fechaRevision: fechaRevision,
       fechaCreacion: DateTime.now(),
@@ -50,6 +49,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       estaSincronizado: false,
       latitud: latitud,
       longitud: longitud,
+      estadoCenso: estadoCenso ?? 'creado',
     );
 
     final id = await insertar(nuevoEstado);
@@ -58,14 +58,12 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
 
   /// Registrar escaneo de equipo con ubicación
   Future<EstadoEquipo> registrarEscaneoEquipo({
-    required int equipoId,
-    required int clienteId,
+    required int equipoClienteId,
     required double latitud,
     required double longitud,
   }) async {
     final nuevoEstado = EstadoEquipo(
-      equipoId: equipoId,
-      clienteId: clienteId,
+      equipoClienteId: equipoClienteId,
       enLocal: true,
       fechaRevision: DateTime.now(),
       fechaCreacion: DateTime.now(),
@@ -73,19 +71,20 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       estaSincronizado: false,
       latitud: latitud,
       longitud: longitud,
+      estadoCenso: 'creado',
     );
 
     final id = await insertar(nuevoEstado);
     return nuevoEstado.copyWith(id: id);
   }
 
-  /// Obtener historial completo por equipo y cliente
-  Future<List<EstadoEquipo>> obtenerHistorialCompleto(int equipoId, int clienteId) async {
+  /// Obtener historial completo por equipo_cliente_id
+  Future<List<EstadoEquipo>> obtenerHistorialCompleto(int equipoClienteId) async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
-        where: 'equipo_id = ? AND id_clientes = ?',
-        whereArgs: [equipoId, clienteId],
+        where: 'equipo_cliente_id = ?',
+        whereArgs: [equipoClienteId],
         orderBy: 'fecha_revision DESC',
       );
       return maps.map((map) => fromMap(map)).toList();
@@ -95,29 +94,29 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-  /// Obtener estados por equipo y cliente (MÉTODO ÚNICO)
-  Future<List<EstadoEquipo>> obtenerPorEquipoCliente(int equipoId, int clienteId) async {
+  /// Obtener estados por equipo_cliente_id
+  Future<List<EstadoEquipo>> obtenerPorEquipoCliente(int equipoClienteId) async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
-        where: 'equipo_id = ? AND id_clientes = ?',
-        whereArgs: [equipoId, clienteId],
+        where: 'equipo_cliente_id = ?',
+        whereArgs: [equipoClienteId],
         orderBy: 'fecha_revision DESC',
       );
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
-      _logger.e('Error al obtener estados por equipo y cliente: $e');
+      _logger.e('Error al obtener estados por equipo cliente: $e');
       return [];
     }
   }
 
-  /// Obtener estado más reciente por equipo y cliente
-  Future<EstadoEquipo?> obtenerUltimoEstadoPorEquipoCliente(int equipoId, int clienteId) async {
+  /// Obtener estado más reciente por equipo_cliente_id
+  Future<EstadoEquipo?> obtenerUltimoEstado(int equipoClienteId) async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
-        where: 'equipo_id = ? AND id_clientes = ?',
-        whereArgs: [equipoId, clienteId],
+        where: 'equipo_cliente_id = ?',
+        whereArgs: [equipoClienteId],
         orderBy: 'fecha_revision DESC',
         limit: 1,
       );
@@ -128,29 +127,13 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-  /// Obtener estados por equipo (todos los clientes)
-  Future<List<EstadoEquipo>> obtenerPorEquipo(int equipoId) async {
-    try {
-      final maps = await dbHelper.consultar(
-        tableName,
-        where: 'equipo_id = ?',
-        whereArgs: [equipoId],
-        orderBy: getDefaultOrderBy(),
-      );
-      return maps.map((map) => fromMap(map)).toList();
-    } catch (e) {
-      _logger.e('Error al obtener estados por equipo: $e');
-      return [];
-    }
-  }
-
   /// Obtener últimos N cambios
-  Future<List<EstadoEquipo>> obtenerUltimosCambios(int equipoId, int clienteId, {int limite = 5}) async {
+  Future<List<EstadoEquipo>> obtenerUltimosCambios(int equipoClienteId, {int limite = 5}) async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
-        where: 'equipo_id = ? AND id_clientes = ?',
-        whereArgs: [equipoId, clienteId],
+        where: 'equipo_cliente_id = ?',
+        whereArgs: [equipoClienteId],
         orderBy: 'fecha_revision DESC',
         limit: limite,
       );
@@ -162,6 +145,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   /// Obtener registros no sincronizados
+  @override
   Future<List<EstadoEquipo>> obtenerNoSincronizados() async {
     try {
       final maps = await dbHelper.consultar(
@@ -215,13 +199,13 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-  /// Contar cambios por equipo y cliente
-  Future<int> contarCambios(int equipoId, int clienteId) async {
+  /// Contar cambios por equipo_cliente_id
+  Future<int> contarCambios(int equipoClienteId) async {
     try {
       final result = await dbHelper.consultar(
         tableName,
-        where: 'equipo_id = ? AND id_clientes = ?',
-        whereArgs: [equipoId, clienteId],
+        where: 'equipo_cliente_id = ?',
+        whereArgs: [equipoClienteId],
       );
       return result.length;
     } catch (e) {
@@ -231,9 +215,9 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   /// Obtener estadísticas de cambios
-  Future<Map<String, dynamic>> obtenerEstadisticasCambios(int equipoId, int clienteId) async {
+  Future<Map<String, dynamic>> obtenerEstadisticasCambios(int equipoClienteId) async {
     try {
-      final historial = await obtenerHistorialCompleto(equipoId, clienteId);
+      final historial = await obtenerHistorialCompleto(equipoClienteId);
 
       if (historial.isEmpty) {
         return {
@@ -263,20 +247,33 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-  /// Obtener último estado del equipo (para compatibilidad)
-  Future<Map<String, dynamic>?> obtenerUltimoEstadoEquipo(int equipoId, int clienteId) async {
+  /// Obtener estado del equipo con datos completos (con JOIN)
+  Future<Map<String, dynamic>?> obtenerEstadoConDetalles(int equipoClienteId) async {
     try {
-      final maps = await dbHelper.consultar(
-        tableName,
-        where: 'equipo_id = ? AND id_clientes = ?',
-        whereArgs: [equipoId, clienteId],
-        orderBy: 'fecha_revision DESC',
-        limit: 1,
-      );
+      final sql = '''
+        SELECT se.*,
+               ec.equipo_id,
+               ec.cliente_id,
+               e.cod_barras,
+               e.numero_serie,
+               m.nombre as marca_nombre,
+               mo.nombre as modelo_nombre,
+               c.nombre as cliente_nombre
+        FROM Estado_Equipo se
+        JOIN equipo_cliente ec ON se.equipo_cliente_id = ec.id
+        JOIN equipos e ON ec.equipo_id = e.id
+        JOIN marcas m ON e.marca_id = m.id
+        JOIN modelos mo ON e.modelo_id = mo.id
+        JOIN clientes c ON ec.cliente_id = c.id
+        WHERE se.equipo_cliente_id = ?
+        ORDER BY se.fecha_revision DESC
+        LIMIT 1
+      ''';
 
-      return maps.isNotEmpty ? maps.first : null;
+      final result = await dbHelper.consultarPersonalizada(sql, [equipoClienteId]);
+      return result.isNotEmpty ? result.first : null;
     } catch (e) {
-      _logger.e('Error obteniendo último estado del equipo $equipoId para cliente $clienteId: $e');
+      _logger.e('Error obteniendo estado con detalles: $e');
       return null;
     }
   }
@@ -285,7 +282,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   Future<List<Map<String, dynamic>>> prepararDatosParaSincronizacion() async {
     try {
       final noSincronizados = await obtenerNoSincronizados();
-      return noSincronizados.map((estado) => estado.toMap()).toList();
+      return noSincronizados.map((estado) => estado.toJson()).toList();
     } catch (e) {
       _logger.e('Error al preparar datos para sincronización: $e');
       return [];
@@ -308,20 +305,65 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-  // ========== MÉTODOS LEGACY (DEPRECATED) ==========
+  // ========== MÉTODOS DE COMPATIBILIDAD (Para migración gradual) ==========
 
-  @Deprecated('Usar crearNuevoEstado() en su lugar')
+  /// Buscar equipoClienteId basado en equipoId y clienteId
+  Future<int?> buscarEquipoClienteId(int equipoId, int clienteId) async {
+    try {
+      final result = await dbHelper.consultar(
+        'equipo_cliente',
+        where: 'equipo_id = ? AND cliente_id = ? AND activo = 1',
+        whereArgs: [equipoId, clienteId],
+        limit: 1,
+      );
+      return result.isNotEmpty ? result.first['id'] as int : null;
+    } catch (e) {
+      _logger.e('Error buscando equipo_cliente_id: $e');
+      return null;
+    }
+  }
+
+  /// Método de compatibilidad - buscar por equipoId y clienteId
+  Future<EstadoEquipo?> obtenerUltimoEstadoPorEquipoCliente(int equipoId, int clienteId) async {
+    final equipoClienteId = await buscarEquipoClienteId(equipoId, clienteId);
+    if (equipoClienteId == null) return null;
+
+    return await obtenerUltimoEstado(equipoClienteId);
+  }
+
+  /// Método de compatibilidad - crear estado con equipoId y clienteId
+  Future<EstadoEquipo?> crearNuevoEstadoLegacy({
+    required int equipoId,
+    required int clienteId,
+    required bool enLocal,
+    required DateTime fechaRevision,
+    double? latitud,
+    double? longitud,
+  }) async {
+    final equipoClienteId = await buscarEquipoClienteId(equipoId, clienteId);
+    if (equipoClienteId == null) {
+      _logger.w('No se encontró relación equipo_cliente para equipoId: $equipoId, clienteId: $clienteId');
+      return null;
+    }
+
+    return await crearNuevoEstado(
+      equipoClienteId: equipoClienteId,
+      enLocal: enLocal,
+      fechaRevision: fechaRevision,
+      latitud: latitud,
+      longitud: longitud,
+    );
+  }
+
+  // ========== MÉTODOS DEPRECATED ==========
+
+  @Deprecated('Usar crearNuevoEstado() con equipoClienteId')
   Future<void> actualizarEstadoEquipo(int equipoId, int clienteId, bool enLocal) async {
-    await crearNuevoEstado(
+    await crearNuevoEstadoLegacy(
       equipoId: equipoId,
       clienteId: clienteId,
       enLocal: enLocal,
       fechaRevision: DateTime.now(),
     );
-  }
-
-  @Deprecated('Usar obtenerUltimoEstadoPorEquipoCliente() en su lugar')
-  Future<EstadoEquipo?> obtenerPorEquipoYCliente(int equipoId, int clienteId) async {
-    return await obtenerUltimoEstadoPorEquipoCliente(equipoId, clienteId);
   }
 }

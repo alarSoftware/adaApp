@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/services/sync_service.dart';
+
 
 class LoginScreenViewModel extends ChangeNotifier {
   final _authService = AuthService();
@@ -19,6 +21,7 @@ class LoginScreenViewModel extends ChangeNotifier {
   bool _biometricAvailable = false;
   bool _usernameValid = false;
   bool _passwordValid = false;
+  bool _isSyncingUsers = false;
   String? _errorMessage;
 
   // Getters
@@ -27,6 +30,7 @@ class LoginScreenViewModel extends ChangeNotifier {
   bool get biometricAvailable => _biometricAvailable;
   bool get usernameValid => _usernameValid;
   bool get passwordValid => _passwordValid;
+  bool get isSyncingUsers => _isSyncingUsers;
   String? get errorMessage => _errorMessage;
 
   LoginScreenViewModel() {
@@ -61,6 +65,25 @@ class LoginScreenViewModel extends ChangeNotifier {
       if (_errorMessage != null) {
         _errorMessage = null;
       }
+      notifyListeners();
+    }
+  }
+
+  Future<SyncResult> syncUsers() async {
+    _isSyncingUsers = true;
+    notifyListeners();
+
+    try {
+      final SyncResult resultado = await SyncService.sincronizarUsuarios();
+      return resultado;
+    } catch (e) {
+      return SyncResult(
+        exito: false,
+        mensaje: 'Error: $e',
+        itemsSincronizados: 0,
+      );
+    } finally {
+      _isSyncingUsers = false;
       notifyListeners();
     }
   }
@@ -230,3 +253,4 @@ class AuthResult {
     this.icon,
   });
 }
+

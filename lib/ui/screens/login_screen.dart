@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:ada_app/viewmodels/login_screen_viewmodel.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -17,6 +18,27 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+
+  Future<void> _syncUsers(LoginScreenViewModel viewModel) async {
+    try {
+      final resultado = await viewModel.syncUsers();
+
+      if (mounted) {
+        if (resultado.exito) {
+          _showSuccessSnackBar(
+            '${resultado.itemsSincronizados} usuarios sincronizados',
+            Icons.cloud_done,
+          );
+        } else {
+          _showErrorSnackBar(resultado.mensaje);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('Error al sincronizar usuarios: $e');
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -123,11 +145,15 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       create: (context) => LoginScreenViewModel(),
       child: Scaffold(
         backgroundColor: AppColors.background,
+        appBar: _buildAppBar(),
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
               padding: EdgeInsets.symmetric(
-                horizontal: MediaQuery.of(context).size.width < 600 ? 24.0 : 32.0,
+                horizontal: MediaQuery
+                    .of(context)
+                    .size
+                    .width < 600 ? 24.0 : 32.0,
                 vertical: 24.0,
               ),
               child: FadeTransition(
@@ -241,14 +267,16 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         labelText: 'Usuario',
         prefixIcon: Icon(
           Icons.person_outline_rounded,
-          color: AppColors.getValidationIconColor(viewModel.usernameValid, hasContent),
+          color: AppColors.getValidationIconColor(
+              viewModel.usernameValid, hasContent),
         ),
         suffixIcon: hasContent
             ? Icon(
           viewModel.usernameValid
               ? Icons.check_circle_outline
               : Icons.error_outline,
-          color: AppColors.getValidationIconColor(viewModel.usernameValid, hasContent) ,
+          color: AppColors.getValidationIconColor(
+              viewModel.usernameValid, hasContent),
           size: 20,
         )
             : null,
@@ -259,7 +287,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(
-            color: AppColors.getValidationBorderColor(viewModel.usernameValid, hasContent),
+            color: AppColors.getValidationBorderColor(
+                viewModel.usernameValid, hasContent),
           ),
         ),
         focusedBorder: OutlineInputBorder(
@@ -300,7 +329,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         hintText: 'Ingresa tu contraseña',
         prefixIcon: Icon(
           Icons.lock_outline_rounded,
-          color: AppColors.getValidationIconColor(viewModel.passwordValid, hasContent),
+          color: AppColors.getValidationIconColor(
+              viewModel.passwordValid, hasContent),
         ),
         suffixIcon: Row(
           mainAxisSize: MainAxisSize.min,
@@ -310,7 +340,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 viewModel.passwordValid
                     ? Icons.check_circle_outline
                     : Icons.error_outline,
-                color: AppColors.getValidationIconColor(viewModel.passwordValid, hasContent),
+                color: AppColors.getValidationIconColor(
+                    viewModel.passwordValid, hasContent),
                 size: 20,
               ),
             const SizedBox(width: 8),
@@ -335,7 +366,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(
-            color: AppColors.getValidationBorderColor(viewModel.passwordValid, hasContent),
+            color: AppColors.getValidationBorderColor(
+                viewModel.passwordValid, hasContent),
           ),
         ),
         focusedBorder: OutlineInputBorder(
@@ -407,6 +439,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     );
   }
 
+
   Widget _buildLoginButton(LoginScreenViewModel viewModel) {
     return SizedBox(
       height: 54,
@@ -431,7 +464,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             height: 20,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.buttonTextPrimary),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                  AppColors.buttonTextPrimary),
             ),
           )
               : const Text(
@@ -507,18 +541,55 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     );
   }
 
+
   Widget _buildFooter() {
-    return Semantics(
-      label: 'Información de copyright',
-      child: Text(
-        '© 2025 Alarsoftware. Todos los derechos reservados.',
-        style: TextStyle(
-          color: AppColors.textSecondary,
-          fontSize: 12,
-          fontWeight: FontWeight.w400,
+    return Consumer<LoginScreenViewModel>(
+      builder: (context, viewModel, child) {
+        return Column(
+          children: [
+            // Botón de sincronización discreto
+            // Copyright existente
+            Text(
+              '© 2025 Alarsoftware. Todos los derechos reservados.',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      actions: [
+        Padding(
+          padding: EdgeInsets.only(right: 8),
+          child: Consumer<LoginScreenViewModel>(
+            builder: (context, viewModel, child) {
+              return IconButton(
+                onPressed: viewModel.isSyncingUsers ? null : () =>
+                    _syncUsers(viewModel),
+                icon: viewModel.isSyncingUsers
+                    ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2)
+                )
+                    : Icon(
+                    Icons.cloud_sync, color: AppColors.textSecondary, size: 20),
+                tooltip: 'Sincronizar usuarios',
+              );
+            },
+          ),
         ),
-        textAlign: TextAlign.center,
-      ),
+      ],
     );
   }
 }
