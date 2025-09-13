@@ -451,6 +451,8 @@ class _FormsScreenState extends State<FormsScreen> {
             _buildLogoDropdown(),
             const SizedBox(height: 16),
             _buildSerieField(),
+            const SizedBox(height: 16,),
+            _buildImagenField(),
           ],
         ),
       ),
@@ -701,6 +703,76 @@ class _FormsScreenState extends State<FormsScreen> {
                 },
               ),
             ),
+          ],
+        );
+      },
+    );
+  }
+  Widget _buildImagenField() {
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, child) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Imagen del equipo:',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Vista previa de la imagen
+            if (_viewModel.imagenSeleccionada != null) ...[
+              Container(
+                height: 200,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(
+                    _viewModel.imagenSeleccionada!,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // Solo botón de cámara
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _viewModel.tomarFoto,
+                icon: const Icon(Icons.camera_alt),
+                label: const Text('Tomar foto del equipo'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(color: AppColors.primary),
+                  foregroundColor: AppColors.primary,
+                ),
+              ),
+            ),
+
+            if (_viewModel.imagenSeleccionada != null) ...[
+              const SizedBox(height: 8),
+              Center(
+                child: TextButton.icon(
+                  onPressed: _viewModel.eliminarImagen,
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('Eliminar imagen'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                  ),
+                ),
+              ),
+            ],
           ],
         );
       },

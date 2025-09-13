@@ -9,6 +9,8 @@ import 'package:logger/logger.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:barcode_scan2/barcode_scan2.dart';
 import 'package:ada_app/repositories/equipo_cliente_repository.dart';
+import 'package:ada_app/services/image_service.dart';
+import 'dart:io';
 
 // Eventos UI
 abstract class FormsUIEvent {}
@@ -51,10 +53,11 @@ class DialogAction {
     this.isDefault = false,
   });
 }
-
+//Variables existentes
 class FormsScreenViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
   final EquipoClienteRepository _equipoClienteRepository = EquipoClienteRepository();
+  final ImageService _imageService = ImageService();
 
   // Controladores de texto
   final TextEditingController codigoBarrasController = TextEditingController();
@@ -68,6 +71,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   List<Map<String, dynamic>> _logos = [];
   int? _logoSeleccionado;
   Cliente? _cliente;
+  File? _imagenSeleccionada;
 
   // VARIABLES PARA PASAR AL PREVIEW - AQUÍ GUARDAMOS TODO PARA EL PREVIEW
   Map<String, dynamic>? _equipoCompleto;
@@ -79,6 +83,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   bool get isScanning => _isScanning;
   List<Map<String, dynamic>> get logos => _logos;
   int? get logoSeleccionado => _logoSeleccionado;
+  File? get imagenSeleccionada => _imagenSeleccionada; // <- MOVER AQUÍ
   Stream<FormsUIEvent> get uiEvents => _eventController.stream;
 
   late final StreamController<FormsUIEvent> _eventController;
@@ -203,6 +208,113 @@ class FormsScreenViewModel extends ChangeNotifier {
       _logger.e('Error buscando visicooler: $e', stackTrace: stackTrace);
       _limpiarDatosAutocompletados();
       _eventController.add(ShowSnackBarEvent('Error al consultar la base de datos', Colors.red));
+    }
+  }
+
+  // ===============================
+// LÓGICA DE NEGOCIO - IMÁGENES
+// ===============================
+
+  Future<void> tomarFoto() async {
+    try {
+      _logger.i('Iniciando captura de foto...');
+
+      final File? foto = await _imageService.tomarFoto();
+
+      if (foto != null) {
+        await _procesarImagenSeleccionada(foto);
+      } else {
+        _logger.i('Usuario canceló la captura de foto');
+      }
+    } catch (e) {
+      _logger.e('Error tomando foto: $e');
+      _eventController.add(ShowSnackBarEvent(
+          'Error al tomar la foto: $e',
+          Colors.red
+      ));
+    }
+  }
+
+
+  Future<void> _procesarImagenSeleccionada(File imagen) async {
+    try {
+      // Validar que sea una imagen válida
+      if (!_imageService.esImagenValida(imagen)) {
+        _eventController.add(ShowSnackBarEvent(
+            'El archivo seleccionado no es una imagen válida',
+            Colors.red
+        ));
+        return;
+      }
+
+      // Verificar tamaño de imagen
+      final double tamanoMB = await _imageService.obtenerTamanoImagen(imagen);
+      if (tamanoMB > 10.0) { // Límite de 10MB
+        _eventController.add(ShowSnackBarEvent(
+            'La imagen es demasiado grande (${tamanoMB.toStringAsFixed(1)}MB). Máximo 10MB.',
+            Colors.red
+        ));
+        return;
+      }
+
+      // Guardar imagen en el directorio de la app
+      final String codigoEquipo = codigoBarrasController.text.trim().isEmpty
+          ? 'temp_${DateTime.now().millisecondsSinceEpoch}'
+          : codigoBarrasController.text.trim();
+
+      final File imagenGuardada = await _imageService.guardarImagenEnApp(imagen, codigoEquipo);
+
+      // Eliminar imagen anterior si existe
+      if (_imagenSeleccionada != null) {
+        await _imageService.eliminarImagen(_imagenSeleccionada!);
+      }
+
+      _imagenSeleccionada = imagenGuardada;
+      _logger.i('Imagen procesada exitosamente: ${imagenGuardada.path}');
+
+      _eventController.add(ShowSnackBarEvent(
+          'Imagen agregada correctamente (${tamanoMB.toStringAsFixed(1)}MB)',
+          Colors.green
+      ));
+
+      notifyListeners();
+    } catch (e) {
+      _logger.e('Error procesando imagen: $e');
+      _eventController.add(ShowSnackBarEvent(
+          'Error al procesar la imagen: $e',
+          Colors.red
+      ));
+    }
+  }
+
+  Future<void> _eliminarImagenTemporal() async {
+    if (_imagenSeleccionada != null) {
+      try {
+        await _imageService.eliminarImagen(_imagenSeleccionada!);
+      } catch (e) {
+        _logger.w('No se pudo eliminar imagen temporal: $e');
+      }
+      _imagenSeleccionada = null;
+    }
+  }
+
+  Future<void> eliminarImagen() async {
+    if (_imagenSeleccionada != null) {
+      try {
+        await _imageService.eliminarImagen(_imagenSeleccionada!);
+        _imagenSeleccionada = null;
+        _eventController.add(ShowSnackBarEvent(
+            'Imagen eliminada',
+            Colors.orange
+        ));
+        notifyListeners();
+      } catch (e) {
+        _logger.e('Error eliminando imagen: $e');
+        _eventController.add(ShowSnackBarEvent(
+            'Error al eliminar la imagen',
+            Colors.red
+        ));
+      }
     }
   }
 
@@ -340,11 +452,15 @@ class FormsScreenViewModel extends ChangeNotifier {
     modeloController.clear();
     numeroSerieController.clear();
     _logoSeleccionado = null;
+    // Limpiar imagen
+    _eliminarImagenTemporal();
     // Limpiar datos del preview
     _equipoCompleto = null;
     _equipoYaAsignado = false;
     notifyListeners();
   }
+
+
 
   // ===============================
   // LÓGICA DE NEGOCIO - VALIDACIÓN
@@ -422,6 +538,7 @@ class FormsScreenViewModel extends ChangeNotifier {
       'logo_id': _logoSeleccionado,
       'logo': logoSeleccionado['nombre'],
       'numero_serie': numeroSerieController.text.trim(),
+      'imagen_path': _imagenSeleccionada?.path,
       'latitud': ubicacion['latitud'],
       'longitud': ubicacion['longitud'],
       'fecha_registro': DateTime.now().toIso8601String(),
