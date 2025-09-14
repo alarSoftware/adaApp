@@ -385,21 +385,30 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: backgroundColor,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: borderColor),
-                                ),
-                                child: Text(
-                                  isAsignado ? 'ASIGNADO' : 'PENDIENTE',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: equipoColor,
+                              // Contenedor para badge + ícono de sync en línea horizontal
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: backgroundColor,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: borderColor),
+                                    ),
+                                    child: Text(
+                                      isAsignado ? 'ASIGNADO' : 'PENDIENTE',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: equipoColor,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  // NUEVO: Ícono de sincronización compacto
+                                  const SizedBox(width: 6),
+                                  _buildSyncIcon(equipoData),
+                                ],
                               ),
                             ],
                           ),
@@ -454,6 +463,57 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
     );
   }
 
+  // MÉTODO SEPARADO PARA EL ÍCONO DE SINCRONIZACIÓN
+  Widget _buildSyncIcon(Map<String, dynamic> equipoData) {
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _viewModel.getEstadoCensoInfo(equipoData),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data == null) {
+          return SizedBox.shrink();
+        }
+
+        final estadoInfo = snapshot.data!;
+        Color iconColor;
+        IconData icon;
+        String tooltip;
+
+        if (estadoInfo['todos_migrados'] == true) {
+          iconColor = AppColors.success;
+          icon = Icons.cloud_done;
+          tooltip = 'Sincronizado con servidor';
+        } else if (estadoInfo['tiene_pendientes'] == true) {
+          iconColor = AppColors.warning;
+          icon = Icons.cloud_upload;
+          final pendientes = estadoInfo['pendientes_count'] ?? 0;
+          tooltip = pendientes > 1
+              ? '$pendientes registros pendientes'
+              : 'Sincronización pendiente';
+        } else {
+          return SizedBox.shrink();
+        }
+
+        return Tooltip(
+          message: tooltip,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: iconColor.withValues(alpha: 0.3),
+                width: 0.5,
+              ),
+            ),
+            child: Icon(
+              icon,
+              size: 14,
+              color: iconColor,
+            ),
+          ),
+        );
+      },
+    );
+  }
   Widget _buildLoadingState() {
     return Container(
       padding: const EdgeInsets.all(32),

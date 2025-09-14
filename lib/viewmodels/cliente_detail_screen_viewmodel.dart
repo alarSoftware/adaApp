@@ -6,6 +6,7 @@ import '../models/cliente.dart';
 import '../models/equipos_cliente.dart';
 import '../repositories/equipo_cliente_repository.dart';
 import '../repositories/estado_equipo_repository.dart'; // AGREGAR IMPORT
+import 'package:ada_app/models/estado_equipo.dart';
 
 // ========== EVENTOS PARA LA UI ==========
 abstract class ClienteDetailUIEvent {}
@@ -261,6 +262,39 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
       return 'Censado: ${formatearFecha(fecha)}';
     }
     return 'Fecha no disponible';
+  }
+
+  // Agregar al ClienteDetailScreenViewModel
+  Future<Map<String, dynamic>?> getEstadoCensoInfo(Map<String, dynamic> equipoData) async {
+    try {
+      final equipoClienteId = equipoData['id'] as int?;
+      if (equipoClienteId == null) return null;
+
+      // Obtener registros de estado de este equipo
+      final registrosEstado = await _estadoEquipoRepository.obtenerPorEquipoCliente(equipoClienteId);
+
+      if (registrosEstado.isEmpty) {
+        return null; // No hay registros de censo
+      }
+
+      // Contar registros por estado
+      final migrados = registrosEstado.where((r) => r.estadoCensoEnum == EstadoEquipoCenso.migrado).length;
+      final creados = registrosEstado.where((r) => r.estadoCensoEnum == EstadoEquipoCenso.creado).length;
+      final total = registrosEstado.length;
+
+      return {
+        'total_registros': total,
+        'migrados_count': migrados,
+        'pendientes_count': creados,
+        'todos_migrados': creados == 0 && migrados > 0,
+        'tiene_pendientes': creados > 0,
+        'ultimo_estado': registrosEstado.isNotEmpty ? registrosEstado.first.estadoCenso : null,
+      };
+
+    } catch (e) {
+      _logger.e('Error obteniendo estado censo: $e');
+      return null;
+    }
   }
 
   bool shouldShowCliente() => _cliente?.nombre.isNotEmpty == true;
