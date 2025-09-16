@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../../models/cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/preview_screen_viewmodel.dart';
+import 'dart:io';
+import 'dart:convert';
 
 class PreviewScreen extends StatefulWidget {
   final Map<String, dynamic> datos;
@@ -19,16 +21,79 @@ class PreviewScreen extends StatefulWidget {
 class _PreviewScreenState extends State<PreviewScreen> {
   late PreviewScreenViewModel viewModel;
 
+  // VARIABLES PARA MANEJO DE IMAGEN
+  String? _imagePath;
+  String? _imageBase64;
+
   @override
   void initState() {
     super.initState();
     viewModel = PreviewScreenViewModel();
+
+    // CARGAR IMAGEN QUE VIENE DE FORMSSCREEN
+    _cargarImagenInicial();
+  }
+
+  // CARGAR LA IMAGEN QUE VIENE DE LA PANTALLA ANTERIOR
+  Future<void> _cargarImagenInicial() async {
+    final imagenPath = widget.datos['imagen_path'] as String?;
+
+    if (imagenPath != null && imagenPath.isNotEmpty) {
+      try {
+        final file = File(imagenPath);
+        if (await file.exists()) {
+          // Convertir a Base64 para envio
+          final bytes = await file.readAsBytes();
+          final base64Data = base64Encode(bytes);
+
+          setState(() {
+            _imagePath = imagenPath;
+            _imageBase64 = base64Data;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error cargando imagen inicial: $e');
+      }
+    }
   }
 
   @override
   void dispose() {
     viewModel.dispose();
     super.dispose();
+  }
+
+  // AGREGAR DATOS DE IMAGEN ANTES DE ENVIAR
+  Future<void> _confirmarRegistro() async {
+    // Agregar datos de imagen a los datos del registro
+    final datosCompletos = Map<String, dynamic>.from(widget.datos);
+
+    if (_imagePath != null && _imageBase64 != null) {
+      // Calcular tamano
+      final bytes = base64Decode(_imageBase64!);
+
+      datosCompletos['imagen_path'] = _imagePath;
+      datosCompletos['imagen_base64'] = _imageBase64;
+      datosCompletos['tiene_imagen'] = true;
+      datosCompletos['imagen_tamano'] = bytes.length;
+    } else {
+      datosCompletos['tiene_imagen'] = false;
+      datosCompletos['imagen_path'] = null;
+      datosCompletos['imagen_base64'] = null;
+      datosCompletos['imagen_tamano'] = null;
+    }
+
+    final resultado = await viewModel.confirmarRegistro(datosCompletos);
+
+    if (mounted) {
+      if (resultado['success']) {
+        _mostrarSnackBar(resultado['message'], AppColors.success);
+        await Future.delayed(const Duration(seconds: 2));
+        Navigator.of(context).pop(true);
+      } else {
+        await _mostrarDialogoErrorConfirmacion(resultado['error']);
+      }
+    }
   }
 
   @override
@@ -68,7 +133,286 @@ class _PreviewScreenState extends State<PreviewScreen> {
           const SizedBox(height: 16),
           _buildUbicacionCard(),
           const SizedBox(height: 16),
+
+          // SECCION DE IMAGEN
+          _buildImagenCard(),
+          const SizedBox(height: 16),
         ],
+      ),
+    );
+  }
+
+  // TARJETA DE IMAGEN CON OPCION DE VER COMPLETA
+  Widget _buildImagenCard() {
+    return Card(
+      elevation: 2,
+      color: AppColors.surface,
+      shadowColor: AppColors.shadowLight,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: AppColors.border,
+          width: 0.5,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.camera_alt,
+                  color: AppColors.secondary,
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Imagen del Equipo',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (_imagePath != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green, size: 16),
+                        const SizedBox(width: 4),
+                        const Text(
+                          'Incluida',
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            Divider(height: 20, color: AppColors.border),
+
+            // SI HAY IMAGEN, MOSTRAR PREVIEW CON OPCION DE VER COMPLETA
+            if (_imagePath != null) ...[
+              GestureDetector(
+                onTap: () => _verImagenCompleta(),
+                child: Container(
+                  width: double.infinity,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(_imagePath!),
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey[200],
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.error, color: Colors.grey[600]),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Error cargando imagen',
+                                    style: TextStyle(color: Colors.grey[600]),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      // OVERLAY PARA INDICAR QUE SE PUEDE TOCAR
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.zoom_in, color: Colors.white, size: 16),
+                              const SizedBox(width: 4),
+                              const Text(
+                                'Ver',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // INFO DE LA IMAGEN
+              if (_imageBase64 != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info, color: AppColors.primary, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Imagen preparada para envio (${(base64Decode(_imageBase64!).length / (1024 * 1024)).toStringAsFixed(1)} MB). Toca para ver completa.',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 12,
+                          ),
+                          overflow: TextOverflow.visible,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ] else ...[
+              // SI NO HAY IMAGEN, MOSTRAR MENSAJE
+              Container(
+                width: double.infinity,
+                height: 120,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.border, style: BorderStyle.solid),
+                  color: Colors.grey[50],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.image_not_supported_outlined,
+                      color: Colors.grey[400],
+                      size: 32,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Sin imagen',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Use "Volver a Editar" para agregar una',
+                        style: TextStyle(
+                          color: Colors.grey[500],
+                          fontSize: 12,
+                        ),
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.visible,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // METODO PARA VER IMAGEN COMPLETA
+  void _verImagenCompleta() {
+    if (_imagePath == null) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Stack(
+          children: [
+            // IMAGEN A PANTALLA COMPLETA
+            Center(
+              child: InteractiveViewer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(
+                      File(_imagePath!),
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // BOTON DE CERRAR
+            Positioned(
+              top: 40,
+              right: 20,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -98,20 +442,23 @@ class _PreviewScreenState extends State<PreviewScreen> {
                   size: 24,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  'Información del Cliente',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                Expanded(
+                  child: Text(
+                    'Informacion del Cliente',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
             Divider(height: 20, color: AppColors.border),
             _buildInfoRow('Nombre', cliente.nombre, Icons.account_circle),
-            _buildInfoRow('Dirección', cliente.direccion, Icons.location_on),
-            _buildInfoRow('Teléfono', cliente.telefono ?? 'No especificado', Icons.phone),
+            _buildInfoRow('Direccion', cliente.direccion, Icons.location_on),
+            _buildInfoRow('Telefono', cliente.telefono ?? 'No especificado', Icons.phone),
           ],
         ),
       ),
@@ -143,19 +490,22 @@ class _PreviewScreenState extends State<PreviewScreen> {
                   size: 24,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  'Datos del Visicooler',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                Expanded(
+                  child: Text(
+                    'Datos del Visicooler',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
             Divider(height: 20, color: AppColors.border),
             _buildInfoRow(
-              'Código de Barras',
+              'Codigo de Barras',
               widget.datos['codigo_barras'] ?? 'No especificado',
               Icons.qr_code,
             ),
@@ -210,12 +560,15 @@ class _PreviewScreenState extends State<PreviewScreen> {
                   size: 24,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  'Información de Registro',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                Expanded(
+                  child: Text(
+                    'Informacion de Registro',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -269,6 +622,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -278,6 +632,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     fontWeight: FontWeight.w400,
                     color: AppColors.textPrimary,
                   ),
+                  overflow: TextOverflow.visible,
+                  softWrap: true,
                 ),
               ],
             ),
@@ -327,6 +683,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
                               fontSize: 12,
                               color: AppColors.textSecondary,
                             ),
+                            overflow: TextOverflow.visible,
+                            softWrap: true,
                           ),
                         ),
                       ],
@@ -353,6 +711,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                             fontWeight: FontWeight.w600,
                             color: AppColors.textSecondary,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),
@@ -383,19 +742,27 @@ class _PreviewScreenState extends State<PreviewScreen> {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            const Text('Registrando...'),
+                            const Flexible(
+                              child: Text(
+                                'Registrando...',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ],
                         )
-                            : const Row(
+                            : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.check_circle, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Confirmar Registro',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                            const Icon(Icons.check_circle, size: 20),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                _imagePath != null ? 'Confirmar con Imagen' : 'Confirmar Registro',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -412,19 +779,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
-  Future<void> _confirmarRegistro() async {
-    final resultado = await viewModel.confirmarRegistro(widget.datos);
-
-    if (mounted) {
-      if (resultado['success']) {
-        _mostrarSnackBar(resultado['message'], AppColors.success);
-        await Future.delayed(const Duration(seconds: 2));
-        Navigator.of(context).pop(true); // Solo este pop
-      } else {
-        await _mostrarDialogoErrorConfirmacion(resultado['error']);
-      }
-    }
-  }
   Future<void> _mostrarDialogoErrorConfirmacion(String error) async {
     return showDialog<void>(
       context: context,
@@ -445,11 +799,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Error en Confirmación',
+                  'Error en Confirmacion',
                   style: TextStyle(
                     fontSize: 18,
                     color: AppColors.textPrimary,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -472,6 +827,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
                   fontSize: 14,
                   color: AppColors.error,
                 ),
+                overflow: TextOverflow.visible,
+                softWrap: true,
               ),
               const SizedBox(height: 16),
               Container(
@@ -488,22 +845,27 @@ class _PreviewScreenState extends State<PreviewScreen> {
                       children: [
                         Icon(Icons.info, color: AppColors.info, size: 20),
                         const SizedBox(width: 8),
-                        Text(
-                          'Datos Protegidos',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                        Expanded(
+                          child: Text(
+                            'Datos Protegidos',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Sus datos están guardados localmente y no se perderán. Se sincronizarán automáticamente cuando se resuelva el problema.',
+                      'Sus datos estan guardados localmente y no se perderan. Se sincronizaran automaticamente cuando se resuelva el problema.',
                       style: TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
                       ),
+                      overflow: TextOverflow.visible,
+                      softWrap: true,
                     ),
                   ],
                 ),
@@ -513,7 +875,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
           actions: [
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop(); // Cerrar diálogo
+                Navigator.of(context).pop(); // Cerrar dialogo
                 Navigator.of(context).pop(false); // Solo regresar a FormsScreen
               },
               style: ElevatedButton.styleFrom(

@@ -15,14 +15,13 @@ class Cliente {
     required this.propietario,
   });
 
-  // Factory constructor desde Map/JSON (API response)
   factory Cliente.fromJson(Map<String, dynamic> json) {
     return Cliente(
       id: json['id'] as int?,
-      nombre: _parseString(json['nombre']) ?? '',
+      nombre: _parseString(json['cliente']) ?? '',  // ← Cambiar de 'nombre' a 'cliente'
       telefono: _parseString(json['telefono']) ?? '',
       direccion: _parseString(json['direccion']) ?? '',
-      rucCi: _parseString(json['ruc_ci']) ?? '',
+      rucCi: _parseString(json['ruc'] ?? json['cedula']) ?? '', // ← Usar 'ruc' o 'cedula'
       propietario: _parseString(json['propietario']) ?? '',
     );
   }

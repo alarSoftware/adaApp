@@ -69,12 +69,13 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
+  // Método actualizado para usar AuthService en lugar de SyncService
   Future<SyncResult> syncUsers() async {
     _isSyncingUsers = true;
     notifyListeners();
 
     try {
-      final SyncResult resultado = await SyncService.sincronizarUsuarios();
+      final SyncResult resultado = await AuthService.sincronizarSoloUsuarios();
       return resultado;
     } catch (e) {
       return SyncResult(
@@ -253,4 +254,3 @@ class AuthResult {
     this.icon,
   });
 }
-

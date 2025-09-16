@@ -1,3 +1,5 @@
+// Tu modelo EstadoEquipo actualizado - Solo agregamos campos de imagen
+
 enum EstadoEquipoCenso {
   creado,
   migrado,
@@ -44,6 +46,12 @@ class EstadoEquipo {
   final bool estaSincronizado;
   final String? estadoCenso;
 
+  // NUEVOS CAMPOS PARA IMAGENES - Solo agregamos estos
+  final String? imagenPath;
+  final String? imagenBase64;
+  final bool tieneImagen;
+  final int? imagenTamano;
+
   EstadoEquipo({
     this.id,
     required this.equipoClienteId,
@@ -55,6 +63,12 @@ class EstadoEquipo {
     this.fechaActualizacion,
     this.estaSincronizado = false,
     this.estadoCenso,
+
+    // Nuevos parametros opcionales
+    this.imagenPath,
+    this.imagenBase64,
+    this.tieneImagen = false,
+    this.imagenTamano,
   });
 
   factory EstadoEquipo.fromMap(Map<String, dynamic> map) {
@@ -71,6 +85,12 @@ class EstadoEquipo {
           : null,
       estaSincronizado: (map['sincronizado'] as int?) == 1,
       estadoCenso: map['estado_censo'] as String?,
+
+      // Nuevos campos de imagen
+      imagenPath: map['imagen_path'] as String?,
+      imagenBase64: map['imagen_base64'] as String?,
+      tieneImagen: (map['tiene_imagen'] as int? ?? 0) == 1,
+      imagenTamano: map['imagen_tamano'] as int?,
     );
   }
 
@@ -85,6 +105,12 @@ class EstadoEquipo {
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
       'sincronizado': estaSincronizado ? 1 : 0,
+
+      // Nuevos campos de imagen
+      'imagen_path': imagenPath,
+      'imagen_base64': imagenBase64,
+      'tiene_imagen': tieneImagen ? 1 : 0,
+      'imagen_tamano': imagenTamano,
     };
 
     if (estadoCenso != null) {
@@ -106,6 +132,12 @@ class EstadoEquipo {
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
       'sincronizado': estaSincronizado,
       'estado_censo': estadoCenso,
+
+      // Nuevos campos de imagen para JSON
+      'imagen_path': imagenPath,
+      'tiene_imagen': tieneImagen,
+      'imagen_tamano': imagenTamano,
+      // Nota: No incluimos imagen_base64 en JSON para ahorrar espacio
     };
   }
 
@@ -120,6 +152,12 @@ class EstadoEquipo {
     DateTime? fechaActualizacion,
     bool? estaSincronizado,
     String? estadoCenso,
+
+    // Nuevos parametros para copyWith
+    String? imagenPath,
+    String? imagenBase64,
+    bool? tieneImagen,
+    int? imagenTamano,
   }) {
     return EstadoEquipo(
       id: id ?? this.id,
@@ -132,12 +170,28 @@ class EstadoEquipo {
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
       estaSincronizado: estaSincronizado ?? this.estaSincronizado,
       estadoCenso: estadoCenso ?? this.estadoCenso,
+
+      // Nuevos campos
+      imagenPath: imagenPath ?? this.imagenPath,
+      imagenBase64: imagenBase64 ?? this.imagenBase64,
+      tieneImagen: tieneImagen ?? this.tieneImagen,
+      imagenTamano: imagenTamano ?? this.imagenTamano,
     );
   }
 
-  // Helpers actualizados
+  // Helpers existentes - SIN CAMBIOS
   EstadoEquipoCenso get estadoCensoEnum => EstadoEquipoCensoExtension.fromString(estadoCenso);
   bool get estaCreado => estadoCenso == EstadoEquipoCenso.creado.valor;
   bool get estaMigrado => estadoCenso == EstadoEquipoCenso.migrado.valor;
   bool get tieneError => estadoCenso == EstadoEquipoCenso.error.valor;
+
+  // NUEVOS HELPERS PARA IMAGENES
+  bool get necesitaSincronizarImagen => tieneImagen && !estaSincronizado && imagenBase64 != null;
+
+  String get infoImagen {
+    if (!tieneImagen) return 'Sin imagen';
+    final tamanoMB = imagenTamano != null ? (imagenTamano! / (1024 * 1024)).toStringAsFixed(1) : '?';
+    final estado = estaSincronizado ? 'Sincronizada' : 'Pendiente';
+    return 'Imagen ($tamanoMB MB) - $estado';
+  }
 }

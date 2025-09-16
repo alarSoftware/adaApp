@@ -405,15 +405,15 @@ class EquipoRepository extends BaseRepository<Equipo> {
 
   /// Crear equipo con validaciones - CORREGIDO
   Future<int> crearEquipo({
-    required String codBarras,
+    String? codBarras,
     required int marcaId,
     required int modeloId, // CAMBIADO: de String modelo a int modeloId
     required int logoId,
     String? numeroSerie,
     int estadoLocal = 1,
   }) async {
-    // Validar que el código de barras no exista
-    if (await existeCodigoBarras(codBarras)) {
+    // Validar que el código de barras no exista (solo si se proporciona)
+    if (codBarras != null && codBarras.isNotEmpty && await existeCodigoBarras(codBarras)) {
       throw Exception('Ya existe un equipo con el código de barras: $codBarras');
     }
 
@@ -424,9 +424,9 @@ class EquipoRepository extends BaseRepository<Equipo> {
 
     final now = DateTime.now().toIso8601String();
     final equipoData = {
-      'cod_barras': codBarras,
+      'cod_barras': codBarras ?? '', // Usar string vacío si es null
       'marca_id': marcaId,
-      'modelo_id': modeloId, // CORREGIDO
+      'modelo_id': modeloId,
       'logo_id': logoId,
       'numero_serie': numeroSerie,
       'estado_local': estadoLocal,
@@ -470,7 +470,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
     final datosActualizacion = <String, dynamic>{};
     if (codBarras != null) datosActualizacion['cod_barras'] = codBarras;
     if (marcaId != null) datosActualizacion['marca_id'] = marcaId;
-    if (modeloId != null) datosActualizacion['modelo_id'] = modeloId; // CORREGIDO
+    if (modeloId != null) datosActualizacion['modelo_id'] = modeloId;
     if (logoId != null) datosActualizacion['logo_id'] = logoId;
     if (numeroSerie != null) datosActualizacion['numero_serie'] = numeroSerie;
     if (estadoLocal != null) datosActualizacion['estado_local'] = estadoLocal;
@@ -539,6 +539,23 @@ class EquipoRepository extends BaseRepository<Equipo> {
     await limpiarYSincronizar(equiposAPI);
   }
 
+  /// Insertar lote de equipos
+  Future<void> insertarLote(List<Equipo> equipos) async {
+    if (equipos.isEmpty) return;
+
+    await dbHelper.ejecutarTransaccion((txn) async {
+      for (final equipo in equipos) {
+        final equipoMap = equipo.toMap();
+        await txn.insert(tableName, equipoMap);
+      }
+    });
+  }
+
+  /// Borrar todos los equipos
+  Future<void> borrarTodos() async {
+    await dbHelper.eliminar(tableName);
+  }
+
   /// Método alternativo para sincronización específica de equipos - CORREGIDO
   Future<void> sincronizarEquiposCompletos(List<dynamic> equiposAPI) async {
     final db = await dbHelper.database;
@@ -562,8 +579,8 @@ class EquipoRepository extends BaseRepository<Equipo> {
         }
 
         // Asegurar campos requeridos
-        datos['activo'] = 1; // Cambié true por 1
-        datos['sincronizado'] = 1; // Cambié true por 1
+        datos['activo'] = 1;
+        datos['sincronizado'] = 1;
         datos['fecha_actualizacion'] = DateTime.now().toIso8601String();
 
         if (datos['fecha_creacion'] == null) {

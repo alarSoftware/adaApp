@@ -92,8 +92,8 @@ class DatabaseHelper {
     // Tabla equipos CORREGIDA
     await db.execute('''
       CREATE TABLE equipos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        cod_barras TEXT UNIQUE NOT NULL,
+         id TEXT PRIMARY KEY,
+        cod_barras TEXT UNIQUE,
         marca_id INTEGER NOT NULL,
         modelo_id INTEGER NOT NULL,
         numero_serie TEXT UNIQUE,
@@ -102,7 +102,7 @@ class DatabaseHelper {
         activo INTEGER DEFAULT 1,
         sincronizado INTEGER DEFAULT 0,
         fecha_creacion TEXT NOT NULL,
-        fecha_actualizacion TEXT NOT NULL,
+        fecha_actualizacion TEXT,  -- También sin NOT NULL
         FOREIGN KEY (marca_id) REFERENCES marcas (id),
         FOREIGN KEY (modelo_id) REFERENCES modelos (id),
         FOREIGN KEY (logo_id) REFERENCES logo (id)
@@ -131,12 +131,12 @@ class DatabaseHelper {
     // Tabla usuarios
 // Simplificar la tabla usuarios en _onCreate
     await db.execute('''
-  CREATE TABLE usuarios (
+  CREATE TABLE Users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL UNIQUE,
+    code INTEGER NOT NULL UNIQUE,
+    username TEXT NOT NULL,
     password TEXT NOT NULL,
-    rol TEXT NOT NULL DEFAULT 'vendedor',
-    activo INTEGER DEFAULT 1,
+    fullname TEXT NOT NULL,
     sincronizado INTEGER DEFAULT 0,
     fecha_creacion TEXT NOT NULL,
     fecha_actualizacion TEXT NOT NULL
@@ -363,20 +363,20 @@ class DatabaseHelper {
     logger.i('Usuarios recibidos: ${usuariosAPI.length}');
 
     await ejecutarTransaccion((txn) async {
-      await txn.delete('usuarios');
+      await txn.delete('Users');
       logger.i('Usuarios existentes eliminados');
 
       for (var data in usuariosAPI) {
         logger.i('Insertando usuario: $data');
-        await txn.insert('usuarios', {
-          'id': data['id'],
-          'nombre': data['nombre'],
+        await txn.insert('Users', {
+          // 'id' se omite porque es AUTOINCREMENT
+          'code': data['id'],           // El id de la API se mapea a code
+          'username': data['username'],
           'password': data['password'],
-          'rol': data['rol'],
-          'activo': 1,
-          'sincronizado': 1,
-          'fecha_creacion': DateTime.now().toIso8601String(),
-          'fecha_actualizacion': DateTime.now().toIso8601String(),
+          'fullname': data['fullname'],
+          'sincronizado': 1,            // Campo requerido
+          'fecha_creacion': DateTime.now().toIso8601String(),  // Campo requerido
+          'fecha_actualizacion': DateTime.now().toIso8601String(), // Campo requerido
         });
       }
     });
@@ -384,11 +384,10 @@ class DatabaseHelper {
     logger.i('=== SINCRONIZACIÓN COMPLETADA ===');
   }
 
-  // Agregar este método en DatabaseHelper
 // Agregar este método en DatabaseHelper
   Future<List<Usuario>> obtenerUsuarios() async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('usuarios');
+    final List<Map<String, dynamic>> maps = await db.query('Users');
 
     return List.generate(maps.length, (i) {
       return Usuario.fromMap(maps[i]);
@@ -565,7 +564,7 @@ class DatabaseHelper {
       for (var logoData in logosAPI) {
         await txn.insert('logo', {
           'id': logoData['id'],
-          'nombre': logoData['nombre'],
+          'nombre': logoData['logo'],
           'activo': 1,
           'fecha_creacion': DateTime.now().toIso8601String(),
         }, conflictAlgorithm: ConflictAlgorithm.replace);

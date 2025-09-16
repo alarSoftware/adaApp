@@ -44,7 +44,7 @@ class Logo {
 
   Logo copyWith({
     int? id,
-    String? nombre,
+    String? maca,
     bool? activo,
     bool? sincronizado,
     DateTime? fechaCreacion,
@@ -61,7 +61,7 @@ class Logo {
   }
 
   @override
-  String toString() => 'Logo(id: $id, nombre: $nombre, activo: $activo)';
+  String toString() => 'Logo(id: $id, modelo $nombre, activo: $activo)';
 
   @override
   bool operator ==(Object other) {

@@ -1,64 +1,51 @@
 class Usuario {
   final int? id;
-  final String nombre;
+  final int code;
+  final String username;
   final String password;
-  final String rol;
-  final bool activo;
-  final bool sincronizado;
-  final DateTime fechaCreacion;
-  final DateTime? fechaActualizacion;
+  final String fullname;
 
   Usuario({
     this.id,
-    required this.nombre,
+    required this.code,
+    required this.username,
     required this.password,
-    required this.rol,
-    this.activo = true,
-    this.sincronizado = false,
-    required this.fechaCreacion,
-    this.fechaActualizacion,
+    required this.fullname,
   });
 
   factory Usuario.fromMap(Map<String, dynamic> map) {
     return Usuario(
       id: map['id'] as int?,
-      nombre: map['nombre'] as String,
+      code: map['code'] as int,
+      username: map['username'] as String,
       password: map['password'] as String,
-      rol: map['rol'] as String,
-      activo: (map['activo'] as int?) == 1,
-      sincronizado: (map['sincronizado'] as int?) == 1,
-      fechaCreacion: DateTime.parse(map['fecha_creacion'] as String),
-      fechaActualizacion: map['fecha_actualizacion'] != null
-          ? DateTime.parse(map['fecha_actualizacion'] as String)
-          : null,
+      fullname: map['fullname'] as String,
     );
   }
 
   factory Usuario.fromJson(Map<String, dynamic> json) {
     return Usuario(
       id: json['id'] as int?,
-      nombre: json['nombre'] as String,
+      code: json['id'] as int, // Mapear id de API a code
+      username: json['username'] as String,
       password: json['password'] as String,
-      rol: json['rol'] as String,
-      activo: true,
-      sincronizado: true,
-      fechaCreacion: DateTime.now(),
+      fullname: json['fullname'] as String,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'nombre': nombre,
+      'code': code,
+      'username': username,
       'password': password,
-      'rol': rol,
-      'activo': activo ? 1 : 0,
-      'sincronizado': sincronizado ? 1 : 0,
-      'fecha_creacion': fechaCreacion.toIso8601String(),
-      'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
+      'fullname': fullname,
     };
   }
 
-  bool get esAdmin => rol == 'admin';
-  bool get esVendedor => rol == 'vendedor';
+
+// Puedes mantener estos getters si los necesitas,
+// aunque tendrías que definir cómo determinar el rol
+// bool get esAdmin => username == 'admin'; // ejemplo
+// bool get esVendedor => !esAdmin; // ejemplo
 }

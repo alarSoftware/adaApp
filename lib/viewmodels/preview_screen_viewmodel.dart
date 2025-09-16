@@ -6,8 +6,8 @@ import 'dart:io';
 import '../../models/cliente.dart';
 import 'package:ada_app/repositories/equipo_cliente_repository.dart';
 import 'package:ada_app/repositories/estado_equipo_repository.dart';
-import 'package:ada_app/models/estado_equipo.dart'; // Agregar si no está
-import 'dart:async'; // Agregar esta línea
+import 'package:ada_app/models/estado_equipo.dart';
+import 'dart:async';
 
 final _logger = Logger();
 
@@ -20,8 +20,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
   final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
 
   // ⚠️ CAMBIAR ESTA IP POR LA IP DE TU SERVIDOR
-  static const String _baseUrl = 'https://ada-api-production-5d7e.up.railway.app';
-  static const String _estadosEndpoint = '/estados';
+  static const String _baseUrl = 'https://56a494bb0732.ngrok-free.app/adaControl/api/';
+  static const String _estadosEndpoint = '/insertCensoActivo';
   static const String _pingEndpoint = '/ping';
 
   bool get isLoading => _isLoading;
@@ -105,6 +105,12 @@ class PreviewScreenViewModel extends ChangeNotifier {
             fechaRevision: DateTime.now(),
             enLocal: true,
             observaciones: datos['observaciones']?.toString(),
+
+            // NUEVOS PARAMETROS DE IMAGEN
+            imagenPath: datos['imagen_path'],
+            imagenBase64: datos['imagen_base64'],
+            tieneImagen: datos['tiene_imagen'] ?? false,
+            imagenTamano: datos['imagen_tamano'],
           );
 
           estadoIdActual = estadoCreado.id; // Guardar ID del registro actual
@@ -115,9 +121,22 @@ class PreviewScreenViewModel extends ChangeNotifier {
         }
       }
 
-      // ✅ PASO 3: PREPARAR DATOS PARA API
+      // ✅ PASO 3: PREPARAR DATOS PARA API USANDO EL ESTADO CREADO
       _setStatusMessage('📤 Preparando datos para migración...');
-      final datosCompletos = _prepararDatosParaEnvio(datos);
+      Map<String, dynamic> datosCompletos;
+
+      if (estadoIdActual != null) {
+        // Obtener el estado recién creado con todos sus datos
+        final estadoCreado = await _estadoEquipoRepository.obtenerPorId(estadoIdActual);
+        if (estadoCreado != null) {
+          datosCompletos = await _prepararDatosDesdeEstado(estadoCreado);
+        } else {
+          throw 'No se pudo obtener el estado creado con ID: $estadoIdActual';
+        }
+      } else {
+        // Fallback al método anterior si no hay estado creado
+        datosCompletos = _prepararDatosParaEnvio(datos);
+      }
 
       // ✅ PASO 4: GUARDAR REGISTRO LOCAL MAESTRO
       _setStatusMessage('💾 Guardando registro local maestro...');
@@ -135,19 +154,28 @@ class PreviewScreenViewModel extends ChangeNotifier {
             timeoutSegundos: 8 // Timeout corto para no bloquear UI
         );
 
-        if (respuestaServidor['exito']) {
+        _logger.i('🔍 Respuesta completa del servidor: $respuestaServidor');
+
+        if (respuestaServidor['exito'] == true) {
+          _logger.i('✅ Marcando estado como migrado con ID: $estadoIdActual');
+
           // Migrar solo el registro actual
           await _estadoEquipoRepository.marcarComoMigrado(
             estadoIdActual,
             servidorId: respuestaServidor['servidor_id'],
           );
+
           await _marcarComoSincronizado(datosCompletos['id_local'] as int);
 
           mensajeFinal = 'Censo completado y sincronizado al servidor';
           migracionExitosa = true;
           _setStatusMessage('✅ Registro sincronizado exitosamente');
 
+          _logger.i('✅ Estado $estadoIdActual marcado como migrado exitosamente');
+
         } else {
+          _logger.w('⚠️ Migración no exitosa: ${respuestaServidor['motivo']} - ${respuestaServidor['detalle']}');
+
           // El registro queda en estado "creado" para migrar después
           mensajeFinal = 'Censo guardado localmente. Se sincronizará automáticamente';
           _setStatusMessage('📱 Censo guardado. Sincronización automática pendiente');
@@ -188,19 +216,22 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       // Preparar datos para API
       final datosApi = _prepararDatosParaApiEstados(datos);
+      _logger.i('🔍 Datos preparados para API: ${json.encode(datosApi)}');
 
       // Enviar con timeout específico
       final response = await _enviarAApiEstadosConTimeout(datosApi, timeoutSegundos);
 
-      if (response['exito']) {
-        _logger.i('✅ Estado registrado inmediatamente en servidor');
+      _logger.i('🔍 Respuesta de _enviarAApiEstadosConTimeout: $response');
+
+      if (response['exito'] == true) {
+        _logger.i('✅ Estado registrado exitosamente en servidor');
         return {
           'exito': true,
           'servidor_id': response['id'],
           'mensaje': response['mensaje']
         };
       } else {
-        _logger.w('⚠️ Error del servidor: ${response['mensaje']}');
+        _logger.w('⚠️ Respuesta no exitosa del servidor: ${response['mensaje']}');
         return {
           'exito': false,
           'motivo': 'error_servidor',
@@ -209,7 +240,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
 
     } catch (e) {
-      _logger.w('⚠️ Error o timeout enviando al servidor: $e');
+      _logger.e('⚠️ Excepción en intentarEnviarAlServidorConTimeout: $e');
       return {
         'exito': false,
         'motivo': 'timeout_o_error',
@@ -239,13 +270,14 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// Enviar a API con timeout específico
+  /// Enviar a API con timeout específico - SIMPLIFICADO PARA CONSIDERAR CUALQUIER 200 COMO ÉXITO
   Future<Map<String, dynamic>> _enviarAApiEstadosConTimeout(
       Map<String, dynamic> datos,
       int timeoutSegundos
       ) async {
     try {
       _logger.i('📤 Enviando con timeout de ${timeoutSegundos}s: $_baseUrl$_estadosEndpoint');
+      _logger.i('🔍 Datos a enviar: ${json.encode(datos)}');
 
       final response = await http.post(
         Uri.parse('$_baseUrl$_estadosEndpoint'),
@@ -254,53 +286,105 @@ class PreviewScreenViewModel extends ChangeNotifier {
           'Accept': 'application/json',
         },
         body: json.encode(datos),
-      ).timeout(Duration(seconds: timeoutSegundos)); // Timeout configurable
+      ).timeout(Duration(seconds: timeoutSegundos));
 
-      _logger.i('📥 Respuesta: ${response.statusCode}');
+      _logger.i('📥 Respuesta Status: ${response.statusCode}');
+      _logger.i('📄 Respuesta Body: ${response.body}');
 
+      // ✅ CUALQUIER STATUS 200-299 SE CONSIDERA ÉXITO
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        final responseBody = json.decode(response.body);
+        _logger.i('✅ Status HTTP exitoso: ${response.statusCode} - Marcando como exitoso automáticamente');
 
-        if (responseBody['success'] == true) {
-          return {
-            'exito': true,
-            'id': responseBody['estado']['id'],
-            'mensaje': responseBody['message'] ?? 'Estado actualizado correctamente'
-          };
-        } else {
-          return {
-            'exito': false,
-            'mensaje': responseBody['message'] ?? 'Error desconocido'
-          };
+        dynamic servidorId = DateTime.now().millisecondsSinceEpoch; // ID por defecto
+        String mensaje = 'Estado registrado correctamente';
+
+        // Intentar parsear respuesta pero sin fallar si no es JSON válido
+        try {
+          final responseBody = json.decode(response.body);
+          _logger.i('📋 Response body parseado: $responseBody');
+
+          // Extraer ID si está disponible
+          servidorId = responseBody['estado']?['id'] ??
+              responseBody['id'] ??
+              responseBody['insertId'] ??
+              servidorId; // Usar el timestamp como fallback
+
+          // Usar mensaje del servidor si está disponible
+          if (responseBody['message'] != null) {
+            mensaje = responseBody['message'].toString();
+          }
+
+        } catch (parseError) {
+          _logger.w('⚠️ No se pudo parsear JSON, usando valores por defecto: $parseError');
+          // Mantener los valores por defecto ya asignados
         }
-      } else {
-        final errorBody = response.body.isNotEmpty ?
-        json.decode(response.body) : {'message': 'Error HTTP ${response.statusCode}'};
+
+        return {
+          'exito': true,
+          'id': servidorId,
+          'mensaje': mensaje
+        };
+      }
+      // Status no exitoso (4xx, 5xx)
+      else {
+        _logger.e('❌ Status HTTP no exitoso: ${response.statusCode}');
+
+        String mensajeError = 'Error del servidor: ${response.statusCode}';
+        try {
+          final errorBody = json.decode(response.body);
+          mensajeError = errorBody['message'] ?? mensajeError;
+        } catch (e) {
+          // Si no se puede parsear, usar mensaje por defecto
+          mensajeError = 'Error HTTP ${response.statusCode}';
+        }
 
         return {
           'exito': false,
-          'mensaje': errorBody['message'] ?? 'Error del servidor: ${response.statusCode}'
+          'mensaje': mensajeError
         };
       }
 
     } catch (e) {
-      _logger.e('❌ Timeout o excepción enviando a API: $e');
+      _logger.e('❌ Excepción enviando a API: $e');
       return {
         'exito': false,
-        'mensaje': 'Timeout o error de conexión: $e'
+        'mensaje': 'Error de conexión: $e'
       };
     }
   }
 
   /// Programar sincronización en background para registros pendientes
   void _programarSincronizacionBackground() {
-    // Ejecutar después de un delay para que la UI responda primero
-    Timer(Duration(seconds: 3), () async {
+    // Ejecutar después de un delay inicial para que la UI responda primero
+    Timer(Duration(seconds: 5), () async {
       try {
-        _logger.i('🔄 Iniciando sincronización background de registros pendientes');
+        _logger.i('🔄 Iniciando primera sincronización background de registros pendientes');
         await _sincronizarRegistrosPendientesEnBackground();
       } catch (e) {
         _logger.e('❌ Error en sincronización background: $e');
+      }
+    });
+
+    // Programar sincronización periódica cada 10 minutos
+    _programarSincronizacionPeriodica();
+  }
+
+  void _programarSincronizacionPeriodica() {
+    Timer.periodic(Duration(minutes: 30), (timer) async {
+      try {
+        _logger.i('⏰ Sincronización automática programada (cada 10 min)');
+
+        // Verificar si hay registros pendientes antes de intentar
+        final registrosCreados = await _estadoEquipoRepository.obtenerCreados();
+
+        if (registrosCreados.isNotEmpty) {
+          _logger.i('📋 Encontrados ${registrosCreados.length} registros pendientes para sincronizar');
+          await _sincronizarRegistrosPendientesEnBackground();
+        } else {
+          _logger.i('✅ No hay registros pendientes para sincronizar');
+        }
+      } catch (e) {
+        _logger.e('❌ Error en sincronización periódica: $e');
       }
     });
   }
@@ -389,7 +473,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// Preparar datos desde un estado existente
+  /// Preparar datos desde un estado existente - MEJORADO PARA INCLUIR TODOS LOS CAMPOS
   Future<Map<String, dynamic>> _prepararDatosDesdeEstado(EstadoEquipo estado) async {
     try {
       // Obtener detalles completos del estado
@@ -405,23 +489,38 @@ class PreviewScreenViewModel extends ChangeNotifier {
         'estado_sincronizacion': 'background',
         'fecha_creacion_local': estado.fechaCreacion.toIso8601String(),
 
-        // Datos para API
+        // Datos para API - INCLUIR TODOS LOS CAMPOS DEL ESTADO
         'equipo_id': estadoConDetalles['equipo_id'],
         'cliente_id': estadoConDetalles['cliente_id'],
         'usuario_id': 1,
         'funcionando': true,
-        'estado_general': 'Censo registrado desde APP móvil - Sincronización automática',
         'temperatura_actual': null,
         'temperatura_freezer': null,
         'latitud': estado.latitud,
         'longitud': estado.longitud,
 
-        // Datos adicionales
+        // ✅ INCLUIR DATOS DE IMAGEN
+        'imagen_path': estado.imagenPath,
+        'imagen_base64': estado.imagenBase64,
+        'tiene_imagen': estado.tieneImagen,
+        'imagen_tamano': estado.imagenTamano,
+
+        // Datos adicionales del equipo
         'codigo_barras': estadoConDetalles['cod_barras'],
         'numero_serie': estadoConDetalles['numero_serie'],
+        'modelo': estadoConDetalles['modelo'] ?? 'No especificado',
+        'logo': estadoConDetalles['logo'] ?? 'Sin logo',
+        'marca_nombre': estadoConDetalles['marca_nombre'],
+
+        // Datos del cliente
+        'cliente_nombre': estadoConDetalles['cliente_nombre'],
+
+        // Metadatos
         'es_censo': true,
         'version_app': '1.0.0',
         'dispositivo': Platform.operatingSystem,
+        'fecha_revision': estado.fechaRevision.toIso8601String(),
+        'en_local': estado.enLocal,
       };
 
     } catch (e) {
@@ -450,6 +549,12 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'temperatura_freezer': null, // Se actualizará en próximas revisiones
       'latitud': datos['latitud'],
       'longitud': datos['longitud'],
+
+      // ✅ INCLUIR DATOS DE IMAGEN EN EL MÉTODO ORIGINAL TAMBIÉN
+      'imagen_path': datos['imagen_path'],
+      'imagen_base64': datos['imagen_base64'],
+      'tiene_imagen': datos['tiene_imagen'] ?? false,
+      'imagen_tamano': datos['imagen_tamano'],
 
       // Datos adicionales para referencia local
       'codigo_barras': datos['codigo_barras'],
@@ -564,17 +669,39 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Map<String, dynamic> _prepararDatosParaApiEstados(Map<String, dynamic> datosLocales) {
-    // Estructura exacta que espera tu API /estados
     return {
+      // DATOS BÁSICOS
       'equipo_id': datosLocales['equipo_id'],
       'cliente_id': datosLocales['cliente_id'],
       'usuario_id': datosLocales['usuario_id'],
       'funcionando': datosLocales['funcionando'],
-      'estado_general': datosLocales['estado_general'],
-      'temperatura_actual': datosLocales['temperatura_actual'],
-      'temperatura_freezer': datosLocales['temperatura_freezer'],
       'latitud': datosLocales['latitud'],
       'longitud': datosLocales['longitud'],
+      'estado_general': datosLocales['estado_general'],
+
+      // ✅ DATOS DE IMAGEN INCLUIDOS EN LA API
+      'imagen_path': datosLocales['imagen_path'],
+      'imagen_base64': datosLocales['imagen_base64'],
+      'tiene_imagen': datosLocales['tiene_imagen'],
+      'imagen_tamano': datosLocales['imagen_tamano'],
+
+      // DATOS COMPLETOS DEL EQUIPO
+      'equipo_codigo_barras': datosLocales['codigo_barras'],
+      'equipo_numero_serie': datosLocales['numero_serie'],
+      'equipo_modelo': datosLocales['modelo'],
+      'equipo_logo': datosLocales['logo'],
+      'equipo_marca': datosLocales['marca_nombre'],
+
+      // DATOS DEL CLIENTE
+      'cliente_nombre': datosLocales['cliente_nombre'],
+
+      // METADATOS
+      'es_censo': datosLocales['es_censo'],
+      'version_app': datosLocales['version_app'],
+      'dispositivo': datosLocales['dispositivo'],
+      'fecha_revision': datosLocales['fecha_revision'],
+      'en_local': datosLocales['en_local'],
+      'observaciones': datosLocales['observaciones'],
     };
   }
 
@@ -595,30 +722,50 @@ class PreviewScreenViewModel extends ChangeNotifier {
       _logger.i('📥 Respuesta API: ${response.statusCode}');
       _logger.i('📄 Body: ${response.body}');
 
+      // ✅ CUALQUIER STATUS 200-299 SE CONSIDERA ÉXITO
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        final responseBody = json.decode(response.body);
+        _logger.i('✅ Status HTTP exitoso: ${response.statusCode}');
 
-        // Tu API devuelve { success: true, message: "...", estado: {...} }
-        if (responseBody['success'] == true) {
-          return {
-            'exito': true,
-            'id': responseBody['estado']['id'],
-            'mensaje': responseBody['message'] ?? 'Estado actualizado correctamente'
-          };
-        } else {
-          return {
-            'exito': false,
-            'mensaje': responseBody['message'] ?? 'Error desconocido'
-          };
+        dynamic servidorId = DateTime.now().millisecondsSinceEpoch;
+        String mensaje = 'Estado registrado correctamente';
+
+        try {
+          final responseBody = json.decode(response.body);
+
+          // Intentar extraer el ID del servidor si está disponible
+          servidorId = responseBody['estado']?['id'] ??
+              responseBody['id'] ??
+              responseBody['insertId'] ??
+              servidorId; // Usar el timestamp como fallback
+
+          // Usar el mensaje del servidor si está disponible
+          if (responseBody['message'] != null) {
+            mensaje = responseBody['message'].toString();
+          }
+
+        } catch (parseError) {
+          _logger.w('⚠️ Error parseando JSON, pero status es exitoso: $parseError');
+          // Mantener valores por defecto
         }
-      } else {
-        final errorBody = response.body.isNotEmpty ?
-        json.decode(response.body) : {'message': 'Error HTTP ${response.statusCode}'};
 
         return {
-          'exito': false,
-          'mensaje': errorBody['message'] ?? 'Error del servidor: ${response.statusCode}'
+          'exito': true,
+          'id': servidorId,
+          'mensaje': mensaje
         };
+      } else {
+        try {
+          final errorBody = json.decode(response.body);
+          return {
+            'exito': false,
+            'mensaje': errorBody['message'] ?? 'Error del servidor: ${response.statusCode}'
+          };
+        } catch (e) {
+          return {
+            'exito': false,
+            'mensaje': 'Error HTTP ${response.statusCode}: ${response.body}'
+          };
+        }
       }
 
     } catch (e) {

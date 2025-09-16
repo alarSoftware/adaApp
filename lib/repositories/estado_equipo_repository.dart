@@ -81,6 +81,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   // ========== MÉTODOS PARA MANEJO DE ESTADOS DE CENSO ==========
 
   /// Crear nuevo estado de censo con estado 'creado' por defecto
+  /// Crear nuevo estado de censo con estado 'creado' por defecto
   Future<EstadoEquipo> crearNuevoEstadoCenso({
     required int equipoClienteId,
     required double latitud,
@@ -88,6 +89,12 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     DateTime? fechaRevision,
     bool enLocal = true,
     String? observaciones,
+
+    // Nuevos parámetros de imagen (OPCIONALES)
+    String? imagenPath,
+    String? imagenBase64,
+    bool tieneImagen = false,
+    int? imagenTamano,
   }) async {
     try {
       final now = fechaRevision ?? DateTime.now();
@@ -101,16 +108,21 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         fechaCreacion: now,
         fechaActualizacion: now,
         estaSincronizado: false,
-        // ESTADO POR DEFECTO AL CREAR CENSO
         estadoCenso: EstadoEquipoCenso.creado.valor,
+
+        // Campos de imagen
+        imagenPath: imagenPath,
+        imagenBase64: imagenBase64,
+        tieneImagen: tieneImagen,
+        imagenTamano: imagenTamano,
       );
 
       final id = await insertar(nuevoEstado);
-      _logger.i('✅ Estado CREADO para equipo_cliente $equipoClienteId (ID: $id)');
+      _logger.i('Estado CREADO ${tieneImagen ? "con imagen" : "sin imagen"} para equipo_cliente $equipoClienteId (ID: $id)');
 
       return nuevoEstado.copyWith(id: id);
     } catch (e) {
-      _logger.e('❌ Error creando estado de censo: $e');
+      _logger.e('Error creando estado de censo: $e');
       rethrow;
     }
   }
@@ -577,5 +589,245 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       enLocal: enLocal,
       fechaRevision: DateTime.now(),
     );
+  }
+  /// Crear nuevo estado de censo con imagen
+  Future<EstadoEquipo> crearNuevoEstadoCensoConImagen({
+    required int equipoClienteId,
+    required double latitud,
+    required double longitud,
+    DateTime? fechaRevision,
+    bool enLocal = true,
+    String? observaciones,
+
+    // Nuevos parámetros de imagen
+    String? imagenPath,
+    String? imagenBase64,
+    bool tieneImagen = false,
+    int? imagenTamano,
+  }) async {
+    try {
+      final now = fechaRevision ?? DateTime.now();
+
+      final nuevoEstado = EstadoEquipo(
+        equipoClienteId: equipoClienteId,
+        enLocal: enLocal,
+        latitud: latitud,
+        longitud: longitud,
+        fechaRevision: now,
+        fechaCreacion: now,
+        fechaActualizacion: now,
+        estaSincronizado: false,
+        estadoCenso: EstadoEquipoCenso.creado.valor,
+
+        // Campos de imagen
+        imagenPath: imagenPath,
+        imagenBase64: imagenBase64,
+        tieneImagen: tieneImagen,
+        imagenTamano: imagenTamano,
+      );
+
+      final id = await insertar(nuevoEstado);
+      _logger.i('✅ Estado CREADO ${tieneImagen ? "con imagen" : "sin imagen"} para equipo_cliente $equipoClienteId (ID: $id)');
+
+      return nuevoEstado.copyWith(id: id);
+    } catch (e) {
+      _logger.e('❌ Error creando estado de censo con imagen: $e');
+      rethrow;
+    }
+  }
+
+  /// Limpiar Base64 después de sincronización exitosa (para ahorrar espacio)
+  Future<void> limpiarBase64DespuesDeSincronizacion(int estadoId) async {
+    try {
+      final datosActualizacion = <String, dynamic>{
+        'imagen_base64': null, // Limpiar Base64 para ahorrar espacio
+        'fecha_actualizacion': DateTime.now().toIso8601String(),
+      };
+
+      await dbHelper.actualizar(
+        tableName,
+        datosActualizacion,
+        where: 'id = ? AND sincronizado = 1', // Solo si ya está sincronizado
+        whereArgs: [estadoId],
+      );
+
+      _logger.i('🧹 Base64 limpiado para estado $estadoId (ya sincronizado)');
+    } catch (e) {
+      _logger.e('❌ Error limpiando Base64: $e');
+      rethrow;
+    }
+  }
+
+  /// Obtener estados con imágenes pendientes de sincronización
+  Future<List<EstadoEquipo>> obtenerEstadosConImagenesPendientes() async {
+    try {
+      final maps = await dbHelper.consultar(
+        tableName,
+        where: 'tiene_imagen = 1 AND sincronizado = 0 AND imagen_base64 IS NOT NULL',
+        orderBy: 'fecha_creacion ASC',
+      );
+
+      final estados = maps.map((map) => fromMap(map)).toList();
+      _logger.i('📸 Encontrados ${estados.length} estados con imágenes pendientes');
+      return estados;
+    } catch (e) {
+      _logger.e('❌ Error obteniendo estados con imágenes pendientes: $e');
+      return [];
+    }
+  }
+
+  /// Obtener estadísticas de imágenes
+  Future<Map<String, dynamic>> obtenerEstadisticasImagenes() async {
+    try {
+      // Total de estados con imágenes
+      final totalConImagenesResult = await dbHelper.consultarPersonalizada(
+          'SELECT COUNT(*) as count FROM Estado_Equipo WHERE tiene_imagen = 1'
+      );
+      final totalConImagenes = totalConImagenesResult.first['count'] as int;
+
+      // Imágenes sincronizadas
+      final imagenesSincronizadasResult = await dbHelper.consultarPersonalizada(
+          'SELECT COUNT(*) as count FROM Estado_Equipo WHERE tiene_imagen = 1 AND sincronizado = 1'
+      );
+      final imagenesSincronizadas = imagenesSincronizadasResult.first['count'] as int;
+
+      // Imágenes pendientes
+      final imagenesPendientesResult = await dbHelper.consultarPersonalizada(
+          'SELECT COUNT(*) as count FROM Estado_Equipo WHERE tiene_imagen = 1 AND sincronizado = 0'
+      );
+      final imagenesPendientes = imagenesPendientesResult.first['count'] as int;
+
+      // Tamaño total aproximado de imágenes pendientes
+      final tamanoTotalResult = await dbHelper.consultarPersonalizada(
+          'SELECT SUM(imagen_tamano) as total FROM Estado_Equipo WHERE tiene_imagen = 1 AND sincronizado = 0'
+      );
+      final tamanoTotalPendiente = tamanoTotalResult.first['total'] as int? ?? 0;
+
+      return {
+        'total_con_imagenes': totalConImagenes,
+        'imagenes_sincronizadas': imagenesSincronizadas,
+        'imagenes_pendientes': imagenesPendientes,
+        'tamano_total_pendiente_bytes': tamanoTotalPendiente,
+        'tamano_total_pendiente_mb': (tamanoTotalPendiente / (1024 * 1024)).toStringAsFixed(2),
+      };
+    } catch (e) {
+      _logger.e('❌ Error obteniendo estadísticas de imágenes: $e');
+      return {
+        'total_con_imagenes': 0,
+        'imagenes_sincronizadas': 0,
+        'imagenes_pendientes': 0,
+        'tamano_total_pendiente_bytes': 0,
+        'tamano_total_pendiente_mb': '0.00',
+      };
+    }
+  }
+
+  /// Marcar imagen como sincronizada y limpiar Base64
+  Future<void> marcarImagenComoSincronizada(int estadoId, {dynamic servidorId}) async {
+    try {
+      final datosActualizacion = <String, dynamic>{
+        'sincronizado': 1,
+        'estado_censo': EstadoEquipoCenso.migrado.valor,
+        'fecha_actualizacion': DateTime.now().toIso8601String(),
+        'imagen_base64': null, // Limpiar Base64 inmediatamente después de envío exitoso
+      };
+
+      await dbHelper.actualizar(
+        tableName,
+        datosActualizacion,
+        where: 'id = ?',
+        whereArgs: [estadoId],
+      );
+
+      _logger.i('✅ Estado $estadoId marcado como sincronizado y Base64 limpiado');
+    } catch (e) {
+      _logger.e('❌ Error marcando imagen como sincronizada: $e');
+      rethrow;
+    }
+  }
+
+  /// Obtener solo la ruta de imagen (sin Base64 para ahorrar memoria)
+  Future<String?> obtenerRutaImagen(int estadoId) async {
+    try {
+      final result = await dbHelper.consultar(
+        tableName,
+        where: 'id = ? AND tiene_imagen = 1',
+        whereArgs: [estadoId],
+      );
+
+      return result.isNotEmpty ? result.first['imagen_path'] as String? : null;
+    } catch (e) {
+      _logger.e('❌ Error obteniendo ruta de imagen: $e');
+      return null;
+    }
+  }
+
+  /// Validar integridad de datos de imagen
+  Future<Map<String, dynamic>> validarIntegridadImagenes() async {
+    try {
+      // Buscar estados que dicen tener imagen pero no tienen datos
+      final sinDatosResult = await dbHelper.consultarPersonalizada('''
+      SELECT COUNT(*) as count FROM Estado_Equipo 
+      WHERE tiene_imagen = 1 AND (imagen_path IS NULL OR imagen_path = '')
+    ''');
+      final sinDatos = sinDatosResult.first['count'] as int;
+
+      // Buscar estados con Base64 pero sin flag de imagen
+      final inconsistentesResult = await dbHelper.consultarPersonalizada('''
+      SELECT COUNT(*) as count FROM Estado_Equipo 
+      WHERE tiene_imagen = 0 AND imagen_base64 IS NOT NULL
+    ''');
+      final inconsistentes = inconsistentesResult.first['count'] as int;
+
+      // Tamaño promedio de imágenes
+      final promedioResult = await dbHelper.consultarPersonalizada('''
+      SELECT AVG(imagen_tamano) as promedio FROM Estado_Equipo 
+      WHERE tiene_imagen = 1 AND imagen_tamano IS NOT NULL
+    ''');
+      final tamanoPromedio = promedioResult.first['promedio'] as double? ?? 0.0;
+
+      return {
+        'estados_sin_datos': sinDatos,
+        'estados_inconsistentes': inconsistentes,
+        'tamano_promedio_mb': (tamanoPromedio / (1024 * 1024)).toStringAsFixed(2),
+        'integridad_ok': sinDatos == 0 && inconsistentes == 0,
+      };
+    } catch (e) {
+      _logger.e('❌ Error validando integridad de imágenes: $e');
+      return {
+        'estados_sin_datos': -1,
+        'estados_inconsistentes': -1,
+        'tamano_promedio_mb': '0.00',
+        'integridad_ok': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
+  /// Limpiar imágenes huérfanas (opcional - para mantenimiento)
+  Future<int> limpiarImagenesHuerfanas() async {
+    try {
+      // Limpiar estados que dicen tener imagen pero no tienen datos válidos
+      final resultado = await dbHelper.actualizar(
+        tableName,
+        {
+          'tiene_imagen': 0,
+          'imagen_path': null,
+          'imagen_base64': null,
+          'imagen_tamano': null,
+          'fecha_actualizacion': DateTime.now().toIso8601String(),
+        },
+        where: 'tiene_imagen = 1 AND (imagen_path IS NULL OR imagen_path = "")',
+      );
+
+      if (resultado > 0) {
+        _logger.i('🧹 Limpiadas $resultado imágenes huérfanas');
+      }
+
+      return resultado;
+    } catch (e) {
+      _logger.e('❌ Error limpiando imágenes huérfanas: $e');
+      return 0;
+    }
   }
 }

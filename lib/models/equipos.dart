@@ -57,6 +57,17 @@ class Equipo {
   }
 
   factory Equipo.fromJson(Map<String, dynamic> json) {
+    // Función auxiliar para convertir a int de forma segura
+    int _safeParseInt(dynamic value, {int defaultValue = 1}) {
+      if (value == null) return defaultValue;
+      if (value is int) return value;
+      if (value is String) {
+        final parsed = int.tryParse(value);
+        return parsed ?? defaultValue;
+      }
+      return defaultValue;
+    }
+
     DateTime fecha;
     DateTime? fechaAct;
 
@@ -81,19 +92,24 @@ class Equipo {
     }
 
     return Equipo(
-      id: json['id'],
-      codBarras: json['cod_barras'] ?? json['codBarras'] ?? '',
-      marcaId: json['marca_id'] ?? json['marcaId'] ?? 1,
-      modeloId: json['modelo_id'] ?? json['modeloId'] ?? 1,  // CAMBIADO
-      numeroSerie: json['numero_serie'] ?? json['numeroSerie'],
-      logoId: json['logo_id'] ?? json['logoId'] ?? 1,
-      estadoLocal: json['estado_local'] ?? json['estadoLocal'] ?? 1,
-      activo: json['activo'] ?? 1,
+      id: _safeParseInt(json['id'], defaultValue: 0),
+      // Manejar diferentes nombres de campos para código de barras
+      codBarras: json['cod_barras'] ?? json['codBarras'] ?? json['equipo'] ?? json['equipoId'] ?? '',
+      // Convertir marcaId de forma segura
+      marcaId: _safeParseInt(json['marca_id'] ?? json['marcaId']),
+      // Manejar edfModeloId de la API
+      modeloId: _safeParseInt(json['modelo_id'] ?? json['modeloId'] ?? json['edfModeloId']),
+      // Manejar diferentes nombres para número de serie
+      numeroSerie: json['numero_serie'] ?? json['numeroSerie'] ?? json['numSerie'],
+      // Manejar edfLogoId de la API
+      logoId: _safeParseInt(json['logo_id'] ?? json['logoId'] ?? json['edfLogoId']),
+      estadoLocal: _safeParseInt(json['estado_local'] ?? json['estadoLocal'], defaultValue: 1),
+      activo: _safeParseInt(json['activo'] ?? (json['esActivo'] == true ? 1 : 0), defaultValue: 1),
       fechaCreacion: fecha,
       fechaActualizacion: fechaAct,
-      sincronizado: json['sincronizado'] ?? 0,
+      sincronizado: _safeParseInt(json['sincronizado'], defaultValue: 0),
       marcaNombre: json['marca_nombre'] ?? json['marcaNombre'],
-      modeloNombre: json['modelo_nombre'] ?? json['modeloNombre'],  // CAMBIADO
+      modeloNombre: json['modelo_nombre'] ?? json['modeloNombre'],
       logoNombre: json['logo_nombre'] ?? json['logoNombre'],
     );
   }

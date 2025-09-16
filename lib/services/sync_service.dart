@@ -4,6 +4,7 @@ import 'package:ada_app/repositories/cliente_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/repositories/equipo_cliente_repository.dart';
 import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/models/equipos.dart';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/models/cliente.dart';
 import 'dart:async';
@@ -12,12 +13,13 @@ import 'package:logger/logger.dart';
 final _logger = Logger();
 
 class SyncService {
-  static const String baseUrl = 'https://ada-api-production-5d7e.up.railway.app';
-  static const Duration timeout = Duration(seconds: 30);
+  static const String baseUrl = 'https://56a494bb0732.ngrok-free.app/adaControl/api';
+  static const Duration timeout = Duration(minutes: 5);
 
   static Map<String, String> get _headers => {
     'Content-Type': 'application/json; charset=UTF-8',
     'Accept': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   };
 
   static final _dbHelper = DatabaseHelper();
@@ -42,7 +44,9 @@ class SyncService {
       await _sincronizarMarcas();
       await _sincronizarModelos();
       await _sincronizarLogos();
-      await _sincronizarUsuarios();
+      await sincronizarUsuarios();
+
+
 
       final resultadoClientes = await sincronizarClientes();
       resultado.clientesSincronizados = resultadoClientes.itemsSincronizados;
@@ -90,12 +94,28 @@ class SyncService {
   static Future<void> _sincronizarModelos() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/modelos'),
+        Uri.parse('$baseUrl/getEdfModelos'),
         headers: _headers,
       ).timeout(timeout);
 
       if (response.statusCode == 200) {
-        final List<dynamic> modelosAPI = jsonDecode(response.body);
+        final responseData = jsonDecode(response.body);
+
+        // Extraer el array de modelos correctamente
+        List<dynamic> modelosAPI = [];
+        if (responseData is Map<String, dynamic>) {
+          if (responseData.containsKey('data')) {
+            // Si 'data' es un string JSON, decodificarlo
+            if (responseData['data'] is String) {
+              final String dataString = responseData['data'];
+              modelosAPI = jsonDecode(dataString) as List<dynamic>;
+            } else if (responseData['data'] is List) {
+              modelosAPI = responseData['data'] as List<dynamic>;
+            }
+          }
+        } else if (responseData is List) {
+          modelosAPI = responseData;
+        }
 
         // FILTRAR modelos con nombre válido (API usa 'modelo' no 'nombre')
         final modelosValidos = modelosAPI.where((modelo) {
@@ -121,64 +141,50 @@ class SyncService {
     }
   }
 
-  // Agregar después de _sincronizarLogos()
-  static Future<void> _sincronizarUsuarios() async {
-    try {
-      _logger.i('=== INICIANDO SINCRONIZACIÓN USUARIOS ===');
-      final response = await http.get(
-        Uri.parse('$baseUrl/usuarios'),
-        headers: _headers,
-      ).timeout(timeout);
 
-      _logger.i('Status Code: ${response.statusCode}');
-      _logger.i('Response Body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final List<dynamic> usuariosAPI = jsonDecode(response.body);
-        _logger.i('Usuarios parseados: ${usuariosAPI.length}');
-
-        if (usuariosAPI.isNotEmpty) {
-          _logger.i('Primer usuario: ${usuariosAPI.first}');
-
-
-
-          await _dbHelper.sincronizarUsuarios(usuariosAPI);
-          _logger.i('✅ Usuarios sincronizados: ${usuariosAPI.length}');
-        } else {
-          _logger.w('⚠️ Array de usuarios vacío');
-        }
-      } else {
-        _logger.e('❌ Error response: ${response.statusCode}');
-      }
-    } catch (e) {
-      _logger.e('💥 Error sincronizando usuarios: $e');
-    }
-  }
   static Future<SyncResult> sincronizarUsuarios() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/usuarios'),
+        Uri.parse('$baseUrl/getUsers'), // ← Cambiar de /usuarios a /getUsers
         headers: _headers,
       ).timeout(timeout);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        final List<dynamic> usuariosData = _parseResponse(response.body);
+        final responseData = jsonDecode(response.body);
 
-        if (usuariosData.isEmpty) {
+        // Extraer el array de usuarios del campo "data"
+        final String dataString = responseData['data'];
+        final List<dynamic> usuariosAPI = jsonDecode(dataString);
+
+        if (usuariosAPI.isEmpty) {
           return SyncResult(
             exito: true,
-            mensaje: 'Usuarios sincronizados',
+            mensaje: 'No hay usuarios en el servidor',
             itemsSincronizados: 0,
           );
         }
 
-        await _dbHelper.sincronizarUsuarios(usuariosData);
+        // Procesar datos igual que AuthService
+        final usuariosProcesados = usuariosAPI.map((usuario) {
+          String password = usuario['password'].toString();
+          if (password.startsWith('{bcrypt}')) {
+            password = password.substring(8);
+          }
+          return {
+            'id': usuario['id'],
+            'username': usuario['username'],
+            'password': password,
+            'fullname': usuario['fullname'],
+          };
+        }).toList();
+
+        await _dbHelper.sincronizarUsuarios(usuariosProcesados);
 
         return SyncResult(
           exito: true,
           mensaje: 'Usuarios sincronizados',
-          itemsSincronizados: usuariosData.length,
-          totalEnAPI: usuariosData.length,
+          itemsSincronizados: usuariosProcesados.length,
+          totalEnAPI: usuariosProcesados.length,
         );
       } else {
         final mensaje = _extraerMensajeError(response);
@@ -196,11 +202,10 @@ class SyncService {
       );
     }
   }
-
   static Future<SyncResult> sincronizarModelos() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/modelos'),
+        Uri.parse('$baseUrl/getEdfModelos'),
         headers: _headers,
       ).timeout(timeout);
 
@@ -264,14 +269,42 @@ class SyncService {
   static Future<void> _sincronizarMarcas() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/marcas'),
+        Uri.parse('$baseUrl/getEdfMarcas'),
         headers: _headers,
       ).timeout(timeout);
 
       if (response.statusCode == 200) {
-        final List<dynamic> marcasAPI = jsonDecode(response.body);
-        await _dbHelper.sincronizarMarcas(marcasAPI);
-        _logger.i('Marcas sincronizadas: ${marcasAPI.length}');
+        final responseData = jsonDecode(response.body);
+
+        // Extraer el array de marcas correctamente
+        List<dynamic> marcasAPI = [];
+        if (responseData is Map<String, dynamic>) {
+          if (responseData.containsKey('data')) {
+            // Si 'data' es un string JSON, decodificarlo
+            if (responseData['data'] is String) {
+              final String dataString = responseData['data'];
+              marcasAPI = jsonDecode(dataString) as List<dynamic>;
+            } else if (responseData['data'] is List) {
+              marcasAPI = responseData['data'] as List<dynamic>;
+            }
+          }
+        } else if (responseData is List) {
+          marcasAPI = responseData;
+        }
+
+        // AGREGAR FILTRO AQUÍ - antes de sincronizar
+        final marcasValidas = marcasAPI.where((marca) {
+          return marca != null &&
+              marca['nombre'] != null &&
+              marca['nombre'].toString().trim().isNotEmpty;
+        }).toList();
+
+        if (marcasValidas.isNotEmpty) {
+          await _dbHelper.sincronizarMarcas(marcasValidas);
+          _logger.i('Marcas sincronizadas: ${marcasValidas.length} de ${marcasAPI.length}');
+        } else {
+          _logger.w('No hay marcas válidas para sincronizar');
+        }
       }
     } catch (e) {
       _logger.e('Error sincronizando marcas: $e');
@@ -281,14 +314,35 @@ class SyncService {
   static Future<void> _sincronizarLogos() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/logo'),
+        Uri.parse('$baseUrl/getEdfLogos'),
         headers: _headers,
       ).timeout(timeout);
 
       if (response.statusCode == 200) {
-        final List<dynamic> logosAPI = jsonDecode(response.body);
-        await _dbHelper.sincronizarLogos(logosAPI);
-        _logger.i('Logos sincronizados: ${logosAPI.length}');
+        final responseData = jsonDecode(response.body);
+
+        // Extraer el array de logos correctamente
+        List<dynamic> logosAPI = [];
+        if (responseData is Map<String, dynamic>) {
+          if (responseData.containsKey('data')) {
+            // Si 'data' es un string JSON, decodificarlo
+            if (responseData['data'] is String) {
+              final String dataString = responseData['data'];
+              logosAPI = jsonDecode(dataString) as List<dynamic>;
+            } else if (responseData['data'] is List) {
+              logosAPI = responseData['data'] as List<dynamic>;
+            }
+          }
+        } else if (responseData is List) {
+          logosAPI = responseData;
+        }
+
+        if (logosAPI.isNotEmpty) {
+          await _dbHelper.sincronizarLogos(logosAPI);
+          _logger.i('Logos sincronizados: ${logosAPI.length}');
+        } else {
+          _logger.w('No se encontraron logos en la respuesta');
+        }
       }
     } catch (e) {
       _logger.e('Error sincronizando logos: $e');
@@ -300,11 +354,13 @@ class SyncService {
       _logger.i('🔄 Iniciando sincronización de clientes...');
 
       final response = await http.get(
-        Uri.parse('$baseUrl/clientes'),
+        Uri.parse('$baseUrl/getEdfClientes'),
         headers: _headers,
       ).timeout(timeout);
 
       _logger.i('📡 Respuesta del servidor: ${response.statusCode}');
+
+      _logger.i('📄 Contenido respuesta: ${response.body}');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final List<dynamic> clientesData = _parseResponse(response.body);
@@ -377,13 +433,17 @@ class SyncService {
   // ✅ MÉTODO CORREGIDO - Cambié 'modelo' por 'modelo_id'
   static Future<SyncResult> sincronizarEquipos() async {
     try {
+      _logger.i('🔄 Iniciando sincronización de equipos...');
       final response = await http.get(
-        Uri.parse('$baseUrl/equipos'),
+        Uri.parse('$baseUrl/edfEquipos'),
         headers: _headers,
       ).timeout(timeout);
 
+      _logger.i('📡 Respuesta equipos: ${response.statusCode}');
+
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final List<dynamic> equiposData = _parseResponse(response.body);
+        _logger.i('📊 Datos parseados equipos: ${equiposData.length}');
 
         if (equiposData.isEmpty) {
           return SyncResult(
@@ -393,26 +453,25 @@ class SyncService {
           );
         }
 
-        final equiposLimpios = equiposData.map((equipo) {
-          return {
-            'id': equipo['id'],
-            'cod_barras': equipo['cod_barras'],
-            'marca_id': equipo['marca_id'],
-            'modelo_id': equipo['modelo_id'], // ✅ CORREGIDO: Era 'modelo', ahora es 'modelo_id'
-            'numero_serie': equipo['numero_serie'],
-            'logo_id': equipo['logo_id'],
-            'estado_local': equipo['estado_local'] ?? 1,
-            'fecha_creacion': equipo['fecha_creacion'],
-          };
-        }).toList();
+        // ✅ USAR fromJson en lugar de mapeo manual
+        final equipos = <Equipo>[];
+        for (var equipoJson in equiposData) {
+          try {
+            final equipo = Equipo.fromJson(equipoJson);
+            equipos.add(equipo);
+          } catch (e) {
+            _logger.w('Error procesando equipo: $e');
+          }
+        }
 
-        await _equipoRepo.sincronizarDesdeAPI(equiposLimpios);
+        _logger.i('💾 Guardando ${equipos.length} equipos en base de datos...');
+        final equiposMapas = equipos.map((e) => e.toMap()).toList();
+        await _equipoRepo.limpiarYSincronizar(equiposMapas);
 
         return SyncResult(
           exito: true,
           mensaje: 'Equipos sincronizados correctamente',
-          itemsSincronizados: equiposLimpios.length,
-          totalEnAPI: equiposLimpios.length,
+          itemsSincronizados: equipos.length,
         );
       } else {
         final mensaje = _extraerMensajeError(response);
@@ -423,6 +482,7 @@ class SyncService {
         );
       }
     } catch (e) {
+      _logger.e('💥 Error en sincronización de equipos: $e');
       return SyncResult(
         exito: false,
         mensaje: _getErrorMessage(e),
@@ -621,15 +681,15 @@ class SyncService {
   static Future<ApiResponse> enviarClienteAAPI(Cliente cliente) async {
     try {
       final clienteData = {
-        'nombre': cliente.nombre,
+        'cliente': cliente.nombre,    // ✅ Cambiar de 'nombre' a 'cliente'
         'telefono': cliente.telefono,
         'direccion': cliente.direccion,
-        'ruc_ci': cliente.rucCi,
+        'ruc': cliente.rucCi,        // ✅ Cambiar de 'ruc_ci' a 'ruc'
         'propietario': cliente.propietario,
       };
 
       final response = await http.post(
-        Uri.parse('$baseUrl/clientes'),
+        Uri.parse('$baseUrl/getEdfClientes'),
         headers: _headers,
         body: jsonEncode(clienteData),
       ).timeout(timeout);
@@ -724,8 +784,9 @@ class SyncService {
 
   static Future<ApiResponse> probarConexion() async {
     try {
+      // Usar /getUsers en lugar de /ping para probar la conexión
       final response = await http.get(
-        Uri.parse('$baseUrl/ping'),
+        Uri.parse('$baseUrl/getUsers'),
         headers: _headers,
       ).timeout(const Duration(seconds: 10));
 
@@ -734,7 +795,12 @@ class SyncService {
 
         try {
           if (response.body.trim().isNotEmpty) {
-            serverInfo = jsonDecode(response.body);
+            final responseData = jsonDecode(response.body);
+            serverInfo = {
+              'status': responseData['status'] ?? 'OK',
+              'endpoint': 'getUsers',
+              'hasData': responseData['data'] != null,
+            };
           }
         } catch (e) {
           _logger.w('No se pudo parsear info del servidor: $e');
@@ -759,6 +825,7 @@ class SyncService {
       );
     }
   }
+
 
   static Future<Map<String, dynamic>> obtenerEstadisticas() async {
     try {
@@ -788,6 +855,15 @@ class SyncService {
       if (responseData is Map<String, dynamic>) {
         if (responseData.containsKey('data')) {
           final data = responseData['data'];
+
+          // ✅ AGREGAR ESTA CONDICIÓN AQUÍ - antes de las otras
+          if (data is String) {
+            // El 'data' es un string JSON que necesita ser decodificado
+            final decodedData = jsonDecode(data);
+            if (decodedData is List) {
+              return decodedData;
+            }
+          }
 
           if (data is List) {
             return data;
@@ -830,19 +906,29 @@ class SyncService {
 
       final data = clienteJson;
 
-      if (data['nombre'] == null || data['nombre'].toString().trim().isEmpty) {
+      // API usa 'cliente' no 'nombre'
+      if (data['cliente'] == null || data['cliente'].toString().trim().isEmpty) {
         return null;
+      }
+
+      // Determinar RUC/CI: API puede tener 'ruc' o 'cedula'
+      String rucCi = '';
+      if (data['ruc'] != null && data['ruc'].toString().trim().isNotEmpty) {
+        rucCi = data['ruc'].toString().trim();
+      } else if (data['cedula'] != null && data['cedula'].toString().trim().isNotEmpty) {
+        rucCi = data['cedula'].toString().trim();
       }
 
       return Cliente(
         id: data['id'] is int ? data['id'] : null,
-        nombre: data['nombre'].toString().trim(),
+        nombre: data['cliente'].toString().trim(),        // ✅ Cambiar a 'cliente'
         telefono: data['telefono']?.toString().trim() ?? '',
         direccion: data['direccion']?.toString().trim() ?? '',
-        rucCi: data['ruc_ci']?.toString().trim() ?? '',
+        rucCi: rucCi,                                     // ✅ Usar 'ruc' o 'cedula'
         propietario: data['propietario']?.toString().trim() ?? '',
       );
     } catch (e) {
+      _logger.e('Error creando cliente desde API: $e');
       return null;
     }
   }

@@ -24,13 +24,13 @@ class AuthService {
 
   static final _dbHelper = DatabaseHelper();
 
-  // Agregar este método en AuthService
+  // Método para sincronizar usuarios desde la nueva API
   static Future<SyncResult> sincronizarSoloUsuarios() async {
     try {
       logger.i('🔄 Sincronizando solo usuarios...');
 
       final response = await http.get(
-        Uri.parse('${SyncService.baseUrl}/usuarios'),
+        Uri.parse('${SyncService.baseUrl}/getUsers'),
         headers: {
           'Content-Type': 'application/json; charset=UTF-8',
           'Accept': 'application/json',
@@ -38,21 +38,26 @@ class AuthService {
       ).timeout(Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        final List<dynamic> usuariosAPI = jsonDecode(response.body);
+        final responseData = jsonDecode(response.body);
 
-        // Procesar hashes bcrypt si es necesario
+        // Extraer el array de usuarios del campo "data"
+        final String dataString = responseData['data'];
+        final List<dynamic> usuariosAPI = jsonDecode(dataString);
+
+        // Procesar datos de la API para que coincidan con tu estructura
         final usuariosProcesados = usuariosAPI.map((usuario) {
           String password = usuario['password'].toString();
 
+          // Remover el prefijo {bcrypt} si existe
           if (password.startsWith('{bcrypt}')) {
             password = password.substring(8);
           }
 
           return {
             'id': usuario['id'],
-            'nombre': usuario['nombre'],
+            'username': usuario['username'],
             'password': password,
-            'rol': usuario['rol'],
+            'fullname': usuario['fullname'],
           };
         }).toList();
 
@@ -79,19 +84,19 @@ class AuthService {
     }
   }
 
-// 🔑 Login híbrido (online/offline) con soporte bcrypt + credenciales de prueba
-  Future<AuthResult> login(String nombre, String password) async {
-    logger.i('🔑 Intentando login para: $nombre');
+  // 🔑 Login híbrido (online/offline) actualizado
+  Future<AuthResult> login(String username, String password) async {
+    logger.i('🔑 Intentando login para: $username');
 
     // 1. Intentar login online primero
-    final loginOnline = await _intentarLoginOnline(nombre, password);
+    final loginOnline = await _intentarLoginOnline(username, password);
     if (loginOnline.exitoso) {
       await _saveLoginSuccess(loginOnline.usuario!);
       return loginOnline;
     }
 
     // 2. Si falla online, intentar offline con datos sincronizados
-    final loginOffline = await _loginOffline(nombre, password);
+    final loginOffline = await _loginOffline(username, password);
     if (loginOffline.exitoso) {
       await _saveLoginSuccess(loginOffline.usuario!);
       return loginOffline;
@@ -117,9 +122,8 @@ class AuthService {
     }
   }
 
-
-  // 🌐 Intentar login online
-  Future<AuthResult> _intentarLoginOnline(String nombre, String password) async {
+  // 🌐 Intentar login online actualizado
+  Future<AuthResult> _intentarLoginOnline(String username, String password) async {
     try {
       logger.i('🌐 Intentando login online...');
 
@@ -129,7 +133,7 @@ class AuthService {
           'Content-Type': 'application/json; charset=UTF-8',
           'Accept': 'application/json',
         },
-        body: jsonEncode({'nombre': nombre, 'password': password}),
+        body: jsonEncode({'username': username, 'password': password}),
       ).timeout(Duration(seconds: 5));
 
       if (response.statusCode == 200) {
@@ -138,14 +142,14 @@ class AuthService {
           final usuarioData = data['usuario'];
           final usuario = UsuarioAuth(
             id: usuarioData['id'],
-            username: usuarioData['nombre'],
-            rol: usuarioData['rol'],
+            username: usuarioData['username'],
+            fullname: usuarioData['fullname'],
           );
 
-          logger.i('✅ Login online exitoso para: $nombre');
+          logger.i('✅ Login online exitoso para: $username');
           return AuthResult(
             exitoso: true,
-            mensaje: 'Bienvenido, $nombre',
+            mensaje: 'Bienvenido, ${usuarioData['fullname']}',
             usuario: usuario,
             esOnline: true,
           );
@@ -163,8 +167,8 @@ class AuthService {
     return AuthResult(exitoso: false, mensaje: 'Sin conexión');
   }
 
-// 📱 Login offline con datos sincronizados
-  Future<AuthResult> _loginOffline(String nombre, String password) async {
+  // 📱 Login offline actualizado para nuevos campos
+  Future<AuthResult> _loginOffline(String username, String password) async {
     try {
       logger.i('📱 Intentando login offline...');
 
@@ -172,11 +176,11 @@ class AuthService {
 
       // Buscar usuarios que coincidan
       final usuariosEncontrados = usuarios.where(
-            (u) => u.nombre.toLowerCase() == nombre.toLowerCase(),
+            (u) => u.username.toLowerCase() == username.toLowerCase(),
       );
 
       if (usuariosEncontrados.isEmpty) {
-        logger.w('❌ Usuario no encontrado offline: $nombre');
+        logger.w('❌ Usuario no encontrado offline: $username');
         return AuthResult(
           exitoso: false,
           mensaje: 'Usuario no encontrado',
@@ -188,33 +192,33 @@ class AuthService {
       bool passwordValido = false;
 
       // Validar según el tipo de password
-      if (usuario.password.startsWith('{bcrypt}')) {
+      if (usuario.password.isNotEmpty) {
         // Hash bcrypt
-        final hash = usuario.password.substring(8);
+        final hash = usuario.password;
         passwordValido = BCrypt.checkpw(password, hash);
-        logger.i('Validando con bcrypt para: $nombre');
+        logger.i('Validando con bcrypt para: $username');
       } else {
         // Password en texto plano (temporal)
         passwordValido = usuario.password == password;
-        logger.i('Validando texto plano para: $nombre');
+        logger.i('Validando texto plano para: $username');
       }
 
       if (passwordValido) {
         final usuarioAuth = UsuarioAuth(
           id: usuario.id,
-          username: usuario.nombre,
-          rol: usuario.rol,
+          username: usuario.username,
+          fullname: usuario.fullname,
         );
 
-        logger.i('Login exitoso para: $nombre');
+        logger.i('Login exitoso para: $username');
         return AuthResult(
           exitoso: true,
-          mensaje: 'Bienvenido, $nombre',
+          mensaje: 'Bienvenido, ${usuario.fullname}',
           usuario: usuarioAuth,
           esOnline: false,
         );
       } else {
-        logger.w('Contraseña incorrecta offline para: $nombre');
+        logger.w('Contraseña incorrecta offline para: $username');
         return AuthResult(
           exitoso: false,
           mensaje: 'Contraseña incorrecta',
@@ -268,7 +272,7 @@ class AuthService {
 
       if (username != null && role != null) {
         logger.i('👤 Usuario actual: $username ($role)');
-        return UsuarioAuth(id: null, username: username, rol: role);
+        return UsuarioAuth(id: null, username: username, fullname: '');
       }
 
       logger.i('👤 No hay usuario logueado');
@@ -411,18 +415,30 @@ class AuthResult {
   });
 }
 
-// Usuario para autenticación
+// Usuario para autenticación actualizado
 class UsuarioAuth {
   final int? id;
   final String username;
-  final String rol;
+  final String fullname;
 
   UsuarioAuth({
     this.id,
     required this.username,
-    required this.rol,
+    required this.fullname,
   });
 
+  // Getter para mantener compatibilidad si necesitas determinar rol
+  String get rol {
+    // Puedes implementar lógica para determinar el rol basado en username
+    if (username == 'admin' || username == 'useradmin') {
+      return 'admin';
+    }
+    return 'user';
+  }
+
+  // Getters de conveniencia
+  bool get esAdmin => username == 'admin' || username == 'useradmin';
+
   @override
-  String toString() => 'UsuarioAuth(id: $id, username: $username, rol: $rol)';
+  String toString() => 'UsuarioAuth(id: $id, username: $username, fullname: $fullname)';
 }

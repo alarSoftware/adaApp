@@ -249,7 +249,7 @@ class FormsScreenViewModel extends ChangeNotifier {
 
       // Verificar tamaño de imagen
       final double tamanoMB = await _imageService.obtenerTamanoImagen(imagen);
-      if (tamanoMB > 10.0) { // Límite de 10MB
+      if (tamanoMB > 15.0) { // Límite de 15MB
         _eventController.add(ShowSnackBarEvent(
             'La imagen es demasiado grande (${tamanoMB.toStringAsFixed(1)}MB). Máximo 10MB.',
             Colors.red

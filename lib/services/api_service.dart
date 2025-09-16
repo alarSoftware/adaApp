@@ -12,9 +12,9 @@ var logger = Logger();
 
 class ApiService {
   // Cambia esta URL por tu endpoint real
-  static const String baseUrl = 'http://192.168.1.185:3000';
-  static const String clientesEndpoint = '$baseUrl/clientes';
-  static const String equiposEndpoint = '$baseUrl/equipos';
+  static const String baseUrl = 'https://56a494bb0732.ngrok-free.app/adaControl/api';
+  static const String clientesEndpoint = '$baseUrl/getEdfClientes';
+  static const String equiposEndpoint = '$baseUrl/edfEquipos';
 
   // Timeout para las peticiones
   static const Duration timeout = Duration(seconds: 30);
