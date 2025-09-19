@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/viewmodels/cliente_detail_screen_viewmodel.dart';
-import 'equipos_clientes_detail_screen.dart';
+import 'package:ada_app/ui/screens/equipos_clientes_detail_screen.dart';
 import 'forms_screen.dart';
 import 'dart:async';
 import 'package:ada_app/ui/theme/colors.dart';

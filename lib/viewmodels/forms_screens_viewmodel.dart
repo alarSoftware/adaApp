@@ -1,4 +1,3 @@
-// viewmodels/forms_screen_viewmodel.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
@@ -6,10 +5,10 @@ import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/repositories/logo_repository.dart';
 import 'package:logger/logger.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:barcode_scan2/barcode_scan2.dart';
 import 'package:ada_app/repositories/equipo_cliente_repository.dart';
 import 'package:ada_app/services/image_service.dart';
+import 'package:ada_app/services/location_service.dart';
 import 'dart:io';
 
 // Eventos UI
@@ -53,11 +52,12 @@ class DialogAction {
     this.isDefault = false,
   });
 }
-//Variables existentes
+
 class FormsScreenViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
   final EquipoClienteRepository _equipoClienteRepository = EquipoClienteRepository();
   final ImageService _imageService = ImageService();
+  final LocationService _locationService = LocationService(); // AGREGADO
 
   // Controladores de texto
   final TextEditingController codigoBarrasController = TextEditingController();
@@ -73,7 +73,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   Cliente? _cliente;
   File? _imagenSeleccionada;
 
-  // VARIABLES PARA PASAR AL PREVIEW - AQUÍ GUARDAMOS TODO PARA EL PREVIEW
+  // VARIABLES PARA PASAR AL PREVIEW
   Map<String, dynamic>? _equipoCompleto;
   bool _equipoYaAsignado = false;
 
@@ -83,7 +83,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   bool get isScanning => _isScanning;
   List<Map<String, dynamic>> get logos => _logos;
   int? get logoSeleccionado => _logoSeleccionado;
-  File? get imagenSeleccionada => _imagenSeleccionada; // <- MOVER AQUÍ
+  File? get imagenSeleccionada => _imagenSeleccionada;
   Stream<FormsUIEvent> get uiEvents => _eventController.stream;
 
   late final StreamController<FormsUIEvent> _eventController;
@@ -112,6 +112,26 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   // ===============================
+  // MÉTODOS AUXILIARES PARA EVENTOS UI
+  // ===============================
+
+  void _showError(String message) {
+    _eventController.add(ShowSnackBarEvent(message, Colors.red));
+  }
+
+  void _showSuccess(String message) {
+    _eventController.add(ShowSnackBarEvent(message, Colors.green));
+  }
+
+  void _showInfo(String message) {
+    _eventController.add(ShowSnackBarEvent(message, Colors.blue));
+  }
+
+  void _showWarning(String message) {
+    _eventController.add(ShowSnackBarEvent(message, Colors.orange));
+  }
+
+  // ===============================
   // LÓGICA DE NEGOCIO - LOGOS
   // ===============================
 
@@ -127,14 +147,10 @@ class FormsScreenViewModel extends ChangeNotifier {
       }).toList();
 
       _logger.i('Logos cargados exitosamente: ${_logos.length}');
-      for (final logo in _logos) {
-        _logger.i('Logo: ${logo['id']} - ${logo['nombre']}');
-      }
-
       notifyListeners();
     } catch (e) {
       _logger.e('Error cargando logos: $e');
-      _eventController.add(ShowSnackBarEvent('Error cargando logos', Colors.red));
+      _showError('Error cargando logos');
     }
   }
 
@@ -168,13 +184,13 @@ class FormsScreenViewModel extends ChangeNotifier {
 
     } on PlatformException catch (e) {
       if (e.code == BarcodeScanner.cameraAccessDenied) {
-        _eventController.add(ShowSnackBarEvent('Permisos de cámara denegados', Colors.red));
+        _showError('Permisos de cámara denegados');
       } else {
-        _eventController.add(ShowSnackBarEvent('Error desconocido: ${e.message}', Colors.red));
+        _showError('Error desconocido: ${e.message}');
       }
     } catch (e) {
       _logger.e('Error escaneando código: $e');
-      _eventController.add(ShowSnackBarEvent('Error al escanear código', Colors.red));
+      _showError('Error al escanear código');
     } finally {
       _setScanning(false);
     }
@@ -186,7 +202,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   // ===============================
-  // LÓGICA DE NEGOCIO - BÚSQUEDA EQUIPOS (SOLO VALIDACIÓN Y UI)
+  // LÓGICA DE NEGOCIO - BÚSQUEDA EQUIPOS
   // ===============================
 
   Future<void> buscarEquipoPorCodigo(String codigo) async {
@@ -198,6 +214,7 @@ class FormsScreenViewModel extends ChangeNotifier {
         codigoBarras: codigo.trim(),
         soloActivos: true,
       );
+
       if (equiposCompletos.isNotEmpty) {
         await _procesarEquipoEncontrado(equiposCompletos.first);
       } else {
@@ -207,165 +224,57 @@ class FormsScreenViewModel extends ChangeNotifier {
     } catch (e, stackTrace) {
       _logger.e('Error buscando visicooler: $e', stackTrace: stackTrace);
       _limpiarDatosAutocompletados();
-      _eventController.add(ShowSnackBarEvent('Error al consultar la base de datos', Colors.red));
+      _showError('Error al consultar la base de datos');
     }
   }
 
-  // ===============================
-// LÓGICA DE NEGOCIO - IMÁGENES
-// ===============================
-
-  Future<void> tomarFoto() async {
-    try {
-      _logger.i('Iniciando captura de foto...');
-
-      final File? foto = await _imageService.tomarFoto();
-
-      if (foto != null) {
-        await _procesarImagenSeleccionada(foto);
-      } else {
-        _logger.i('Usuario canceló la captura de foto');
-      }
-    } catch (e) {
-      _logger.e('Error tomando foto: $e');
-      _eventController.add(ShowSnackBarEvent(
-          'Error al tomar la foto: $e',
-          Colors.red
-      ));
-    }
-  }
-
-
-  Future<void> _procesarImagenSeleccionada(File imagen) async {
-    try {
-      // Validar que sea una imagen válida
-      if (!_imageService.esImagenValida(imagen)) {
-        _eventController.add(ShowSnackBarEvent(
-            'El archivo seleccionado no es una imagen válida',
-            Colors.red
-        ));
-        return;
-      }
-
-      // Verificar tamaño de imagen
-      final double tamanoMB = await _imageService.obtenerTamanoImagen(imagen);
-      if (tamanoMB > 15.0) { // Límite de 15MB
-        _eventController.add(ShowSnackBarEvent(
-            'La imagen es demasiado grande (${tamanoMB.toStringAsFixed(1)}MB). Máximo 10MB.',
-            Colors.red
-        ));
-        return;
-      }
-
-      // Guardar imagen en el directorio de la app
-      final String codigoEquipo = codigoBarrasController.text.trim().isEmpty
-          ? 'temp_${DateTime.now().millisecondsSinceEpoch}'
-          : codigoBarrasController.text.trim();
-
-      final File imagenGuardada = await _imageService.guardarImagenEnApp(imagen, codigoEquipo);
-
-      // Eliminar imagen anterior si existe
-      if (_imagenSeleccionada != null) {
-        await _imageService.eliminarImagen(_imagenSeleccionada!);
-      }
-
-      _imagenSeleccionada = imagenGuardada;
-      _logger.i('Imagen procesada exitosamente: ${imagenGuardada.path}');
-
-      _eventController.add(ShowSnackBarEvent(
-          'Imagen agregada correctamente (${tamanoMB.toStringAsFixed(1)}MB)',
-          Colors.green
-      ));
-
-      notifyListeners();
-    } catch (e) {
-      _logger.e('Error procesando imagen: $e');
-      _eventController.add(ShowSnackBarEvent(
-          'Error al procesar la imagen: $e',
-          Colors.red
-      ));
-    }
-  }
-
-  Future<void> _eliminarImagenTemporal() async {
-    if (_imagenSeleccionada != null) {
-      try {
-        await _imageService.eliminarImagen(_imagenSeleccionada!);
-      } catch (e) {
-        _logger.w('No se pudo eliminar imagen temporal: $e');
-      }
-      _imagenSeleccionada = null;
-    }
-  }
-
-  Future<void> eliminarImagen() async {
-    if (_imagenSeleccionada != null) {
-      try {
-        await _imageService.eliminarImagen(_imagenSeleccionada!);
-        _imagenSeleccionada = null;
-        _eventController.add(ShowSnackBarEvent(
-            'Imagen eliminada',
-            Colors.orange
-        ));
-        notifyListeners();
-      } catch (e) {
-        _logger.e('Error eliminando imagen: $e');
-        _eventController.add(ShowSnackBarEvent(
-            'Error al eliminar la imagen',
-            Colors.red
-        ));
-      }
-    }
-  }
-
-  // MÉTODO PRINCIPAL - SOLO VALIDACIÓN Y LLENADO DE CAMPOS (NO GUARDAR EN BD)
+  // MÉTODO PRINCIPAL REFACTORIZADO - DIVIDIDO EN MÉTODOS MÁS PEQUEÑOS
   Future<void> _procesarEquipoEncontrado(Map<String, dynamic> equipoCompleto) async {
-    _logger.i('=== PROCESANDO EQUIPO ENCONTRADO (SOLO VALIDACIÓN) ===');
+    _logger.i('=== PROCESANDO EQUIPO ENCONTRADO ===');
     _logger.i('Equipo: ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']}');
 
     try {
-      // Verificar si el equipo está asignado al cliente actual
-      bool estaAsignado = await _equipoClienteRepository.verificarAsignacionEquipoCliente(
-          equipoCompleto['id'],
-          _cliente!.id!
-      );
-
-      // Rellenar campos en la UI
-      _isCensoMode = true;
-      modeloController.text = equipoCompleto['modelo_nombre']?.toString() ?? '';
-      numeroSerieController.text = equipoCompleto['numero_serie']?.toString() ?? '';
-
-      if (equipoCompleto['logo_id'] != null) {
-        final logoExists = _logos.any((logo) => logo['id'] == equipoCompleto['logo_id']);
-        if (logoExists) {
-          _logoSeleccionado = equipoCompleto['logo_id'] as int?;
-        } else {
-          _logoSeleccionado = null;
-        }
-      }
-
-      // ✅ GUARDAR DATOS PARA EL PREVIEW (NO GUARDAR EN BD AÚN)
-      _equipoCompleto = equipoCompleto;
-      _equipoYaAsignado = estaAsignado;
-
-      // ✅ SOLO MOSTRAR MENSAJES DE ESTADO (NO GUARDAR)
-      if (estaAsignado) {
-        _eventController.add(ShowSnackBarEvent(
-          'Equipo ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']} - YA ASIGNADO ✓',
-          Colors.green,
-        ));
-      } else {
-        _eventController.add(ShowSnackBarEvent(
-          'Equipo ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']} - LISTO PARA REGISTRAR',
-          Colors.blue,
-        ));
-      }
-
+      await _verificarAsignacionEquipo(equipoCompleto);
+      _llenarCamposFormulario(equipoCompleto);
+      _prepararDatosPreview(equipoCompleto);
+      _mostrarEstadoEquipo(equipoCompleto);
       notifyListeners();
 
     } catch (e) {
       _logger.e('Error procesando equipo: $e');
-      _eventController.add(ShowSnackBarEvent('Error procesando equipo: $e', Colors.red));
+      _showError('Error procesando equipo: $e');
+    }
+  }
+
+  Future<void> _verificarAsignacionEquipo(Map<String, dynamic> equipo) async {
+    _equipoYaAsignado = await _equipoClienteRepository.verificarAsignacionEquipoCliente(
+        equipo['id'],
+        _cliente!.id!
+    );
+  }
+
+  void _llenarCamposFormulario(Map<String, dynamic> equipo) {
+    _isCensoMode = true;
+    modeloController.text = equipo['modelo_nombre']?.toString() ?? '';
+    numeroSerieController.text = equipo['numero_serie']?.toString() ?? '';
+
+    if (equipo['logo_id'] != null) {
+      final logoExists = _logos.any((logo) => logo['id'] == equipo['logo_id']);
+      _logoSeleccionado = logoExists ? equipo['logo_id'] as int? : null;
+    }
+  }
+
+  void _prepararDatosPreview(Map<String, dynamic> equipo) {
+    _equipoCompleto = equipo;
+  }
+
+  void _mostrarEstadoEquipo(Map<String, dynamic> equipo) {
+    final nombreEquipo = '${equipo['marca_nombre']} ${equipo['modelo_nombre']}';
+
+    if (_equipoYaAsignado) {
+      _showSuccess('Equipo $nombreEquipo - YA ASIGNADO ✓');
+    } else {
+      _showInfo('Equipo $nombreEquipo - LISTO PARA REGISTRAR');
     }
   }
 
@@ -403,6 +312,91 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   // ===============================
+  // LÓGICA DE NEGOCIO - IMÁGENES
+  // ===============================
+
+  Future<void> tomarFoto() async {
+    try {
+      _logger.i('Iniciando captura de foto...');
+
+      final File? foto = await _imageService.tomarFoto();
+
+      if (foto != null) {
+        await _procesarImagenSeleccionada(foto);
+      } else {
+        _logger.i('Usuario canceló la captura de foto');
+      }
+    } catch (e) {
+      _logger.e('Error tomando foto: $e');
+      _showError('Error al tomar la foto: $e');
+    }
+  }
+
+  Future<void> _procesarImagenSeleccionada(File imagen) async {
+    try {
+      // Validar que sea una imagen válida
+      if (!_imageService.esImagenValida(imagen)) {
+        _showError('El archivo seleccionado no es una imagen válida');
+        return;
+      }
+
+      // Verificar tamaño de imagen
+      final double tamanoMB = await _imageService.obtenerTamanoImagen(imagen);
+      if (tamanoMB > 15.0) {
+        _showError('La imagen es demasiado grande (${tamanoMB.toStringAsFixed(1)}MB). Máximo 15MB.');
+        return;
+      }
+
+      // Guardar imagen en el directorio de la app
+      final String codigoEquipo = codigoBarrasController.text.trim().isEmpty
+          ? 'temp_${DateTime.now().millisecondsSinceEpoch}'
+          : codigoBarrasController.text.trim();
+
+      final File imagenGuardada = await _imageService.guardarImagenEnApp(imagen, codigoEquipo);
+
+      // Eliminar imagen anterior si existe
+      if (_imagenSeleccionada != null) {
+        await _imageService.eliminarImagen(_imagenSeleccionada!);
+      }
+
+      _imagenSeleccionada = imagenGuardada;
+      _logger.i('Imagen procesada exitosamente: ${imagenGuardada.path}');
+
+      _showSuccess('Imagen agregada correctamente (${tamanoMB.toStringAsFixed(1)}MB)');
+      notifyListeners();
+
+    } catch (e) {
+      _logger.e('Error procesando imagen: $e');
+      _showError('Error al procesar la imagen: $e');
+    }
+  }
+
+  Future<void> _eliminarImagenTemporal() async {
+    if (_imagenSeleccionada != null) {
+      try {
+        await _imageService.eliminarImagen(_imagenSeleccionada!);
+      } catch (e) {
+        _logger.w('No se pudo eliminar imagen temporal: $e');
+      }
+      _imagenSeleccionada = null;
+    }
+  }
+
+  Future<void> eliminarImagen() async {
+    if (_imagenSeleccionada != null) {
+      try {
+        await _imageService.eliminarImagen(_imagenSeleccionada!);
+        _imagenSeleccionada = null;
+        _showWarning('Imagen eliminada');
+        notifyListeners();
+      } catch (e) {
+        _logger.e('Error eliminando imagen: $e');
+        _showError('Error al eliminar la imagen');
+      }
+    }
+  }
+
+  // ===============================
   // LÓGICA DE NEGOCIO - MODOS
   // ===============================
 
@@ -419,7 +413,7 @@ class FormsScreenViewModel extends ChangeNotifier {
     if (codigo.length >= 3) {
       buscarEquipoPorCodigo(codigo);
     } else if (codigo.isNotEmpty) {
-      _eventController.add(ShowSnackBarEvent('El código debe tener al menos 3 caracteres', Colors.orange));
+      _showWarning('El código debe tener al menos 3 caracteres');
     }
   }
 
@@ -433,11 +427,7 @@ class FormsScreenViewModel extends ChangeNotifier {
     _equipoCompleto = null;
     _equipoYaAsignado = false;
 
-    _eventController.add(ShowSnackBarEvent(
-        'Modo: Registrar nuevo equipo. Complete todos los campos',
-        Colors.blue
-    ));
-
+    _showInfo('Modo: Registrar nuevo equipo. Complete todos los campos');
     notifyListeners();
   }
 
@@ -460,39 +450,27 @@ class FormsScreenViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-
-
   // ===============================
-  // LÓGICA DE NEGOCIO - VALIDACIÓN
+  // VALIDACIONES SIMPLIFICADAS
   // ===============================
 
-  String? validarCodigoBarras(String? value) {
+  String? _validarCampo(String? value, String nombreCampo, {int minLength = 1}) {
     if (value == null || value.trim().isEmpty) {
-      return 'El código de barras es requerido';
+      return '$nombreCampo es requerido';
     }
-    if (value.trim().length < 3) {
-      return 'El código debe tener al menos 3 caracteres';
+    if (value.trim().length < minLength) {
+      return '$nombreCampo debe tener al menos $minLength caracteres';
     }
     return null;
   }
 
-  String? validarModelo(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'El modelo del visicooler es requerido';
-    }
-    return null;
-  }
+  String? validarCodigoBarras(String? value) => _validarCampo(value, 'El código de barras', minLength: 3);
+  String? validarModelo(String? value) => _validarCampo(value, 'El modelo del visicooler');
+  String? validarNumeroSerie(String? value) => _validarCampo(value, 'El número de serie');
 
   String? validarLogo(int? value) {
     if (value == null) {
       return 'El logo es requerido';
-    }
-    return null;
-  }
-
-  String? validarNumeroSerie(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'El número de serie es requerido';
     }
     return null;
   }
@@ -544,8 +522,6 @@ class FormsScreenViewModel extends ChangeNotifier {
       'fecha_registro': DateTime.now().toIso8601String(),
       'timestamp_gps': DateTime.now().millisecondsSinceEpoch,
       'es_censo': _isCensoMode,
-
-      // ✅ DATOS COMPLETOS PARA EL PREVIEW (INCLUIR TODO LO NECESARIO PARA GUARDAR)
       'equipo_completo': _equipoCompleto,
       'ya_asignado': _equipoYaAsignado,
     };
@@ -567,46 +543,16 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   // ===============================
-  // LÓGICA DE NEGOCIO - GPS
+  // LÓGICA DE NEGOCIO - GPS (OPTIMIZADA)
   // ===============================
 
   Future<Map<String, double>> _obtenerUbicacion() async {
     try {
-      _logger.i('Iniciando obtención de ubicación GPS...');
-
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        throw 'El servicio de ubicación está deshabilitado. Active el GPS para continuar.';
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          throw 'Permisos de ubicación denegados. Permita el acceso a la ubicación.';
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        throw 'Permisos de ubicación denegados permanentemente. Vaya a configuración y habilite la ubicación.';
-      }
-
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 30),
+      return await _locationService.getCurrentLocationAsMap(
+        timeout: const Duration(seconds: 30),
       );
-
-      _logger.i('Ubicación GPS obtenida: ${position.latitude}, ${position.longitude}');
-      _logger.i('Precisión: ${position.accuracy}m');
-
-      return {
-        'latitud': position.latitude,
-        'longitud': position.longitude,
-      };
-
-    } catch (e) {
-      _logger.e('Error crítico obteniendo ubicación GPS: $e');
-      throw 'Error obteniendo ubicación GPS: $e. La ubicación es requerida para registrar el visicooler.';
+    } on LocationException catch (e) {
+      throw 'Error obteniendo ubicación GPS: ${e.message}';
     }
   }
 

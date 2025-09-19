@@ -1,5 +1,3 @@
-// Tu modelo EstadoEquipo actualizado - Solo agregamos campos de imagen
-
 enum EstadoEquipoCenso {
   creado,
   migrado,

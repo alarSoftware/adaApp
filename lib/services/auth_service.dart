@@ -4,13 +4,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/database_helper.dart';
-import 'package:ada_app/services/sync/base_sync_service.dart'; // AGREGADO: Import faltante
+import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/models/usuario.dart';
 
 var logger = Logger();
 
 class AuthService {
-
   // Keys para SharedPreferences
   static const String _keyHasLoggedIn = 'has_logged_in_before';
   static const String _keyCurrentUser = 'current_user';
@@ -24,7 +23,7 @@ class AuthService {
 
   static final _dbHelper = DatabaseHelper();
 
-  // Método para sincronizar usuarios desde la nueva API - CORREGIDO PARA RETORNAR SyncResult
+  // Método para sincronizar usuarios desde la nueva API
   static Future<SyncResult> sincronizarSoloUsuarios() async {
     try {
       logger.i('Sincronizando solo usuarios...');
@@ -237,7 +236,6 @@ class AuthService {
     }
   }
 
-
   // Login híbrido (online/offline) actualizado
   Future<AuthResult> login(String username, String password) async {
     logger.i('Intentando login para: $username');
@@ -415,7 +413,40 @@ class AuthService {
   }
 
   // Obtener usuario actual (si existe sesión)
-  Future<UsuarioAuth?> getCurrentUser() async {
+  Future<Usuario?> getCurrentUser() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString(_keyCurrentUser);
+
+      if (username == null) {
+        logger.i('No hay usuario actual en SharedPreferences');
+        return null;
+      }
+
+      logger.i('Buscando usuario completo para: $username');
+
+      // Buscar el usuario completo en la base de datos local
+      final usuarios = await _dbHelper.obtenerUsuarios();
+
+      final usuarioEncontrado = usuarios.where(
+            (u) => u.username.toLowerCase() == username.toLowerCase(),
+      ).firstOrNull;
+
+      if (usuarioEncontrado != null) {
+        logger.i('Usuario completo encontrado: ${usuarioEncontrado.username} - edf_vendedor_id: ${usuarioEncontrado.edfVendedorId}');
+        return usuarioEncontrado;
+      } else {
+        logger.w('Usuario $username no encontrado en base de datos local');
+        return null;
+      }
+
+    } catch (e) {
+      logger.e('Error obteniendo usuario completo: $e');
+      return null;
+    }
+  }
+
+  Future<UsuarioAuth?> getCurrentUserAuth() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final username = prefs.getString(_keyCurrentUser);
@@ -449,7 +480,7 @@ class AuthService {
     }
   }
 
-  // Autenticación biométrica (verifica usuario guardado)
+  // Autenticación biométrica CORREGIDA
   Future<AuthResult> authenticateWithBiometric() async {
     logger.i('Intentando autenticación biométrica');
 
@@ -466,12 +497,15 @@ class AuthService {
         );
       }
 
+      // CORRECCIÓN: Convertir Usuario a UsuarioAuth usando constructor de conversión
+      final usuarioAuth = UsuarioAuth.fromUsuario(currentUser);
+
       // Si hay usuario guardado, la biometría es válida
       logger.i('Autenticación biométrica exitosa para: ${currentUser.username}');
       return AuthResult(
         exitoso: true,
-        mensaje: 'Bienvenido de nuevo, ${currentUser.username}',
-        usuario: currentUser,
+        mensaje: 'Bienvenido de nuevo, ${currentUser.fullname}',
+        usuario: usuarioAuth,
       );
 
     } catch (e) {
@@ -481,6 +515,15 @@ class AuthService {
         mensaje: 'Error en autenticación biométrica',
       );
     }
+  }
+
+  // Método de conversión auxiliar
+  UsuarioAuth _convertirAUsuarioAuth(Usuario usuario) {
+    return UsuarioAuth(
+      id: usuario.id,
+      username: usuario.username,
+      fullname: usuario.fullname,
+    );
   }
 
   // Limpiar completamente (para testing o reset)
@@ -551,7 +594,7 @@ class AuthService {
   }
 }
 
-// Resultado del login actualizado
+// Resultado del login
 class AuthResult {
   final bool exitoso;
   final String mensaje;
@@ -566,7 +609,7 @@ class AuthResult {
   });
 }
 
-// Usuario para autenticación actualizado
+// Usuario para autenticación CORREGIDO
 class UsuarioAuth {
   final int? id;
   final String username;
@@ -578,9 +621,14 @@ class UsuarioAuth {
     required this.fullname,
   });
 
+  // Constructor de conversión desde Usuario
+  UsuarioAuth.fromUsuario(Usuario usuario)
+      : id = usuario.id,
+        username = usuario.username,
+        fullname = usuario.fullname;
+
   // Getter para mantener compatibilidad si necesitas determinar rol
   String get rol {
-    // Puedes implementar lógica para determinar el rol basado en username
     if (username == 'admin' || username == 'useradmin') {
       return 'admin';
     }

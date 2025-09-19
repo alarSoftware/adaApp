@@ -20,6 +20,7 @@ enum LocationErrorType {
   unknown,
 }
 
+
 /// Servicio centralizado para manejo de ubicación GPS
 class LocationService {
   static LocationService? _instance;
@@ -30,6 +31,21 @@ class LocationService {
   /// Singleton - una sola instancia del servicio
   factory LocationService() {
     return _instance ??= LocationService._internal();
+  }
+  // Agregar este método a tu LocationService
+  Future<Map<String, double>> getCurrentLocationAsMap({
+    LocationAccuracy accuracy = LocationAccuracy.high,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final position = await getCurrentLocationRequired(
+      accuracy: accuracy,
+      timeout: timeout,
+    );
+
+    return {
+      'latitud': position.latitude,
+      'longitud': position.longitude,
+    };
   }
 
   /// Verificar si los servicios de ubicación están habilitados en el dispositivo

@@ -1,3 +1,4 @@
+// database_helper.dart (CORREGIDO)
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -6,16 +7,30 @@ import 'package:path/path.dart';
 import 'package:logger/logger.dart';
 import 'package:ada_app/models/usuario.dart';
 
+// ✅ Importar con alias para evitar conflictos
+import 'database_tables.dart' as tables;
+import 'database_sync.dart' as sync;
+import 'database_queries.dart' as queries;
+
 var logger = Logger();
 
 class DatabaseHelper {
   static DatabaseHelper? _instance;
   static Database? _database;
 
-  static const String _databaseName = 'AdaAapp.db';
-  static const int _databaseVersion = 1; //incrementar cuando haya actualizacion
+  static const String _databaseName = 'AdaApp.db';
+  static const int _databaseVersion = 1;
 
-  DatabaseHelper._internal();
+  // ✅ Delegados especializados con nombres corregidos
+  late final tables.DatabaseTables _tables;
+  late final sync.DatabaseSync _sync;
+  late final queries.DatabaseQueries _queries;
+
+  DatabaseHelper._internal() {
+    _tables = tables.DatabaseTables();
+    _sync = sync.DatabaseSync();
+    _queries = queries.DatabaseQueries();
+  }
 
   factory DatabaseHelper() {
     return _instance ??= DatabaseHelper._internal();
@@ -35,11 +50,9 @@ class DatabaseHelper {
       return await openDatabase(
         path,
         version: _databaseVersion,
-        onCreate: _onCreate,
-        onUpgrade: _onUpgrade,
-        onOpen: (db) {
-          logger.i('Base de datos abierta exitosamente');
-        },
+        onCreate: _tables.onCreate,
+        onUpgrade: _tables.onUpgrade,
+        onOpen: (db) => logger.i('Base de datos abierta exitosamente'),
       );
     } catch (e) {
       logger.e('Error al inicializar base de datos: $e');
@@ -47,162 +60,8 @@ class DatabaseHelper {
     }
   }
 
-  Future<void> _onCreate(Database db, int version) async {
-    logger.i('Creando tablas de base de datos v$version');
-
-    // TABLAS MAESTRAS: modelos, marcas y logo (deben crearse primero por FK)
-
-    await db.execute('''
-      CREATE TABLE modelos (
-        id INTEGER PRIMARY KEY,
-        nombre TEXT NOT NULL UNIQUE
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE marcas (
-        id INTEGER PRIMARY KEY,
-        nombre TEXT NOT NULL UNIQUE,
-        activo INTEGER DEFAULT 1,
-        fecha_creacion TEXT NOT NULL
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE logo (
-        id INTEGER PRIMARY KEY,
-        nombre TEXT NOT NULL UNIQUE,
-        activo INTEGER DEFAULT 1,
-        fecha_creacion TEXT NOT NULL
-      )
-    ''');
-
-    // Tabla clientes
-    await db.execute('''
-  CREATE TABLE clientes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    codigo INTEGER,
-    nombre TEXT NOT NULL,
-    telefono TEXT NOT NULL,
-    direccion TEXT NOT NULL,
-    ruc_ci TEXT NOT NULL,
-    propietario TEXT NOT NULL
-  )
-''');
-
-    // Tabla equipos CORREGIDA
-    await db.execute('''
-CREATE TABLE equipos (
-   id INTEGER PRIMARY KEY AUTOINCREMENT,
-   id_remoto TEXT,                        
-   cod_barras TEXT,                       
-   marca_id INTEGER NOT NULL,
-   modelo_id INTEGER NOT NULL,
-   numero_serie TEXT,                      
-   logo_id INTEGER NOT NULL,
-   estado_local INTEGER DEFAULT 1,
-   activo INTEGER DEFAULT 1,
-   sincronizado INTEGER DEFAULT 0,
-   fecha_creacion TEXT NOT NULL,
-   fecha_actualizacion TEXT,
-   FOREIGN KEY (marca_id) REFERENCES marcas (id),
-   FOREIGN KEY (modelo_id) REFERENCES modelos (id),
-   FOREIGN KEY (logo_id) REFERENCES logo (id)
-);
-    ''');
-
-    // Tabla equipo_cliente
-    await db.execute('''
-  CREATE TABLE equipo_cliente (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    equipo_id INTEGER NOT NULL,
-    cliente_id INTEGER NOT NULL,
-    estado TEXT NOT NULL,
-    fecha_asignacion TEXT NOT NULL,
-    fecha_retiro TEXT,
-    activo INTEGER DEFAULT 1,
-    sincronizado INTEGER DEFAULT 0,
-    fecha_creacion TEXT NOT NULL,
-    fecha_actualizacion TEXT NOT NULL,
-    FOREIGN KEY (equipo_id) REFERENCES equipos (id) ON DELETE CASCADE,
-    FOREIGN KEY (cliente_id) REFERENCES clientes (id) ON DELETE CASCADE,
-    UNIQUE(equipo_id, cliente_id, fecha_asignacion),
-    CHECK (estado IN ('pendiente', 'asignado'))
-  )
-''');
-    // Tabla usuarios
-    await db.execute('''
-  CREATE TABLE Users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    edf_vendedor_id TEXT,
-    edf_vendedor_nombre TEXT,
-    code INTEGER NOT NULL UNIQUE,
-    username TEXT NOT NULL,
-    password TEXT NOT NULL,   
-    fullname TEXT NOT NULL,
-    sincronizado INTEGER DEFAULT 0,
-    fecha_creacion TEXT NOT NULL,
-    fecha_actualizacion TEXT NOT NULL
-  )
-''');
-//Tabla Estado_Equipo
-    await db.execute('''
-  CREATE TABLE Estado_Equipo (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    equipo_cliente_id INTEGER NOT NULL,
-    en_local INTEGER NOT NULL DEFAULT 0,
-    latitud REAL,
-    longitud REAL,
-    fecha_revision TEXT NOT NULL,
-    fecha_creacion TEXT NOT NULL,
-    fecha_actualizacion TEXT,
-    sincronizado INTEGER NOT NULL DEFAULT 0,
-    estado_censo TEXT DEFAULT 'creado',
-    FOREIGN KEY (equipo_cliente_id) REFERENCES equipo_cliente (id) ON DELETE CASCADE
-  )
-''');
-    // Crear índices para mejorar rendimiento
-    await _crearIndices(db);
-    logger.i('Todas las tablas, índices y datos iniciales creados exitosamente');
-  }
-
-  Future<void> _crearIndices(Database db) async {
-    // Índices para clientes
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_nombre ON clientes (nombre)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_ruc_ci ON clientes (ruc_ci)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_telefono ON clientes (telefono)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_direccion ON clientes (direccion)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_codigo ON clientes (codigo)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_propietario ON clientes (propietario)');
-
-    // Índices para equipos
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_equipos_cod_barras ON equipos (cod_barras)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_equipos_numero_serie ON equipos (numero_serie)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_equipos_marca_id ON equipos (marca_id)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_equipos_modelo_id ON equipos (modelo_id)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_equipos_logo_id ON equipos (logo_id)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_equipos_activo ON equipos (activo)');
-
-    // Índices para equipo_cliente
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_equipo_cliente_equipo_id ON equipo_cliente (equipo_id)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_equipo_cliente_cliente_id ON equipo_cliente (cliente_id)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_equipo_cliente_activo ON equipo_cliente (activo)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_equipo_cliente_estado ON equipo_cliente (estado)');
-
-    // Índices para marcas, modelos y logo
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_marcas_nombre ON marcas (nombre)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_modelos_nombre ON modelos (nombre)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_logo_nombre ON logo (nombre)');
-  }
-
-
-
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    logger.i('Actualizando base de datos de v$oldVersion a v$newVersion');
-  }
-
   // ================================================================
-  // MÉTODOS CRUD GENÉRICOS CON MEJORAS
+  // MÉTODOS CRUD GENÉRICOS SIMPLIFICADOS
   // ================================================================
 
   Future<List<Map<String, dynamic>>> consultar(
@@ -223,10 +82,10 @@ CREATE TABLE equipos (
         limit: limit,
         offset: offset,
       );
-      logger.d('Consulta en $tableName: ${result.length} registros encontrados');
+      logger.d('Consulta en $tableName: ${result.length} registros');
       return result;
     } catch (e) {
-      logger.e('Error al consultar $tableName: $e');
+      logger.e('Error consultando $tableName: $e');
       rethrow;
     }
   }
@@ -244,91 +103,18 @@ CREATE TABLE equipos (
   }
 
   Future<Map<String, dynamic>?> consultarPorId(String tableName, int id) async {
-    try {
-      final result = await consultar(tableName, where: 'id = ?', whereArgs: [id]);
-      return result.isNotEmpty ? result.first : null;
-    } catch (e) {
-      logger.e('Error al consultar por ID en $tableName: $e');
-      rethrow;
-    }
+    final result = await consultar(tableName, where: 'id = ?', whereArgs: [id]);
+    return result.isNotEmpty ? result.first : null;
   }
 
   Future<int> insertar(String tableName, Map<String, dynamic> values) async {
-    try {
-      if (values.isEmpty) {
-        throw ArgumentError('Los valores no pueden estar vacíos');
-      }
+    _validateValues(values);
+    _addTimestamps(tableName, values);
 
-      final now = DateTime.now().toIso8601String();
-
-      // Solo agregar timestamps si la tabla los tiene
-      if (await _tablaRequiereFechas(tableName)) {
-        values['fecha_actualizacion'] = now;
-        if (!values.containsKey('fecha_creacion')) {
-          values['fecha_creacion'] = now;
-        }
-      }
-
-      final db = await database;
-      final id = await db.insert(tableName, values);
-      logger.d('Registro insertado en $tableName con ID: $id');
-      return id;
-    } catch (e) {
-      logger.e('Error al insertar en $tableName: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> sincronizarClientes(List<dynamic> clientesAPI) async {
-    logger.i('=== SINCRONIZANDO CLIENTES EN DATABASE_HELPER ===');
-    logger.i('Clientes recibidos: ${clientesAPI.length}');
-
-    await ejecutarTransaccion((txn) async {
-      // Limpiar clientes existentes
-      await txn.delete('clientes');
-      logger.i('Clientes existentes eliminados');
-
-      int sincronizados = 0;
-      int omitidos = 0;
-
-      for (int i = 0; i < clientesAPI.length; i++) {
-        final clienteData = clientesAPI[i];
-
-        logger.i('=== INSERTANDO CLIENTE ${i + 1} ===');
-        logger.i('Mapa completo: $clienteData');
-
-        // Validar campos requeridos
-        if (clienteData['nombre'] == null || clienteData['nombre'].toString().trim().isEmpty) {
-          logger.e('ERROR: nombre es null o vacío para cliente');
-          omitidos++;
-          continue;
-        }
-
-        try {
-          final mapaParaInsertar = {
-            'id': clienteData['id'],
-            'nombre': clienteData['nombre'].toString().trim(),
-            'telefono': clienteData['telefono']?.toString().trim() ?? '',
-            'direccion': clienteData['direccion']?.toString().trim() ?? '',
-            'ruc_ci': clienteData['ruc_ci']?.toString().trim() ?? '',
-            'propietario': clienteData['propietario']?.toString().trim() ?? '',
-          };
-
-          logger.i('Insertando cliente: $mapaParaInsertar');
-          await txn.insert('clientes', mapaParaInsertar);
-          sincronizados++;
-          logger.i('✅ Cliente insertado exitosamente');
-
-        } catch (e) {
-          logger.e('❌ Error insertando cliente: $e');
-          omitidos++;
-        }
-      }
-
-      logger.i('Clientes: $sincronizados sincronizados, $omitidos omitidos');
-    });
-
-    logger.i('=== SINCRONIZACIÓN DE CLIENTES COMPLETADA ===');
+    final db = await database;
+    final id = await db.insert(tableName, values);
+    logger.d('Insertado en $tableName: ID $id');
+    return id;
   }
 
   Future<int> actualizar(
@@ -337,262 +123,90 @@ CREATE TABLE equipos (
         String? where,
         List<dynamic>? whereArgs,
       }) async {
-    try {
-      if (values.isEmpty) {
-        throw ArgumentError('Los valores no pueden estar vacíos');
-      }
+    _validateValues(values);
+    _addTimestamps(tableName, values, isUpdate: true);
 
-      // Solo agregar timestamp si la tabla lo requiere
-      if (await _tablaRequiereFechas(tableName)) {
-        values['fecha_actualizacion'] = DateTime.now().toIso8601String();
-      }
-
-      final db = await database;
-      final count = await db.update(
-        tableName,
-        values,
-        where: where,
-        whereArgs: whereArgs,
-      );
-      logger.d('$count registros actualizados en $tableName');
-      return count;
-    } catch (e) {
-      logger.e('Error al actualizar $tableName: $e');
-      rethrow;
-    }
+    final db = await database;
+    final count = await db.update(tableName, values, where: where, whereArgs: whereArgs);
+    logger.d('Actualizados en $tableName: $count registros');
+    return count;
   }
 
-  Future<int> eliminar(
-      String tableName, {
-        String? where,
-        List<dynamic>? whereArgs,
-      }) async {
-    try {
-      final db = await database;
-      final count = await db.delete(
-        tableName,
-        where: where,
-        whereArgs: whereArgs,
-      );
-      logger.d('$count registros eliminados de $tableName');
-      return count;
-    } catch (e) {
-      logger.e('Error al eliminar de $tableName: $e');
-      rethrow;
-    }
+  Future<int> eliminar(String tableName, {String? where, List<dynamic>? whereArgs}) async {
+    final db = await database;
+    final count = await db.delete(tableName, where: where, whereArgs: whereArgs);
+    logger.d('Eliminados de $tableName: $count registros');
+    return count;
   }
 
   Future<int> eliminarPorId(String tableName, int id) async {
     return await eliminar(tableName, where: 'id = ?', whereArgs: [id]);
   }
 
-  // Método auxiliar para saber si una tabla requiere campos de fecha
-  Future<bool> _tablaRequiereFechas(String tableName) async {
-    // clientes Y modelos no tienen campos de fecha
-    if (tableName == 'clientes' || tableName == 'modelos') return false;
-    return true;
-  }
-
   // ================================================================
-  // MÉTODOS DE TRANSACCIONES
+  // MÉTODOS DE SINCRONIZACIÓN (DELEGADOS)
   // ================================================================
 
-  Future<T> ejecutarTransaccion<T>(Future<T> Function(Transaction) operaciones) async {
-    try {
-      final db = await database;
-      return await db.transaction<T>((txn) async {
-        logger.d('Iniciando transacción');
-        final result = await operaciones(txn);
-        logger.d('Transacción completada exitosamente');
-        return result;
-      });
-    } catch (e) {
-      logger.e('Error en transacción: $e');
-      rethrow;
-    }
-  }
-
-  // ================================================================
-  // MÉTODOS ESPECÍFICOS DEL NEGOCIO ACTUALIZADOS
-  // ================================================================
-// En DatabaseHelper - Métodos de sincronización masiva
-  Future<void> sincronizarUsuarios(List<Map<String, dynamic>> usuariosMapas) async {
-    logger.i('=== SINCRONIZANDO USUARIOS EN DATABASE_HELPER ===');
-    logger.i('Usuarios recibidos: ${usuariosMapas.length}');
-
-    await ejecutarTransaccion((txn) async {
-      await txn.delete('Users');
-      logger.i('Usuarios existentes eliminados');
-
-      for (int i = 0; i < usuariosMapas.length; i++) {
-        final usuarioMapa = usuariosMapas[i];
-
-        // ✅ DEBUG: Verificar cada campo antes de insertar
-        logger.i('=== INSERTANDO USUARIO ${i + 1} ===');
-        logger.i('Mapa completo: $usuarioMapa');
-        logger.i('code: ${usuarioMapa['code']} (${usuarioMapa['code'].runtimeType})');
-        logger.i('username: ${usuarioMapa['username']} (${usuarioMapa['username'].runtimeType})');
-        logger.i('password: ${usuarioMapa['password']} (${usuarioMapa['password'].runtimeType})');
-        logger.i('fullname: ${usuarioMapa['fullname']} (${usuarioMapa['fullname'].runtimeType})');
-        logger.i('edf_vendedor_id: ${usuarioMapa['edf_vendedor_id']} (${usuarioMapa['edf_vendedor_id'].runtimeType})');
-
-        // ✅ VALIDAR campos requeridos
-        if (usuarioMapa['code'] == null) {
-          logger.e('ERROR: code es null para usuario ${usuarioMapa['username']}');
-          continue; // Saltar este usuario
-        }
-
-        if (usuarioMapa['username'] == null) {
-          logger.e('ERROR: username es null');
-          continue;
-        }
-
-        if (usuarioMapa['password'] == null) {
-          logger.e('ERROR: password es null');
-          continue;
-        }
-
-        if (usuarioMapa['fullname'] == null) {
-          logger.e('ERROR: fullname es null');
-          continue;
-        }
-
-        try {
-          final mapaParaInsertar = {
-            'edf_vendedor_id': usuarioMapa['edf_vendedor_id'],
-            'code': usuarioMapa['code'],
-            'username': usuarioMapa['username'],
-            'password': usuarioMapa['password'],
-            'fullname': usuarioMapa['fullname'],
-            'sincronizado': usuarioMapa['sincronizado'] ?? 1,
-            'fecha_creacion': usuarioMapa['fecha_creacion'] ?? DateTime.now().toIso8601String(),
-            'fecha_actualizacion': usuarioMapa['fecha_actualizacion'] ?? DateTime.now().toIso8601String(),
-          };
-
-          logger.i('Insertando con mapa: $mapaParaInsertar');
-          await txn.insert('Users', mapaParaInsertar);
-          logger.i('✅ Usuario insertado exitosamente');
-
-        } catch (e) {
-          logger.e('❌ Error insertando usuario ${usuarioMapa['username']}: $e');
-          logger.e('Mapa que causó error: $usuarioMapa');
-        }
-      }
-    });
-
-    logger.i('=== SINCRONIZACIÓN DE USUARIOS COMPLETADA ===');
-  }
-
-// Agregar este método en DatabaseHelper
-  Future<List<Usuario>> obtenerUsuarios() async {
+  Future<void> sincronizarClientes(List<dynamic> clientesAPI) async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('Users');
+    return _sync.sincronizarClientes(db, clientesAPI);
+  }
 
-    return List.generate(maps.length, (i) {
-      return Usuario.fromMap(maps[i]);
-    });
+  Future<void> sincronizarUsuarios(List<Map<String, dynamic>> usuariosMapas) async {
+    final db = await database;
+    return _sync.sincronizarUsuarios(db, usuariosMapas);
+  }
+
+  Future<void> sincronizarMarcas(List<dynamic> marcasAPI) async {
+    final db = await database;
+    return _sync.sincronizarMarcas(db, marcasAPI);
+  }
+
+  Future<void> sincronizarModelos(List<dynamic> modelosAPI) async {
+    final db = await database;
+    return _sync.sincronizarModelos(db, modelosAPI);
+  }
+
+  Future<void> sincronizarLogos(List<dynamic> logosAPI) async {
+    final db = await database;
+    return _sync.sincronizarLogos(db, logosAPI);
   }
 
   Future<void> sincronizarUsuarioCliente(List<dynamic> usuarioClienteAPI) async {
-    await ejecutarTransaccion((txn) async {
-      await txn.delete('usuario_cliente');
-
-      for (var data in usuarioClienteAPI) {
-        await txn.insert('usuario_cliente', {
-          'id': data['id'],
-          'usuario_id': data['usuario_id'],
-          'cliente_id': data['cliente_id'],
-          'fecha_asignacion': data['fecha_asignacion'],
-          'activo': data['activo'] ?? 1,
-          'sincronizado': 1,
-          'fecha_creacion': data['fecha_asignacion'],
-          'fecha_actualizacion': DateTime.now().toIso8601String(),
-        });
-      }
-    });
+    final db = await database;
+    return _sync.sincronizarUsuarioCliente(db, usuarioClienteAPI);
   }
+
+  // ================================================================
+  // CONSULTAS ESPECIALIZADAS (DELEGADAS)
+  // ================================================================
+
   Future<List<Map<String, dynamic>>> obtenerClientesConEquipos() async {
-    const sql = '''
-      SELECT 
-        c.*,
-        COUNT(ec.equipo_id) as total_equipos
-      FROM clientes c
-      LEFT JOIN equipo_cliente ec ON c.id = ec.cliente_id AND ec.activo = 1
-      GROUP BY c.id
-      ORDER BY c.nombre
-    ''';
-    return await consultarPersonalizada(sql);
+    final db = await database;
+    return _queries.obtenerClientesConEquipos(db);
   }
 
   Future<List<Map<String, dynamic>>> obtenerEquiposDisponibles() async {
-    const sql = '''
-      SELECT 
-        e.*,
-        m.nombre as marca_nombre,
-        mo.nombre as modelo_nombre,
-        l.nombre as logo_nombre
-      FROM equipos e
-      JOIN marcas m ON e.marca_id = m.id
-      JOIN modelos mo ON e.modelo_id = mo.id
-      JOIN logo l ON e.logo_id = l.id
-      LEFT JOIN equipo_cliente ec ON e.id = ec.equipo_id AND ec.activo = 1 AND ec.fecha_retiro IS NULL
-      WHERE e.activo = 1 AND e.estado_local = 1 AND ec.equipo_id IS NULL
-      ORDER BY m.nombre, mo.nombre
-    ''';
-    return await consultarPersonalizada(sql);
+    final db = await database;
+    return _queries.obtenerEquiposDisponibles(db);
   }
 
   Future<List<Map<String, dynamic>>> obtenerEquiposConDetalles() async {
-    const sql = '''
-      SELECT 
-        e.*,
-        m.nombre as marca_nombre,
-        mo.nombre as modelo_nombre,
-        l.nombre as logo_nombre,
-        CASE 
-          WHEN ec.id IS NOT NULL THEN 'Asignado'
-          ELSE 'Disponible'
-        END as estado_asignacion,
-        c.nombre as cliente_nombre
-      FROM equipos e
-      JOIN marcas m ON e.marca_id = m.id
-      JOIN modelos mo ON e.modelo_id = mo.id
-      JOIN logo l ON e.logo_id = l.id
-      LEFT JOIN equipo_cliente ec ON e.id = ec.equipo_id AND ec.activo = 1 AND ec.fecha_retiro IS NULL
-      LEFT JOIN clientes c ON ec.cliente_id = c.id
-      WHERE e.activo = 1
-      ORDER BY m.nombre, mo.nombre
-    ''';
-    return await consultarPersonalizada(sql);
+    final db = await database;
+    return _queries.obtenerEquiposConDetalles(db);
   }
 
   Future<List<Map<String, dynamic>>> obtenerHistorialEquipo(int equipoId) async {
-    const sql = '''
-      SELECT 
-        ec.*,
-        c.nombre as cliente_nombre,
-        c.ruc_ci as cliente_ruc_ci,
-        e.numero_serie,
-        m.nombre as marca_nombre,
-        mo.nombre as modelo_nombre,
-        l.nombre as logo_nombre
-      FROM equipo_cliente ec
-      JOIN clientes c ON ec.cliente_id = c.id
-      JOIN equipos e ON ec.equipo_id = e.id
-      JOIN marcas m ON e.marca_id = m.id
-      JOIN modelos mo ON e.modelo_id = mo.id
-      JOIN logo l ON e.logo_id = l.id
-      WHERE ec.equipo_id = ?
-      ORDER BY ec.fecha_asignacion DESC
-    ''';
-    return await consultarPersonalizada(sql, [equipoId]);
+    final db = await database;
+    return _queries.obtenerHistorialEquipo(db, equipoId);
   }
 
-  // ================================================================
-  // MÉTODOS NUEVOS PARA SINCRONIZACIÓN
-  // ================================================================
+  Future<List<Usuario>> obtenerUsuarios() async {
+    final db = await database;
+    final maps = await db.query('Users');
+    return maps.map((map) => Usuario.fromMap(map)).toList();
+  }
 
-  /// Obtener marcas, modelos y logos para sincronización
   Future<Map<String, List<Map<String, dynamic>>>> obtenerMarcasModelosYLogos() async {
     final marcas = await consultar('marcas', where: 'activo = ?', whereArgs: [1], orderBy: 'nombre');
     final modelos = await consultar('modelos', orderBy: 'nombre');
@@ -605,75 +219,101 @@ CREATE TABLE equipos (
     };
   }
 
-  /// Sincronizar marcas desde API
-  Future<void> sincronizarMarcas(List<dynamic> marcasAPI) async {
-    await ejecutarTransaccion((txn) async {
-      for (var marcaData in marcasAPI) {
-        await txn.insert('marcas', {
-          'id': marcaData['id'],
-          'nombre': marcaData['marca'],
-          'activo': 1,
-          'fecha_creacion': DateTime.now().toIso8601String(),
-        }, conflictAlgorithm: ConflictAlgorithm.replace);
-      }
+  // ================================================================
+  // MÉTODOS DE UTILIDAD Y TRANSACCIONES
+  // ================================================================
+
+  Future<T> ejecutarTransaccion<T>(Future<T> Function(Transaction) operaciones) async {
+    final db = await database;
+    return await db.transaction<T>((txn) async {
+      logger.d('Ejecutando transacción');
+      final result = await operaciones(txn);
+      logger.d('Transacción completada');
+      return result;
     });
   }
 
-  /// Sincronizar modelos desde API
-  Future<void> sincronizarModelos(List<dynamic> modelosAPI) async {
-    await ejecutarTransaccion((txn) async {
-      int sincronizados = 0;
-      int omitidos = 0;
-
-      for (var modeloData in modelosAPI) {
-        // Validar que el modelo tenga datos válidos
-        if (modeloData == null) {
-          omitidos++;
-          continue;
-        }
-
-        final id = modeloData['id'];
-        final nombre = modeloData['nombre'];
-
-        if (id == null || nombre == null || nombre.toString().trim().isEmpty) {
-          logger.w('Modelo omitido - ID: $id, Nombre: $nombre');
-          omitidos++;
-          continue;
-        }
-
-        try {
-          await txn.insert('modelos', {
-            'id': id,
-            'nombre': nombre.toString().trim(),
-          }, conflictAlgorithm: ConflictAlgorithm.replace);
-          sincronizados++;
-        } catch (e) {
-          logger.e('Error insertando modelo ID $id: $e');
-          omitidos++;
-        }
-      }
-
-      logger.i('Modelos: $sincronizados sincronizados, $omitidos omitidos');
-    });
+  Future<bool> existeRegistro(String tableName, String where, List<dynamic> whereArgs) async {
+    final count = await contarRegistros(tableName, where: where, whereArgs: whereArgs);
+    return count > 0;
   }
 
-  /// Sincronizar logos desde API
-  Future<void> sincronizarLogos(List<dynamic> logosAPI) async {
-    await ejecutarTransaccion((txn) async {
-      for (var logoData in logosAPI) {
-        await txn.insert('logo', {
-          'id': logoData['id'],
-          'nombre': logoData['logo'],
-          'activo': 1,
-          'fecha_creacion': DateTime.now().toIso8601String(),
-        }, conflictAlgorithm: ConflictAlgorithm.replace);
-      }
-    });
+  Future<int> contarRegistros(String tableName, {String? where, List<dynamic>? whereArgs}) async {
+    final db = await database;
+    final result = await db.query(
+      tableName,
+      columns: ['COUNT(*) as count'],
+      where: where,
+      whereArgs: whereArgs,
+    );
+    return result.first['count'] as int;
   }
 
   // ================================================================
-  // MÉTODOS DE RESPALDO Y RESTAURACIÓN
+  // ADMINISTRACIÓN
   // ================================================================
+
+  Future<void> cerrarBaseDatos() async {
+    if (_database?.isOpen == true) {
+      await _database!.close();
+      _database = null;
+      logger.i('Base de datos cerrada');
+    }
+  }
+
+  Future<void> borrarBaseDatos() async {
+    await cerrarBaseDatos();
+    final path = join(await getDatabasesPath(), _databaseName);
+    await deleteDatabase(path);
+    logger.w('Base de datos eliminada');
+  }
+
+  Future<void> optimizarBaseDatos() async {
+    final db = await database;
+    await db.execute('VACUUM');
+    await db.execute('ANALYZE');
+    logger.i('Base de datos optimizada');
+  }
+
+  Future<List<String>> obtenerNombresTablas() async {
+    try {
+      final db = await database;
+      final result = await db.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+      );
+      return result.map((row) => row['name'] as String).toList();
+    } catch (e) {
+      logger.e('Error al obtener nombres de tablas: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> obtenerEstadisticasBaseDatos() async {
+    try {
+      final tablas = await obtenerNombresTablas();
+      final estadisticas = <String, dynamic>{};
+
+      for (final tabla in tablas) {
+        final count = await contarRegistros(tabla);
+        estadisticas[tabla] = count;
+      }
+
+      return estadisticas;
+    } catch (e) {
+      logger.e('Error al obtener estadísticas: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> obtenerEsquemaTabla(String tableName) async {
+    try {
+      final db = await database;
+      return await db.rawQuery('PRAGMA table_info($tableName)');
+    } catch (e) {
+      logger.e('Error al obtener esquema de $tableName: $e');
+      rethrow;
+    }
+  }
 
   Future<String> respaldarDatos() async {
     try {
@@ -720,118 +360,28 @@ CREATE TABLE equipos (
   }
 
   // ================================================================
-  // MÉTODOS DE UTILIDAD
+  // MÉTODOS PRIVADOS DE AYUDA
   // ================================================================
 
-  Future<List<Map<String, dynamic>>> obtenerEsquemaTabla(String tableName) async {
-    try {
-      final db = await database;
-      return await db.rawQuery('PRAGMA table_info($tableName)');
-    } catch (e) {
-      logger.e('Error al obtener esquema de $tableName: $e');
-      rethrow;
+  void _validateValues(Map<String, dynamic> values) {
+    if (values.isEmpty) {
+      throw ArgumentError('Los valores no pueden estar vacíos');
     }
   }
 
-  Future<List<String>> obtenerNombresTablas() async {
-    try {
-      final db = await database;
-      final result = await db.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-      );
-      return result.map((row) => row['name'] as String).toList();
-    } catch (e) {
-      logger.e('Error al obtener nombres de tablas: $e');
-      rethrow;
+  void _addTimestamps(String tableName, Map<String, dynamic> values, {bool isUpdate = false}) {
+    if (!_requiresTimestamps(tableName)) return;
+
+    final now = DateTime.now().toIso8601String();
+    values['fecha_actualizacion'] = now;
+
+    if (!isUpdate && !values.containsKey('fecha_creacion')) {
+      values['fecha_creacion'] = now;
     }
   }
 
-  Future<int> contarRegistros(String tableName, {String? where, List<dynamic>? whereArgs}) async {
-    try {
-      final db = await database;
-      final result = await db.query(
-        tableName,
-        columns: ['COUNT(*) as count'],
-        where: where,
-        whereArgs: whereArgs,
-      );
-      return result.first['count'] as int;
-    } catch (e) {
-      logger.e('Error al contar registros en $tableName: $e');
-      rethrow;
-    }
-  }
-
-  Future<bool> existeRegistro(String tableName, String where, List<dynamic> whereArgs) async {
-    try {
-      final count = await contarRegistros(tableName, where: where, whereArgs: whereArgs);
-      return count > 0;
-    } catch (e) {
-      logger.e('Error al verificar existencia en $tableName: $e');
-      rethrow;
-    }
-  }
-
-  // ================================================================
-  // ADMINISTRACIÓN DE BASE DE DATOS
-  // ================================================================
-
-  Future<void> cerrarBaseDatos() async {
-    try {
-      final db = _database;
-      if (db != null && db.isOpen) {
-        await db.close();
-        _database = null;
-        logger.i('Base de datos cerrada exitosamente');
-      }
-    } catch (e) {
-      logger.e('Error al cerrar base de datos: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> borrarBaseDatos() async {
-    try {
-      await cerrarBaseDatos();
-      final path = join(await getDatabasesPath(), _databaseName);
-      await deleteDatabase(path);
-      logger.w('Base de datos eliminada: $path');
-    } catch (e) {
-      logger.e('Error al borrar base de datos: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> optimizarBaseDatos() async {
-    try {
-      final db = await database;
-      await db.execute('VACUUM');
-      await db.execute('ANALYZE');
-      logger.i('Base de datos optimizada');
-    } catch (e) {
-      logger.e('Error al optimizar base de datos: $e');
-      rethrow;
-    }
-  }
-
-  Future<Map<String, dynamic>> obtenerEstadisticasBaseDatos() async {
-    try {
-      final tablas = await obtenerNombresTablas();
-      final estadisticas = <String, dynamic>{};
-
-      for (final tabla in tablas) {
-        final count = await contarRegistros(tabla);
-        estadisticas[tabla] = count;
-      }
-
-      final db = await database;
-      final pragmaResult = await db.rawQuery('PRAGMA database_list');
-      estadisticas['info_db'] = pragmaResult;
-
-      return estadisticas;
-    } catch (e) {
-      logger.e('Error al obtener estadísticas: $e');
-      rethrow;
-    }
+  bool _requiresTimestamps(String tableName) {
+    const tablesWithoutTimestamps = {'clientes', 'modelos'};
+    return !tablesWithoutTimestamps.contains(tableName);
   }
 }

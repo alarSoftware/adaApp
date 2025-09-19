@@ -5,7 +5,6 @@ import 'package:ada_app/services/auth_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/sync/equipment_sync_service.dart';
 
-
 class LoginScreenViewModel extends ChangeNotifier {
   final _authService = AuthService();
   final _localAuth = LocalAuthentication();
@@ -177,6 +176,12 @@ class LoginScreenViewModel extends ChangeNotifier {
         final result = await _authService.authenticateWithBiometric();
 
         if (result.exitoso) {
+          // NUEVA VALIDACIÓN: Verificar asignación de clientes después de autenticación biométrica
+          final validationResult = await _validateUserAssignment();
+          if (!validationResult.success) {
+            return validationResult;
+          }
+
           return AuthResult(
               success: true,
               message: result.mensaje,
@@ -220,6 +225,14 @@ class LoginScreenViewModel extends ChangeNotifier {
       if (result.exitoso) {
         HapticFeedback.lightImpact();
 
+        // NUEVA VALIDACIÓN: Verificar si el usuario tiene clientes asignados
+        final validationResult = await _validateUserAssignment();
+        if (!validationResult.success) {
+          _errorMessage = validationResult.message;
+          notifyListeners();
+          return validationResult;
+        }
+
         // Después del primer login exitoso, verificar biometría nuevamente
         await _checkBiometricAvailability();
 
@@ -247,6 +260,41 @@ class LoginScreenViewModel extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  /// NUEVA FUNCIÓN: Validar que el usuario tenga clientes asignados
+  Future<AuthResult> _validateUserAssignment() async {
+    try {
+      // Obtener el usuario completo desde la base de datos
+      final usuario = await _authService.getCurrentUser();
+
+      // Verificar si edf_vendedor_id es null o vacío
+      if (usuario?.edfVendedorId == null || usuario!.edfVendedorId!.trim().isEmpty) {
+        return AuthResult(
+            success: false,
+            message: 'Su usuario no tiene clientes asignados.\n\n'
+                'Comuníquese con el administrador del sistema para obtener acceso a los clientes.\n\n'
+                'Si es un usuario nuevo, es posible que su cuenta aún no haya sido configurada completamente.',
+            icon: Icons.admin_panel_settings
+        );
+      }
+
+      // Si llegamos aquí, el usuario tiene edf_vendedor_id válido
+      debugPrint('Usuario validado - edf_vendedor_id: ${usuario.edfVendedorId}');
+      return AuthResult(
+          success: true,
+          message: 'Usuario validado correctamente'
+      );
+
+    } catch (e) {
+      debugPrint('Error validando asignación de usuario: $e');
+      return AuthResult(
+          success: false,
+          message: 'Error validando información del usuario. Intente nuevamente.\n\n'
+              'Si el problema persiste, contacte al administrador.',
+          icon: Icons.error_outline
+      );
     }
   }
 
