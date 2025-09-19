@@ -111,6 +111,7 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     _logger.i('Estado inicial - displayedClientes.length: ${_state.displayedClientes.length}');
     _logger.i('Estado inicial - currentPage: ${_state.currentPage}');
     _logger.i('Estado inicial - hasMoreData: ${_state.hasMoreData}');
+    _logger.i('Query actual: "${_state.searchQuery}"');
 
     _updateState(_state.copyWith(
       isLoading: true,
@@ -119,15 +120,11 @@ class ClienteListScreenViewModel extends ChangeNotifier {
       error: null,
     ));
 
-    _logger.i('Después de actualizar estado inicial:');
-    _logger.i('- isLoading: ${_state.isLoading}');
-    _logger.i('- currentPage: ${_state.currentPage}');
-    _logger.i('- displayedClientes.length: ${_state.displayedClientes.length}');
-
     try {
       _logger.i('Cargando clientes desde la base de datos...');
 
-      final clientesDB = await _repository.buscar('');
+      // USAR EL QUERY ACTUAL en lugar de string vacío
+      final clientesDB = await _repository.buscar(_state.searchQuery);
 
       _logger.i('Clientes obtenidos de BD: ${clientesDB.length}');
 
@@ -140,19 +137,8 @@ class ClienteListScreenViewModel extends ChangeNotifier {
         hasMoreData: true,
       ));
 
-      _logger.i('Estado antes de _loadNextPage:');
-      _logger.i('- isLoading: ${_state.isLoading}');
-      _logger.i('- currentPage: ${_state.currentPage}');
-      _logger.i('- displayedClientes.length: ${_state.displayedClientes.length}');
-      _logger.i('- hasMoreData: ${_state.hasMoreData}');
-      _logger.i('- _filteredClientes.length: ${_filteredClientes.length}');
-
       await _loadNextPage();
 
-      _logger.i('Estado final después de _loadNextPage:');
-      _logger.i('- displayedClientes.length: ${_state.displayedClientes.length}');
-      _logger.i('- currentPage: ${_state.currentPage}');
-      _logger.i('- hasMoreData: ${_state.hasMoreData}');
       _logger.i('Clientes cargados: ${clientesDB.length}');
     } catch (e, stackTrace) {
       _logger.e('Error al cargar clientes', error: e, stackTrace: stackTrace);
@@ -166,6 +152,20 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     }
 
     _logger.i('=== FINALIZANDO loadClientes ===');
+  }
+
+// ========== REFRESH MEJORADO ==========
+  Future<void> refresh() async {
+    _logger.i('=== REFRESH - Query actual: "${_state.searchQuery}" ===');
+
+    // Si hay búsqueda activa, mantenerla
+    if (_state.searchQuery.isNotEmpty) {
+      await _performSearch(_state.searchQuery);
+    } else {
+      // Solo si no hay filtro, cargar todos
+      _updateState(_state.copyWith(searchQuery: ''));
+      await loadClientes();
+    }
   }
 
 // ========== PAGINACIÓN ==========
@@ -302,10 +302,6 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     _eventController.add(NavigateToDetailEvent(cliente));
   }
 
-  // ========== REFRESH ==========
-  Future<void> refresh() async {
-    await loadClientes();
-  }
 
   // ========== UTILIDADES ==========
   String getInitials(Cliente cliente) {

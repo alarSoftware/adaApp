@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/database_helper.dart';
-import 'package:ada_app/services/sync_service.dart';
+import 'package:ada_app/services/sync/base_sync_service.dart'; // AGREGADO: Import faltante
 import 'package:ada_app/models/usuario.dart';
 
 var logger = Logger();
@@ -24,69 +24,223 @@ class AuthService {
 
   static final _dbHelper = DatabaseHelper();
 
-  // Método para sincronizar usuarios desde la nueva API
+  // Método para sincronizar usuarios desde la nueva API - CORREGIDO PARA RETORNAR SyncResult
   static Future<SyncResult> sincronizarSoloUsuarios() async {
     try {
-      logger.i('🔄 Sincronizando solo usuarios...');
+      logger.i('Sincronizando solo usuarios...');
 
       final response = await http.get(
-        Uri.parse('${SyncService.baseUrl}/getUsers'),
-        headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'Accept': 'application/json',
-        },
-      ).timeout(Duration(seconds: 10));
+        Uri.parse('${BaseSyncService.baseUrl}/getUsers'),
+        headers: BaseSyncService.headers,
+      ).timeout(BaseSyncService.timeout);
 
-      if (response.statusCode == 200) {
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         final responseData = jsonDecode(response.body);
+
+        logger.i('=== RESPUESTA DE API ===');
+        logger.i('Response data: $responseData');
 
         // Extraer el array de usuarios del campo "data"
         final String dataString = responseData['data'];
         final List<dynamic> usuariosAPI = jsonDecode(dataString);
 
-        // Procesar datos de la API para que coincidan con tu estructura
+        logger.i('=== USUARIOS DE API ===');
+        for (int i = 0; i < usuariosAPI.length; i++) {
+          logger.i('Usuario API ${i + 1}: ${usuariosAPI[i]}');
+
+          final usuario = usuariosAPI[i];
+          logger.i('=== DEBUG CAMPOS USUARIO ${i + 1} ===');
+          logger.i('Todos los campos disponibles: ${usuario.keys.toList()}');
+          logger.i('edf_vendedor_id específico: ${usuario['edf_vendedor_id']}');
+          logger.i('¿Existe el campo?: ${usuario.containsKey('edf_vendedor_id')}');
+        }
+
+        if (usuariosAPI.isEmpty) {
+          logger.w('No hay usuarios en el servidor');
+          return SyncResult(
+            exito: true,
+            mensaje: 'No hay usuarios en el servidor',
+            itemsSincronizados: 0,
+          );
+        }
+
+        // PROCESAMIENTO CORREGIDO - mapear correctamente el ID a code
         final usuariosProcesados = usuariosAPI.map((usuario) {
           String password = usuario['password'].toString();
-
-          // Remover el prefijo {bcrypt} si existe
           if (password.startsWith('{bcrypt}')) {
             password = password.substring(8);
           }
 
-          return {
-            'id': usuario['id'],
+          final now = DateTime.now().toIso8601String();
+
+          final usuarioProcesado = {
+            'edf_vendedor_id': usuario['edfVendedorId']?.toString(),
+            'code': usuario['id'], // CRÍTICO: Mapear ID de API a code
             'username': usuario['username'],
             'password': password,
             'fullname': usuario['fullname'],
+            'sincronizado': 1,
+            'fecha_creacion': usuario['fecha_creacion'] ?? now,
+            'fecha_actualizacion': usuario['fecha_actualizacion'] ?? now,
           };
+
+          logger.i('Usuario procesado: $usuarioProcesado');
+          return usuarioProcesado;
         }).toList();
+
+        logger.i('=== ENVIANDO A DATABASE_HELPER ===');
+        logger.i('Total usuarios procesados: ${usuariosProcesados.length}');
 
         await _dbHelper.sincronizarUsuarios(usuariosProcesados);
 
+        logger.i('Sincronización de usuarios completada');
         return SyncResult(
           exito: true,
-          mensaje: 'Usuarios sincronizados',
-          itemsSincronizados: usuariosAPI.length,
+          mensaje: 'Usuarios sincronizados correctamente',
+          itemsSincronizados: usuariosProcesados.length,
+          totalEnAPI: usuariosProcesados.length,
         );
+
       } else {
+        final mensaje = BaseSyncService.extractErrorMessage(response);
+        logger.e('Error del servidor: ${response.statusCode} - ${response.body}');
         return SyncResult(
           exito: false,
-          mensaje: 'Error del servidor: ${response.statusCode}',
+          mensaje: mensaje,
           itemsSincronizados: 0,
         );
       }
     } catch (e) {
+      logger.e('Error sincronizando usuarios: $e');
       return SyncResult(
         exito: false,
-        mensaje: 'Error de conexión: $e',
+        mensaje: BaseSyncService.getErrorMessage(e),
         itemsSincronizados: 0,
       );
     }
   }
 
-  // 🔑 Login híbrido (online/offline) actualizado
+  static Future<SyncResult> sincronizarClientesDelVendedor(String edfVendedorId) async {
+    try {
+      logger.i('Sincronizando clientes del vendedor: $edfVendedorId');
+
+      // Debug de la URL
+      final url = '${BaseSyncService.baseUrl}/getEdfClientes?edfvendedorId=$edfVendedorId';
+      logger.i('URL completa: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: BaseSyncService.headers,
+      ).timeout(BaseSyncService.timeout);
+
+      // Debug de la respuesta
+      logger.i('Status code: ${response.statusCode}');
+      logger.i('Response body completo: ${response.body}');
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final List<dynamic> clientesAPI = BaseSyncService.parseResponse(response.body);
+
+        logger.i('=== CLIENTES DE API PARA VENDEDOR $edfVendedorId ===');
+        logger.i('Total clientes recibidos: ${clientesAPI.length}');
+
+        for (int i = 0; i < clientesAPI.length; i++) {
+          logger.i('Cliente API ${i + 1}: ${clientesAPI[i]}');
+        }
+
+        if (clientesAPI.isEmpty) {
+          logger.w('No hay clientes para el vendedor $edfVendedorId');
+          return SyncResult(
+            exito: true,
+            mensaje: 'No hay clientes para este vendedor',
+            itemsSincronizados: 0,
+          );
+        }
+
+        // Procesar clientes
+        final clientesProcesados = <Map<String, dynamic>>[];
+
+        for (int i = 0; i < clientesAPI.length; i++) {
+          final cliente = clientesAPI[i];
+
+          logger.i('=== PROCESANDO CLIENTE ${i + 1} ===');
+          logger.i('Cliente completo: $cliente');
+          logger.i('Campos disponibles: ${cliente.keys.toList()}');
+
+          // Validar campos críticos
+          if (cliente['cliente'] == null || cliente['cliente'].toString().trim().isEmpty) {
+            logger.e('Cliente ${i + 1} tiene nombre null o vacío - SALTANDO');
+            continue;
+          }
+
+          // Determinar RUC/CI
+          String rucCi = '';
+          if (cliente['ruc'] != null && cliente['ruc'].toString().trim().isNotEmpty) {
+            rucCi = cliente['ruc'].toString().trim();
+            logger.i('RUC obtenido: $rucCi');
+          } else if (cliente['cedula'] != null && cliente['cedula'].toString().trim().isNotEmpty) {
+            rucCi = cliente['cedula'].toString().trim();
+            logger.i('Cedula obtenida: $rucCi');
+          } else {
+            logger.w('Cliente sin RUC ni cedula');
+          }
+
+          final clienteProcesado = {
+            'id': cliente['id'],
+            'nombre': cliente['cliente'].toString().trim(),
+            'telefono': cliente['telefono']?.toString().trim() ?? '',
+            'direccion': cliente['direccion']?.toString().trim() ?? '',
+            'ruc_ci': rucCi,
+            'propietario': cliente['propietario']?.toString().trim() ?? '',
+          };
+
+          clientesProcesados.add(clienteProcesado);
+          logger.i('Cliente ${i + 1} procesado: $clienteProcesado');
+        }
+
+        if (clientesProcesados.isEmpty) {
+          logger.e('No se pudieron procesar clientes válidos');
+          return SyncResult(
+            exito: false,
+            mensaje: 'No se pudieron procesar clientes válidos del servidor',
+            itemsSincronizados: 0,
+          );
+        }
+
+        logger.i('=== ENVIANDO ${clientesProcesados.length} CLIENTES A DATABASE_HELPER ===');
+
+        await _dbHelper.sincronizarClientes(clientesProcesados);
+
+        logger.i('Sincronización de clientes completada');
+        return SyncResult(
+          exito: true,
+          mensaje: 'Clientes sincronizados correctamente',
+          itemsSincronizados: clientesProcesados.length,
+          totalEnAPI: clientesProcesados.length,
+        );
+
+      } else {
+        final mensaje = BaseSyncService.extractErrorMessage(response);
+        logger.e('Error del servidor: ${response.statusCode} - ${response.body}');
+        return SyncResult(
+          exito: false,
+          mensaje: mensaje,
+          itemsSincronizados: 0,
+        );
+      }
+    } catch (e) {
+      logger.e('Error sincronizando clientes: $e');
+      return SyncResult(
+        exito: false,
+        mensaje: BaseSyncService.getErrorMessage(e),
+        itemsSincronizados: 0,
+      );
+    }
+  }
+
+
+  // Login híbrido (online/offline) actualizado
   Future<AuthResult> login(String username, String password) async {
-    logger.i('🔑 Intentando login para: $username');
+    logger.i('Intentando login para: $username');
 
     // 1. Intentar login online primero
     final loginOnline = await _intentarLoginOnline(username, password);
@@ -122,17 +276,14 @@ class AuthService {
     }
   }
 
-  // 🌐 Intentar login online actualizado
+  // Intentar login online actualizado
   Future<AuthResult> _intentarLoginOnline(String username, String password) async {
     try {
-      logger.i('🌐 Intentando login online...');
+      logger.i('Intentando login online...');
 
       final response = await http.post(
-        Uri.parse('${SyncService.baseUrl}/login'),
-        headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'Accept': 'application/json',
-        },
+        Uri.parse('${BaseSyncService.baseUrl}/login'),
+        headers: BaseSyncService.headers,
         body: jsonEncode({'username': username, 'password': password}),
       ).timeout(Duration(seconds: 5));
 
@@ -146,7 +297,7 @@ class AuthService {
             fullname: usuarioData['fullname'],
           );
 
-          logger.i('✅ Login online exitoso para: $username');
+          logger.i('Login online exitoso para: $username');
           return AuthResult(
             exitoso: true,
             mensaje: 'Bienvenido, ${usuarioData['fullname']}',
@@ -161,16 +312,16 @@ class AuthService {
         );
       }
     } catch (e) {
-      logger.w('🌐 Error en login online: $e');
+      logger.w('Error en login online: $e');
     }
 
     return AuthResult(exitoso: false, mensaje: 'Sin conexión');
   }
 
-  // 📱 Login offline actualizado para nuevos campos
+  // Login offline actualizado para nuevos campos
   Future<AuthResult> _loginOffline(String username, String password) async {
     try {
-      logger.i('📱 Intentando login offline...');
+      logger.i('Intentando login offline...');
 
       final usuarios = await _dbHelper.obtenerUsuarios();
 
@@ -180,7 +331,7 @@ class AuthService {
       );
 
       if (usuariosEncontrados.isEmpty) {
-        logger.w('❌ Usuario no encontrado offline: $username');
+        logger.w('Usuario no encontrado offline: $username');
         return AuthResult(
           exitoso: false,
           mensaje: 'Usuario no encontrado',
@@ -225,7 +376,7 @@ class AuthService {
         );
       }
     } catch (e) {
-      logger.e('❌ Error en login offline: $e');
+      logger.e('Error en login offline: $e');
       return AuthResult(
         exitoso: false,
         mensaje: 'Error en login offline: $e',
@@ -233,21 +384,21 @@ class AuthService {
     }
   }
 
-  // 📱 Verificar si el usuario ya se logueó antes
+  // Verificar si el usuario ya se logueó antes
   Future<bool> hasUserLoggedInBefore() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final hasLoggedIn = prefs.getBool(_keyHasLoggedIn) ?? false;
 
-      logger.i('📱 ¿Usuario logueado antes?: $hasLoggedIn');
+      logger.i('¿Usuario logueado antes?: $hasLoggedIn');
       return hasLoggedIn;
     } catch (e) {
-      logger.e('❌ Error verificando login previo: $e');
+      logger.e('Error verificando login previo: $e');
       return false;
     }
   }
 
-  // 💾 Guardar estado de login exitoso
+  // Guardar estado de login exitoso
   Future<void> _saveLoginSuccess(UsuarioAuth usuario) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -257,13 +408,13 @@ class AuthService {
       await prefs.setString(_keyCurrentUserRole, usuario.rol);
       await prefs.setString(_keyLastLoginDate, DateTime.now().toIso8601String());
 
-      logger.i('💾 Sesión guardada para: ${usuario.username}');
+      logger.i('Sesión guardada para: ${usuario.username}');
     } catch (e) {
-      logger.e('❌ Error guardando sesión: $e');
+      logger.e('Error guardando sesión: $e');
     }
   }
 
-  // 👤 Obtener usuario actual (si existe sesión)
+  // Obtener usuario actual (si existe sesión)
   Future<UsuarioAuth?> getCurrentUser() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -271,19 +422,19 @@ class AuthService {
       final role = prefs.getString(_keyCurrentUserRole);
 
       if (username != null && role != null) {
-        logger.i('👤 Usuario actual: $username ($role)');
+        logger.i('Usuario actual: $username ($role)');
         return UsuarioAuth(id: null, username: username, fullname: '');
       }
 
-      logger.i('👤 No hay usuario logueado');
+      logger.i('No hay usuario logueado');
       return null;
     } catch (e) {
-      logger.e('❌ Error obteniendo usuario actual: $e');
+      logger.e('Error obteniendo usuario actual: $e');
       return null;
     }
   }
 
-  // 🔓 Logout
+  // Logout
   Future<void> logout() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -292,23 +443,23 @@ class AuthService {
       await prefs.remove(_keyCurrentUser);
       await prefs.remove(_keyCurrentUserRole);
 
-      logger.i('🔓 Logout exitoso');
+      logger.i('Logout exitoso');
     } catch (e) {
-      logger.e('❌ Error en logout: $e');
+      logger.e('Error en logout: $e');
     }
   }
 
-  // 👆 Autenticación biométrica (verifica usuario guardado)
+  // Autenticación biométrica (verifica usuario guardado)
   Future<AuthResult> authenticateWithBiometric() async {
-    logger.i('👆 Intentando autenticación biométrica');
+    logger.i('Intentando autenticación biométrica');
 
     try {
       // Verificar si hay un usuario previamente autenticado
       final currentUser = await getCurrentUser();
-      logger.i('🔍 Usuario actual encontrado: $currentUser');
+      logger.i('Usuario actual encontrado: $currentUser');
 
       if (currentUser == null) {
-        logger.w('❌ No hay usuario previamente autenticado para biometría');
+        logger.w('No hay usuario previamente autenticado para biometría');
         return AuthResult(
           exitoso: false,
           mensaje: 'Debes iniciar sesión con credenciales primero',
@@ -316,7 +467,7 @@ class AuthService {
       }
 
       // Si hay usuario guardado, la biometría es válida
-      logger.i('✅ Autenticación biométrica exitosa para: ${currentUser.username}');
+      logger.i('Autenticación biométrica exitosa para: ${currentUser.username}');
       return AuthResult(
         exitoso: true,
         mensaje: 'Bienvenido de nuevo, ${currentUser.username}',
@@ -324,7 +475,7 @@ class AuthService {
       );
 
     } catch (e) {
-      logger.e('❌ Error en autenticación biométrica: $e');
+      logger.e('Error en autenticación biométrica: $e');
       return AuthResult(
         exitoso: false,
         mensaje: 'Error en autenticación biométrica',
@@ -332,7 +483,7 @@ class AuthService {
     }
   }
 
-  // 🗑️ Limpiar completamente (para testing o reset)
+  // Limpiar completamente (para testing o reset)
   Future<void> clearAllData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -342,13 +493,13 @@ class AuthService {
       await prefs.remove(_keyCurrentUserRole);
       await prefs.remove(_keyLastLoginDate);
 
-      logger.i('🗑️ Todos los datos limpiados');
+      logger.i('Todos los datos limpiados');
     } catch (e) {
-      logger.e('❌ Error limpiando datos: $e');
+      logger.e('Error limpiando datos: $e');
     }
   }
 
-  // 📅 Obtener fecha del último login
+  // Obtener fecha del último login
   Future<DateTime?> getLastLoginDate() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -360,28 +511,28 @@ class AuthService {
 
       return null;
     } catch (e) {
-      logger.e('❌ Error obteniendo fecha de último login: $e');
+      logger.e('Error obteniendo fecha de último login: $e');
       return null;
     }
   }
 
-  // 🔍 Verificar si hay sesión activa
+  // Verificar si hay sesión activa
   Future<bool> hasActiveSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final username = prefs.getString(_keyCurrentUser);
 
       final hasSession = username != null;
-      logger.i('🔍 ¿Sesión activa?: $hasSession');
+      logger.i('¿Sesión activa?: $hasSession');
 
       return hasSession;
     } catch (e) {
-      logger.e('❌ Error verificando sesión activa: $e');
+      logger.e('Error verificando sesión activa: $e');
       return false;
     }
   }
 
-  // 📊 Obtener información de sesión (para debug)
+  // Obtener información de sesión (para debug)
   Future<Map<String, dynamic>> getSessionInfo() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -394,7 +545,7 @@ class AuthService {
         'hasActiveSession': prefs.getString(_keyCurrentUser) != null,
       };
     } catch (e) {
-      logger.e('❌ Error obteniendo info de sesión: $e');
+      logger.e('Error obteniendo info de sesión: $e');
       return {};
     }
   }

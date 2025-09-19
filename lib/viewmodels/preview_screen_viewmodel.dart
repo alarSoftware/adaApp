@@ -20,7 +20,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
 
   // ⚠️ CAMBIAR ESTA IP POR LA IP DE TU SERVIDOR
-  static const String _baseUrl = 'https://56a494bb0732.ngrok-free.app/adaControl/api/';
+  static const String _baseUrl = 'https://e1522fa98849.ngrok-free.app/adaControl/api/';
   static const String _estadosEndpoint = '/insertCensoActivo';
   static const String _pingEndpoint = '/ping';
 

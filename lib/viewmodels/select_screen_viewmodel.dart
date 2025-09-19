@@ -2,13 +2,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:ada_app/repositories/cliente_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
-import '../services/sync_service.dart';
+import '../services/sync/sync_service.dart';
 import '../services/api_service.dart';
 import 'package:logger/logger.dart';
 import '../repositories/models_repository.dart';
 import '../repositories/logo_repository.dart';
+import '../models/usuario.dart'; // ← Usar tu modelo Usuario
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ========== EVENTOS PARA LA UI (CERO WIDGETS) ==========
 abstract class UIEvent {}
@@ -95,6 +97,10 @@ class SelectScreenViewModel extends ChangeNotifier {
     type: ConnectionType.noInternet,
   );
 
+  // ← ESTADO DEL USUARIO
+  String _userFullName = 'Usuario';
+  bool _isLoadingUser = true;
+
   // ========== STREAMS PARA COMUNICACIÓN ==========
   final StreamController<UIEvent> _eventController = StreamController<UIEvent>.broadcast();
   Stream<UIEvent> get uiEvents => _eventController.stream;
@@ -108,9 +114,14 @@ class SelectScreenViewModel extends ChangeNotifier {
   ConnectionStatus get connectionStatus => _connectionStatus;
   bool get isConnected => _connectionStatus.hasInternet && _connectionStatus.hasApiConnection;
 
+  // ← GETTERS DEL USUARIO
+  String get userDisplayName => _userFullName;
+  bool get isLoadingUser => _isLoadingUser;
+
   // ========== CONSTRUCTOR ==========
   SelectScreenViewModel() {
     _initializeMonitoring();
+    _loadCurrentUser(); // ← Cargar usuario al inicializar
   }
 
   @override
@@ -128,6 +139,100 @@ class SelectScreenViewModel extends ChangeNotifier {
     _checkInitialConnection();
   }
 
+  // ← MÉTODO PARA CARGAR USUARIO DESDE SHAREDPREFERENCES Y BD
+  Future<void> _loadCurrentUser() async {
+    try {
+      _isLoadingUser = true;
+      notifyListeners();
+
+      final prefs = await SharedPreferences.getInstance();
+
+      // DEBUGGING: Ver todas las keys guardadas
+      final keys = prefs.getKeys();
+      _logger.i('🔍 TODAS LAS KEYS EN SHAREDPREFERENCES: $keys');
+
+      // Primero intentar obtener el fullname directamente
+      final fullName = prefs.getString('user_fullname');
+
+      if (fullName != null && fullName.isNotEmpty) {
+        _userFullName = fullName;
+        _logger.i('✅ Usuario cargado desde SharedPreferences: $fullName');
+      } else {
+        // Si no está el fullname, intentar obtenerlo usando el current_user (username)
+        final currentUsername = prefs.getString('current_user');
+        _logger.i('🔍 Buscando fullname para username: $currentUsername');
+
+        if (currentUsername != null && currentUsername.isNotEmpty) {
+          // TEMPORAL: Mapeo hardcodeado para testing
+          String? tempFullName;
+          if (currentUsername == 'rrebollo') {
+            tempFullName = 'Ronaldo Rebollo';
+          }
+          // Aquí puedes agregar más mapeos si tienes otros usuarios
+
+          if (tempFullName != null) {
+            _userFullName = tempFullName;
+            // Guardarlo para la próxima vez
+            await prefs.setString('user_fullname', tempFullName);
+            _logger.i('✅ Usuario cargado (temporal): $tempFullName');
+          } else {
+            // Aquí necesitamos buscar en la base de datos local
+            final fullNameFromDB = await _getFullNameFromDatabase(currentUsername);
+            if (fullNameFromDB != null && fullNameFromDB.isNotEmpty) {
+              _userFullName = fullNameFromDB;
+              // Guardarlo para la próxima vez
+              await prefs.setString('user_fullname', fullNameFromDB);
+              _logger.i('✅ Usuario cargado desde BD: $fullNameFromDB');
+            } else {
+              _userFullName = 'Usuario';
+              _logger.w('❌ No se encontró fullname en BD para: $currentUsername');
+            }
+          }
+        } else {
+          _userFullName = 'Usuario';
+          _logger.w('❌ No se encontró current_user en SharedPreferences');
+        }
+      }
+    } catch (e) {
+      _logger.e('Error cargando usuario: $e');
+      _userFullName = 'Usuario';
+    } finally {
+      _isLoadingUser = false;
+      notifyListeners();
+    }
+  }
+
+  // ← NUEVO MÉTODO: Obtener fullname desde la base de datos
+  Future<String?> _getFullNameFromDatabase(String username) async {
+    try {
+      // Necesitarás ajustar esto según tu implementación de base de datos
+      // Por ejemplo, usando sqflite:
+
+      // final db = await database; // Tu instancia de base de datos
+      // final List<Map<String, dynamic>> maps = await db.query(
+      //   'usuarios', // nombre de tu tabla
+      //   where: 'username = ?',
+      //   whereArgs: [username],
+      // );
+
+      // if (maps.isNotEmpty) {
+      //   final usuario = Usuario.fromMap(maps.first);
+      //   return usuario.fullname;
+      // }
+
+      // POR AHORA: Método temporal - puedes reemplazar esto
+      _logger.i('🔍 Buscando en BD el fullname para: $username');
+
+      // TODO: Implementar búsqueda real en base de datos
+      // Por ahora retornamos null para que uses la Opción 2
+      return null;
+
+    } catch (e) {
+      _logger.e('Error buscando usuario en BD: $e');
+      return null;
+    }
+  }
+
   void _startConnectivityMonitoring() {
     _connectivitySubscription = Connectivity()
         .onConnectivityChanged
@@ -136,7 +241,7 @@ class SelectScreenViewModel extends ChangeNotifier {
 
   void _startApiMonitoring() {
     _apiMonitorTimer = Timer.periodic(
-      Duration(minutes: 10), // ← Intervalo fijo de 5 minutos
+      Duration(minutes: 10),
           (_) => _checkApiConnectionSilently(),
     );
   }
@@ -247,7 +352,7 @@ class SelectScreenViewModel extends ChangeNotifier {
       final syncInfo = SyncInfo(
         estimatedClients: await _getEstimatedClients(),
         estimatedEquipments: await _getEstimatedEquipments(),
-        serverUrl: conexion.mensaje, // o la URL del servidor
+        serverUrl: conexion.mensaje,
       );
 
       // Solicitar confirmación a la UI
@@ -376,6 +481,11 @@ class SelectScreenViewModel extends ChangeNotifier {
     await _checkInitialConnection();
   }
 
+  /// Refresca la información del usuario
+  Future<void> refreshUser() async {
+    await _loadCurrentUser();
+  }
+
   // ========== MÉTODOS PRIVADOS ==========
   void _setLoading(bool loading) {
     _isSyncing = loading;
@@ -393,7 +503,6 @@ class SelectScreenViewModel extends ChangeNotifier {
 
   Future<int> _getEstimatedClients() async {
     try {
-      // Podrías obtener esto del repository o API
       return 0; // Implementar según tu lógica
     } catch (e) {
       return 0;
@@ -402,7 +511,6 @@ class SelectScreenViewModel extends ChangeNotifier {
 
   Future<int> _getEstimatedEquipments() async {
     try {
-      // Podrías obtener esto del repository o API
       return 0; // Implementar según tu lógica
     } catch (e) {
       return 0;

@@ -432,74 +432,121 @@ class _SelectScreenState extends State<SelectScreen> {
           ),
         ],
       ),
-      body: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24.0),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.containerBackground,
-              AppColors.background,
-            ],
-          ),
-        ),
-        child: Column(
-          children: [
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(height: 16),
-                  Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildMenuButton(
-                            context,
-                            label: 'Clientes',
-                            icon: Icons.people,
-                            color: AppColors.primary,
-                            routeName: '/clienteLista',
-                          ),
-                          _buildMenuButton(
-                            context,
-                            label: 'Equipos',
-                            icon: Icons.devices,
-                            color: AppColors.primary,
-                            page: const EquipoListScreen(),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildMenuButton(
-                            context,
-                            label: 'Modelos',
-                            icon: Icons.branding_watermark,
-                            color: AppColors.primary,
-                            page: const ModelosScreen(),
-                          ),
-                          _buildMenuButton(
-                            context,
-                            label: 'Logos',
-                            icon: Icons.newspaper,
-                            color: AppColors.primary,
-                            page: const LogosScreen(),
-                          ),
-                        ],
-                      ),
-                    ],
-                  )
-                ],
-              ),
+
+      body: SafeArea(
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24.0),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                AppColors.containerBackground,
+                AppColors.background,
+              ],
             ),
-            SafeArea(
-              child: TextButton.icon(
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 24.0),
+                child: Card(
+                  color: AppColors.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: AppColors.border),
+                  ),
+                  elevation: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: ListenableBuilder(
+                      listenable: _viewModel,
+                      builder: (context, child) {
+                        return Row(
+                          children: [
+                            if (_viewModel.isLoadingUser) ...[
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Cargando usuario...',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ] else
+                              Text(
+                                'Hola, ${_viewModel.userDisplayName}',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildMenuButton(
+                          context,
+                          label: 'Clientes',
+                          icon: Icons.people,
+                          color: AppColors.primary,
+                          routeName: '/clienteLista',
+                        ),
+                        _buildMenuButton(
+                          context,
+                          label: 'Equipos',
+                          icon: Icons.kitchen,
+                          color: AppColors.primary,
+                          page: const EquipoListScreen(),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildMenuButton(
+                          context,
+                          label: 'Modelos',
+                          icon: Icons.branding_watermark,
+                          color: AppColors.primary,
+                          page: const ModelosScreen(),
+                        ),
+                        _buildMenuButton(
+                          context,
+                          label: 'Logos',
+                          icon: Icons.newspaper,
+                          color: AppColors.primary,
+                          page: const LogosScreen(),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
                 onPressed: () {
                   Navigator.pushReplacementNamed(context, '/login');
                 },
@@ -512,9 +559,8 @@ class _SelectScreenState extends State<SelectScreen> {
                   ),
                 ),
               ),
-            )
-
-          ],
+            ],
+          ),
         ),
       ),
     );

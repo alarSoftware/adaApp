@@ -81,6 +81,7 @@ class DatabaseHelper {
     await db.execute('''
   CREATE TABLE clientes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    codigo INTEGER,
     nombre TEXT NOT NULL,
     telefono TEXT NOT NULL,
     direccion TEXT NOT NULL,
@@ -91,22 +92,23 @@ class DatabaseHelper {
 
     // Tabla equipos CORREGIDA
     await db.execute('''
-      CREATE TABLE equipos (
-         id TEXT PRIMARY KEY,
-        cod_barras TEXT UNIQUE,
-        marca_id INTEGER NOT NULL,
-        modelo_id INTEGER NOT NULL,
-        numero_serie TEXT UNIQUE,
-        logo_id INTEGER NOT NULL,
-        estado_local INTEGER DEFAULT 1,
-        activo INTEGER DEFAULT 1,
-        sincronizado INTEGER DEFAULT 0,
-        fecha_creacion TEXT NOT NULL,
-        fecha_actualizacion TEXT,  -- También sin NOT NULL
-        FOREIGN KEY (marca_id) REFERENCES marcas (id),
-        FOREIGN KEY (modelo_id) REFERENCES modelos (id),
-        FOREIGN KEY (logo_id) REFERENCES logo (id)
-      )
+CREATE TABLE equipos (
+   id INTEGER PRIMARY KEY AUTOINCREMENT,
+   id_remoto TEXT,                        
+   cod_barras TEXT,                       
+   marca_id INTEGER NOT NULL,
+   modelo_id INTEGER NOT NULL,
+   numero_serie TEXT,                      
+   logo_id INTEGER NOT NULL,
+   estado_local INTEGER DEFAULT 1,
+   activo INTEGER DEFAULT 1,
+   sincronizado INTEGER DEFAULT 0,
+   fecha_creacion TEXT NOT NULL,
+   fecha_actualizacion TEXT,
+   FOREIGN KEY (marca_id) REFERENCES marcas (id),
+   FOREIGN KEY (modelo_id) REFERENCES modelos (id),
+   FOREIGN KEY (logo_id) REFERENCES logo (id)
+);
     ''');
 
     // Tabla equipo_cliente
@@ -129,13 +131,14 @@ class DatabaseHelper {
   )
 ''');
     // Tabla usuarios
-// Simplificar la tabla usuarios en _onCreate
     await db.execute('''
   CREATE TABLE Users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    edf_vendedor_id TEXT,
+    edf_vendedor_nombre TEXT,
     code INTEGER NOT NULL UNIQUE,
     username TEXT NOT NULL,
-    password TEXT NOT NULL,
+    password TEXT NOT NULL,   
     fullname TEXT NOT NULL,
     sincronizado INTEGER DEFAULT 0,
     fecha_creacion TEXT NOT NULL,
@@ -167,6 +170,9 @@ class DatabaseHelper {
     // Índices para clientes
     await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_nombre ON clientes (nombre)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_ruc_ci ON clientes (ruc_ci)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_telefono ON clientes (telefono)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_direccion ON clientes (direccion)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_codigo ON clientes (codigo)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_clientes_propietario ON clientes (propietario)');
 
     // Índices para equipos
@@ -273,6 +279,58 @@ class DatabaseHelper {
     }
   }
 
+  Future<void> sincronizarClientes(List<dynamic> clientesAPI) async {
+    logger.i('=== SINCRONIZANDO CLIENTES EN DATABASE_HELPER ===');
+    logger.i('Clientes recibidos: ${clientesAPI.length}');
+
+    await ejecutarTransaccion((txn) async {
+      // Limpiar clientes existentes
+      await txn.delete('clientes');
+      logger.i('Clientes existentes eliminados');
+
+      int sincronizados = 0;
+      int omitidos = 0;
+
+      for (int i = 0; i < clientesAPI.length; i++) {
+        final clienteData = clientesAPI[i];
+
+        logger.i('=== INSERTANDO CLIENTE ${i + 1} ===');
+        logger.i('Mapa completo: $clienteData');
+
+        // Validar campos requeridos
+        if (clienteData['nombre'] == null || clienteData['nombre'].toString().trim().isEmpty) {
+          logger.e('ERROR: nombre es null o vacío para cliente');
+          omitidos++;
+          continue;
+        }
+
+        try {
+          final mapaParaInsertar = {
+            'id': clienteData['id'],
+            'nombre': clienteData['nombre'].toString().trim(),
+            'telefono': clienteData['telefono']?.toString().trim() ?? '',
+            'direccion': clienteData['direccion']?.toString().trim() ?? '',
+            'ruc_ci': clienteData['ruc_ci']?.toString().trim() ?? '',
+            'propietario': clienteData['propietario']?.toString().trim() ?? '',
+          };
+
+          logger.i('Insertando cliente: $mapaParaInsertar');
+          await txn.insert('clientes', mapaParaInsertar);
+          sincronizados++;
+          logger.i('✅ Cliente insertado exitosamente');
+
+        } catch (e) {
+          logger.e('❌ Error insertando cliente: $e');
+          omitidos++;
+        }
+      }
+
+      logger.i('Clientes: $sincronizados sincronizados, $omitidos omitidos');
+    });
+
+    logger.i('=== SINCRONIZACIÓN DE CLIENTES COMPLETADA ===');
+  }
+
   Future<int> actualizar(
       String tableName,
       Map<String, dynamic> values, {
@@ -358,30 +416,71 @@ class DatabaseHelper {
   // MÉTODOS ESPECÍFICOS DEL NEGOCIO ACTUALIZADOS
   // ================================================================
 // En DatabaseHelper - Métodos de sincronización masiva
-  Future<void> sincronizarUsuarios(List<dynamic> usuariosAPI) async {
-    logger.i('=== SINCRONIZANDO EN DATABASE_HELPER ===');
-    logger.i('Usuarios recibidos: ${usuariosAPI.length}');
+  Future<void> sincronizarUsuarios(List<Map<String, dynamic>> usuariosMapas) async {
+    logger.i('=== SINCRONIZANDO USUARIOS EN DATABASE_HELPER ===');
+    logger.i('Usuarios recibidos: ${usuariosMapas.length}');
 
     await ejecutarTransaccion((txn) async {
       await txn.delete('Users');
       logger.i('Usuarios existentes eliminados');
 
-      for (var data in usuariosAPI) {
-        logger.i('Insertando usuario: $data');
-        await txn.insert('Users', {
-          // 'id' se omite porque es AUTOINCREMENT
-          'code': data['id'],           // El id de la API se mapea a code
-          'username': data['username'],
-          'password': data['password'],
-          'fullname': data['fullname'],
-          'sincronizado': 1,            // Campo requerido
-          'fecha_creacion': DateTime.now().toIso8601String(),  // Campo requerido
-          'fecha_actualizacion': DateTime.now().toIso8601String(), // Campo requerido
-        });
+      for (int i = 0; i < usuariosMapas.length; i++) {
+        final usuarioMapa = usuariosMapas[i];
+
+        // ✅ DEBUG: Verificar cada campo antes de insertar
+        logger.i('=== INSERTANDO USUARIO ${i + 1} ===');
+        logger.i('Mapa completo: $usuarioMapa');
+        logger.i('code: ${usuarioMapa['code']} (${usuarioMapa['code'].runtimeType})');
+        logger.i('username: ${usuarioMapa['username']} (${usuarioMapa['username'].runtimeType})');
+        logger.i('password: ${usuarioMapa['password']} (${usuarioMapa['password'].runtimeType})');
+        logger.i('fullname: ${usuarioMapa['fullname']} (${usuarioMapa['fullname'].runtimeType})');
+        logger.i('edf_vendedor_id: ${usuarioMapa['edf_vendedor_id']} (${usuarioMapa['edf_vendedor_id'].runtimeType})');
+
+        // ✅ VALIDAR campos requeridos
+        if (usuarioMapa['code'] == null) {
+          logger.e('ERROR: code es null para usuario ${usuarioMapa['username']}');
+          continue; // Saltar este usuario
+        }
+
+        if (usuarioMapa['username'] == null) {
+          logger.e('ERROR: username es null');
+          continue;
+        }
+
+        if (usuarioMapa['password'] == null) {
+          logger.e('ERROR: password es null');
+          continue;
+        }
+
+        if (usuarioMapa['fullname'] == null) {
+          logger.e('ERROR: fullname es null');
+          continue;
+        }
+
+        try {
+          final mapaParaInsertar = {
+            'edf_vendedor_id': usuarioMapa['edf_vendedor_id'],
+            'code': usuarioMapa['code'],
+            'username': usuarioMapa['username'],
+            'password': usuarioMapa['password'],
+            'fullname': usuarioMapa['fullname'],
+            'sincronizado': usuarioMapa['sincronizado'] ?? 1,
+            'fecha_creacion': usuarioMapa['fecha_creacion'] ?? DateTime.now().toIso8601String(),
+            'fecha_actualizacion': usuarioMapa['fecha_actualizacion'] ?? DateTime.now().toIso8601String(),
+          };
+
+          logger.i('Insertando con mapa: $mapaParaInsertar');
+          await txn.insert('Users', mapaParaInsertar);
+          logger.i('✅ Usuario insertado exitosamente');
+
+        } catch (e) {
+          logger.e('❌ Error insertando usuario ${usuarioMapa['username']}: $e');
+          logger.e('Mapa que causó error: $usuarioMapa');
+        }
       }
     });
 
-    logger.i('=== SINCRONIZACIÓN COMPLETADA ===');
+    logger.i('=== SINCRONIZACIÓN DE USUARIOS COMPLETADA ===');
   }
 
 // Agregar este método en DatabaseHelper
@@ -512,7 +611,7 @@ class DatabaseHelper {
       for (var marcaData in marcasAPI) {
         await txn.insert('marcas', {
           'id': marcaData['id'],
-          'nombre': marcaData['nombre'],
+          'nombre': marcaData['marca'],
           'activo': 1,
           'fecha_creacion': DateTime.now().toIso8601String(),
         }, conflictAlgorithm: ConflictAlgorithm.replace);

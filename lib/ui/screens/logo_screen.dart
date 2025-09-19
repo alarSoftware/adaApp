@@ -13,18 +13,45 @@ class LogosScreen extends StatefulWidget {
 
 class _LogosScreenState extends State<LogosScreen> {
   List<Map<String, dynamic>> _logos = [];
-  bool _isLoading = false; // Cambiado a false inicialmente
-  bool _isSyncing = false; // Nuevo estado para sincronización
+  List<Map<String, dynamic>> _logosFiltrados = [];
+  bool _isLoading = false;
+  bool _isSyncing = false;
   String? _errorMessage;
+
+  // Controlador para el campo de búsqueda
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    // Solo cargar logos que ya existen localmente, SIN descargar nuevos
     _cargarLogosLocales();
+
+    // Listener para el campo de búsqueda
+    _searchController.addListener(_filtrarLogos);
   }
 
-  // Nueva función para cargar solo logos locales existentes
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filtrarLogos() {
+    final query = _searchController.text.toLowerCase().trim();
+
+    setState(() {
+      if (query.isEmpty) {
+        _logosFiltrados = List.from(_logos);
+      } else {
+        _logosFiltrados = _logos.where((logo) {
+          final nombre = (logo['nombre'] ?? '').toString().toLowerCase();
+          final id = (logo['id'] ?? '').toString().toLowerCase();
+          return nombre.contains(query) || id.contains(query);
+        }).toList();
+      }
+    });
+  }
+
   Future<void> _cargarLogosLocales() async {
     if (!mounted) return;
 
@@ -38,11 +65,14 @@ class _LogosScreenState extends State<LogosScreen> {
       final logosLocales = await logoRepo.obtenerTodos();
 
       if (mounted) {
+        final logosData = logosLocales.map((logo) => {
+          'id': logo.id,
+          'nombre': logo.nombre,
+        }).toList();
+
         setState(() {
-          _logos = logosLocales.map((logo) => {
-            'id': logo.id,
-            'nombre': logo.nombre,
-          }).toList();
+          _logos = logosData;
+          _logosFiltrados = List.from(logosData);
           _isLoading = false;
         });
       }
@@ -59,7 +89,6 @@ class _LogosScreenState extends State<LogosScreen> {
     }
   }
 
-  // Nueva función para sincronizar (descargar desde servidor)
   Future<void> _sincronizarLogos() async {
     if (!mounted) return;
 
@@ -79,13 +108,21 @@ class _LogosScreenState extends State<LogosScreen> {
       final logosActualizados = await logoRepo.obtenerTodos();
 
       if (mounted) {
+        final logosData = logosActualizados.map((logo) => {
+          'id': logo.id,
+          'nombre': logo.nombre,
+        }).toList();
+
         setState(() {
-          _logos = logosActualizados.map((logo) => {
-            'id': logo.id,
-            'nombre': logo.nombre,
-          }).toList();
+          _logos = logosData;
+          _logosFiltrados = List.from(logosData);
           _isSyncing = false;
         });
+
+        // Aplicar filtro si hay búsqueda activa
+        if (_searchController.text.isNotEmpty) {
+          _filtrarLogos();
+        }
       }
 
       _logger.i('Logos sincronizados exitosamente: ${_logos.length}');
@@ -129,7 +166,6 @@ class _LogosScreenState extends State<LogosScreen> {
         foregroundColor: Colors.white,
         elevation: 1,
         actions: [
-          // Botón de sincronizar en el AppBar
           IconButton(
             onPressed: _isSyncing ? null : _sincronizarLogos,
             icon: _isSyncing
@@ -146,8 +182,62 @@ class _LogosScreenState extends State<LogosScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: _buildContent(),
+      body: Column(
+        children: [
+          // Barra de búsqueda fija
+          _buildSearchSection(),
+
+          // Contenido principal
+          Expanded(
+            child: _buildContent(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.grey[200]!,
+            width: 1,
+          ),
+        ),
+      ),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Buscar logos por nombre o ID...',
+          hintStyle: TextStyle(color: Colors.grey[500]),
+          prefixIcon: Icon(Icons.search, color: Colors.grey[500]),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+            icon: Icon(Icons.clear, color: Colors.grey[500]),
+            onPressed: () {
+              _searchController.clear();
+            },
+          )
+              : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[600]!, width: 2),
+          ),
+          filled: true,
+          fillColor: Colors.grey[50],
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
       ),
     );
   }
@@ -272,6 +362,41 @@ class _LogosScreenState extends State<LogosScreen> {
   }
 
   Widget _buildLogosList() {
+    // Mostrar mensaje si no hay resultados de búsqueda
+    if (_logosFiltrados.isEmpty && _searchController.text.isNotEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.search_off,
+                size: 64,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No se encontraron logos',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Intenta con otros términos de búsqueda',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[500],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Column(
       children: [
         // Banner de estado de sincronización
@@ -302,7 +427,23 @@ class _LogosScreenState extends State<LogosScreen> {
             ),
           ),
 
-        // Lista de logos
+        // Contador de resultados si hay búsqueda activa
+        if (_searchController.text.isNotEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: Colors.grey[100],
+            child: Text(
+              '${_logosFiltrados.length} resultado${_logosFiltrados.length != 1 ? 's' : ''} encontrado${_logosFiltrados.length != 1 ? 's' : ''}',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+
+        // Grid de logos
         Expanded(
           child: GridView.builder(
             padding: EdgeInsets.only(
@@ -317,9 +458,9 @@ class _LogosScreenState extends State<LogosScreen> {
               mainAxisSpacing: 12,
               childAspectRatio: 0.9,
             ),
-            itemCount: _logos.length,
+            itemCount: _logosFiltrados.length,
             itemBuilder: (context, index) {
-              final logo = _logos[index];
+              final logo = _logosFiltrados[index];
               return _buildLogoCard(logo);
             },
           ),
@@ -329,6 +470,9 @@ class _LogosScreenState extends State<LogosScreen> {
   }
 
   Widget _buildLogoCard(Map<String, dynamic> logo) {
+    final searchQuery = _searchController.text.toLowerCase();
+    final nombreLogo = logo['nombre'] ?? 'Sin nombre';
+
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(
@@ -355,9 +499,10 @@ class _LogosScreenState extends State<LogosScreen> {
                   size: 18,
                 ),
               ),
-              Text(
-                logo['nombre'] ?? 'Sin nombre',
-                style: const TextStyle(
+              _buildHighlightedText(
+                nombreLogo,
+                searchQuery,
+                const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: Colors.black87,
@@ -372,9 +517,10 @@ class _LogosScreenState extends State<LogosScreen> {
                   color: Colors.grey[200],
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: Text(
+                child: _buildHighlightedText(
                   'ID: ${logo['id']}',
-                  style: TextStyle(
+                  searchQuery,
+                  TextStyle(
                     fontSize: 8,
                     fontWeight: FontWeight.w500,
                     color: Colors.grey[600],
@@ -384,6 +530,54 @@ class _LogosScreenState extends State<LogosScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildHighlightedText(
+      String text,
+      String query,
+      TextStyle style, {
+        TextAlign? textAlign,
+        int? maxLines,
+        TextOverflow? overflow,
+      }) {
+    if (query.isEmpty || !text.toLowerCase().contains(query)) {
+      return Text(
+        text,
+        style: style,
+        textAlign: textAlign,
+        maxLines: maxLines,
+        overflow: overflow,
+      );
+    }
+
+    final lowerText = text.toLowerCase();
+    final startIndex = lowerText.indexOf(query);
+    final endIndex = startIndex + query.length;
+
+    return RichText(
+      textAlign: textAlign ?? TextAlign.start,
+      maxLines: maxLines,
+      overflow: overflow ?? TextOverflow.clip,
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: text.substring(0, startIndex),
+            style: style,
+          ),
+          TextSpan(
+            text: text.substring(startIndex, endIndex),
+            style: style.copyWith(
+              backgroundColor: Colors.yellow[200],
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          TextSpan(
+            text: text.substring(endIndex),
+            style: style,
+          ),
+        ],
       ),
     );
   }

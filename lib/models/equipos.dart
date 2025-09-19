@@ -75,6 +75,7 @@ class Equipo {
       fecha = DateTime.parse(
           json['fecha_creacion'] ??
               json['fechaCreacion'] ??
+              json['fecha'] ??
               DateTime.now().toIso8601String()
       );
     } catch (_) {
@@ -92,25 +93,36 @@ class Equipo {
     }
 
     return Equipo(
-      id: _safeParseInt(json['id'], defaultValue: 0),
-      // Manejar diferentes nombres de campos para código de barras
-      codBarras: json['cod_barras'] ?? json['codBarras'] ?? json['equipo'] ?? json['equipoId'] ?? '',
-      // Convertir marcaId de forma segura
-      marcaId: _safeParseInt(json['marca_id'] ?? json['marcaId']),
-      // Manejar edfModeloId de la API
-      modeloId: _safeParseInt(json['modelo_id'] ?? json['modeloId'] ?? json['edfModeloId']),
-      // Manejar diferentes nombres para número de serie
-      numeroSerie: json['numero_serie'] ?? json['numeroSerie'] ?? json['numSerie'],
-      // Manejar edfLogoId de la API
-      logoId: _safeParseInt(json['logo_id'] ?? json['logoId'] ?? json['edfLogoId']),
-      estadoLocal: _safeParseInt(json['estado_local'] ?? json['estadoLocal'], defaultValue: 1),
-      activo: _safeParseInt(json['activo'] ?? (json['esActivo'] == true ? 1 : 0), defaultValue: 1),
+      // ← ID: No uses json['id'] porque es string, mejor genera uno o usa null
+      id: null, // La BD asignará el ID automáticamente
+
+      // ← EL CÓDIGO DE BARRAS VIENE EN equipoId
+      codBarras: json['equipoId']?.toString().trim() ?? '',
+
+      // ← marcaId viene como string "101", convertir a int
+      marcaId: _safeParseInt(json['marcaId']),
+
+      // ← edfModeloId es el modelo (viene como int 102)
+      modeloId: _safeParseInt(json['edfModeloId']),
+
+      // ← numSerie es el número de serie
+      numeroSerie: json['numSerie']?.toString().trim(),
+
+      // ← edfLogoId es el logo (viene como int 20, 24, etc.)
+      logoId: _safeParseInt(json['edfLogoId']),
+
+      // ← Estados basados en los campos de tu API
+      estadoLocal: json['esDisponible'] == true ? 1 : 0,
+      activo: json['esActivo'] == true ? 1 : 0,
+
       fechaCreacion: fecha,
       fechaActualizacion: fechaAct,
-      sincronizado: _safeParseInt(json['sincronizado'], defaultValue: 0),
-      marcaNombre: json['marca_nombre'] ?? json['marcaNombre'],
-      modeloNombre: json['modelo_nombre'] ?? json['modeloNombre'],
-      logoNombre: json['logo_nombre'] ?? json['logoNombre'],
+      sincronizado: 0, // Siempre 0 para datos que vienen de API
+
+      // ← Nombres para mostrar (temporal hasta hacer JOIN)
+      marcaNombre: null, // Se llenará con JOIN posteriormente
+      modeloNombre: json['equipo']?.toString().replaceAll('\n', ' ').trim(), // Limpiar saltos de línea
+      logoNombre: null, // Se llenará con JOIN posteriormente
     );
   }
 

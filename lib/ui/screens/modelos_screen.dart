@@ -13,14 +13,43 @@ class ModelosScreen extends StatefulWidget {
 
 class _ModelosScreenState extends State<ModelosScreen> {
   List<Map<String, dynamic>> _modelos = [];
+  List<Map<String, dynamic>> _modelosFiltrados = [];
   bool _isLoading = false;
   bool _isSyncing = false;
   String? _errorMessage;
+
+  // Controlador para el campo de búsqueda
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _cargarModelosLocales();
+
+    // Listener para el campo de búsqueda
+    _searchController.addListener(_filtrarModelos);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filtrarModelos() {
+    final query = _searchController.text.toLowerCase().trim();
+
+    setState(() {
+      if (query.isEmpty) {
+        _modelosFiltrados = List.from(_modelos);
+      } else {
+        _modelosFiltrados = _modelos.where((modelo) {
+          final nombre = (modelo['nombre'] ?? '').toString().toLowerCase();
+          final id = (modelo['id'] ?? '').toString().toLowerCase();
+          return nombre.contains(query) || id.contains(query);
+        }).toList();
+      }
+    });
   }
 
   Future<void> _cargarModelosLocales() async {
@@ -36,11 +65,14 @@ class _ModelosScreenState extends State<ModelosScreen> {
       final modelosLocales = await modeloRepo.obtenerTodos();
 
       if (mounted) {
+        final modelosData = modelosLocales.map((modelo) => {
+          'id': modelo.id,
+          'nombre': modelo.nombre,
+        }).toList();
+
         setState(() {
-          _modelos = modelosLocales.map((modelo) => {
-            'id': modelo.id,
-            'nombre': modelo.nombre,
-          }).toList();
+          _modelos = modelosData;
+          _modelosFiltrados = List.from(modelosData);
           _isLoading = false;
         });
       }
@@ -76,13 +108,21 @@ class _ModelosScreenState extends State<ModelosScreen> {
           // Recargar los modelos locales después de sincronizar
           final modelosActualizados = await modeloRepo.obtenerTodos();
 
+          final modelosData = modelosActualizados.map((modelo) => {
+            'id': modelo.id,
+            'nombre': modelo.nombre,
+          }).toList();
+
           setState(() {
-            _modelos = modelosActualizados.map((modelo) => {
-              'id': modelo.id,
-              'nombre': modelo.nombre,
-            }).toList();
+            _modelos = modelosData;
+            _modelosFiltrados = List.from(modelosData);
             _isSyncing = false;
           });
+
+          // Aplicar filtro si hay búsqueda activa
+          if (_searchController.text.isNotEmpty) {
+            _filtrarModelos();
+          }
 
           _logger.i('Modelos sincronizados exitosamente: ${_modelos.length}');
 
@@ -155,8 +195,81 @@ class _ModelosScreenState extends State<ModelosScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: _buildContent(),
+      body: Column(
+        children: [
+          // Barra de búsqueda fija
+          _buildSearchSection(),
+
+          // Contenido principal
+          Expanded(
+            child: _buildContent(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.grey[200]!,
+            width: 1,
+          ),
+        ),
+      ),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Buscar modelos por nombre o ID...',
+          hintStyle: TextStyle(color: Colors.grey[500]),
+          prefixIcon: Icon(Icons.search, color: Colors.grey[500]),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+            icon: Icon(Icons.clear, color: Colors.grey[500]),
+            onPressed: () {
+              _searchController.clear();
+            },
+          )
+              : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[600]!, width: 2),
+          ),
+          filled: true,
+          fillColor: Colors.grey[50],
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        child: TextField(
+          controller: _searchController,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Buscar por nombre o ID...',
+            hintStyle: TextStyle(color: Colors.grey[300]),
+            border: InputBorder.none,
+            prefixIcon: Icon(Icons.search, color: Colors.grey[300]),
+          ),
+        ),
       ),
     );
   }
@@ -281,6 +394,41 @@ class _ModelosScreenState extends State<ModelosScreen> {
   }
 
   Widget _buildModelosList() {
+    // Mostrar mensaje si no hay resultados de búsqueda
+    if (_modelosFiltrados.isEmpty && _searchController.text.isNotEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.search_off,
+                size: 64,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No se encontraron modelos',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Intenta con otros términos de búsqueda',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[500],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Column(
       children: [
         // Banner de estado de sincronización
@@ -311,6 +459,22 @@ class _ModelosScreenState extends State<ModelosScreen> {
             ),
           ),
 
+        // Contador de resultados si hay búsqueda activa
+        if (_searchController.text.isNotEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: Colors.grey[100],
+            child: Text(
+              '${_modelosFiltrados.length} resultado${_modelosFiltrados.length != 1 ? 's' : ''} encontrado${_modelosFiltrados.length != 1 ? 's' : ''}',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+
         // Lista de modelos
         Expanded(
           child: ListView.builder(
@@ -320,9 +484,9 @@ class _ModelosScreenState extends State<ModelosScreen> {
               top: 16,
               bottom: 16 + MediaQuery.of(context).padding.bottom,
             ),
-            itemCount: _modelos.length,
+            itemCount: _modelosFiltrados.length,
             itemBuilder: (context, index) {
-              final modelo = _modelos[index];
+              final modelo = _modelosFiltrados[index];
               return _buildModeloCard(modelo);
             },
           ),
@@ -332,6 +496,9 @@ class _ModelosScreenState extends State<ModelosScreen> {
   }
 
   Widget _buildModeloCard(Map<String, dynamic> modelo) {
+    final searchQuery = _searchController.text.toLowerCase();
+    final nombreModelo = modelo['nombre'] ?? 'Sin nombre';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: Card(
@@ -362,18 +529,20 @@ class _ModelosScreenState extends State<ModelosScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      modelo['nombre'] ?? 'Sin nombre',
-                      style: const TextStyle(
+                    _buildHighlightedText(
+                      nombreModelo,
+                      searchQuery,
+                      const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: Colors.black87,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
+                    _buildHighlightedText(
                       'ID: ${modelo['id']}',
-                      style: TextStyle(
+                      searchQuery,
+                      TextStyle(
                         fontSize: 12,
                         color: Colors.grey[500],
                       ),
@@ -399,6 +568,38 @@ class _ModelosScreenState extends State<ModelosScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildHighlightedText(String text, String query, TextStyle style) {
+    if (query.isEmpty || !text.toLowerCase().contains(query)) {
+      return Text(text, style: style);
+    }
+
+    final lowerText = text.toLowerCase();
+    final startIndex = lowerText.indexOf(query);
+    final endIndex = startIndex + query.length;
+
+    return RichText(
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: text.substring(0, startIndex),
+            style: style,
+          ),
+          TextSpan(
+            text: text.substring(startIndex, endIndex),
+            style: style.copyWith(
+              backgroundColor: Colors.yellow[200],
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          TextSpan(
+            text: text.substring(endIndex),
+            style: style,
+          ),
+        ],
       ),
     );
   }

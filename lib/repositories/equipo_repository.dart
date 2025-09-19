@@ -27,7 +27,77 @@ class EquipoRepository extends BaseRepository<Equipo> {
   @override
   String getEntityName() => 'Equipo';
 
-  /// Obtener equipos con datos completos (JOIN con marcas, modelos y logos) - CORREGIDO
+  // ========== MÉTODOS PRINCIPALES DE BÚSQUEDA ==========
+
+  /// Búsqueda con detalles completos - FIX para espacios en blanco
+  Future<List<Map<String, dynamic>>> buscarConDetalles(String query) async {
+    if (query.trim().isEmpty) {
+      return await obtenerCompletos(soloActivos: true);
+    }
+
+    final searchTerm = query.toLowerCase().trim();
+
+    final sql = '''
+  SELECT e.*,
+         m.nombre as marca_nombre,
+         mo.nombre as modelo_nombre,
+         l.nombre as logo_nombre,
+         CASE 
+           WHEN ec.id IS NOT NULL THEN 'Asignado'
+           ELSE 'Disponible'
+         END as estado_asignacion,
+         c.nombre as cliente_nombre
+  FROM equipos e
+  LEFT JOIN marcas m ON e.marca_id = m.id
+  LEFT JOIN modelos mo ON e.modelo_id = mo.id
+  LEFT JOIN logo l ON e.logo_id = l.id
+  LEFT JOIN equipo_cliente ec ON e.id = ec.equipo_id 
+    AND ec.activo = 1 
+    AND ec.fecha_retiro IS NULL
+  LEFT JOIN clientes c ON ec.cliente_id = c.id
+  WHERE e.activo = 1 
+    AND (
+      -- Búsqueda exacta con TRIM
+      LOWER(TRIM(e.cod_barras)) = ? OR
+      LOWER(TRIM(m.nombre)) = ? OR
+      LOWER(TRIM(mo.nombre)) = ? OR
+      LOWER(TRIM(l.nombre)) = ? OR
+      
+      -- Búsqueda que empieza con TRIM
+      LOWER(TRIM(e.cod_barras)) LIKE ? OR
+      LOWER(TRIM(m.nombre)) LIKE ? OR
+      LOWER(TRIM(mo.nombre)) LIKE ? OR
+      LOWER(TRIM(l.nombre)) LIKE ? OR
+      
+      -- Búsqueda menos restrictiva
+      LOWER(TRIM(e.numero_serie)) LIKE ? OR
+      LOWER(TRIM(c.nombre)) LIKE ?
+    )
+  ORDER BY 
+    -- Ordenar por relevancia con TRIM
+    CASE 
+      WHEN LOWER(TRIM(l.nombre)) = ? THEN 1
+      WHEN LOWER(TRIM(m.nombre)) = ? THEN 1
+      WHEN LOWER(TRIM(l.nombre)) LIKE ? THEN 2
+      WHEN LOWER(TRIM(m.nombre)) LIKE ? THEN 2
+      ELSE 3
+    END,
+    e.fecha_creacion DESC
+  ''';
+
+    return await dbHelper.consultarPersonalizada(sql, [
+      // Exactas
+      searchTerm, searchTerm, searchTerm, searchTerm,
+      // Empieza con
+      '$searchTerm%', '$searchTerm%', '$searchTerm%', '$searchTerm%',
+      // Contiene
+      '%$searchTerm%', '%$searchTerm%',
+      // Para ORDER BY
+      searchTerm, searchTerm, '$searchTerm%', '$searchTerm%',
+    ]);
+  }
+
+  /// Obtener equipos con datos completos (método unificado)
   Future<List<Map<String, dynamic>>> obtenerCompletos({bool soloActivos = true}) async {
     final whereClause = soloActivos ? 'WHERE e.activo = 1' : '';
 
@@ -56,81 +126,19 @@ class EquipoRepository extends BaseRepository<Equipo> {
     return await dbHelper.consultarPersonalizada(sql);
   }
 
-  /// Obtener equipos activos
-  Future<List<Equipo>> obtenerActivos() async {
-    final maps = await dbHelper.consultar(
-      tableName,
-      where: 'activo = ?',
-      whereArgs: [1],
-      orderBy: getDefaultOrderBy(),
-    );
-    return maps.map((map) => fromMap(map)).toList();
-  }
+  // ========== MÉTODOS DE BÚSQUEDA ESPECÍFICA ==========
 
-  /// Obtener equipos por marca ID
-  Future<List<Equipo>> obtenerPorMarcaId(int marcaId, {bool soloActivos = true}) async {
-    final whereCondition = soloActivos
-        ? 'marca_id = ? AND activo = ?'
-        : 'marca_id = ?';
-    final whereArgs = soloActivos ? [marcaId, 1] : [marcaId];
-
-    final maps = await dbHelper.consultar(
-      tableName,
-      where: whereCondition,
-      whereArgs: whereArgs,
-      orderBy: getDefaultOrderBy(),
-    );
-    return maps.map((map) => fromMap(map)).toList();
-  }
-
-  /// Obtener equipos por modelo ID - NUEVO
-  Future<List<Equipo>> obtenerPorModeloId(int modeloId, {bool soloActivos = true}) async {
-    final whereCondition = soloActivos
-        ? 'modelo_id = ? AND activo = ?'
-        : 'modelo_id = ?';
-    final whereArgs = soloActivos ? [modeloId, 1] : [modeloId];
-
-    final maps = await dbHelper.consultar(
-      tableName,
-      where: whereCondition,
-      whereArgs: whereArgs,
-      orderBy: getDefaultOrderBy(),
-    );
-    return maps.map((map) => fromMap(map)).toList();
-  }
-
-  /// Obtener equipos por logo ID
-  Future<List<Equipo>> obtenerPorLogoId(int logoId, {bool soloActivos = true}) async {
-    final whereCondition = soloActivos
-        ? 'logo_id = ? AND activo = ?'
-        : 'logo_id = ?';
-    final whereArgs = soloActivos ? [logoId, 1] : [logoId];
-
-    final maps = await dbHelper.consultar(
-      tableName,
-      where: whereCondition,
-      whereArgs: whereArgs,
-      orderBy: getDefaultOrderBy(),
-    );
-    return maps.map((map) => fromMap(map)).toList();
-  }
-
+  /// Buscar por código exacto
   Future<List<Map<String, dynamic>>> buscarPorCodigoExacto({
     required String codigoBarras,
     bool soloActivos = true,
   }) async {
-    final condiciones = <String>[];
-    final argumentos = <dynamic>[];
-
-    // ✅ BÚSQUEDA EXACTA - No parcial
-    condiciones.add('UPPER(e.cod_barras) = ?');
-    argumentos.add(codigoBarras.toUpperCase());
+    final condiciones = ['UPPER(e.cod_barras) = ?'];
+    final argumentos = [codigoBarras.toUpperCase()];
 
     if (soloActivos) {
       condiciones.add('e.activo = 1');
     }
-
-    final whereClause = 'WHERE ${condiciones.join(' AND ')}';
 
     final sql = '''
     SELECT e.*, 
@@ -141,13 +149,48 @@ class EquipoRepository extends BaseRepository<Equipo> {
     LEFT JOIN marcas m ON e.marca_id = m.id
     LEFT JOIN modelos mo ON e.modelo_id = mo.id
     LEFT JOIN logo l ON e.logo_id = l.id
-    $whereClause
+    WHERE ${condiciones.join(' AND ')}
     ORDER BY e.fecha_creacion DESC
     LIMIT 1
-  ''';
+    ''';
 
     return await dbHelper.consultarPersonalizada(sql, argumentos);
   }
+
+  /// Obtener equipos por estado
+  Future<List<Map<String, dynamic>>> obtenerPorEstado({
+    required bool disponibles,
+  }) async {
+    final condition = disponibles
+        ? 'AND ec.id IS NULL'
+        : 'AND ec.id IS NOT NULL';
+
+    final joinType = disponibles ? 'LEFT JOIN' : 'INNER JOIN';
+
+    final sql = '''
+      SELECT e.*,
+             m.nombre as marca_nombre,
+             mo.nombre as modelo_nombre,
+             l.nombre as logo_nombre,
+             c.nombre as cliente_nombre
+      FROM equipos e
+      LEFT JOIN marcas m ON e.marca_id = m.id
+      LEFT JOIN modelos mo ON e.modelo_id = mo.id
+      LEFT JOIN logo l ON e.logo_id = l.id
+      $joinType equipo_cliente ec ON e.id = ec.equipo_id 
+        AND ec.activo = 1 
+        AND ec.fecha_retiro IS NULL
+      LEFT JOIN clientes c ON ec.cliente_id = c.id
+      WHERE e.activo = 1 
+        AND e.estado_local = 1
+        $condition
+      ORDER BY m.nombre, mo.nombre
+    ''';
+
+    return await dbHelper.consultarPersonalizada(sql);
+  }
+
+  // ========== MÉTODOS DE VALIDACIÓN ==========
 
   /// Buscar por código de barras
   Future<Equipo?> buscarPorCodigoBarras(String codBarras) async {
@@ -158,25 +201,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
       limit: 1,
     );
 
-    if (maps.isNotEmpty) {
-      return fromMap(maps.first);
-    }
-    return null;
-  }
-
-  /// Buscar por número de serie
-  Future<Equipo?> buscarPorNumeroSerie(String numeroSerie) async {
-    final maps = await dbHelper.consultar(
-      tableName,
-      where: 'numero_serie = ? AND activo = ?',
-      whereArgs: [numeroSerie, 1],
-      limit: 1,
-    );
-
-    if (maps.isNotEmpty) {
-      return fromMap(maps.first);
-    }
-    return null;
+    return maps.isNotEmpty ? fromMap(maps.first) : null;
   }
 
   /// Verificar si existe un código de barras
@@ -219,163 +244,9 @@ class EquipoRepository extends BaseRepository<Equipo> {
     return maps.isNotEmpty;
   }
 
-  /// Obtener equipos disponibles (no asignados) - CORREGIDO
-  Future<List<Map<String, dynamic>>> obtenerDisponiblesConDetalles() async {
-    final sql = '''
-      SELECT e.*,
-             m.nombre as marca_nombre,
-             mo.nombre as modelo_nombre,
-             l.nombre as logo_nombre
-      FROM equipos e
-      LEFT JOIN marcas m ON e.marca_id = m.id
-      LEFT JOIN modelos mo ON e.modelo_id = mo.id
-      LEFT JOIN logo l ON e.logo_id = l.id
-      LEFT JOIN equipo_cliente ec ON e.id = ec.equipo_id 
-        AND ec.activo = 1 
-        AND ec.fecha_retiro IS NULL
-      WHERE e.activo = 1 
-        AND e.estado_local = 1
-        AND ec.id IS NULL
-      ORDER BY m.nombre, mo.nombre
-    ''';
+  // ========== MÉTODOS DE REFERENCIA ==========
 
-    return await dbHelper.consultarPersonalizada(sql);
-  }
-
-  /// Obtener equipos asignados - CORREGIDO
-  Future<List<Map<String, dynamic>>> obtenerAsignadosConDetalles() async {
-    final sql = '''
-      SELECT DISTINCT e.*,
-             m.nombre as marca_nombre,
-             mo.nombre as modelo_nombre,
-             l.nombre as logo_nombre,
-             c.nombre as cliente_nombre
-      FROM equipos e
-      LEFT JOIN marcas m ON e.marca_id = m.id
-      LEFT JOIN modelos mo ON e.modelo_id = mo.id
-      LEFT JOIN logo l ON e.logo_id = l.id
-      INNER JOIN equipo_cliente ec ON e.id = ec.equipo_id
-      LEFT JOIN clientes c ON ec.cliente_id = c.id
-      WHERE e.activo = 1 
-        AND ec.activo = 1 
-        AND ec.fecha_retiro IS NULL
-      ORDER BY m.nombre, mo.nombre
-    ''';
-
-    return await dbHelper.consultarPersonalizada(sql);
-  }
-
-  /// Obtener estadísticas de equipos
-  Future<Map<String, dynamic>> obtenerEstadisticasEquipos() async {
-    final sql = '''
-      SELECT 
-        COUNT(*) as total_equipos,
-        COUNT(CASE WHEN e.activo = 1 THEN 1 END) as equipos_activos,
-        COUNT(CASE WHEN e.activo = 0 THEN 1 END) as equipos_inactivos,
-        COUNT(CASE WHEN e.sincronizado = 0 THEN 1 END) as no_sincronizados,
-        COUNT(CASE WHEN ec.id IS NOT NULL THEN 1 END) as equipos_asignados,
-        COUNT(CASE WHEN ec.id IS NULL AND e.activo = 1 THEN 1 END) as equipos_disponibles,
-        COUNT(DISTINCT e.marca_id) as marcas_diferentes,
-        COUNT(DISTINCT e.modelo_id) as modelos_diferentes
-      FROM equipos e
-      LEFT JOIN equipo_cliente ec ON e.id = ec.equipo_id 
-        AND ec.activo = 1 
-        AND ec.fecha_retiro IS NULL
-    ''';
-
-    final result = await dbHelper.consultarPersonalizada(sql);
-    return result.isNotEmpty ? result.first : {};
-  }
-
-  /// Buscar equipos con filtros avanzados - CORREGIDO
-  Future<List<Map<String, dynamic>>> buscarConFiltrosLike({
-    int? marcaId,
-    int? modeloId,
-    int? logoId,
-    String? numeroSerie,
-    String? codigoBarras, // Esta sigue siendo búsqueda parcial para filtros
-    bool? soloActivos,
-    bool? soloDisponibles,
-    DateTime? fechaDesde,
-    DateTime? fechaHasta,
-  }) async {
-    final condiciones = <String>[];
-    final argumentos = <dynamic>[];
-
-    if (soloActivos == true) {
-      condiciones.add('e.activo = 1');
-    }
-
-    if (marcaId != null) {
-      condiciones.add('e.marca_id = ?');
-      argumentos.add(marcaId);
-    }
-
-    if (modeloId != null) { // CORREGIDO
-      condiciones.add('e.modelo_id = ?');
-      argumentos.add(modeloId);
-    }
-
-    if (logoId != null) {
-      condiciones.add('e.logo_id = ?');
-      argumentos.add(logoId);
-    }
-
-    if (numeroSerie?.isNotEmpty == true) {
-      condiciones.add('LOWER(e.numero_serie) LIKE ?');
-      argumentos.add('%${numeroSerie!.toLowerCase()}%');
-    }
-
-    if (codigoBarras?.isNotEmpty == true) {
-      condiciones.add('LOWER(e.cod_barras) LIKE ?');
-      argumentos.add('%${codigoBarras!.toLowerCase()}%');
-    }
-
-    if (fechaDesde != null) {
-      condiciones.add('DATE(e.fecha_creacion) >= ?');
-      argumentos.add(fechaDesde.toIso8601String().split('T')[0]);
-    }
-
-    if (fechaHasta != null) {
-      condiciones.add('DATE(e.fecha_creacion) <= ?');
-      argumentos.add(fechaHasta.toIso8601String().split('T')[0]);
-    }
-
-    String sqlBase = '''
-      SELECT e.*, 
-             m.nombre as marca_nombre,
-             mo.nombre as modelo_nombre,
-             l.nombre as logo_nombre
-      FROM equipos e
-      LEFT JOIN marcas m ON e.marca_id = m.id
-      LEFT JOIN modelos mo ON e.modelo_id = mo.id
-      LEFT JOIN logo l ON e.logo_id = l.id
-    ''';
-
-    if (soloDisponibles == true) {
-      sqlBase += '''
-        LEFT JOIN equipo_cliente ec ON e.id = ec.equipo_id 
-          AND ec.activo = 1 
-          AND ec.fecha_retiro IS NULL
-      ''';
-      condiciones.add('ec.id IS NULL');
-    }
-
-    final whereClause = condiciones.isNotEmpty
-        ? 'WHERE ${condiciones.join(' AND ')}'
-        : '';
-
-    final sql = '''
-      $sqlBase
-      $whereClause
-      ORDER BY m.nombre, mo.nombre
-      LIMIT 100
-    ''';
-
-    return await dbHelper.consultarPersonalizada(sql, argumentos);
-  }
-
-  /// Obtener marcas para dropdown
+  /// Obtener marcas activas
   Future<List<Map<String, dynamic>>> obtenerMarcas() async {
     return await dbHelper.consultar(
       'marcas',
@@ -385,7 +256,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
     );
   }
 
-  /// Obtener modelos para dropdown - NUEVO
+  /// Obtener modelos
   Future<List<Map<String, dynamic>>> obtenerModelos() async {
     return await dbHelper.consultar(
       'modelos',
@@ -393,7 +264,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
     );
   }
 
-  /// Obtener logos para dropdown
+  /// Obtener logos activos
   Future<List<Map<String, dynamic>>> obtenerLogos() async {
     return await dbHelper.consultar(
       'logo',
@@ -403,113 +274,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
     );
   }
 
-  /// Crear equipo con validaciones - CORREGIDO
-  Future<int> crearEquipo({
-    String? codBarras,
-    required int marcaId,
-    required int modeloId, // CAMBIADO: de String modelo a int modeloId
-    required int logoId,
-    String? numeroSerie,
-    int estadoLocal = 1,
-  }) async {
-    // Validar que el código de barras no exista (solo si se proporciona)
-    if (codBarras != null && codBarras.isNotEmpty && await existeCodigoBarras(codBarras)) {
-      throw Exception('Ya existe un equipo con el código de barras: $codBarras');
-    }
-
-    // Validar que el número de serie no exista (si se proporciona)
-    if (numeroSerie != null && numeroSerie.isNotEmpty && await existeNumeroSerie(numeroSerie)) {
-      throw Exception('Ya existe un equipo con el número de serie: $numeroSerie');
-    }
-
-    final now = DateTime.now().toIso8601String();
-    final equipoData = {
-      'cod_barras': codBarras ?? '', // Usar string vacío si es null
-      'marca_id': marcaId,
-      'modelo_id': modeloId,
-      'logo_id': logoId,
-      'numero_serie': numeroSerie,
-      'estado_local': estadoLocal,
-      'activo': 1,
-      'sincronizado': 0,
-      'fecha_creacion': now,
-      'fecha_actualizacion': now,
-    };
-
-    return await dbHelper.insertar(tableName, equipoData);
-  }
-
-  /// Actualizar equipo con validaciones - CORREGIDO
-  Future<int> actualizarEquipo(int id, {
-    String? codBarras,
-    int? marcaId,
-    int? modeloId, // CAMBIADO: de String modelo a int modeloId
-    int? logoId,
-    String? numeroSerie,
-    int? estadoLocal,
-  }) async {
-    final equipoActual = await obtenerPorId(id);
-    if (equipoActual == null) {
-      throw Exception('Equipo no encontrado');
-    }
-
-    // Validar código de barras si se cambió
-    if (codBarras != null && codBarras != equipoActual.codBarras) {
-      if (await existeCodigoBarras(codBarras, excludeId: id)) {
-        throw Exception('Ya existe otro equipo con el código de barras: $codBarras');
-      }
-    }
-
-    // Validar número de serie si se cambió
-    if (numeroSerie != null && numeroSerie != equipoActual.numeroSerie) {
-      if (numeroSerie.isNotEmpty && await existeNumeroSerie(numeroSerie, excludeId: id)) {
-        throw Exception('Ya existe otro equipo con el número de serie: $numeroSerie');
-      }
-    }
-
-    final datosActualizacion = <String, dynamic>{};
-    if (codBarras != null) datosActualizacion['cod_barras'] = codBarras;
-    if (marcaId != null) datosActualizacion['marca_id'] = marcaId;
-    if (modeloId != null) datosActualizacion['modelo_id'] = modeloId;
-    if (logoId != null) datosActualizacion['logo_id'] = logoId;
-    if (numeroSerie != null) datosActualizacion['numero_serie'] = numeroSerie;
-    if (estadoLocal != null) datosActualizacion['estado_local'] = estadoLocal;
-
-    datosActualizacion['sincronizado'] = 0;
-    datosActualizacion['fecha_actualizacion'] = DateTime.now().toIso8601String();
-
-    return await dbHelper.actualizar(
-      tableName,
-      datosActualizacion,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
-
-  /// Marcar como sincronizado
-  Future<int> marcarComoSincronizado(int id) async {
-    return await dbHelper.actualizar(
-      tableName,
-      {
-        'sincronizado': 1,
-        'fecha_actualizacion': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
-
-  /// Obtener equipos no sincronizados
-  @override
-  Future<List<Equipo>> obtenerNoSincronizados() async {
-    final maps = await dbHelper.consultar(
-      tableName,
-      where: 'sincronizado = ? AND activo = ?',
-      whereArgs: [0, 1],
-      orderBy: getDefaultOrderBy(),
-    );
-    return maps.map((map) => fromMap(map)).toList();
-  }
+  // ========== MÉTODOS DE ESTADÍSTICAS ==========
 
   /// Obtener resumen para dashboard
   Future<Map<String, dynamic>> obtenerResumenDashboard() async {
@@ -528,10 +293,91 @@ class EquipoRepository extends BaseRepository<Equipo> {
     ''';
 
     final result = await dbHelper.consultarPersonalizada(sql);
-    if (result.isNotEmpty) {
-      return result.first;
+    return result.isNotEmpty ? result.first : {};
+  }
+
+  // ========== MÉTODOS DE GESTIÓN ==========
+
+  /// Crear equipo con validaciones
+  Future<int> crearEquipo({
+    String? codBarras,
+    required int marcaId,
+    required int modeloId,
+    required int logoId,
+    String? numeroSerie,
+    int estadoLocal = 1,
+  }) async {
+    // Validaciones
+    if (codBarras != null && codBarras.isNotEmpty && await existeCodigoBarras(codBarras)) {
+      throw Exception('Ya existe un equipo con el código de barras: $codBarras');
     }
-    return {};
+
+    if (numeroSerie != null && numeroSerie.isNotEmpty && await existeNumeroSerie(numeroSerie)) {
+      throw Exception('Ya existe un equipo con el número de serie: $numeroSerie');
+    }
+
+    final now = DateTime.now().toIso8601String();
+    final equipoData = {
+      'cod_barras': codBarras ?? '',
+      'marca_id': marcaId,
+      'modelo_id': modeloId,
+      'logo_id': logoId,
+      'numero_serie': numeroSerie,
+      'estado_local': estadoLocal,
+      'activo': 1,
+      'sincronizado': 0,
+      'fecha_creacion': now,
+      'fecha_actualizacion': now,
+    };
+
+    return await dbHelper.insertar(tableName, equipoData);
+  }
+
+  /// Actualizar equipo
+  Future<int> actualizarEquipo(int id, Map<String, dynamic> datos) async {
+    final equipoActual = await obtenerPorId(id);
+    if (equipoActual == null) {
+      throw Exception('Equipo no encontrado');
+    }
+
+    // Validar código de barras si se cambió
+    if (datos.containsKey('cod_barras') && datos['cod_barras'] != equipoActual.codBarras) {
+      if (await existeCodigoBarras(datos['cod_barras'], excludeId: id)) {
+        throw Exception('Ya existe otro equipo con el código de barras: ${datos['cod_barras']}');
+      }
+    }
+
+    // Agregar campos de control
+    datos['sincronizado'] = 0;
+    datos['fecha_actualizacion'] = DateTime.now().toIso8601String();
+
+    return await dbHelper.actualizar(tableName, datos, where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Marcar como sincronizado
+  Future<int> marcarComoSincronizado(int id) async {
+    return await dbHelper.actualizar(
+      tableName,
+      {
+        'sincronizado': 1,
+        'fecha_actualizacion': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // ========== MÉTODOS DE SINCRONIZACIÓN ==========
+
+  @override
+  Future<List<Equipo>> obtenerNoSincronizados() async {
+    final maps = await dbHelper.consultar(
+      tableName,
+      where: 'sincronizado = ? AND activo = ?',
+      whereArgs: [0, 1],
+      orderBy: getDefaultOrderBy(),
+    );
+    return maps.map((map) => fromMap(map)).toList();
   }
 
   /// Sincronizar equipos desde API
@@ -545,54 +391,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
 
     await dbHelper.ejecutarTransaccion((txn) async {
       for (final equipo in equipos) {
-        final equipoMap = equipo.toMap();
-        await txn.insert(tableName, equipoMap);
-      }
-    });
-  }
-
-  /// Borrar todos los equipos
-  Future<void> borrarTodos() async {
-    await dbHelper.eliminar(tableName);
-  }
-
-  /// Método alternativo para sincronización específica de equipos - CORREGIDO
-  Future<void> sincronizarEquiposCompletos(List<dynamic> equiposAPI) async {
-    final db = await dbHelper.database;
-
-    await db.transaction((txn) async {
-      // Marcar todos los equipos existentes como inactivos
-      await txn.update('equipos', {
-        'activo': 0,
-        'fecha_actualizacion': DateTime.now().toIso8601String(),
-      });
-
-      // Insertar/actualizar equipos de la API
-      for (var equipoData in equiposAPI) {
-        Map<String, dynamic> datos;
-
-        if (equipoData is Map<String, dynamic>) {
-          datos = Map<String, dynamic>.from(equipoData);
-        } else {
-          // Si equipoData es un objeto Equipo
-          datos = (equipoData as Equipo).toMap();
-        }
-
-        // Asegurar campos requeridos
-        datos['activo'] = 1;
-        datos['sincronizado'] = 1;
-        datos['fecha_actualizacion'] = DateTime.now().toIso8601String();
-
-        if (datos['fecha_creacion'] == null) {
-          datos['fecha_creacion'] = DateTime.now().toIso8601String();
-        }
-
-        // Usar INSERT OR REPLACE para manejar conflictos
-        await txn.insert(
-            'equipos',
-            datos,
-            conflictAlgorithm: ConflictAlgorithm.replace
-        );
+        await txn.insert(tableName, equipo.toMap());
       }
     });
   }

@@ -71,21 +71,26 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
             color: AppColors.textPrimary,
           ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDetalleRow('Código', equipo['cod_barras'] ?? 'N/A'),
-            _buildDetalleRow('Marca', equipo['marca_nombre'] ?? 'Sin marca'),
-            _buildDetalleRow('Modelo', equipo['modelo_nombre'] ?? 'Sin modelo'),
-            _buildDetalleRow('Logo', equipo['logo_nombre'] ?? 'Sin logo'),
-            if (equipo['numero_serie'] != null)
-              _buildDetalleRow('Número de Serie', equipo['numero_serie']),
-            _buildDetalleRow('Estado Local', (equipo['estado_local'] == 1) ? "Activo" : "Inactivo"),
-            _buildDetalleRow('Estado Asignación', _viewModel.getEstadoAsignacion(equipo)),
-            if (equipo['cliente_nombre'] != null)
-              _buildDetalleRow('Asignado a', equipo['cliente_nombre']),
-          ],
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildDetalleRow('Código', equipo['cod_barras'] ?? 'N/A'),
+                _buildDetalleRow('Marca', equipo['marca_nombre'] ?? 'Sin marca'),
+                _buildDetalleRow('Modelo', equipo['modelo_nombre'] ?? 'Sin modelo'),
+                _buildDetalleRow('Logo', equipo['logo_nombre'] ?? 'Sin logo'),
+                if (equipo['numero_serie'] != null)
+                  _buildDetalleRow('Número de Serie', equipo['numero_serie']),
+                _buildDetalleRow('Estado Local', (equipo['estado_local'] == 1) ? "Activo" : "Inactivo"),
+                _buildDetalleRow('Estado Asignación', _viewModel.getEstadoAsignacion(equipo)),
+                if (equipo['cliente_nombre'] != null)
+                  _buildDetalleRow('Asignado a', equipo['cliente_nombre']),
+              ],
+            ),
+          ),
         ),
         actions: [
           TextButton(

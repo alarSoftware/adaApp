@@ -183,54 +183,78 @@ abstract class BaseRepository<T> {
   // MÉTODOS PARA SINCRONIZACIÓN
   // ════════════════════════════════════════════════════════════════
 
-  /// Limpiar y sincronizar desde API
+  /// Limpiar y sincronizar desde API con debug
   Future<void> limpiarYSincronizar(List<dynamic> itemsAPI) async {
     final db = await dbHelper.database;
 
+    logger.i('Iniciando limpiarYSincronizar con ${itemsAPI.length} items');
+
     await db.transaction((txn) async {
       if (_tieneColumnaActivo()) {
-        // Soft delete de elementos existentes
         final updateData = <String, dynamic>{'activo': 0};
         if (_tieneCamposFecha()) {
           updateData['fecha_actualizacion'] = DateTime.now().toIso8601String();
         }
-        await txn.update(tableName, updateData);
+        final updated = await txn.update(tableName, updateData);
+        logger.i('Items marcados como inactivos: $updated');
       } else {
-        // Para tablas sin 'activo', limpiar completamente
-        await txn.delete(tableName);
+        final deleted = await txn.delete(tableName);
+        logger.i('Items eliminados: $deleted');
       }
 
-      // Insertar elementos de la API
+      // Insertar con contador de éxito/error
+      int exitosos = 0;
+      int errores = 0;
+
       for (var itemData in itemsAPI) {
-        Map<String, dynamic> datos;
+        try {
+          Map<String, dynamic> datos;
 
-        if (itemData is Map<String, dynamic>) {
-          datos = Map<String, dynamic>.from(itemData);
-        } else {
-          datos = toMap(itemData);
-        }
+          if (itemData is Map<String, dynamic>) {
+            datos = Map<String, dynamic>.from(itemData);
+          } else {
+            datos = toMap(itemData);
+          }
 
-        // Solo agregar campos de auditoría si la tabla los tiene
-        if (_tieneColumnaActivo()) {
-          datos['activo'] = 1; // Usar INTEGER en lugar de boolean
-        }
+          if (_tieneColumnaActivo()) {
+            datos['activo'] = 1;
+          }
 
-        if (_tieneColumnaSincronizado()) {
-          datos['sincronizado'] = 1; // Usar INTEGER en lugar de boolean
-        }
+          if (_tieneColumnaSincronizado()) {
+            datos['sincronizado'] = 1;
+          }
 
-        if (_tieneCamposFecha()) {
-          datos['fecha_actualizacion'] = DateTime.now().toIso8601String();
-          if (datos['fecha_creacion'] == null) {
-            datos['fecha_creacion'] = DateTime.now().toIso8601String();
+          if (_tieneCamposFecha()) {
+            datos['fecha_actualizacion'] = DateTime.now().toIso8601String();
+            if (datos['fecha_creacion'] == null) {
+              datos['fecha_creacion'] = DateTime.now().toIso8601String();
+            }
+          }
+
+          await txn.insert(tableName, datos, conflictAlgorithm: ConflictAlgorithm.replace);
+          exitosos++;
+
+          // Log cada 500 inserciones exitosas
+          if (exitosos % 500 == 0) {
+            logger.i('Procesados: $exitosos de ${itemsAPI.length}');
+          }
+
+        } catch (e) {
+          errores++;
+          logger.e('Error insertando item: $e');
+          // Log del item problemático
+          logger.e('Datos del item con error: $itemData');
+
+          if (errores <= 5) { // Solo mostrar los primeros 5 errores
+            logger.e('Error detalle: $e');
           }
         }
-
-        await txn.insert(tableName, datos, conflictAlgorithm: ConflictAlgorithm.replace);
       }
+
+      logger.i('Inserción completa: $exitosos exitosos, $errores errores');
     });
 
-    logger.i('✅ Sincronización completa: ${itemsAPI.length} ${getEntityName().toLowerCase()}s procesados');
+    logger.i('Sincronización completa: ${itemsAPI.length} items procesados');
   }
 
   /// Obtener elementos no sincronizados

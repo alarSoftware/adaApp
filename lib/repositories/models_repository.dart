@@ -1,9 +1,10 @@
 // repositories/modelo_repository.dart
 import 'package:logger/logger.dart';
-
+import '../services/sync/sync_service.dart';
 import '../models/modelo.dart';
 import 'base_repository.dart';
-import '../services/sync_service.dart';
+import 'package:ada_app/services/sync/base_sync_service.dart';
+import 'package:ada_app/services/sync/equipment_sync_service.dart';
 var _logger = Logger();
 class ModeloRepository extends BaseRepository<Modelo> {
   @override
@@ -90,7 +91,7 @@ class ModeloRepository extends BaseRepository<Modelo> {
   Future<SyncResult> sincronizarDesdeServidor() async {
     try {
       _logger.i('Iniciando sincronización de modelos desde servidor');
-      return await SyncService.sincronizarModelos();
+      return await EquipmentSyncService.sincronizarModelos();
     } catch (e) {
       _logger.e('Error en sincronización de modelos: $e');
       return SyncResult(

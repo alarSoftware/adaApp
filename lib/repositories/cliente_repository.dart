@@ -16,12 +16,12 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
   @override
   String getBuscarWhere() =>
-      'LOWER(nombre) LIKE ? OR LOWER(propietario) LIKE ? OR LOWER(ruc_ci) LIKE ? OR LOWER(telefono) LIKE ? OR LOWER(direccion) LIKE ?';
+      'LOWER(nombre) LIKE ? OR LOWER(propietario) LIKE ? OR LOWER(ruc_ci) LIKE ? OR LOWER(telefono) LIKE ? OR LOWER(direccion) LIKE ? OR CAST(codigo AS TEXT) LIKE ?';
 
   @override
   List<dynamic> getBuscarArgs(String query) {
     final searchTerm = '%${query.toLowerCase()}%';
-    return [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm];
+    return [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm];
   }
 
   @override

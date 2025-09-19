@@ -1,7 +1,6 @@
-// viewmodels/equipo_list_screen_viewmodel.dart
 import 'package:flutter/material.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
-import 'package:ada_app/services/sync_service.dart';
+import 'package:ada_app/services/sync/sync_service.dart';
 import 'package:logger/logger.dart';
 import 'dart:async';
 
@@ -77,86 +76,180 @@ class EquipoListScreenViewModel extends ChangeNotifier {
   // ===============================
   // LÓGICA DE NEGOCIO - CARGA DE DATOS
   // ===============================
-
   Future<void> initialize() async {
     await cargarEquipos();
   }
+// Reemplaza estos métodos en tu EquipoListScreenViewModel:
 
   Future<void> cargarEquipos() async {
     _setLoading(true);
     _resetPaginacion();
 
     try {
-      final equiposDB = await _equipoRepository.obtenerCompletos(soloActivos: true);
+      final query = searchController.text.trim();
+      _logger.i('=== CARGANDO EQUIPOS ===');
+      _logger.i('Query: "$query"');
+
+      List<Map<String, dynamic>> equiposDB;
+
+      if (query.isEmpty) {
+        // Sin filtro: cargar todos
+        _logger.i('Cargando TODOS los equipos...');
+        equiposDB = await _equipoRepository.obtenerCompletos(soloActivos: true);
+      } else {
+        // Con filtro: usar búsqueda del Repository
+        _logger.i('Usando buscarConDetalles con query: "$query"');
+        equiposDB = await _equipoRepository.buscarConDetalles(query);
+      }
+
+      _logger.i('Equipos obtenidos de Repository: ${equiposDB.length}');
+
+      // Log de algunos ejemplos para debug
+      if (equiposDB.isNotEmpty) {
+        _logger.i('Primer equipo: ${equiposDB.first}');
+        if (equiposDB.length > 1) {
+          _logger.i('Segundo equipo: ${equiposDB[1]}');
+        }
+      } else {
+        _logger.w('¡NO SE ENCONTRARON EQUIPOS!');
+
+        // Hacer una prueba: cargar todos para ver si hay datos
+        final todosLosEquipos = await _equipoRepository.obtenerCompletos(soloActivos: true);
+        _logger.i('Prueba - Total de equipos en DB: ${todosLosEquipos.length}');
+
+        if (todosLosEquipos.isNotEmpty) {
+          _logger.i('Ejemplo de equipo en DB: ${todosLosEquipos.first}');
+        }
+      }
 
       _equipos = equiposDB;
       _equiposFiltrados = equiposDB;
-      _hayMasDatos = _equiposFiltrados.length > equiposPorPagina;
 
-      _logger.i('Equipos cargados: ${_equipos.length}');
+      _hayMasDatos = true;
+
+      _logger.i('Equipos asignados: ${_equipos.length}');
+      _logger.i('Equipos filtrados: ${_equiposFiltrados.length}');
 
       _cargarSiguientePagina();
 
-    } catch (e) {
+    } catch (e, stackTrace) {
       _logger.e('Error cargando equipos: $e');
+      _logger.e('StackTrace: $stackTrace');
       _eventController.add(ShowSnackBarEvent('Error cargando equipos: $e', Colors.red));
     } finally {
       _setLoading(false);
     }
   }
 
+  void _filtrarEquipos() {
+    final query = searchController.text.trim();
+    _logger.i('=== FILTRANDO EQUIPOS ===');
+    _logger.i('Query actual: "$query"');
+
+    // Volver a cargar desde Repository
+    cargarEquipos();
+  }
+
   Future<void> refrescarDatos() async {
     try {
-      final resultado = await SyncService.sincronizarEquipos();
+      final query = searchController.text.trim();
+      _logger.i('=== REFRESH - Query actual: "$query" ===');
 
-      if (resultado.exito) {
-        await cargarEquipos();
-        _eventController.add(ShowSnackBarEvent(
-            'Equipos actualizados: ${resultado.itemsSincronizados}',
-            Colors.green,
-            durationSeconds: 2
-        ));
-      } else {
-        throw Exception(resultado.mensaje);
-      }
+      // Solo recargar datos locales manteniendo el filtro
+      await cargarEquipos();
+
+      _eventController.add(ShowSnackBarEvent(
+          'Lista actualizada',
+          Colors.green,
+          durationSeconds: 1
+      ));
     } catch (e) {
       _logger.e('Error refrescando datos: $e');
       _eventController.add(ShowSnackBarEvent('Error al actualizar: $e', Colors.red));
     }
   }
+  // Método auxiliar para probar la búsqueda simple
+  Future<void> _testBusquedaSimple() async {
+    try {
+      _logger.i('=== TEST BÚSQUEDA SIMPLE ===');
+
+      // Probar obtener todos
+      final todos = await _equipoRepository.obtenerCompletos(soloActivos: true);
+      _logger.i('Total equipos: ${todos.length}');
+
+      // Probar búsqueda con "pepsi"
+      final conPepsi = await _equipoRepository.buscarConDetalles('pepsi');
+      _logger.i('Con "pepsi": ${conPepsi.length}');
+
+      // Probar búsqueda vacía
+      final vacia = await _equipoRepository.buscarConDetalles('');
+      _logger.i('Búsqueda vacía: ${vacia.length}');
+
+    } catch (e) {
+      _logger.e('Error en test: $e');
+    }
+  }
+
 
   // ===============================
   // LÓGICA DE NEGOCIO - PAGINACIÓN
   // ===============================
 
   void _resetPaginacion() {
+    _logger.i('=== RESET PAGINACIÓN ===');
+    _logger.i('Antes - _paginaActual: $_paginaActual, _equiposMostrados.length: ${_equiposMostrados.length}');
+
     _paginaActual = 0;
     _equiposMostrados.clear();
-  }
 
+    _logger.i('Después - _paginaActual: $_paginaActual, _equiposMostrados.length: ${_equiposMostrados.length}');
+  }
   void _cargarSiguientePagina() {
-    if (_cargandoMas || !_hayMasDatos) return;
+    _logger.i('=== CARGANDO SIGUIENTE PÁGINA ===');
+    _logger.i('_cargandoMas: $_cargandoMas');
+    _logger.i('_hayMasDatos: $_hayMasDatos');
+    _logger.i('_paginaActual: $_paginaActual');
+    _logger.i('_equiposFiltrados.length: ${_equiposFiltrados.length}');
+    _logger.i('_equiposMostrados.length: ${_equiposMostrados.length}');
+
+    if (_cargandoMas || !_hayMasDatos) {
+      _logger.w('Saliendo temprano - _cargandoMas: $_cargandoMas, _hayMasDatos: $_hayMasDatos');
+      return;
+    }
 
     _setCargandoMas(true);
 
     final startIndex = _paginaActual * equiposPorPagina;
     final endIndex = (startIndex + equiposPorPagina).clamp(0, _equiposFiltrados.length);
 
+    _logger.i('startIndex: $startIndex');
+    _logger.i('endIndex: $endIndex');
+    _logger.i('equiposPorPagina: $equiposPorPagina');
+
     if (startIndex < _equiposFiltrados.length) {
       final nuevosEquipos = _equiposFiltrados.sublist(startIndex, endIndex);
+
+      _logger.i('nuevosEquipos.length: ${nuevosEquipos.length}');
 
       _equiposMostrados.addAll(nuevosEquipos);
       _paginaActual++;
       _hayMasDatos = endIndex < _equiposFiltrados.length;
 
-      _logger.d('Página cargada: $_paginaActual, Equipos mostrados: ${_equiposMostrados.length}');
+      _logger.i('Después de agregar:');
+      _logger.i('- _equiposMostrados.length: ${_equiposMostrados.length}');
+      _logger.i('- _paginaActual: $_paginaActual');
+      _logger.i('- _hayMasDatos: $_hayMasDatos');
     } else {
+      _logger.w('startIndex ($startIndex) >= _equiposFiltrados.length (${_equiposFiltrados.length})');
       _hayMasDatos = false;
     }
 
     _setCargandoMas(false);
+    _logger.i('Llamando notifyListeners()...');
     notifyListeners();
+    _logger.i('=== FIN CARGANDO SIGUIENTE PÁGINA ===');
   }
+
 
   void _onScroll() {
     if (scrollController.position.pixels >=
@@ -175,35 +268,6 @@ class EquipoListScreenViewModel extends ChangeNotifier {
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
       _filtrarEquipos();
     });
-  }
-
-  void _filtrarEquipos() {
-    final query = searchController.text.toLowerCase().trim();
-
-    if (query.isEmpty) {
-      _equiposFiltrados = List.from(_equipos);
-    } else {
-      _equiposFiltrados = _equipos.where((equipo) {
-        final codBarras = equipo['cod_barras']?.toString().toLowerCase() ?? '';
-        final marcaNombre = equipo['marca_nombre']?.toString().toLowerCase() ?? '';
-        final modeloNombre = equipo['modelo_nombre']?.toString().toLowerCase() ?? '';
-        final estadoAsignacion = equipo['estado_asignacion']?.toString().toLowerCase() ?? '';
-        final logoNombre = equipo['logo_nombre']?.toString().toLowerCase() ?? '';
-
-        return codBarras.contains(query) ||
-            marcaNombre.contains(query) ||
-            modeloNombre.contains(query) ||
-            estadoAsignacion.contains(query) ||
-            logoNombre.contains(query);
-      }).toList();
-    }
-
-    _resetPaginacion();
-    _hayMasDatos = _equiposFiltrados.isNotEmpty;
-
-    _cargarSiguientePagina();
-
-    _logger.d('Filtro aplicado: "$query", Resultados: ${_equiposFiltrados.length}');
   }
 
   void limpiarBusqueda() {

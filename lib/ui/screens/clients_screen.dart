@@ -91,7 +91,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
           children: [
             AppSearchBar(
               controller: _searchController,
-              hintText: 'Buscar cliente por nombre, email o teléfono...',
+              hintText: 'Buscar por nombre, codigo o documento...',
               onClear: _onClearSearch,
             ),
             Expanded(
@@ -160,25 +160,9 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
           horizontal: 16,
           vertical: 12,
         ),
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.2),
-              width: 1,
-            ),
-          ),
-          child: Icon(
-            Icons.person,
-            color: AppColors.primary,
-            size: 24,
-          ),
-        ),
+        // leading: null, ← Eliminamos el ícono completamente
         title: Text(
-          cliente.nombre,
+          cliente.displayName,
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -193,28 +177,31 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Propietario
               Text(
-                cliente.rucCi,
+                cliente.propietario,
                 style: TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
                 ),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),
-              if (_viewModel.shouldShowPhone(cliente))
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    cliente.telefono,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textTertiary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
+              // RUC/CI
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  '${cliente.tipoDocumento}: ${cliente.rucCi}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textTertiary,
+                    fontFamily: 'monospace',
                   ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
+              ),
             ],
           ),
         ),

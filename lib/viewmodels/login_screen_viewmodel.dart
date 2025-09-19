@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:ada_app/services/auth_service.dart';
-import 'package:ada_app/services/sync_service.dart';
+import 'package:ada_app/services/sync/base_sync_service.dart';
+import 'package:ada_app/services/sync/equipment_sync_service.dart';
 
 
 class LoginScreenViewModel extends ChangeNotifier {
@@ -23,6 +24,7 @@ class LoginScreenViewModel extends ChangeNotifier {
   bool _passwordValid = false;
   bool _isSyncingUsers = false;
   String? _errorMessage;
+  bool _isSyncingClients = false;
 
   // Getters
   bool get isLoading => _isLoading;
@@ -32,6 +34,7 @@ class LoginScreenViewModel extends ChangeNotifier {
   bool get passwordValid => _passwordValid;
   bool get isSyncingUsers => _isSyncingUsers;
   String? get errorMessage => _errorMessage;
+  bool get isSyncingClientes => _isSyncingClients;
 
   LoginScreenViewModel() {
     _setupValidationListeners();
@@ -85,6 +88,25 @@ class LoginScreenViewModel extends ChangeNotifier {
       );
     } finally {
       _isSyncingUsers = false;
+      notifyListeners();
+    }
+  }
+
+  Future<SyncResult> syncClientsForVendor(String edfVendedorId) async {
+    _isSyncingClients = true;
+    notifyListeners();
+
+    try {
+      final SyncResult resultado = await AuthService.sincronizarClientesDelVendedor(edfVendedorId);
+      return resultado;
+    } catch (e) {
+      return SyncResult(
+        exito: false,
+        mensaje: 'Error: $e',
+        itemsSincronizados: 0,
+      );
+    } finally {
+      _isSyncingClients = false;
       notifyListeners();
     }
   }
