@@ -7,15 +7,15 @@ import 'package:ada_app/services/database_helper.dart';
 import 'dart:async';
 import '../widgets/gps_navigation_widget.dart';
 import 'package:flutter/services.dart';
+import 'package:ada_app/repositories/equipo_repository.dart';
 
 class EquiposClientesDetailScreen extends StatefulWidget {
-  final EquipoCliente equipoCliente;
+  final dynamic equipoCliente;  // Cambiar de EquipoCliente a dynamic
 
   const EquiposClientesDetailScreen({
     super.key,
     required this.equipoCliente,
   });
-
   @override
   State<EquiposClientesDetailScreen> createState() => _EquiposClientesDetailScreenState();
 }
@@ -31,6 +31,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
     _viewModel = EquiposClienteDetailScreenViewModel(
       widget.equipoCliente,
       EstadoEquipoRepository(),
+      EquipoRepository(), // Agregar esta línea
     );
     _setupEventListener();
   }
@@ -172,7 +173,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Equipo asignado a: ${widget.equipoCliente.clienteNombreCompleto}',
+                  'Equipo asignado a: ${widget.equipoCliente['cliente_nombre'] ?? 'Cliente'}',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -239,14 +240,13 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                       ),
                       SizedBox(height: 4),
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: _viewModel.equipoCliente.asignacionActiva
+                          color: _viewModel.equipoCliente['activo'] == 1
                               ? AppColors.success.withValues(alpha: 0.1)
                               : AppColors.error.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: _viewModel.equipoCliente.asignacionActiva
+                            color: _viewModel.equipoCliente['activo'] == 1
                                 ? AppColors.success.withValues(alpha: 0.3)
                                 : AppColors.error.withValues(alpha: 0.3),
                           ),
@@ -256,7 +256,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: _viewModel.equipoCliente.asignacionActiva
+                            color: _viewModel.equipoCliente['activo'] == 1
                                 ? AppColors.success
                                 : AppColors.error,
                           ),

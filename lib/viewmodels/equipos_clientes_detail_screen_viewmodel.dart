@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
-import '../models/equipos_cliente.dart';
 import '../repositories/estado_equipo_repository.dart';
+import '../repositories/equipo_repository.dart';
 import '../models/estado_equipo.dart';
 import '../services/location_service.dart';
 import 'package:geolocator/geolocator.dart';
@@ -17,7 +17,7 @@ class ShowMessageEvent extends EquiposClienteDetailUIEvent {
 }
 
 class ShowRetireConfirmationDialogEvent extends EquiposClienteDetailUIEvent {
-  final EquipoCliente equipoCliente;
+  final dynamic equipoCliente;
   ShowRetireConfirmationDialogEvent(this.equipoCliente);
 }
 
@@ -25,11 +25,11 @@ enum MessageType { error, success, info, warning }
 
 // ========== ESTADO PURO ==========
 class EquiposClienteDetailState {
-  final EquipoCliente equipoCliente;
+  final dynamic equipoCliente;
   final bool isProcessing;
   final bool equipoEnLocal;
-  final List<EstadoEquipo> historialCambios; // Historial completo
-  final List<EstadoEquipo> historialUltimos5; // Solo últimos 5 para UI
+  final List<EstadoEquipo> historialCambios;
+  final List<EstadoEquipo> historialUltimos5;
 
   EquiposClienteDetailState({
     required this.equipoCliente,
@@ -37,10 +37,10 @@ class EquiposClienteDetailState {
     bool? equipoEnLocal,
     this.historialCambios = const [],
     this.historialUltimos5 = const [],
-  }) : equipoEnLocal = equipoEnLocal ?? (equipoCliente.enLocal ?? false);
+  }) : equipoEnLocal = equipoEnLocal ?? (equipoCliente['estado_local'] == 1);
 
   EquiposClienteDetailState copyWith({
-    EquipoCliente? equipoCliente,
+    dynamic equipoCliente,
     bool? isProcessing,
     bool? equipoEnLocal,
     List<EstadoEquipo>? historialCambios,
@@ -60,14 +60,16 @@ class EquiposClienteDetailState {
 class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
   final EstadoEquipoRepository _estadoEquipoRepository;
+  final EquipoRepository _equipoRepository;
   final LocationService _locationService = LocationService();
 
   // ========== ESTADO INTERNO ==========
   EquiposClienteDetailState _state;
 
   // ========== NUEVOS CAMPOS PARA DROPDOWN ==========
-  bool? _estadoUbicacionEquipo; // null = no seleccionado, true = en local, false = fuera
+  bool? _estadoUbicacionEquipo;
   bool _hasUnsavedChanges = false;
+  int _estadoLocalActual; // Variable para mantener el estado actual
 
   // ========== STREAMS PARA EVENTOS ==========
   final StreamController<EquiposClienteDetailUIEvent> _eventController =
@@ -76,9 +78,11 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
   // ========== CONSTRUCTOR ==========
   EquiposClienteDetailScreenViewModel(
-      EquipoCliente equipoCliente,
+      dynamic equipoCliente,
       this._estadoEquipoRepository,
-      ) : _state = EquiposClienteDetailState(equipoCliente: equipoCliente) {
+      this._equipoRepository,
+      ) : _state = EquiposClienteDetailState(equipoCliente: equipoCliente),
+        _estadoLocalActual = equipoCliente['estado_local'] {
     _initializeState();
     _loadInitialState();
     _logDebugInfo();
@@ -86,38 +90,28 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
   // ========== INICIALIZAR ESTADO DEL DROPDOWN ==========
   void _initializeState() {
-    _estadoUbicacionEquipo = null; // Forzar selección
+    // Inicializar con el estado actual del equipo
+    _estadoLocalActual = equipoCliente['estado_local'];
+    _estadoUbicacionEquipo = _estadoLocalActual == 1;
     _hasUnsavedChanges = false;
   }
 
   // CARGAR ESTADO INICIAL Y HISTORIAL
   Future<void> _loadInitialState() async {
     try {
-      // Obtener el equipoClienteId de la relación
-      final equipoClienteId = equipoCliente.id; // Asumiendo que tienes el ID de la relación
+      final equipoId = equipoCliente['id'];
 
-      // Si no tienes el ID directamente, puedes buscarlo:
-      // final equipoClienteId = await _estadoEquipoRepository.buscarEquipoClienteId(
-      //     equipoCliente.equipoId,
-      //     equipoCliente.clienteId
-      // );
-
-      if (equipoClienteId == null) {
-        _logger.w('No se encontró relación equipo_cliente');
+      if (equipoId == null) {
+        _logger.w('No se encontró ID del equipo');
         return;
       }
 
-      // Cargar el estado más reciente
-      final estadoActual = await _estadoEquipoRepository.obtenerUltimoEstado(equipoClienteId);
-
-      // Cargar TODOS los registros de historial
-      final historialCompleto = await _estadoEquipoRepository.obtenerHistorialCompleto(equipoClienteId);
-
-      // Tomar solo los últimos 5 para la UI
+      final estadoActual = await _estadoEquipoRepository.obtenerUltimoEstado(equipoId);
+      final historialCompleto = await _estadoEquipoRepository.obtenerHistorialCompleto(equipoId);
       final ultimos5 = historialCompleto.take(5).toList();
 
       _state = _state.copyWith(
-        equipoEnLocal: estadoActual?.enLocal ?? false,
+        equipoEnLocal: estadoActual?.enLocal ?? (_estadoLocalActual == 1),
         historialCambios: historialCompleto,
         historialUltimos5: ultimos5,
       );
@@ -133,9 +127,9 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
   // ========== GETTERS PÚBLICOS ==========
   EquiposClienteDetailState get state => _state;
-  EquipoCliente get equipoCliente => _state.equipoCliente;
+  dynamic get equipoCliente => _state.equipoCliente;
   bool get isProcessing => _state.isProcessing;
-  bool get isEquipoActivo => _state.equipoCliente.asignacionActiva;
+  bool get isEquipoActivo => _state.equipoCliente['activo'] == 1;
 
   // ========== NUEVOS GETTERS PARA DROPDOWN ==========
   bool? get estadoUbicacionEquipo => _estadoUbicacionEquipo;
@@ -148,7 +142,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     return 'Guardar cambios';
   }
 
-  // 🆕 GETTERS PARA HISTORIAL
+  // GETTERS PARA HISTORIAL
   List<EstadoEquipo> get historialUltimos5 => _state.historialUltimos5;
   List<EstadoEquipo> get historialCompleto => _state.historialCambios;
   int get totalCambios => _state.historialCambios.length;
@@ -163,30 +157,30 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   void cambiarUbicacionEquipo(bool? nuevaUbicacion) {
     if (_estadoUbicacionEquipo != nuevaUbicacion) {
       _estadoUbicacionEquipo = nuevaUbicacion;
-      _hasUnsavedChanges = _estadoUbicacionEquipo != equipoCliente.enLocal;
-      notifyListeners();
 
+      final estadoActual = _estadoLocalActual == 1;
+      _hasUnsavedChanges = _estadoUbicacionEquipo != estadoActual;
+
+      notifyListeners();
       _logger.i('🔄 Dropdown cambiado a: $nuevaUbicacion (pendiente de guardar)');
     }
   }
 
-  // ========== MÉTODO LEGACY PARA COMPATIBILIDAD ==========
   Future<void> toggleEquipoEnLocal(bool value) async {
     cambiarUbicacionEquipo(value);
   }
 
-  // 🆕 MÉTODO PARA RECARGAR HISTORIAL COMPLETO
   Future<void> recargarHistorial() async {
     try {
       _logger.i('🔄 Recargando historial completo...');
 
-      if (equipoCliente.id == null) {
-        _logger.w('⚠️ equipoCliente.id es null, no se puede recargar historial');
+      if (equipoCliente['id'] == null) {
+        _logger.w('⚠️ equipoCliente id es null, no se puede recargar historial');
         return;
       }
 
       final historialCompleto = await _estadoEquipoRepository.obtenerHistorialCompleto(
-          equipoCliente.id!
+          equipoCliente['id']
       );
 
       final ultimos5 = historialCompleto.take(5).toList();
@@ -207,7 +201,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
   // ========== GUARDAR CAMBIOS ACTUALIZADO CON VALIDACIÓN ==========
   Future<void> saveAllChanges() async {
-    // VALIDACIÓN: Debe seleccionar una ubicación
     if (_estadoUbicacionEquipo == null) {
       _eventController.add(ShowMessageEvent(
         'Debe seleccionar una ubicación para el equipo antes de guardar',
@@ -230,7 +223,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     try {
       _logger.i('Guardando cambios: enLocal=$_estadoUbicacionEquipo');
 
-      // GPS OBLIGATORIO
       late final Position position;
       try {
         position = await _locationService.getCurrentLocationRequired(
@@ -248,25 +240,35 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
           MessageType.error,
         ));
 
-        return; // No continuar sin GPS
+        return;
       }
 
-// Verificar que tenemos el equipoClienteId
-      if (equipoCliente.id == null) {
-        _logger.w('No se puede crear estado: equipoCliente.id es null');
-        return; // o manejar el error apropiadamente
+      if (equipoCliente['id'] == null) {
+        _logger.w('No se puede crear estado: equipoCliente id es null');
+        return;
       }
 
-// Crear registro con GPS obligatorio
+      // Crear registro con GPS obligatorio
       final nuevoEstado = await _estadoEquipoRepository.crearNuevoEstado(
-        equipoClienteId: equipoCliente.id!,
+        equipoClienteId: equipoCliente['id'],
         enLocal: _estadoUbicacionEquipo!,
         fechaRevision: DateTime.now(),
         latitud: position.latitude,
         longitud: position.longitude,
       );
-      // Actualizar estado local
-// Actualizar estado interno - NO el modelo que es inmutable
+
+      // Actualizar estado_local en la tabla equipos
+      await _equipoRepository.dbHelper.actualizar(
+          'equipos',
+          {'estado_local': _estadoUbicacionEquipo! ? 1 : 0},
+          where: 'id = ?',
+          whereArgs: [equipoCliente['id']]
+      );
+
+      // Actualizar la variable local de estado
+      _estadoLocalActual = _estadoUbicacionEquipo! ? 1 : 0;
+
+      // Actualizar estado interno
       _state = _state.copyWith(equipoEnLocal: _estadoUbicacionEquipo!);
       _hasUnsavedChanges = false;
 
@@ -301,23 +303,20 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== MÉTODOS ADICIONALES DE VALIDACIÓN ==========
   bool canSaveChanges() {
     return _estadoUbicacionEquipo != null && _hasUnsavedChanges;
   }
 
   void resetChanges() {
-    _estadoUbicacionEquipo = equipoCliente.enLocal;
+    _estadoUbicacionEquipo = _estadoLocalActual == 1;
     _hasUnsavedChanges = false;
     notifyListeners();
   }
 
-  // ========== GETTERS PARA ESTADO LOCAL ==========
   bool get isEquipoEnLocal {
     return _estadoUbicacionEquipo ?? _state.equipoEnLocal;
   }
 
-  // ========== UTILIDADES PARA LA UI ==========
   String formatearFecha(DateTime fecha) {
     return '${fecha.day.toString().padLeft(2, '0')}/'
         '${fecha.month.toString().padLeft(2, '0')}/'
@@ -330,7 +329,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         '${fecha.minute.toString().padLeft(2, '0')}';
   }
 
-  // 🆕 FORMATEO ESPECÍFICO PARA HISTORIAL
   String formatearFechaHistorial(DateTime fecha) {
     final ahora = DateTime.now();
     final diferencia = ahora.difference(fecha);
@@ -349,72 +347,90 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   String getNombreCompletoEquipo() {
-    return equipoCliente.equipoNombreCompleto;
+    return '${equipoCliente['marca_nombre'] ?? ''} ${equipoCliente['modelo_nombre'] ?? ''}'.trim();
   }
 
-  // ========== INFORMACIÓN DEL EQUIPO ==========
   bool shouldShowMarca() {
-    return equipoCliente.equipoMarca != null &&
-        equipoCliente.equipoMarca!.isNotEmpty;
+    return equipoCliente['marca_nombre'] != null &&
+        equipoCliente['marca_nombre']!.isNotEmpty;
   }
 
   bool shouldShowModelo() {
-    return equipoCliente.equipoModelo != null &&
-        equipoCliente.equipoModelo!.isNotEmpty;
+    return equipoCliente['modelo_nombre'] != null &&
+        equipoCliente['modelo_nombre']!.isNotEmpty;
   }
 
   bool shouldShowCodBarras() {
-    return equipoCliente.equipoCodBarras != null &&
-        equipoCliente.equipoCodBarras!.isNotEmpty;
+    return equipoCliente['cod_barras'] != null &&
+        equipoCliente['cod_barras']!.isNotEmpty;
   }
 
   bool shouldShowFechaRetiro() {
-    return equipoCliente.fechaRetiro != null;
+    return false;
   }
 
   String getMarcaText() {
-    return equipoCliente.equipoMarca ?? '';
+    return equipoCliente['marca_nombre'] ?? '';
   }
 
   String getModeloText() {
-    return equipoCliente.equipoModelo ?? '';
+    return equipoCliente['modelo_nombre'] ?? '';
   }
 
   String getCodBarrasText() {
-    return equipoCliente.equipoCodBarras ?? '';
+    return equipoCliente['cod_barras'] ?? '';
   }
 
   String getFechaAsignacionText() {
-    final fecha = equipoCliente.fechaAsignacion;
-    return '${fecha.day.toString().padLeft(2, '0')}/'
-        '${fecha.month.toString().padLeft(2, '0')}/'
-        '${fecha.year}';
+    final fechaString = equipoCliente['fecha_creacion'];
+    if (fechaString == null) return 'No disponible';
+
+    try {
+      final fecha = DateTime.parse(fechaString);
+      return '${fecha.day.toString().padLeft(2, '0')}/'
+          '${fecha.month.toString().padLeft(2, '0')}/'
+          '${fecha.year}';
+    } catch (e) {
+      return 'No disponible';
+    }
   }
 
   String getTiempoAsignadoText() {
-    return '${equipoCliente.diasDesdeAsignacion} días';
+    final fechaString = equipoCliente['fecha_creacion'];
+    if (fechaString == null) return '0 días';
+
+    try {
+      final fecha = DateTime.parse(fechaString);
+      final diferencia = DateTime.now().difference(fecha);
+      return '${diferencia.inDays} días';
+    } catch (e) {
+      return '0 días';
+    }
   }
 
   String getFechaRetiroText() {
-    return equipoCliente.fechaRetiro != null
-        ? formatearFechaHora(equipoCliente.fechaRetiro!)
-        : '';
+    return 'No disponible';
   }
 
   String getEstadoText() {
-    return equipoCliente.estadoTexto;
+    if (equipoCliente['activo'] != 1) {
+      return 'Inactivo';
+    }
+    if (_estadoLocalActual == 1) {
+      return 'Asignado';
+    } else {
+      return 'Pendiente';
+    }
   }
 
-  // ========== DATOS PARA DIÁLOGO DE CONFIRMACIÓN ==========
   Map<String, String> getRetireDialogData() {
     return {
-      'equipoNombre': equipoCliente.equipoNombreCompleto,
-      'equipoCodigo': equipoCliente.equipoCodBarras ?? 'Sin código',
-      'clienteNombre': equipoCliente.clienteNombreCompleto,
+      'equipoNombre': getNombreCompletoEquipo(),
+      'equipoCodigo': equipoCliente['cod_barras'] ?? 'Sin código',
+      'clienteNombre': 'Cliente ID: ${equipoCliente['cliente_id'] ?? "No asignado"}',
     };
   }
 
-  // ========== MENSAJES PREDEFINIDOS ==========
   String getInactiveEquipoTitle() {
     return 'Equipo no activo';
   }
@@ -423,30 +439,28 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     return 'Este equipo ya no está asignado activamente a este cliente';
   }
 
-  // ========== MÉTODO PRIVADO ==========
   void _logDebugInfo() {
-    _logger.i('DEBUG - Equipo Marca: ${equipoCliente.equipoMarca}');
-    _logger.i('DEBUG - Equipo Modelo: ${equipoCliente.equipoModelo}');
-    _logger.i('DEBUG - Equipo Nombre: ${equipoCliente.equipoNombre}');
-    _logger.i('DEBUG - Nombre completo calculado: ${equipoCliente.equipoNombreCompleto}');
+    _logger.i('DEBUG - Equipo Marca: ${equipoCliente['marca_nombre']}');
+    _logger.i('DEBUG - Equipo Modelo: ${equipoCliente['modelo_nombre']}');
+    _logger.i('DEBUG - Nombre completo calculado: ${getNombreCompletoEquipo()}');
     _logger.i('DEBUG - En local: ${_state.equipoEnLocal}');
     _logger.i('DEBUG - Estado dropdown: $_estadoUbicacionEquipo');
+    _logger.i('DEBUG - Estado local actual: $_estadoLocalActual');
   }
 
-  // ========== DEBUG INFO ==========
   Map<String, dynamic> getDebugInfo() {
     return {
-      'equipo_id': equipoCliente.equipoId,
-      'cliente_id': equipoCliente.clienteId,
-      'equipo_marca': equipoCliente.equipoMarca,
-      'equipo_modelo': equipoCliente.equipoModelo,
-      'equipo_nombre': equipoCliente.equipoNombre,
-      'codigo_barras': equipoCliente.equipoCodBarras,
-      'asignacion_activa': equipoCliente.asignacionActiva,
-      'cliente_nombre': equipoCliente.clienteNombreCompleto,
+      'equipo_id': equipoCliente['id'],
+      'cliente_id': equipoCliente['cliente_id'],
+      'equipo_marca': equipoCliente['marca_nombre'],
+      'equipo_modelo': equipoCliente['modelo_nombre'],
+      'codigo_barras': equipoCliente['cod_barras'],
+      'activo': equipoCliente['activo'],
+      'cliente_nombre': equipoCliente['cliente_nombre'],
       'is_processing': _state.isProcessing,
       'equipo_en_local': _state.equipoEnLocal,
       'estado_dropdown': _estadoUbicacionEquipo,
+      'estado_local_actual': _estadoLocalActual,
       'has_unsaved_changes': _hasUnsavedChanges,
       'total_cambios_historial': _state.historialCambios.length,
       'ultimos_5_cambios': _state.historialUltimos5.length,

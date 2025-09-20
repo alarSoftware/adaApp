@@ -55,7 +55,7 @@ class DialogAction {
 
 class FormsScreenViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
-  final EquipoClienteRepository _equipoClienteRepository = EquipoClienteRepository();
+  final EquipoRepository _equipoRepository = EquipoRepository();
   final ImageService _imageService = ImageService();
   final LocationService _locationService = LocationService(); // AGREGADO
 
@@ -247,7 +247,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   Future<void> _verificarAsignacionEquipo(Map<String, dynamic> equipo) async {
-    _equipoYaAsignado = await _equipoClienteRepository.verificarAsignacionEquipoCliente(
+    _equipoYaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(
         equipo['id'],
         _cliente!.id!
     );
@@ -270,11 +270,14 @@ class FormsScreenViewModel extends ChangeNotifier {
 
   void _mostrarEstadoEquipo(Map<String, dynamic> equipo) {
     final nombreEquipo = '${equipo['marca_nombre']} ${equipo['modelo_nombre']}';
+    final clienteIdEquipo = equipo['cliente_id'];
 
     if (_equipoYaAsignado) {
       _showSuccess('Equipo $nombreEquipo - YA ASIGNADO ✓');
+    } else if (clienteIdEquipo != null && clienteIdEquipo.toString() != '0' && clienteIdEquipo.toString().isNotEmpty) {
+      _showWarning('Equipo $nombreEquipo - PERTENECE A OTRO CLIENTE (quedará PENDIENTE)');
     } else {
-      _showInfo('Equipo $nombreEquipo - LISTO PARA REGISTRAR');
+      _showInfo('Equipo $nombreEquipo - SIN ASIGNAR (quedará PENDIENTE)');
     }
   }
 

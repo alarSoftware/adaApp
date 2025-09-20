@@ -12,7 +12,7 @@ var logger = Logger();
 
 class ApiService {
   // Cambia esta URL por tu endpoint real
-  static const String baseUrl = 'https://e1522fa98849.ngrok-free.app/adaControl/api/';
+  static const String baseUrl = 'https://71a489ac7ede.ngrok-free.app/adaControl/api/';
   static const String clientesEndpoint = '$baseUrl/getEdfClientes';
   static const String equiposEndpoint = '$baseUrl/getEdfEquipos';
 

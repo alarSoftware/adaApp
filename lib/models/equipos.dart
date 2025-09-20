@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 class Equipo {
   final int? id;
+  final String? clienteId;
   final String codBarras;
   final int marcaId;
-  final int modeloId;  // CAMBIADO: de String modelo a int modeloId
+  final int modeloId;
   final String? numeroSerie;
   final int logoId;
   final int estadoLocal;
@@ -13,14 +16,15 @@ class Equipo {
 
   // Campos adicionales para JOIN (no se almacenan en DB)
   final String? marcaNombre;
-  final String? modeloNombre;  // CAMBIADO: de logoNombre duplicado
+  final String? modeloNombre;
   final String? logoNombre;
 
   Equipo({
     this.id,
+    this.clienteId,
     required this.codBarras,
     required this.marcaId,
-    required this.modeloId,  // CAMBIADO
+    required this.modeloId,
     this.numeroSerie,
     required this.logoId,
     this.estadoLocal = 1,
@@ -29,16 +33,17 @@ class Equipo {
     this.fechaActualizacion,
     this.sincronizado = 0,
     this.marcaNombre,
-    this.modeloNombre,  // CAMBIADO
+    this.modeloNombre,
     this.logoNombre,
   }) : fechaCreacion = fechaCreacion ?? DateTime.now();
 
   factory Equipo.fromMap(Map<String, dynamic> map) {
     return Equipo(
       id: map['id'],
+      clienteId: map['cliente_id'],
       codBarras: map['cod_barras'] ?? '',
       marcaId: map['marca_id'] ?? 1,
-      modeloId: map['modelo_id'] ?? 1,  // CAMBIADO
+      modeloId: map['modelo_id'] ?? 1,
       numeroSerie: map['numero_serie'],
       logoId: map['logo_id'] ?? 1,
       estadoLocal: map['estado_local'] ?? 1,
@@ -51,7 +56,7 @@ class Equipo {
           : null,
       sincronizado: map['sincronizado'] ?? 0,
       marcaNombre: map['marca_nombre'], // Para JOINs
-      modeloNombre: map['modelo_nombre'], // CAMBIADO
+      modeloNombre: map['modelo_nombre'],
       logoNombre: map['logo_nombre'],   // Para JOINs
     );
   }
@@ -66,6 +71,13 @@ class Equipo {
         return parsed ?? defaultValue;
       }
       return defaultValue;
+    }
+
+    // Función auxiliar para limpiar strings
+    String? _safeParseString(dynamic value) {
+      if (value == null) return null;
+      final stringValue = value.toString().trim();
+      return stringValue.isEmpty ? null : stringValue;
     }
 
     DateTime fecha;
@@ -92,26 +104,32 @@ class Equipo {
       fechaAct = null;
     }
 
+    // Procesamos el clienteId (que SÍ debería llegar en el JSON individual)
+    final clienteId = _safeParseString(json['clienteId']);
+
     return Equipo(
-      // ← ID: No uses json['id'] porque es string, mejor genera uno o usa null
+      // ID: No uses json['id'] porque es string, mejor genera uno o usa null
       id: null, // La BD asignará el ID automáticamente
 
-      // ← EL CÓDIGO DE BARRAS VIENE EN equipoId
-      codBarras: json['equipoId']?.toString().trim() ?? '',
+      // EL CÓDIGO DE BARRAS VIENE EN equipoId
+      codBarras: _safeParseString(json['equipoId']) ?? '',
 
-      // ← marcaId viene como string "101", convertir a int
+      // marcaId viene como string "101", convertir a int
       marcaId: _safeParseInt(json['marcaId']),
 
-      // ← edfModeloId es el modelo (viene como int 102)
+      // edfModeloId es el modelo (viene como int 102)
       modeloId: _safeParseInt(json['edfModeloId']),
 
-      // ← numSerie es el número de serie
-      numeroSerie: json['numSerie']?.toString().trim(),
+      // numSerie es el número de serie
+      numeroSerie: _safeParseString(json['numSerie']),
 
-      // ← edfLogoId es el logo (viene como int 20, 24, etc.)
+      // edfLogoId es el logo (viene como int 20, 24, etc.)
       logoId: _safeParseInt(json['edfLogoId']),
 
-      // ← Estados basados en los campos de tu API
+      // clienteId debe llegar como string
+      clienteId: clienteId,
+
+      // Estados basados en los campos de tu API
       estadoLocal: json['esDisponible'] == true ? 1 : 0,
       activo: json['esActivo'] == true ? 1 : 0,
 
@@ -119,9 +137,9 @@ class Equipo {
       fechaActualizacion: fechaAct,
       sincronizado: 0, // Siempre 0 para datos que vienen de API
 
-      // ← Nombres para mostrar (temporal hasta hacer JOIN)
+      // Nombres para mostrar (temporal hasta hacer JOIN)
       marcaNombre: null, // Se llenará con JOIN posteriormente
-      modeloNombre: json['equipo']?.toString().replaceAll('\n', ' ').trim(), // Limpiar saltos de línea
+      modeloNombre: _safeParseString(json['equipo'])?.replaceAll('\n', ' '), // Limpiar saltos de línea
       logoNombre: null, // Se llenará con JOIN posteriormente
     );
   }
@@ -129,9 +147,10 @@ class Equipo {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'cliente_id': clienteId,
       'cod_barras': codBarras,
       'marca_id': marcaId,
-      'modelo_id': modeloId,  // CAMBIADO
+      'modelo_id': modeloId,
       'numero_serie': numeroSerie,
       'logo_id': logoId,
       'estado_local': estadoLocal,
@@ -146,11 +165,12 @@ class Equipo {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'clienteId': clienteId,
       'cod_barras': codBarras,
       'codBarras': codBarras, // Para compatibilidad con API
       'marca_id': marcaId,
       'marcaId': marcaId, // Para compatibilidad con API
-      'modelo_id': modeloId,  // CAMBIADO
+      'modelo_id': modeloId,
       'modeloId': modeloId,   // Para compatibilidad con API
       'numero_serie': numeroSerie,
       'numeroSerie': numeroSerie, // Para compatibilidad
@@ -165,16 +185,17 @@ class Equipo {
       'fechaActualizacion': fechaActualizacion?.toIso8601String(), // Para compatibilidad
       'sincronizado': sincronizado,
       'marca_nombre': marcaNombre, // Incluir para respuestas completas
-      'modelo_nombre': modeloNombre, // CAMBIADO
+      'modelo_nombre': modeloNombre,
       'logo_nombre': logoNombre,   // Incluir para respuestas completas
     };
   }
 
   Equipo copyWith({
     int? id,
+    String? clienteId,
     String? codBarras,
     int? marcaId,
-    int? modeloId,  // CAMBIADO
+    int? modeloId,
     String? numeroSerie,
     int? logoId,
     int? estadoLocal,
@@ -183,14 +204,15 @@ class Equipo {
     DateTime? fechaActualizacion,
     int? sincronizado,
     String? marcaNombre,
-    String? modeloNombre,  // CAMBIADO
+    String? modeloNombre,
     String? logoNombre,
   }) {
     return Equipo(
       id: id ?? this.id,
+      clienteId: clienteId ?? this.clienteId,
       codBarras: codBarras ?? this.codBarras,
       marcaId: marcaId ?? this.marcaId,
-      modeloId: modeloId ?? this.modeloId,  // CAMBIADO
+      modeloId: modeloId ?? this.modeloId,
       numeroSerie: numeroSerie ?? this.numeroSerie,
       logoId: logoId ?? this.logoId,
       estadoLocal: estadoLocal ?? this.estadoLocal,
@@ -199,24 +221,24 @@ class Equipo {
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
       sincronizado: sincronizado ?? this.sincronizado,
       marcaNombre: marcaNombre ?? this.marcaNombre,
-      modeloNombre: modeloNombre ?? this.modeloNombre,  // CAMBIADO
+      modeloNombre: modeloNombre ?? this.modeloNombre,
       logoNombre: logoNombre ?? this.logoNombre,
     );
   }
 
-  // Métodos de utilidad - CORREGIDOS
+  // Métodos de utilidad
   bool get estaActivo => activo == 1;
   bool get estaSincronizado => sincronizado == 1;
   bool get estaDisponible => estadoLocal == 1;
-  String get nombreCompleto => '$marcaNombre $modeloNombre';  // CAMBIADO
-  String get nombreCompletoFallback => 'MarcaID:$marcaId ModeloID:$modeloId'; // CAMBIADO
+  String get nombreCompleto => '$marcaNombre $modeloNombre';
+  String get nombreCompletoFallback => 'MarcaID:$marcaId ModeloID:$modeloId';
 
   @override
   String toString() {
-    return 'Equipo{id: $id, codBarras: $codBarras, marcaId: $marcaId, modeloId: $modeloId, '  // CAMBIADO
+    return 'Equipo{id: $id, clienteId: $clienteId, codBarras: $codBarras, marcaId: $marcaId, modeloId: $modeloId, '
         'numeroSerie: $numeroSerie, logoId: $logoId, estadoLocal: $estadoLocal, '
         'activo: $activo, sincronizado: $sincronizado, marcaNombre: $marcaNombre, '
-        'modeloNombre: $modeloNombre, logoNombre: $logoNombre}';  // CAMBIADO
+        'modeloNombre: $modeloNombre, logoNombre: $logoNombre}';
   }
 
   @override
@@ -229,6 +251,140 @@ class Equipo {
 
   @override
   int get hashCode => id.hashCode ^ codBarras.hashCode;
+}
+
+// ========================================
+// FUNCIONES PARA PARSEAR LA RESPUESTA API
+// ========================================
+
+/// Parsea la respuesta completa del API que viene con estructura: {"data": "[{...}]"}
+List<Equipo> parseEquiposFromApiResponse(String jsonResponse) {
+  try {
+    // 1. Primer parsing: obtener el objeto principal
+    final Map<String, dynamic> mainJson = json.decode(jsonResponse);
+
+    // 2. Verificar que existe el campo "data"
+    if (!mainJson.containsKey('data') || mainJson['data'] == null) {
+      print('No se encontró campo "data" en la respuesta');
+      return [];
+    }
+
+    // 3. Segundo parsing: el campo "data" es un string que contiene JSON
+    final String dataString = mainJson['data'].toString();
+    final List<dynamic> equiposJson = json.decode(dataString);
+
+    // 4. Convertir cada item a Equipo
+    return equiposJson.map((item) {
+      if (item is Map<String, dynamic>) {
+        return Equipo.fromJson(item);
+      } else {
+        print('Item inválido en la lista: $item');
+        return null;
+      }
+    }).where((equipo) => equipo != null).cast<Equipo>().toList();
+
+  } catch (e, stackTrace) {
+    print('Error parseando respuesta de API: $e');
+    print('StackTrace: $stackTrace');
+    return [];
+  }
+}
+
+/// Si ya tienes el Map parseado (por ejemplo, de un HTTP response)
+List<Equipo> parseEquiposFromMap(Map<String, dynamic> responseMap) {
+  try {
+    // 1. Verificar que existe el campo "data"
+    if (!responseMap.containsKey('data') || responseMap['data'] == null) {
+      print('No se encontró campo "data" en el Map');
+      return [];
+    }
+
+    // 2. El campo "data" es un string que contiene JSON
+    final String dataString = responseMap['data'].toString();
+    final List<dynamic> equiposJson = json.decode(dataString);
+
+    // 3. Convertir cada item a Equipo
+    return equiposJson.map((item) {
+      if (item is Map<String, dynamic>) {
+        return Equipo.fromJson(item);
+      } else {
+        print('Item inválido en la lista: $item');
+        return null;
+      }
+    }).where((equipo) => equipo != null).cast<Equipo>().toList();
+
+  } catch (e, stackTrace) {
+    print('Error parseando Map: $e');
+    print('StackTrace: $stackTrace');
+    return [];
+  }
+}
+
+/// Para casos donde el array viene directamente (sin el wrapper "data")
+List<Equipo> parseEquiposFromDirectArray(List<dynamic> equiposJson) {
+  try {
+    return equiposJson.map((item) {
+      if (item is Map<String, dynamic>) {
+        return Equipo.fromJson(item);
+      } else {
+        print('Item inválido en la lista: $item');
+        return null;
+      }
+    }).where((equipo) => equipo != null).cast<Equipo>().toList();
+
+  } catch (e, stackTrace) {
+    print('Error parseando array directo: $e');
+    print('StackTrace: $stackTrace');
+    return [];
+  }
+}
+
+// ========================================
+// EJEMPLOS DE USO
+// ========================================
+
+/// Ejemplo con HTTP request
+/*
+import 'package:http/http.dart' as http;
+
+Future<List<Equipo>> obtenerEquiposDesdeAPI() async {
+  try {
+    final response = await http.get(
+      Uri.parse('tu_url_api_aqui'),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      // Usar la función de parsing
+      return parseEquiposFromApiResponse(response.body);
+    } else {
+      throw Exception('Error en la API: ${response.statusCode}');
+    }
+  } catch (e) {
+    print('Error obteniendo equipos: $e');
+    return [];
+  }
+}
+*/
+
+/// Ejemplo de uso básico
+void ejemploDeUso() {
+  // Tu JSON de ejemplo
+  String jsonResponse = '{"data":"[{\\"id\\":\\"09-00419\\",\\"equipoId\\":\\"09-00419\\",\\"fecVencGarantia\\":null,\\"clienteId\\":\\"193339\\",\\"marcaId\\":\\"101\\",\\"esAplicaCenso\\":false,\\"fechaBaja\\":null,\\"tipEquipoId\\":\\"100\\",\\"fecCompra\\":null,\\"edfLogoId\\":20,\\"facNumero\\":\\"2323\\",\\"costo\\":870.0,\\"esActivo\\":true,\\"esDisponible\\":true,\\"condicionId\\":\\"1\\",\\"monedaId\\":9,\\"fecFactura\\":null,\\"equipo\\":\\"BRIKET M5000 - PULP\\",\\"fecha\\":null,\\"observacion\\":null,\\"numSerie\\":\\"304271\\",\\"edfModeloId\\":102,\\"proveedorId\\":\\"101\\",\\"ubicacionInterna\\":\\"EN CLIENTE\\",\\"ubicacionId\\":\\"24\\"}]"}';
+
+  // Parsear los equipos
+  List<Equipo> equipos = parseEquiposFromApiResponse(jsonResponse);
+
+  print('Equipos encontrados: ${equipos.length}');
+  if (equipos.isNotEmpty) {
+    print('Primer equipo:');
+    print('- ID: ${equipos.first.id}');
+    print('- Cliente ID: ${equipos.first.clienteId}');
+    print('- Código de barras: ${equipos.first.codBarras}');
+    print('- Marca ID: ${equipos.first.marcaId}');
+    print('- Modelo ID: ${equipos.first.modeloId}');
+    print('- Número serie: ${equipos.first.numeroSerie}');
+  }
 }
 
 // Modelos auxiliares para las tablas de referencia
@@ -265,6 +421,54 @@ class Marca {
     return {
       'id': id,
       'nombre': nombre,
+      'activo': activo,
+      'fecha_creacion': fechaCreacion.toIso8601String(),
+      'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
+    };
+  }
+
+  Map<String, dynamic> toJson() {
+    return toMap();
+  }
+}
+
+class Modelo {
+  final int? id;
+  final String nombre;
+  final int marcaId;
+  final int activo;
+  final DateTime fechaCreacion;
+  final DateTime? fechaActualizacion;
+
+  Modelo({
+    this.id,
+    required this.nombre,
+    required this.marcaId,
+    this.activo = 1,
+    DateTime? fechaCreacion,
+    this.fechaActualizacion,
+  }) : fechaCreacion = fechaCreacion ?? DateTime.now();
+
+  factory Modelo.fromMap(Map<String, dynamic> map) {
+    return Modelo(
+      id: map['id'],
+      nombre: map['nombre'] ?? '',
+      marcaId: map['marca_id'] ?? 1,
+      activo: map['activo'] ?? 1,
+      fechaCreacion: map['fecha_creacion'] != null
+          ? DateTime.parse(map['fecha_creacion'])
+          : DateTime.now(),
+      fechaActualizacion: map['fecha_actualizacion'] != null
+          ? DateTime.parse(map['fecha_actualizacion'])
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'nombre': nombre,
+      'marca_id': marcaId,
       'activo': activo,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),

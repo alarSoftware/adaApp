@@ -47,7 +47,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
       } else if (event is NavigateToFormsEvent) {
         _navigateToForms(event.cliente);
       } else if (event is NavigateToEquipoDetailEvent) {
-        _navigateToEquipoDetail(event.equipoCliente);
+        _navigateToEquipoDetail(event.equipoData);
       }
     });
   }
@@ -86,12 +86,12 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
     _viewModel.onNavigationResult(result);
   }
 
-  void _navigateToEquipoDetail(equipoCliente) {
+  void _navigateToEquipoDetail(dynamic equipoData) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => EquiposClientesDetailScreen(
-          equipoCliente: equipoCliente,
+          equipoCliente: equipoData, // Pasar directamente el QueryRow/Map
         ),
       ),
     ).then((_) => _viewModel.refresh());

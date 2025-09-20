@@ -21,9 +21,7 @@ class DatabaseTables {
     // Aquí irían las migraciones futuras
   }
 
-  // ================================================================
   // CREACIÓN DE TABLAS ORGANIZADAS
-  // ================================================================
 
   Future<void> _crearTablasMaestras(Database db) async {
     // Tablas que no dependen de otras (se crean primero por FK)
@@ -87,7 +85,7 @@ class DatabaseTables {
   String _sqlEquipos() => '''
     CREATE TABLE equipos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      id_remoto TEXT,                        
+      cliente_id TEXT,                 
       cod_barras TEXT,                       
       marca_id INTEGER NOT NULL,
       modelo_id INTEGER NOT NULL,
@@ -101,6 +99,7 @@ class DatabaseTables {
       FOREIGN KEY (marca_id) REFERENCES marcas (id),
       FOREIGN KEY (modelo_id) REFERENCES modelos (id),
       FOREIGN KEY (logo_id) REFERENCES logo (id)
+      FOREIGN KEY (cliente_id) REFERENCES clientes(id)
     )
   ''';
 
@@ -188,6 +187,7 @@ class DatabaseTables {
   Future<void> _crearIndicesEquipos(Database db) async {
     final indices = [
       'CREATE INDEX IF NOT EXISTS idx_equipos_cod_barras ON equipos (cod_barras)',
+      'CREATE INDEX IF NOT EXISTS idx_equipos_cliente_id ON equipos (cliente_id)',
       'CREATE INDEX IF NOT EXISTS idx_equipos_numero_serie ON equipos (numero_serie)',
       'CREATE INDEX IF NOT EXISTS idx_equipos_marca_id ON equipos (marca_id)',
       'CREATE INDEX IF NOT EXISTS idx_equipos_modelo_id ON equipos (modelo_id)',

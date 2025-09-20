@@ -7,6 +7,7 @@ import '../../models/cliente.dart';
 import 'package:ada_app/repositories/equipo_cliente_repository.dart';
 import 'package:ada_app/repositories/estado_equipo_repository.dart';
 import 'package:ada_app/models/estado_equipo.dart';
+import 'package:ada_app/repositories/equipo_repository.dart';
 import 'dart:async';
 
 final _logger = Logger();
@@ -16,11 +17,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
   String? _statusMessage;
 
   // Repositorios para el guardado definitivo
-  final EquipoClienteRepository _equipoClienteRepository = EquipoClienteRepository();
+  final EquipoRepository _equipoRepository = EquipoRepository();
   final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
 
   // ⚠️ CAMBIAR ESTA IP POR LA IP DE TU SERVIDOR
-  static const String _baseUrl = 'https://e1522fa98849.ngrok-free.app/adaControl/api/';
+  static const String _baseUrl = 'https://71a489ac7ede.ngrok-free.app/adaControl/api/';
   static const String _estadosEndpoint = '/insertCensoActivo';
   static const String _pingEndpoint = '/ping';
 
@@ -54,9 +55,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ============================================================================
-  // AQUÍ ES DONDE OCURRE EL GUARDADO DEFINITIVO
-  // ============================================================================
+  // Guardado definitivo
   Future<Map<String, dynamic>> confirmarRegistro(Map<String, dynamic> datos) async {
     _setLoading(true);
     _setStatusMessage(null);
@@ -76,7 +75,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         _setStatusMessage('💾 Registrando asignación del equipo...');
 
         try {
-          await _equipoClienteRepository.procesarEscaneoCenso(
+          await _equipoRepository.procesarEscaneoCenso(
             equipoId: equipoCompleto['id'],
             clienteId: cliente.id!,
           );
