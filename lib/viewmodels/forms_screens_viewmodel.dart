@@ -6,7 +6,7 @@ import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/repositories/logo_repository.dart';
 import 'package:logger/logger.dart';
 import 'package:barcode_scan2/barcode_scan2.dart';
-import 'package:ada_app/repositories/equipo_cliente_repository.dart';
+import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/services/image_service.dart';
 import 'package:ada_app/services/location_service.dart';
 import 'dart:io';
@@ -212,7 +212,6 @@ class FormsScreenViewModel extends ChangeNotifier {
       final equipoRepo = EquipoRepository();
       final equiposCompletos = await equipoRepo.buscarPorCodigoExacto(
         codigoBarras: codigo.trim(),
-        soloActivos: true,
       );
 
       if (equiposCompletos.isNotEmpty) {
@@ -229,7 +228,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   // MÉTODO PRINCIPAL REFACTORIZADO - DIVIDIDO EN MÉTODOS MÁS PEQUEÑOS
-  Future<void> _procesarEquipoEncontrado(Map<String, dynamic> equipoCompleto) async {
+  Future<void> _procesarEquipoEncontrado( Map<String, dynamic> equipoCompleto) async {
     _logger.i('=== PROCESANDO EQUIPO ENCONTRADO ===');
     _logger.i('Equipo: ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']}');
 
@@ -245,24 +244,87 @@ class FormsScreenViewModel extends ChangeNotifier {
       _showError('Error procesando equipo: $e');
     }
   }
-
   Future<void> _verificarAsignacionEquipo(Map<String, dynamic> equipo) async {
-    _equipoYaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(
-        equipo['id'],
-        _cliente!.id!
-    );
+    try {
+      // Convertir IDs a int de manera directa
+      int equipoId;
+      int clienteId;
+
+      // Manejar equipo['id']
+      if (equipo['id'] is int) {
+        equipoId = equipo['id'];
+      } else {
+        equipoId = int.parse(equipo['id'].toString());
+      }
+
+      // Manejar cliente.id
+      if (_cliente!.id! is int) {
+        clienteId = _cliente!.id!;
+      } else {
+        clienteId = int.parse(_cliente!.id!.toString());
+      }
+
+      _logger.i('Verificando asignación - EquipoID: $equipoId, ClienteID: $clienteId');
+
+      _equipoYaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(
+          equipo['id'].toString(),  // Mantener como String
+          clienteId  // Solo clienteId como int
+      );
+
+      _logger.i('Resultado verificación: $_equipoYaAsignado');
+
+    } catch (e) {
+      _logger.e('Error verificando asignación de equipo: $e');
+      _logger.e('equipo[id]: ${equipo['id']} (${equipo['id'].runtimeType})');
+      _logger.e('cliente.id: ${_cliente!.id!} (${_cliente!.id!.runtimeType})');
+
+      // En caso de error, asumir que no está asignado
+      _equipoYaAsignado = false;
+    }
   }
+
+// In FormsScreenViewModel.dart
 
   void _llenarCamposFormulario(Map<String, dynamic> equipo) {
     _isCensoMode = true;
     modeloController.text = equipo['modelo_nombre']?.toString() ?? '';
     numeroSerieController.text = equipo['numero_serie']?.toString() ?? '';
 
+    // Handle logo_id - VERSIÓN ROBUSTA
     if (equipo['logo_id'] != null) {
-      final logoExists = _logos.any((logo) => logo['id'] == equipo['logo_id']);
-      _logoSeleccionado = logoExists ? equipo['logo_id'] as int? : null;
+      final equipoLogoId = equipo['logo_id'];
+
+      // Buscar el logo utilizando comparación flexible (int o String)
+      final logoEncontrado = _logos.firstWhere(
+            (logo) {
+          // Comparar tanto como int como String para máxima compatibilidad
+          return logo['id'] == equipoLogoId ||
+              logo['id'].toString() == equipoLogoId.toString();
+        },
+        orElse: () => <String, dynamic>{}, // Retornar mapa vacío si no se encuentra
+      );
+
+      if (logoEncontrado.isNotEmpty) {
+        // Intentar convertir a int si es posible, sino mantener el tipo original
+        if (equipoLogoId is int) {
+          _logoSeleccionado = equipoLogoId;
+        } else {
+          final int? parsedLogoId = int.tryParse(equipoLogoId.toString());
+          _logoSeleccionado = parsedLogoId;
+        }
+
+        _logger.i("Logo encontrado: ${logoEncontrado['nombre']} (ID: ${_logoSeleccionado})");
+      } else {
+        _logger.w("Logo con ID '${equipoLogoId}' no encontrado en la lista de logos.");
+        _logoSeleccionado = null;
+      }
+    } else {
+      _logoSeleccionado = null;
     }
+
+    notifyListeners();
   }
+
 
   void _prepararDatosPreview(Map<String, dynamic> equipo) {
     _equipoCompleto = equipo;

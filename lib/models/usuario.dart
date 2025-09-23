@@ -5,9 +5,6 @@ class Usuario {
   final String username;
   final String password;
   final String fullname;
-  final int sincronizado;
-  final String fechaCreacion;
-  final String fechaActualizacion;
 
   Usuario({
     this.id,
@@ -16,9 +13,6 @@ class Usuario {
     required this.username,
     required this.password,
     required this.fullname,
-    this.sincronizado = 0,
-    required this.fechaCreacion,
-    required this.fechaActualizacion,
   });
 
   // Constructor para crear desde Map (base de datos)
@@ -30,11 +24,6 @@ class Usuario {
       username: map['username']?.toString() ?? '',
       password: map['password']?.toString() ?? '',
       fullname: map['fullname']?.toString() ?? '',
-      sincronizado: map['sincronizado']?.toInt() ?? 0,
-      fechaCreacion: map['fecha_creacion']?.toString() ??
-          DateTime.now().toIso8601String(),
-      fechaActualizacion: map['fecha_actualizacion']?.toString() ??
-          DateTime.now().toIso8601String(),
     );
   }
 
@@ -47,11 +36,6 @@ class Usuario {
       username: json['username']?.toString() ?? '',
       password: json['password']?.toString() ?? '',
       fullname: json['fullname']?.toString() ?? '',
-      sincronizado: json['sincronizado']?.toInt() ?? 0,
-      fechaCreacion: json['fecha_creacion']?.toString() ??
-          DateTime.now().toIso8601String(),
-      fechaActualizacion: json['fecha_actualizacion']?.toString() ??
-          DateTime.now().toIso8601String(),
     );
   }
 
@@ -64,9 +48,6 @@ class Usuario {
       'username': username,
       'password': password,
       'fullname': fullname,
-      'sincronizado': sincronizado,
-      'fecha_creacion': fechaCreacion,
-      'fecha_actualizacion': fechaActualizacion,
     };
   }
 
@@ -79,9 +60,6 @@ class Usuario {
       'username': username,
       'password': password,
       'fullname': fullname,
-      'sincronizado': sincronizado,
-      'fecha_creacion': fechaCreacion,
-      'fecha_actualizacion': fechaActualizacion,
     };
   }
 }

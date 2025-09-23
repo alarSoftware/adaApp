@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:ada_app/models/equipos_cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/equipos_clientes_detail_screen_viewmodel.dart';
 import 'package:ada_app/repositories/estado_equipo_repository.dart';
@@ -241,14 +240,14 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                       SizedBox(height: 4),
                       Container(
                         decoration: BoxDecoration(
-                          color: _viewModel.equipoCliente['activo'] == 1
+                          color: _viewModel.equipoCliente['tipo_estado'] == 'asignado'
                               ? AppColors.success.withValues(alpha: 0.1)
-                              : AppColors.error.withValues(alpha: 0.1),
+                              : AppColors.warning.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: _viewModel.equipoCliente['activo'] == 1
+                            color: _viewModel.equipoCliente['tipo_estado'] == 'asignado'
                                 ? AppColors.success.withValues(alpha: 0.3)
-                                : AppColors.error.withValues(alpha: 0.3),
+                                : AppColors.warning.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Text(
@@ -256,9 +255,9 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: _viewModel.equipoCliente['activo'] == 1
+                            color: _viewModel.equipoCliente['tipo_estado'] == 'asignado'
                                 ? AppColors.success
-                                : AppColors.error,
+                                : AppColors.warning,
                           ),
                         ),
                       ),

@@ -1,3 +1,4 @@
+// base_repository.dart - VERSIÓN SIMPLIFICADA SIN CAMPOS DE AUDITORÍA
 import 'package:sqflite/sqflite.dart';
 import '../services/database_helper.dart';
 import 'package:logger/logger.dart';
@@ -17,43 +18,32 @@ abstract class BaseRepository<T> {
   Map<String, dynamic> toMap(T item);
 
   // ════════════════════════════════════════════════════════════════
-  // MÉTODOS PARA DETECTAR CAPACIDADES DE LA TABLA
+  // MÉTODO DE DEBUG PARA VERIFICAR ESQUEMA
   // ════════════════════════════════════════════════════════════════
 
-  /// Verifica si la tabla tiene columna 'activo'
-  bool _tieneColumnaActivo() {
-    return tableName != 'clientes' && tableName != 'modelos';
-  }
+  /// Debug: Verificar columnas de una tabla
+  Future<void> debugEsquemaTabla() async {
+    final db = await dbHelper.database;
+    try {
+      final result = await db.rawQuery("PRAGMA table_info($tableName)");
+      final columnas = result.map((r) => r['name']).toList();
 
-  /// Verifica si la tabla tiene columnas de fecha
-  bool _tieneCamposFecha() {
-    return tableName != 'clientes' && tableName != 'modelos';
-  }
-
-  /// Verifica si la tabla tiene columna 'sincronizado'
-  bool _tieneColumnaSincronizado() {
-    return tableName != 'clientes' && tableName != 'modelos';
+      logger.i('=== ESQUEMA DE TABLA: $tableName ===');
+      logger.i('Columnas encontradas: $columnas');
+      logger.i('===============================');
+    } catch (e) {
+      logger.e('Error verificando esquema de $tableName: $e');
+    }
   }
 
   // ════════════════════════════════════════════════════════════════
-  // MÉTODOS CRUD GENÉRICOS
+  // MÉTODOS CRUD GENÉRICOS SIMPLIFICADOS
   // ════════════════════════════════════════════════════════════════
 
   /// Obtener todos los elementos
-  Future<List<T>> obtenerTodos({bool soloActivos = true}) async {
-    String? where;
-    List<dynamic>? whereArgs;
-
-    // Solo filtrar por activo si la tabla tiene esa columna
-    if (soloActivos && _tieneColumnaActivo()) {
-      where = 'activo = ?';
-      whereArgs = [1];
-    }
-
+  Future<List<T>> obtenerTodos() async {
     final maps = await dbHelper.consultar(
       tableName,
-      where: where,
-      whereArgs: whereArgs,
       orderBy: getDefaultOrderBy(),
     );
     return maps.map((map) => fromMap(map)).toList();
@@ -82,36 +72,15 @@ abstract class BaseRepository<T> {
     return maps.isNotEmpty ? fromMap(maps.first) : null;
   }
 
-  /// Insertar elemento
+  /// Insertar elemento - SIMPLIFICADO
   Future<int> insertar(T item) async {
     final datos = toMap(item);
-
-    // Solo agregar campos de auditoría si la tabla los tiene
-    if (_tieneCamposFecha()) {
-      datos['fecha_creacion'] = DateTime.now().toIso8601String();
-      datos['fecha_actualizacion'] = DateTime.now().toIso8601String();
-    }
-
-    if (_tieneColumnaSincronizado()) {
-      datos['sincronizado'] = 0;
-    }
-
     return await dbHelper.insertar(tableName, datos);
   }
 
-  /// Actualizar elemento
+  /// Actualizar elemento - SIMPLIFICADO
   Future<int> actualizar(T item, int id) async {
     final datos = toMap(item);
-
-    // Solo agregar campos de auditoría si la tabla los tiene
-    if (_tieneCamposFecha()) {
-      datos['fecha_actualizacion'] = DateTime.now().toIso8601String();
-    }
-
-    if (_tieneColumnaSincronizado()) {
-      datos['sincronizado'] = 0;
-    }
-
     return await dbHelper.actualizar(tableName, datos, where: 'id = ?', whereArgs: [id]);
   }
 
@@ -121,88 +90,40 @@ abstract class BaseRepository<T> {
     return await db.rawQuery(sql);
   }
 
-  /// Eliminar elemento (soft delete si tiene columna activo, sino delete físico)
+  /// Eliminar elemento - DELETE FÍSICO SIEMPRE
   Future<int> eliminar(int id) async {
-    if (_tieneColumnaActivo()) {
-      // Soft delete
-      final datos = <String, dynamic>{'activo': 0};
-      if (_tieneCamposFecha()) {
-        datos['fecha_actualizacion'] = DateTime.now().toIso8601String();
-      }
-      return await dbHelper.actualizar(tableName, datos, where: 'id = ?', whereArgs: [id]);
-    } else {
-      // Delete físico
-      return await dbHelper.eliminar(tableName, where: 'id = ?', whereArgs: [id]);
-    }
+    return await dbHelper.eliminar(tableName, where: 'id = ?', whereArgs: [id]);
   }
 
-  /// Obtener estadísticas
+  /// Obtener estadísticas básicas
   Future<Map<String, dynamic>> obtenerEstadisticas() async {
     final db = await dbHelper.database;
 
-    int total;
-    int sincronizados = 0;
-    int noSincronizados = 0;
+    final total = Sqflite.firstIntValue(await db.rawQuery(
+        'SELECT COUNT(*) FROM $tableName')) ?? 0;
 
-    if (_tieneColumnaActivo()) {
-      total = Sqflite.firstIntValue(await db.rawQuery(
-          'SELECT COUNT(*) FROM $tableName WHERE activo = 1')) ?? 0;
-
-      if (_tieneColumnaSincronizado()) {
-        sincronizados = Sqflite.firstIntValue(await db.rawQuery(
-            'SELECT COUNT(*) FROM $tableName WHERE activo = 1 AND sincronizado = 1')) ?? 0;
-        noSincronizados = Sqflite.firstIntValue(await db.rawQuery(
-            'SELECT COUNT(*) FROM $tableName WHERE activo = 1 AND sincronizado = 0')) ?? 0;
-      }
-    } else {
-      total = Sqflite.firstIntValue(await db.rawQuery(
-          'SELECT COUNT(*) FROM $tableName')) ?? 0;
-
-      if (_tieneColumnaSincronizado()) {
-        sincronizados = Sqflite.firstIntValue(await db.rawQuery(
-            'SELECT COUNT(*) FROM $tableName WHERE sincronizado = 1')) ?? 0;
-        noSincronizados = Sqflite.firstIntValue(await db.rawQuery(
-            'SELECT COUNT(*) FROM $tableName WHERE sincronizado = 0')) ?? 0;
-      }
-    }
-
-    final stats = <String, dynamic>{
+    return {
       'total${getEntityName()}s': total,
       'ultimaActualizacion': DateTime.now().toIso8601String(),
     };
-
-    if (_tieneColumnaSincronizado()) {
-      stats['${getEntityName().toLowerCase()}sSincronizados'] = sincronizados;
-      stats['${getEntityName().toLowerCase()}sNoSincronizados'] = noSincronizados;
-    }
-
-    return stats;
   }
 
   // ════════════════════════════════════════════════════════════════
-  // MÉTODOS PARA SINCRONIZACIÓN
+  // MÉTODOS PARA SINCRONIZACIÓN SIMPLIFICADOS
   // ════════════════════════════════════════════════════════════════
 
-  /// Limpiar y sincronizar desde API con debug
+  /// Limpiar y sincronizar desde API - MANTIENE NOMBRE ORIGINAL
   Future<void> limpiarYSincronizar(List<dynamic> itemsAPI) async {
     final db = await dbHelper.database;
 
-    logger.i('Iniciando limpiarYSincronizar con ${itemsAPI.length} items');
+    logger.i('Iniciando limpiarYSincronizar para $tableName con ${itemsAPI.length} items');
 
     await db.transaction((txn) async {
-      if (_tieneColumnaActivo()) {
-        final updateData = <String, dynamic>{'activo': 0};
-        if (_tieneCamposFecha()) {
-          updateData['fecha_actualizacion'] = DateTime.now().toIso8601String();
-        }
-        final updated = await txn.update(tableName, updateData);
-        logger.i('Items marcados como inactivos: $updated');
-      } else {
-        final deleted = await txn.delete(tableName);
-        logger.i('Items eliminados: $deleted');
-      }
+      // Limpiar tabla completamente
+      final deleted = await txn.delete(tableName);
+      logger.i('Items eliminados de $tableName: $deleted');
 
-      // Insertar con contador de éxito/error
+      // Insertar items de la API
       int exitosos = 0;
       int errores = 0;
 
@@ -216,21 +137,6 @@ abstract class BaseRepository<T> {
             datos = toMap(itemData);
           }
 
-          if (_tieneColumnaActivo()) {
-            datos['activo'] = 1;
-          }
-
-          if (_tieneColumnaSincronizado()) {
-            datos['sincronizado'] = 1;
-          }
-
-          if (_tieneCamposFecha()) {
-            datos['fecha_actualizacion'] = DateTime.now().toIso8601String();
-            if (datos['fecha_creacion'] == null) {
-              datos['fecha_creacion'] = DateTime.now().toIso8601String();
-            }
-          }
-
           await txn.insert(tableName, datos, conflictAlgorithm: ConflictAlgorithm.replace);
           exitosos++;
 
@@ -241,98 +147,66 @@ abstract class BaseRepository<T> {
 
         } catch (e) {
           errores++;
-          logger.e('Error insertando item: $e');
-          // Log del item problemático
-          logger.e('Datos del item con error: $itemData');
+          logger.e('Error insertando item en $tableName: $e');
 
-          if (errores <= 5) { // Solo mostrar los primeros 5 errores
-            logger.e('Error detalle: $e');
+          if (errores <= 3) { // Solo mostrar los primeros 3 errores
+            logger.e('Datos del item con error: $itemData');
           }
         }
       }
 
-      logger.i('Inserción completa: $exitosos exitosos, $errores errores');
+      logger.i('Sincronización completa en $tableName: $exitosos exitosos, $errores errores');
     });
 
-    logger.i('Sincronización completa: ${itemsAPI.length} items procesados');
+    logger.i('Sincronización completa: ${itemsAPI.length} items procesados en $tableName');
   }
 
-  /// Obtener elementos no sincronizados
-  Future<List<T>> obtenerNoSincronizados() async {
-    if (!_tieneColumnaSincronizado()) {
-      // Si la tabla no tiene columna sincronizado, retornar lista vacía
-      return [];
-    }
-
-    String where = 'sincronizado = ?';
-    List<dynamic> whereArgs = [0];
-
-    if (_tieneColumnaActivo()) {
-      where = 'activo = ? AND sincronizado = ?';
-      whereArgs = [1, 0];
-    }
-
-    final maps = await dbHelper.consultar(
-      tableName,
-      where: where,
-      whereArgs: whereArgs,
-      orderBy: _tieneCamposFecha() ? 'fecha_creacion ASC' : getDefaultOrderBy(),
-    );
-    return maps.map((map) => fromMap(map)).toList();
+  /// Método alternativo con nombre más simple
+  Future<void> sincronizar(List<dynamic> itemsAPI) async {
+    return await limpiarYSincronizar(itemsAPI);
   }
 
-  /// Marcar como sincronizados
-  Future<void> marcarComoSincronizados(List<int> ids) async {
-    if (ids.isEmpty || !_tieneColumnaSincronizado()) return;
-
+  /// Método batch insert para mejor performance
+  Future<void> insertarLote(List<dynamic> itemsAPI) async {
     final db = await dbHelper.database;
-    final placeholders = ids.map((_) => '?').join(',');
 
-    final updateData = <dynamic>[1]; // sincronizado = 1
-    if (_tieneCamposFecha()) {
-      updateData.insert(0, DateTime.now().toIso8601String()); // fecha_actualizacion
-    }
-    updateData.addAll(ids);
-
-    String sql = 'UPDATE $tableName SET sincronizado = ?';
-    if (_tieneCamposFecha()) {
-      sql = 'UPDATE $tableName SET fecha_actualizacion = ?, sincronizado = ?';
-    }
-    sql += ' WHERE id IN ($placeholders)';
-
-    await db.rawUpdate(sql, updateData);
-
-    logger.i('✅ ${ids.length} ${getEntityName().toLowerCase()}s marcados como sincronizados');
-  }
-
-  // ════════════════════════════════════════════════════════════════
-  // MÉTODOS ESPECÍFICOS PARA CLIENTES (sobrescribir en ClienteRepository)
-  // ════════════════════════════════════════════════════════════════
-
-  /// Método específico para sincronizar clientes (sin campos de auditoría)
-  Future<void> sincronizarClientesSimple(List<dynamic> clientesAPI) async {
-    final db = await dbHelper.database;
+    logger.i('Insertando lote en $tableName: ${itemsAPI.length} items');
 
     await db.transaction((txn) async {
-      // Limpiar tabla completamente
-      await txn.delete(tableName);
+      final batch = txn.batch();
 
-      // Insertar clientes de la API
-      for (var clienteData in clientesAPI) {
-        Map<String, dynamic> datos;
+      for (var itemData in itemsAPI) {
+        try {
+          Map<String, dynamic> datos;
 
-        if (clienteData is Map<String, dynamic>) {
-          datos = Map<String, dynamic>.from(clienteData);
-        } else {
-          datos = toMap(clienteData);
+          if (itemData is Map<String, dynamic>) {
+            datos = Map<String, dynamic>.from(itemData);
+          } else {
+            datos = toMap(itemData);
+          }
+
+          batch.insert(tableName, datos, conflictAlgorithm: ConflictAlgorithm.replace);
+        } catch (e) {
+          logger.e('Error preparando item para lote: $e');
         }
-
-        // NO agregar campos activo, sincronizado, fechas para clientes
-        await txn.insert(tableName, datos, conflictAlgorithm: ConflictAlgorithm.replace);
       }
-    });
 
-    logger.i('✅ Sincronización de clientes completa: ${clientesAPI.length} clientes procesados');
+      await batch.commit(noResult: true);
+      logger.i('Lote insertado exitosamente en $tableName');
+    });
+  }
+
+  /// Contar registros
+  Future<int> contar() async {
+    final db = await dbHelper.database;
+    return Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM $tableName')) ?? 0;
+  }
+
+  /// Vaciar tabla
+  Future<void> vaciar() async {
+    final db = await dbHelper.database;
+    await db.delete(tableName);
+    logger.i('Tabla $tableName vaciada');
   }
 
   // ════════════════════════════════════════════════════════════════

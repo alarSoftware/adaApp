@@ -6,6 +6,9 @@ import 'package:ada_app/ui/screens/equipos_clientes_detail_screen.dart';
 import 'forms_screen.dart';
 import 'dart:async';
 import 'package:ada_app/ui/theme/colors.dart';
+import 'package:logger/logger.dart';
+
+var logger = Logger();
 
 class ClienteDetailScreen extends StatefulWidget {
   final Cliente cliente;
@@ -19,14 +22,17 @@ class ClienteDetailScreen extends StatefulWidget {
   State<ClienteDetailScreen> createState() => _ClienteDetailScreenState();
 }
 
-class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
+class _ClienteDetailScreenState extends State<ClienteDetailScreen>
+    with TickerProviderStateMixin { // AGREGADO: Para TabController
   late ClienteDetailScreenViewModel _viewModel;
   late StreamSubscription<ClienteDetailUIEvent> _eventSubscription;
+  late TabController _tabController; // NUEVO: Controller para tabs
 
   @override
   void initState() {
     super.initState();
     _viewModel = ClienteDetailScreenViewModel();
+    _tabController = TabController(length: 2, vsync: this); // NUEVO: 2 tabs
     _setupEventListener();
     _viewModel.initialize(widget.cliente);
   }
@@ -34,6 +40,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
   @override
   void dispose() {
     _eventSubscription.cancel();
+    _tabController.dispose(); // NUEVO: Limpiar controller
     _viewModel.dispose();
     super.dispose();
   }
@@ -87,14 +94,173 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
   }
 
   void _navigateToEquipoDetail(dynamic equipoData) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => EquiposClientesDetailScreen(
-          equipoCliente: equipoData, // Pasar directamente el QueryRow/Map
+    // CORREGIDO: Usar el tipo_estado que viene del ViewModel
+    final isAsignado = equipoData['tipo_estado'] == 'asignado';
+
+    logger.i('Navegando a detalle de equipo:');
+    logger.i('- Código: ${equipoData['cod_barras']}');
+    logger.i('- Tipo estado: ${equipoData['tipo_estado']}');
+    logger.i('- Es asignado: $isAsignado');
+
+    if (isAsignado) {
+      // Equipos asignados: ir a pantalla completa para gestionar ubicación
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => EquiposClientesDetailScreen(
+            equipoCliente: equipoData,
+          ),
         ),
+      ).then((_) => _viewModel.refresh());
+    } else {
+      // Equipos pendientes: solo mostrar diálogo informativo
+      _showEquipoDetailsDialog(equipoData);
+    }
+  }
+
+  void _showEquipoDetailsDialog(dynamic equipoData) {
+    final nombreCompleto = _viewModel.getEquipoTitle(equipoData);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          nombreCompleto,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildDetalleRow('Código', equipoData['cod_barras'] ?? 'N/A'),
+                _buildDetalleRow('Marca', equipoData['marca_nombre'] ?? 'Sin marca'),
+                _buildDetalleRow('Modelo', equipoData['modelo_nombre'] ?? 'Sin modelo'),
+                _buildDetalleRow('Logo', equipoData['logo_nombre'] ?? 'Sin logo'),
+                if (equipoData['numero_serie'] != null && equipoData['numero_serie'].toString().isNotEmpty)
+                  _buildDetalleRow('Número de Serie', equipoData['numero_serie']),
+
+                // Estado pendiente con color naranja
+                _buildEstadoRow('Pendiente', AppColors.warning),
+
+                _buildDetalleRow('Cliente', widget.cliente.nombre),
+
+                // Nota explicativa
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.warningContainer,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: AppColors.warning, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Este equipo está pendiente de confirmación',
+                            style: TextStyle(
+                              color: AppColors.warning,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primary,
+            ),
+            child: const Text('Cerrar'),
+          ),
+        ],
       ),
-    ).then((_) => _viewModel.refresh());
+    );
+  }
+
+  // Helper para mostrar estado con color
+  Widget _buildEstadoRow(String estado, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              'Estado:',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              estado,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper para filas normales
+  Widget _buildDetalleRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(color: AppColors.textPrimary),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -102,25 +268,22 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
     return Scaffold(
       appBar: _buildAppBar(),
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _viewModel.refresh,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.only(
-              left: 16.0,
-              right: 16.0,
-              top: 16.0,
-              bottom: 16.0 + MediaQuery.of(context).padding.bottom,
+        child: Column(
+          children: [
+            // Card del cliente (fijo arriba)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _buildClienteInfoCard(),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildClienteInfoCard(),
-                const SizedBox(height: 24),
-                _buildEquiposSection(),
-              ],
+
+            // NUEVA SECCIÓN: TabBar
+            _buildTabBar(),
+
+            // NUEVA SECCIÓN: Contenido de tabs
+            Expanded(
+              child: _buildTabBarView(),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -224,7 +387,93 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
     );
   }
 
-  Widget _buildEquiposSection() {
+  // NUEVO: Construir TabBar
+  Widget _buildTabBar() {
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, child) {
+        return Container(
+          color: AppColors.surface,
+          child: TabBar(
+            controller: _tabController,
+            labelColor: AppColors.primary,
+            unselectedLabelColor: AppColors.textSecondary,
+            indicatorColor: AppColors.primary,
+            indicatorWeight: 3,
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+            ),
+            tabs: [
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle_outline, size: 18),
+                    const SizedBox(width: 8),
+                    Text('Asignados'),
+                    if (_viewModel.equiposAsignadosCount > 0) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.success,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${_viewModel.equiposAsignadosCount}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.pending_outlined, size: 18),
+                    const SizedBox(width: 8),
+                    Text('Pendientes'),
+                    if (_viewModel.equiposPendientesCount > 0) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${_viewModel.equiposPendientesCount}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // NUEVO: Construir contenido de tabs
+  Widget _buildTabBarView() {
     return ListenableBuilder(
       listenable: _viewModel,
       builder: (context, child) {
@@ -236,289 +485,269 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
           return _buildErrorState();
         }
 
-        if (_viewModel.noTieneEquipos) {
-          return _buildEmptyState();
-        }
-
-        // NUEVA ESTRUCTURA: Secciones separadas
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        return TabBarView(
+          controller: _tabController,
           children: [
-            // Sección de Equipos Asignados
-            if (_viewModel.tieneEquiposAsignados) ...[
-              _buildEquiposSectionHeader(
-                title: 'Equipos Asignados',
-                count: _viewModel.equiposAsignadosCount,
-                icon: Icons.check_circle_outline,
-                isAsignado: true,
-              ),
-              const SizedBox(height: 16),
-              _buildEquiposList(_viewModel.equiposAsignadosList, isAsignado: true),
-              const SizedBox(height: 24),
-            ],
+            // TAB 1: Equipos Asignados
+            _buildEquiposTab(
+              equipos: _viewModel.equiposAsignadosList,
+              isAsignado: true,
+              emptyTitle: 'Sin equipos asignados',
+              emptySubtitle: 'Este cliente no tiene equipos asignados actualmente',
+              emptyIcon: Icons.check_circle_outline,
+            ),
 
-            // Sección de Equipos Pendientes
-            if (_viewModel.tieneEquiposPendientes) ...[
-              _buildEquiposSectionHeader(
-                title: 'Equipos Pendientes',
-                count: _viewModel.equiposPendientesCount,
-                icon: Icons.pending_outlined,
-                isAsignado: false,
-              ),
-              const SizedBox(height: 16),
-              _buildEquiposList(_viewModel.equiposPendientesList, isAsignado: false),
-            ],
+            // TAB 2: Equipos Pendientes
+            _buildEquiposTab(
+              equipos: _viewModel.equiposPendientesList,
+              isAsignado: false,
+              emptyTitle: 'Sin equipos pendientes',
+              emptySubtitle: 'No hay equipos pendientes de confirmación',
+              emptyIcon: Icons.pending_outlined,
+            ),
           ],
         );
       },
     );
   }
 
-  Widget _buildEquiposSectionHeader({
-    required String title,
-    required int count,
-    required IconData icon,
+  // NUEVO: Método unificado para construir cada tab
+  Widget _buildEquiposTab({
+    required List<Map<String, dynamic>> equipos,
     required bool isAsignado,
+    required String emptyTitle,
+    required String emptySubtitle,
+    required IconData emptyIcon,
   }) {
-    final headerColor = isAsignado ? AppColors.success : AppColors.warning;
-    final backgroundColor = isAsignado ? AppColors.successContainer : AppColors.warningContainer;
+    if (equipos.isEmpty) {
+      return _buildEmptyStateForTab(
+        title: emptyTitle,
+        subtitle: emptySubtitle,
+        icon: emptyIcon,
+        isAsignado: isAsignado,
+      );
+    }
 
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            color: headerColor,
-            size: 24,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: headerColor,
-            ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: headerColor.withOpacity(0.3)),
-          ),
-          child: Text(
-            '$count',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: headerColor,
-            ),
-          ),
-        ),
-      ],
+    return RefreshIndicator(
+      onRefresh: _viewModel.refresh,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: equipos.length,
+        itemBuilder: (context, index) {
+          final equipoData = equipos[index];
+          return _buildEquipoCard(equipoData, isAsignado: isAsignado);
+        },
+      ),
     );
   }
 
-  Widget _buildEquiposList(List<Map<String, dynamic>> equipos, {required bool isAsignado}) {
+  // NUEVO: Empty state específico para cada tab
+  Widget _buildEmptyStateForTab({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isAsignado,
+  }) {
+    final color = isAsignado ? AppColors.success : AppColors.warning;
+    final backgroundColor = isAsignado ? AppColors.successContainer : AppColors.warningContainer;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: Icon(
+                icon,
+                size: 40,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: _viewModel.navegarAAsignarEquipo,
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Realizar Censo'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: color,
+                side: BorderSide(color: color),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NUEVO: Card individual de equipo
+  Widget _buildEquipoCard(Map<String, dynamic> equipoData, {required bool isAsignado}) {
     final equipoColor = isAsignado ? AppColors.success : AppColors.warning;
     final borderColor = isAsignado ? AppColors.borderSuccess : AppColors.borderWarning;
     final backgroundColor = isAsignado ? AppColors.successContainer : AppColors.warningContainer;
 
-    return Column(
-      children: equipos.map((equipoData) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Card(
-            elevation: 2,
-            color: AppColors.cardBackground,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(
-                color: borderColor,
-                width: 1,
-              ),
-            ),
-            child: InkWell(
-              onTap: () => _viewModel.navegarADetalleEquipo(equipoData),
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: equipoColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        isAsignado ? Icons.check_circle : Icons.pending,
-                        color: AppColors.onPrimary,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        elevation: 2,
+        color: AppColors.cardBackground,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: borderColor,
+            width: 1,
+          ),
+        ),
+        child: InkWell(
+          onTap: () => _viewModel.navegarADetalleEquipo(equipoData),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Icono del equipo
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: equipoColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    isAsignado ? Icons.check_circle : Icons.pending,
+                    color: AppColors.onPrimary,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+
+                // Info del equipo
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Título y badge
+                      Row(
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  _viewModel.getEquipoTitle(equipoData),
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                          Expanded(
+                            child: Text(
+                              _viewModel.getEquipoTitle(equipoData),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
                               ),
-                              // Contenedor para badge + ícono de sync en línea horizontal
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: backgroundColor,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: borderColor),
-                                    ),
-                                    child: Text(
-                                      isAsignado ? 'ASIGNADO' : 'PENDIENTE',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: equipoColor,
-                                      ),
-                                    ),
-                                  ),
-                                  // NUEVO: Ícono de sincronización compacto
-                                  const SizedBox(width: 6),
-                                  _buildSyncIcon(equipoData),
-                                ],
-                              ),
-                            ],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          const SizedBox(height: 4),
-                          if (_viewModel.getEquipoBarcode(equipoData) != null)
-                            Text(
-                              _viewModel.getEquipoBarcode(equipoData)!,
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: backgroundColor,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: borderColor),
+                            ),
+                            child: Text(
+                              isAsignado ? 'ASIGNADO' : 'PENDIENTE',
                               style: TextStyle(
-                                fontSize: 14,
-                                color: AppColors.textSecondary,
-                                fontFamily: 'monospace',
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: equipoColor,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          if (_viewModel.getEquipoLogo(equipoData) != null) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              'Logo: ${_viewModel.getEquipoLogo(equipoData)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textTertiary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                          if (isAsignado) ...[
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Icon(Icons.access_time, size: 14, color: AppColors.textTertiary),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _viewModel.getEquipoFechaCensado(equipoData),
-                                  style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
-                                ),
-                              ],
-                            ),
-                          ],
+                          ),
                         ],
                       ),
-                    ),
-                    Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textTertiary),
-                  ],
+
+                      const SizedBox(height: 4),
+
+                      // Código de barras
+                      if (_viewModel.getEquipoBarcode(equipoData) != null)
+                        Text(
+                          _viewModel.getEquipoBarcode(equipoData)!,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                            fontFamily: 'monospace',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+
+                      // Logo
+                      if (_viewModel.getEquipoLogo(equipoData) != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Logo: ${_viewModel.getEquipoLogo(equipoData)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textTertiary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+
+                      // Fecha (solo para asignados)
+                      if (isAsignado) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(Icons.access_time, size: 14, color: AppColors.textTertiary),
+                            const SizedBox(width: 4),
+                            Text(
+                              _viewModel.getEquipoFechaCensado(equipoData),
+                              style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
+
+                // Flecha
+                Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textTertiary),
+              ],
             ),
           ),
-        );
-      }).toList(),
+        ),
+      ),
     );
   }
 
-  // MÉTODO SEPARADO PARA EL ÍCONO DE SINCRONIZACIÓN
-  Widget _buildSyncIcon(Map<String, dynamic> equipoData) {
-    return FutureBuilder<Map<String, dynamic>?>(
-      future: _viewModel.getEstadoCensoInfo(equipoData),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data == null) {
-          return SizedBox.shrink();
-        }
-
-        final estadoInfo = snapshot.data!;
-        Color iconColor;
-        IconData icon;
-        String tooltip;
-
-        if (estadoInfo['todos_migrados'] == true) {
-          iconColor = AppColors.success;
-          icon = Icons.cloud_done;
-          tooltip = 'Sincronizado con servidor';
-        } else if (estadoInfo['tiene_pendientes'] == true) {
-          iconColor = AppColors.warning;
-          icon = Icons.cloud_upload;
-          final pendientes = estadoInfo['pendientes_count'] ?? 0;
-          tooltip = pendientes > 1
-              ? '$pendientes registros pendientes'
-              : 'Sincronización pendiente';
-        } else {
-          return SizedBox.shrink();
-        }
-
-        return Tooltip(
-          message: tooltip,
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: iconColor.withValues(alpha: 0.3),
-                width: 0.5,
-              ),
-            ),
-            child: Icon(
-              icon,
-              size: 14,
-              color: iconColor,
-            ),
-          ),
-        );
-      },
-    );
-  }
   Widget _buildLoadingState() {
     return Container(
       padding: const EdgeInsets.all(32),
       child: Center(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircularProgressIndicator(
               color: AppColors.primary,
@@ -539,12 +768,14 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.errorContainer,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderError),
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.error_outline, size: 48, color: AppColors.error),
           const SizedBox(height: 12),
@@ -564,7 +795,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
           ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
-            onPressed: _viewModel.cargarEquiposAsignados,
+            onPressed: _viewModel.cargarEquipos,
             icon: const Icon(Icons.refresh),
             label: const Text('Reintentar'),
             style: ElevatedButton.styleFrom(
@@ -575,48 +806,5 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen> {
         ],
       ),
     );
-  }
-
-  Widget _buildEmptyState() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: AppColors.neutral100,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.kitchen_outlined, size: 64, color: AppColors.neutral400),
-          const SizedBox(height: 16),
-          Text(
-            _viewModel.getEmptyStateTitle(),
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _viewModel.getEmptyStateSubtitle(),
-            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
-          OutlinedButton.icon(
-            onPressed: _viewModel.navegarAAsignarEquipo,
-            icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('Realizar Censo'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              side: BorderSide(color: AppColors.primary),
-            ),
-          ),
-        ],
-      ),
-    );
-
   }
 }

@@ -25,7 +25,6 @@ class DatabaseTables {
 
   Future<void> _crearTablasMaestras(Database db) async {
     // Tablas que no dependen de otras (se crean primero por FK)
-
     await db.execute(_sqlModelos());
     await db.execute(_sqlMarcas());
     await db.execute(_sqlLogo());
@@ -33,139 +32,123 @@ class DatabaseTables {
 
   Future<void> _crearTablasPrincipales(Database db) async {
     // Tablas que dependen de las maestras
-
     await db.execute(_sqlClientes());
     await db.execute(_sqlEquipos());
-    await db.execute(_sqlEquipoCliente());
+    await db.execute(_sqlEquiposPendientes());
     await db.execute(_sqlUsuarios());
     await db.execute(_sqlEstadoEquipo());
   }
 
   // ================================================================
-  // DEFINICIONES SQL DE TABLAS (más legibles y mantenibles)
+  // DEFINICIONES SQL DE TABLAS
   // ================================================================
 
   String _sqlModelos() => '''
     CREATE TABLE modelos (
       id INTEGER PRIMARY KEY,
-      nombre TEXT NOT NULL UNIQUE
+      nombre TEXT
     )
   ''';
 
   String _sqlMarcas() => '''
     CREATE TABLE marcas (
       id INTEGER PRIMARY KEY,
-      nombre TEXT NOT NULL UNIQUE,
-      activo INTEGER DEFAULT 1,
-      fecha_creacion TEXT NOT NULL
+      nombre TEXT
     )
   ''';
 
   String _sqlLogo() => '''
     CREATE TABLE logo (
       id INTEGER PRIMARY KEY,
-      nombre TEXT NOT NULL UNIQUE,
-      activo INTEGER DEFAULT 1,
-      fecha_creacion TEXT NOT NULL
+      nombre TEXT
     )
   ''';
 
   String _sqlClientes() => '''
     CREATE TABLE clientes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      codigo INTEGER,
-      nombre TEXT NOT NULL,
-      telefono TEXT NOT NULL,
-      direccion TEXT NOT NULL,
-      ruc_ci TEXT NOT NULL,
-      propietario TEXT NOT NULL
+      id INTEGER PRIMARY KEY,
+      codigo TEXT,
+      nombre TEXT,
+      telefono TEXT,
+      direccion TEXT,
+      ruc_ci TEXT,
+      propietario TEXT
     )
   ''';
 
   String _sqlEquipos() => '''
-    CREATE TABLE equipos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      cliente_id TEXT,                 
-      cod_barras TEXT,                       
-      marca_id INTEGER NOT NULL,
-      modelo_id INTEGER NOT NULL,
-      numero_serie TEXT,                      
-      logo_id INTEGER NOT NULL,
-      estado_local INTEGER DEFAULT 1,
-      activo INTEGER DEFAULT 1,
-      sincronizado INTEGER DEFAULT 0,
-      fecha_creacion TEXT NOT NULL,
-      fecha_actualizacion TEXT,
-      FOREIGN KEY (marca_id) REFERENCES marcas (id),
-      FOREIGN KEY (modelo_id) REFERENCES modelos (id),
-      FOREIGN KEY (logo_id) REFERENCES logo (id)
-      FOREIGN KEY (cliente_id) REFERENCES clientes(id)
-    )
-  ''';
+  CREATE TABLE equipos (
+    id TEXT PRIMARY KEY,
+    cliente_id TEXT,                 
+    cod_barras TEXT,                       
+    marca_id INTEGER,
+    modelo_id INTEGER,
+    numero_serie TEXT,                      
+    logo_id INTEGER,
+    FOREIGN KEY (marca_id) REFERENCES marcas (id),
+    FOREIGN KEY (modelo_id) REFERENCES modelos (id),
+    FOREIGN KEY (logo_id) REFERENCES logo (id),
+    FOREIGN KEY (cliente_id) REFERENCES clientes(id)
+  )
+''';
 
-  String _sqlEquipoCliente() => '''
-    CREATE TABLE equipo_cliente (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      equipo_id INTEGER NOT NULL,
-      cliente_id INTEGER NOT NULL,
-      estado TEXT NOT NULL,
-      fecha_asignacion TEXT NOT NULL,
-      fecha_retiro TEXT,
-      activo INTEGER DEFAULT 1,
-      sincronizado INTEGER DEFAULT 0,
-      fecha_creacion TEXT NOT NULL,
-      fecha_actualizacion TEXT NOT NULL,
-      FOREIGN KEY (equipo_id) REFERENCES equipos (id) ON DELETE CASCADE,
-      FOREIGN KEY (cliente_id) REFERENCES clientes (id) ON DELETE CASCADE,
-      UNIQUE(equipo_id, cliente_id, fecha_asignacion),
-      CHECK (estado IN ('pendiente', 'asignado'))
-    )
-  ''';
+  String _sqlEquiposPendientes() => '''
+  CREATE TABLE equipos_pendientes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    equipo_id INTEGER,
+    cliente_id INTEGER,
+    fecha_censo DATETIME,
+    usuario_censo_id INTEGER,
+    latitud REAL,
+    longitud REAL,
+    observaciones TEXT,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion DATETIME,  -- AGREGAR ESTA LÍNEA
+    FOREIGN KEY (equipo_id) REFERENCES equipos (id),
+    FOREIGN KEY (cliente_id) REFERENCES clientes (id)
+  )
+''';
 
   String _sqlUsuarios() => '''
     CREATE TABLE Users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id INTEGER PRIMARY KEY,
       edf_vendedor_id TEXT,
       edf_vendedor_nombre TEXT,
-      code INTEGER NOT NULL UNIQUE,
-      username TEXT NOT NULL,
-      password TEXT NOT NULL,   
-      fullname TEXT NOT NULL,
-      sincronizado INTEGER DEFAULT 0,
-      fecha_creacion TEXT NOT NULL,
-      fecha_actualizacion TEXT NOT NULL
+      code INTEGER,
+      username,
+      password,   
+      fullname
     )
   ''';
 
   String _sqlEstadoEquipo() => '''
   CREATE TABLE Estado_Equipo (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    equipo_cliente_id INTEGER NOT NULL,
-    en_local INTEGER NOT NULL DEFAULT 0,
+    equipo_id TEXT NOT NULL,
+    cliente_id INTEGER NOT NULL,   
+    en_local INTEGER DEFAULT 0,
     latitud REAL,
     longitud REAL,
-    fecha_revision TEXT NOT NULL,
-    fecha_creacion TEXT NOT NULL,
+    fecha_revision TEXT,
+    fecha_creacion TEXT,
     fecha_actualizacion TEXT,
-    sincronizado INTEGER NOT NULL DEFAULT 0,
+    sincronizado INTEGER DEFAULT 0,
     imagen_path TEXT,
     imagen_base64 TEXT,
     tiene_imagen INTEGER DEFAULT 0,
     imagen_tamano INTEGER,
-    estado_censo TEXT DEFAULT 'creado',
-    FOREIGN KEY (equipo_cliente_id) REFERENCES equipo_cliente (id) ON DELETE CASCADE
+    estado_censo TEXT DEFAULT 'creado'
   )
 ''';
 
-
   // ================================================================
-  // CREACIÓN DE ÍNDICES ORGANIZADOS
+  // CREACIÓN DE ÍNDICES
   // ================================================================
 
   Future<void> _crearIndices(Database db) async {
     await _crearIndicesClientes(db);
     await _crearIndicesEquipos(db);
-    await _crearIndicesEquipoCliente(db);
+    await _crearIndicesEquiposPendientes(db);
     await _crearIndicesMaestras(db);
   }
 
@@ -192,7 +175,6 @@ class DatabaseTables {
       'CREATE INDEX IF NOT EXISTS idx_equipos_marca_id ON equipos (marca_id)',
       'CREATE INDEX IF NOT EXISTS idx_equipos_modelo_id ON equipos (modelo_id)',
       'CREATE INDEX IF NOT EXISTS idx_equipos_logo_id ON equipos (logo_id)',
-      'CREATE INDEX IF NOT EXISTS idx_equipos_activo ON equipos (activo)',
     ];
 
     for (final indice in indices) {
@@ -200,12 +182,12 @@ class DatabaseTables {
     }
   }
 
-  Future<void> _crearIndicesEquipoCliente(Database db) async {
+  Future<void> _crearIndicesEquiposPendientes(Database db) async {
     final indices = [
-      'CREATE INDEX IF NOT EXISTS idx_equipo_cliente_equipo_id ON equipo_cliente (equipo_id)',
-      'CREATE INDEX IF NOT EXISTS idx_equipo_cliente_cliente_id ON equipo_cliente (cliente_id)',
-      'CREATE INDEX IF NOT EXISTS idx_equipo_cliente_activo ON equipo_cliente (activo)',
-      'CREATE INDEX IF NOT EXISTS idx_equipo_cliente_estado ON equipo_cliente (estado)',
+      'CREATE INDEX IF NOT EXISTS idx_equipos_pendientes_equipo_id ON equipos_pendientes (equipo_id)',
+      'CREATE INDEX IF NOT EXISTS idx_equipos_pendientes_cliente_id ON equipos_pendientes (cliente_id)',
+      'CREATE INDEX IF NOT EXISTS idx_equipos_pendientes_fecha_censo ON equipos_pendientes (fecha_censo)',
+      'CREATE INDEX IF NOT EXISTS idx_equipos_pendientes_usuario_censo_id ON equipos_pendientes (usuario_censo_id)',
     ];
 
     for (final indice in indices) {

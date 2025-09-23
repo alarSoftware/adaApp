@@ -34,7 +34,7 @@ extension EstadoEquipoCensoExtension on EstadoEquipoCenso {
 
 class EstadoEquipo {
   final int? id;
-  final int equipoClienteId;
+  final int equipoPendienteId;
   final bool enLocal;
   final double? latitud;
   final double? longitud;
@@ -52,7 +52,7 @@ class EstadoEquipo {
 
   EstadoEquipo({
     this.id,
-    required this.equipoClienteId,
+    required this.equipoPendienteId,
     required this.enLocal,
     this.latitud,
     this.longitud,
@@ -72,7 +72,7 @@ class EstadoEquipo {
   factory EstadoEquipo.fromMap(Map<String, dynamic> map) {
     return EstadoEquipo(
       id: map['id'] as int?,
-      equipoClienteId: map['equipo_cliente_id'] as int,
+      equipoPendienteId: map['equipo_pendiente_id'] as int,
       enLocal: (map['en_local'] as int?) == 1,
       latitud: map['latitud'] as double?,
       longitud: map['longitud'] as double?,
@@ -95,7 +95,7 @@ class EstadoEquipo {
   Map<String, dynamic> toMap() {
     final map = {
       'id': id,
-      'equipo_cliente_id': equipoClienteId,
+      'equipo_pendiente_id': equipoPendienteId,
       'en_local': enLocal ? 1 : 0,
       'latitud': latitud,
       'longitud': longitud,
@@ -121,7 +121,7 @@ class EstadoEquipo {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'equipo_cliente_id': equipoClienteId,
+      'equipo_cliente_id': equipoPendienteId,
       'en_local': enLocal,
       'latitud': latitud,
       'longitud': longitud,
@@ -159,7 +159,7 @@ class EstadoEquipo {
   }) {
     return EstadoEquipo(
       id: id ?? this.id,
-      equipoClienteId: equipoClienteId ?? this.equipoClienteId,
+      equipoPendienteId: equipoClienteId ?? this.equipoPendienteId,
       enLocal: enLocal ?? this.enLocal,
       latitud: latitud ?? this.latitud,
       longitud: longitud ?? this.longitud,

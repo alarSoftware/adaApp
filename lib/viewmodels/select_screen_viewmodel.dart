@@ -3,11 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:ada_app/repositories/cliente_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import '../services/sync/sync_service.dart';
-import '../services/api_service.dart';
+import '../services/database_helper.dart';
 import 'package:logger/logger.dart';
-import '../repositories/models_repository.dart';
-import '../repositories/logo_repository.dart';
-import '../models/usuario.dart'; // ← Usar tu modelo Usuario
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -87,6 +84,7 @@ enum ConnectionType {
 // ========== VIEWMODEL 100% LIMPIO ==========
 class SelectScreenViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
+  final DatabaseHelper _dbHelper = DatabaseHelper();
 
   // ========== ESTADO INTERNO ==========
   bool _isSyncing = false;
@@ -97,7 +95,7 @@ class SelectScreenViewModel extends ChangeNotifier {
     type: ConnectionType.noInternet,
   );
 
-  // ← ESTADO DEL USUARIO
+  // ESTADO DEL USUARIO
   String _userFullName = 'Usuario';
   bool _isLoadingUser = true;
 
@@ -114,14 +112,14 @@ class SelectScreenViewModel extends ChangeNotifier {
   ConnectionStatus get connectionStatus => _connectionStatus;
   bool get isConnected => _connectionStatus.hasInternet && _connectionStatus.hasApiConnection;
 
-  // ← GETTERS DEL USUARIO
+  // GETTERS DEL USUARIO
   String get userDisplayName => _userFullName;
   bool get isLoadingUser => _isLoadingUser;
 
   // ========== CONSTRUCTOR ==========
   SelectScreenViewModel() {
     _initializeMonitoring();
-    _loadCurrentUser(); // ← Cargar usuario al inicializar
+    _loadCurrentUser();
   }
 
   @override
@@ -139,7 +137,7 @@ class SelectScreenViewModel extends ChangeNotifier {
     _checkInitialConnection();
   }
 
-  // ← MÉTODO PARA CARGAR USUARIO DESDE SHAREDPREFERENCES Y BD
+  // MÉTODO PARA CARGAR USUARIO DESDE SHAREDPREFERENCES Y BD
   Future<void> _loadCurrentUser() async {
     try {
       _isLoadingUser = true;
@@ -147,50 +145,29 @@ class SelectScreenViewModel extends ChangeNotifier {
 
       final prefs = await SharedPreferences.getInstance();
 
-      // DEBUGGING: Ver todas las keys guardadas
-      final keys = prefs.getKeys();
-      _logger.i('🔍 TODAS LAS KEYS EN SHAREDPREFERENCES: $keys');
-
-      // Primero intentar obtener el fullname directamente
+      // Intentar obtener el fullname directamente
       final fullName = prefs.getString('user_fullname');
 
       if (fullName != null && fullName.isNotEmpty) {
         _userFullName = fullName;
-        _logger.i('✅ Usuario cargado desde SharedPreferences: $fullName');
+        _logger.i('Usuario cargado desde SharedPreferences: $fullName');
       } else {
-        // Si no está el fullname, intentar obtenerlo usando el current_user (username)
+        // Si no está el fullname, intentar obtenerlo desde la BD
         final currentUsername = prefs.getString('current_user');
-        _logger.i('🔍 Buscando fullname para username: $currentUsername');
 
         if (currentUsername != null && currentUsername.isNotEmpty) {
-          // TEMPORAL: Mapeo hardcodeado para testing
-          String? tempFullName;
-          if (currentUsername == 'rrebollo') {
-            tempFullName = 'Ronaldo Rebollo';
-          }
-          // Aquí puedes agregar más mapeos si tienes otros usuarios
-
-          if (tempFullName != null) {
-            _userFullName = tempFullName;
-            // Guardarlo para la próxima vez
-            await prefs.setString('user_fullname', tempFullName);
-            _logger.i('✅ Usuario cargado (temporal): $tempFullName');
+          final fullNameFromDB = await _getFullNameFromDatabase(currentUsername);
+          if (fullNameFromDB != null && fullNameFromDB.isNotEmpty) {
+            _userFullName = fullNameFromDB;
+            await prefs.setString('user_fullname', fullNameFromDB);
+            _logger.i('Usuario cargado desde BD: $fullNameFromDB');
           } else {
-            // Aquí necesitamos buscar en la base de datos local
-            final fullNameFromDB = await _getFullNameFromDatabase(currentUsername);
-            if (fullNameFromDB != null && fullNameFromDB.isNotEmpty) {
-              _userFullName = fullNameFromDB;
-              // Guardarlo para la próxima vez
-              await prefs.setString('user_fullname', fullNameFromDB);
-              _logger.i('✅ Usuario cargado desde BD: $fullNameFromDB');
-            } else {
-              _userFullName = 'Usuario';
-              _logger.w('❌ No se encontró fullname en BD para: $currentUsername');
-            }
+            _userFullName = currentUsername; // Usar username como fallback
+            _logger.w('No se encontró fullname en BD, usando username: $currentUsername');
           }
         } else {
           _userFullName = 'Usuario';
-          _logger.w('❌ No se encontró current_user en SharedPreferences');
+          _logger.w('No se encontró current_user en SharedPreferences');
         }
       }
     } catch (e) {
@@ -202,31 +179,24 @@ class SelectScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ← NUEVO MÉTODO: Obtener fullname desde la base de datos
+  // IMPLEMENTACIÓN REAL DE BÚSQUEDA EN BASE DE DATOS
   Future<String?> _getFullNameFromDatabase(String username) async {
     try {
-      // Necesitarás ajustar esto según tu implementación de base de datos
-      // Por ejemplo, usando sqflite:
+      _logger.i('Buscando en BD el fullname para: $username');
 
-      // final db = await database; // Tu instancia de base de datos
-      // final List<Map<String, dynamic>> maps = await db.query(
-      //   'usuarios', // nombre de tu tabla
-      //   where: 'username = ?',
-      //   whereArgs: [username],
-      // );
+      final resultado = await _dbHelper.consultarPersonalizada(
+          'SELECT fullname FROM Users WHERE username = ? LIMIT 1',
+          [username]
+      );
 
-      // if (maps.isNotEmpty) {
-      //   final usuario = Usuario.fromMap(maps.first);
-      //   return usuario.fullname;
-      // }
+      if (resultado.isNotEmpty) {
+        final fullname = resultado.first['fullname']?.toString();
+        if (fullname != null && fullname.isNotEmpty) {
+          return fullname;
+        }
+      }
 
-      // POR AHORA: Método temporal - puedes reemplazar esto
-      _logger.i('🔍 Buscando en BD el fullname para: $username');
-
-      // TODO: Implementar búsqueda real en base de datos
-      // Por ahora retornamos null para que uses la Opción 2
       return null;
-
     } catch (e) {
       _logger.e('Error buscando usuario en BD: $e');
       return null;
@@ -418,36 +388,6 @@ class SelectScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// Prueba la API de clientes
-  Future<void> testAPI() async {
-    _setLoading(true);
-
-    try {
-      _logger.i('🔍 INICIANDO TEST DE CLIENTES...');
-
-      final resultado = await ApiService.obtenerTodosLosClientes();
-
-      _logger.i('🔍 RESULTADO:');
-      _logger.i('Éxito: ${resultado.exito}');
-      _logger.i('Total clientes: ${resultado.clientes.length}');
-      _logger.i('Mensaje: ${resultado.mensaje}');
-
-      // Log de primeros 5 clientes
-      for (int i = 0; i < resultado.clientes.length && i < 5; i++) {
-        _logger.i('Cliente ${i + 1}: ${resultado.clientes[i].nombre}');
-      }
-
-      _eventController.add(
-          ShowSuccessEvent('Test completado: ${resultado.clientes.length} clientes recibidos')
-      );
-    } catch (e) {
-      _logger.e('❌ Error en test: $e');
-      _eventController.add(ShowErrorEvent('Error en test: $e'));
-    } finally {
-      _setLoading(false);
-    }
-  }
-
   /// Solicita borrar la base de datos
   Future<void> requestDeleteDatabase() async {
     _eventController.add(RequestDeleteConfirmationEvent());
@@ -460,13 +400,20 @@ class SelectScreenViewModel extends ChangeNotifier {
     try {
       final clienteRepo = ClienteRepository();
       final equipoRepo = EquipoRepository();
-      final modeloRepo = ModeloRepository();
-      final logoRepo = LogoRepository();
 
+      // Usar métodos que realmente existen en BaseRepository
+      await clienteRepo.vaciar();
+      await equipoRepo.vaciar();
+
+      // Para otras tablas, usar limpiarYSincronizar con lista vacía
       await clienteRepo.limpiarYSincronizar([]);
       await equipoRepo.limpiarYSincronizar([]);
-      await modeloRepo.borrarTodos();
-      await logoRepo.borrarTodos();
+
+      // Limpiar también las tablas maestras usando consultas directas
+      await _dbHelper.consultarPersonalizada('DELETE FROM marcas');
+      await _dbHelper.consultarPersonalizada('DELETE FROM modelos');
+      await _dbHelper.consultarPersonalizada('DELETE FROM logo');
+      await _dbHelper.consultarPersonalizada('DELETE FROM Users');
 
       _eventController.add(ShowSuccessEvent('Base de datos completa borrada correctamente'));
     } catch (e) {
@@ -503,7 +450,8 @@ class SelectScreenViewModel extends ChangeNotifier {
 
   Future<int> _getEstimatedClients() async {
     try {
-      return 0; // Implementar según tu lógica
+      final clienteRepo = ClienteRepository();
+      return await clienteRepo.contar();
     } catch (e) {
       return 0;
     }
@@ -511,7 +459,8 @@ class SelectScreenViewModel extends ChangeNotifier {
 
   Future<int> _getEstimatedEquipments() async {
     try {
-      return 0; // Implementar según tu lógica
+      final equipoRepo = EquipoRepository();
+      return await equipoRepo.contar();
     } catch (e) {
       return 0;
     }

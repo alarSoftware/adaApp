@@ -3,13 +3,13 @@ import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
-import 'package:ada_app/repositories/equipo_cliente_repository.dart';
+import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/models/equipos.dart';
 
 class EquipmentSyncService extends BaseSyncService {
   static final _dbHelper = DatabaseHelper();
   static final _equipoRepo = EquipoRepository();
-  static final _equipoClienteRepo = EquipoClienteRepository();
+  static final _equipoClienteRepo = EquipoPendienteRepository();
 
   static Future<SyncResult> sincronizarMarcas() async {
     try {
@@ -241,8 +241,6 @@ class EquipmentSyncService extends BaseSyncService {
           BaseSyncService.logger.i('- edfLogoId: ${primer['edfLogoId']}');
           BaseSyncService.logger.i('- marcaId: ${primer['marcaId']}');
           BaseSyncService.logger.i('- numSerie: ${primer['numSerie']}');
-          BaseSyncService.logger.i('- esActivo: ${primer['esActivo']}');
-          BaseSyncService.logger.i('- esDisponible: ${primer['esDisponible']}');
           BaseSyncService.logger.i('- equipo (modelo): ${primer['equipo']}');
         }
 
@@ -327,7 +325,6 @@ class EquipmentSyncService extends BaseSyncService {
             'estado': asignacion['estado'] ?? 'asignado',
             'fecha_asignacion': asignacion['fecha_asignacion'],
             'fecha_retiro': asignacion['fecha_retiro'],
-            'activo': asignacion['activo'] ?? 1,
           };
         }).toList();
 

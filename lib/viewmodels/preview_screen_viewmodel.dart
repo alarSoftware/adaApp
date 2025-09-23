@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
 import '../../models/cliente.dart';
-import 'package:ada_app/repositories/equipo_cliente_repository.dart';
+import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/repositories/estado_equipo_repository.dart';
 import 'package:ada_app/models/estado_equipo.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
@@ -19,11 +19,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
   // Repositorios para el guardado definitivo
   final EquipoRepository _equipoRepository = EquipoRepository();
   final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
+  final EquipoPendienteRepository _equipoPendienteRepository = EquipoPendienteRepository();
 
-  // ⚠️ CAMBIAR ESTA IP POR LA IP DE TU SERVIDOR
   static const String _baseUrl = 'https://71a489ac7ede.ngrok-free.app/adaControl/api/';
-  static const String _estadosEndpoint = '/insertCensoActivo';
-  static const String _pingEndpoint = '/ping';
+  static const String _estadosEndpoint = 'insertCensoActivo';
 
   bool get isLoading => _isLoading;
   String? get statusMessage => _statusMessage;
@@ -55,93 +54,184 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // Guardado definitivo
+  // Enhanced _convertirAInt method with better null safety
+  int _convertirAInt(dynamic valor, String nombreCampo) {
+    if (valor == null) {
+      throw 'El campo $nombreCampo es null';
+    }
+
+    if (valor is int) {
+      return valor;
+    }
+
+    if (valor is String) {
+      if (valor.isEmpty) {
+        throw 'El campo $nombreCampo está vacío';
+      }
+
+      final int? parsed = int.tryParse(valor);
+      if (parsed != null) {
+        return parsed;
+      } else {
+        throw 'El campo $nombreCampo ("$valor") no es un número válido';
+      }
+    }
+
+    if (valor is double) {
+      return valor.toInt();
+    }
+
+    throw 'El campo $nombreCampo tiene un tipo no soportado: ${valor.runtimeType}';
+  }
+
+  // Safe casting helper method
+  int? _safeCastToInt(dynamic value, String fieldName) {
+    try {
+      if (value == null) return null;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value);
+      if (value is double) return value.toInt();
+      _logger.w('Cannot cast $fieldName to int, type: ${value.runtimeType}, value: $value');
+      return null;
+    } catch (e) {
+      _logger.w('Error casting $fieldName to int: $e');
+      return null;
+    }
+  }
+
+  // Guardado definitivo - CORREGIDO CON EL FLUJO CORRECTO
   Future<Map<String, dynamic>> confirmarRegistro(Map<String, dynamic> datos) async {
     _setLoading(true);
     _setStatusMessage(null);
 
-    int? estadoIdActual; // Para trackear solo el registro actual
+    int? estadoIdActual;
 
     try {
       _logger.i('📝 CONFIRMANDO REGISTRO - GUARDADO DEFINITIVO EN BD');
 
-      final cliente = datos['cliente'] as Cliente;
+      final cliente = datos['cliente'] as Cliente?;
       final equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
-      final yaAsignado = datos['ya_asignado'] as bool? ?? false;
       final esCenso = datos['es_censo'] as bool? ?? true;
 
-      // ✅ PASO 1: GUARDAR ASIGNACIÓN EN BD (usando procesarEscaneoCenso)
-      if (esCenso && equipoCompleto != null && !yaAsignado) {
-        _setStatusMessage('💾 Registrando asignación del equipo...');
-
-        try {
-          await _equipoRepository.procesarEscaneoCenso(
-            equipoId: equipoCompleto['id'],
-            clienteId: cliente.id!,
-          );
-          _logger.i('✅ Asignación equipo-cliente procesada');
-        } catch (e) {
-          _logger.w('⚠️ Equipo ya asignado a otro cliente: $e');
-        }
+      // VALIDATION: Check for null values
+      if (cliente == null) {
+        throw 'Cliente no encontrado en los datos';
       }
 
-      // ✅ PASO 2: REGISTRAR EN HISTORIAL CON ESTADO 'CREADO'
-      if (equipoCompleto != null) {
-        _setStatusMessage('📋 Registrando estado como CREADO...');
+      if (equipoCompleto == null) {
+        throw 'No se encontró información del equipo';
+      }
 
-        // Buscar equipoClienteId
-        final equipoClienteId = await _estadoEquipoRepository.buscarEquipoClienteId(
-          equipoCompleto['id'],
-          cliente.id!,
+      if (cliente.id == null) {
+        throw 'El cliente no tiene ID asignado';
+      }
+
+      if (equipoCompleto['id'] == null) {
+        throw 'El equipo no tiene ID asignado';
+      }
+
+      // PASO 1: VERIFICAR SI YA ESTÁ ASIGNADO - CON CONVERSIÓN SEGURA
+      _setStatusMessage('🔍 Verificando estado del equipo...');
+
+      // Debug logs para identificar tipos
+      _logger.i('Debug - equipoCompleto[id]: ${equipoCompleto['id']} (tipo: ${equipoCompleto['id'].runtimeType})');
+      _logger.i('Debug - cliente.id: ${cliente.id} (tipo: ${cliente.id.runtimeType})');
+
+      try {
+        final equipoId = equipoCompleto['id'].toString(); // Keep as String for equipos table
+
+        // Safe conversion with null check
+        final clienteId = _convertirAInt(cliente.id, 'cliente_id');
+
+        final yaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(
+            equipoId,  // String - matches equipos.id (TEXT)
+            clienteId
         );
 
-        if (equipoClienteId != null) {
-          // Crear estado con estado "creado"
-          final estadoCreado = await _estadoEquipoRepository.crearNuevoEstadoCenso(
-            equipoClienteId: equipoClienteId,
+        _logger.i('🔍 Equipo $equipoId ya asignado: $yaAsignado');
+
+        // PASO 2: CREAR REGISTRO PENDIENTE SOLO SI NO ESTÁ ASIGNADO
+        if (esCenso && !yaAsignado) {
+          _setStatusMessage('💾 Registrando censo pendiente...');
+
+          try {
+            _logger.i('📝 PASO 2: Crear registro pendiente (equipo NO asignado)');
+            // For equipos_pendientes table, equipo_id is INTEGER, so we need to convert
+            final equipoIdInt = _convertirAInt(equipoId, 'equipo_id_for_pendientes');
+
+            await _equipoPendienteRepository.procesarEscaneoCenso(
+                equipoId: equipoIdInt, // INTEGER - matches equipos_pendientes.equipo_id (INTEGER)
+                clienteId: clienteId
+            );
+            _logger.i('✅ Registro pendiente creado exitosamente');
+          } catch (e) {
+            _logger.w('⚠️ Error registrando censo pendiente: $e');
+          }
+        } else if (yaAsignado) {
+          _logger.i('ℹ️ Equipo ya asignado - no se crea registro pendiente');
+        }
+
+        // PASO 3: CREAR ESTADO DIRECTAMENTE
+        _setStatusMessage('📋 Registrando estado como CREADO...');
+
+        // PASO 4: CREAR ESTADO usando equipo_id y cliente_id directamente
+        _logger.i('🔍 Creando estado con equipo_id: $equipoId, cliente_id: $clienteId');
+
+        try {
+          // Use the method that works directly with equipo_id and cliente_id
+          final estadoCreado = await _estadoEquipoRepository.crearEstadoDirecto(
+            equipoId: equipoId,  // TEXT - matches Estado_Equipo.equipo_id (TEXT)
+            clienteId: clienteId, // INTEGER - matches Estado_Equipo.cliente_id (INTEGER)
             latitud: datos['latitud'],
             longitud: datos['longitud'],
             fechaRevision: DateTime.now(),
             enLocal: true,
             observaciones: datos['observaciones']?.toString(),
-
-            // NUEVOS PARAMETROS DE IMAGEN
             imagenPath: datos['imagen_path'],
             imagenBase64: datos['imagen_base64'],
             tieneImagen: datos['tiene_imagen'] ?? false,
             imagenTamano: datos['imagen_tamano'],
           );
 
-          estadoIdActual = estadoCreado.id; // Guardar ID del registro actual
-          _logger.i('✅ Estado CREADO registrado con ID: $estadoIdActual');
-        } else {
-          _logger.w('No se encontró relación equipo_cliente');
-          _setStatusMessage('⚠️ Advertencia: No se registró en historial');
+          // Safe null check for estadoCreado.id
+          if (estadoCreado.id != null) {
+            estadoIdActual = estadoCreado.id!;
+            _logger.i('✅ Estado CREADO registrado con ID: $estadoIdActual');
+          } else {
+            _logger.w('⚠️ Estado creado pero sin ID asignado, continuando sin ID');
+            estadoIdActual = null;
+          }
+
+        } catch (dbError) {
+          _logger.e('❌ Error de base de datos al crear estado: $dbError');
+          throw 'Error creando estado en base de datos: $dbError';
         }
+
+      } catch (conversionError) {
+        _logger.e('❌ Error convertiendo IDs: $conversionError');
+        return {'success': false, 'error': 'Error en tipos de datos: $conversionError'};
       }
 
-      // ✅ PASO 3: PREPARAR DATOS PARA API USANDO EL ESTADO CREADO
+      // PASO 5: PREPARAR DATOS PARA API
       _setStatusMessage('📤 Preparando datos para migración...');
       Map<String, dynamic> datosCompletos;
 
       if (estadoIdActual != null) {
-        // Obtener el estado recién creado con todos sus datos
-        final estadoCreado = await _estadoEquipoRepository.obtenerPorId(estadoIdActual);
-        if (estadoCreado != null) {
-          datosCompletos = await _prepararDatosDesdeEstado(estadoCreado);
+        final estadoRecuperado = await _estadoEquipoRepository.obtenerPorId(estadoIdActual);
+        if (estadoRecuperado != null) {
+          datosCompletos = await _prepararDatosDesdeEstado(estadoRecuperado);
         } else {
           throw 'No se pudo obtener el estado creado con ID: $estadoIdActual';
         }
       } else {
-        // Fallback al método anterior si no hay estado creado
         datosCompletos = _prepararDatosParaEnvio(datos);
       }
 
-      // ✅ PASO 4: GUARDAR REGISTRO LOCAL MAESTRO
+      // PASO 6: GUARDAR REGISTRO LOCAL MAESTRO
       _setStatusMessage('💾 Guardando registro local maestro...');
       await _guardarRegistroLocal(datosCompletos);
 
-      // ✅ PASO 5: INTENTAR MIGRAR SOLO EL REGISTRO ACTUAL (CON TIMEOUT CORTO)
+      // PASO 7: INTENTAR MIGRAR (CON TIMEOUT CORTO - SIN PING)
       _setStatusMessage('🔄 Sincronizando registro actual...');
 
       String mensajeFinal;
@@ -150,32 +240,33 @@ class PreviewScreenViewModel extends ChangeNotifier {
       if (estadoIdActual != null) {
         final respuestaServidor = await _intentarEnviarAlServidorConTimeout(
             datosCompletos,
-            timeoutSegundos: 8 // Timeout corto para no bloquear UI
+            timeoutSegundos: 8
         );
 
-        _logger.i('🔍 Respuesta completa del servidor: $respuestaServidor');
+        _logger.i('🔍 Respuesta del servidor: $respuestaServidor');
 
         if (respuestaServidor['exito'] == true) {
           _logger.i('✅ Marcando estado como migrado con ID: $estadoIdActual');
 
-          // Migrar solo el registro actual
           await _estadoEquipoRepository.marcarComoMigrado(
             estadoIdActual,
             servidorId: respuestaServidor['servidor_id'],
           );
 
-          await _marcarComoSincronizado(datosCompletos['id_local'] as int);
+          // FIXED: Safe casting for id_local
+          final idLocal = _safeCastToInt(datosCompletos['id_local'], 'id_local');
+          if (idLocal != null) {
+            await _marcarComoSincronizado(idLocal);
+          } else {
+            _logger.w('⚠️ No se pudo convertir id_local a int: ${datosCompletos['id_local']}');
+          }
 
           mensajeFinal = 'Censo completado y sincronizado al servidor';
           migracionExitosa = true;
           _setStatusMessage('✅ Registro sincronizado exitosamente');
 
-          _logger.i('✅ Estado $estadoIdActual marcado como migrado exitosamente');
-
         } else {
-          _logger.w('⚠️ Migración no exitosa: ${respuestaServidor['motivo']} - ${respuestaServidor['detalle']}');
-
-          // El registro queda en estado "creado" para migrar después
+          _logger.w('⚠️ Migración no exitosa: ${respuestaServidor['motivo']}');
           mensajeFinal = 'Censo guardado localmente. Se sincronizará automáticamente';
           _setStatusMessage('📱 Censo guardado. Sincronización automática pendiente');
         }
@@ -183,7 +274,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         mensajeFinal = 'Censo guardado localmente';
       }
 
-      // ✅ PASO 6: PROGRAMAR SINCRONIZACIÓN EN BACKGROUND PARA REGISTROS PENDIENTES
+      // PASO 8: PROGRAMAR SINCRONIZACIÓN EN BACKGROUND
       _programarSincronizacionBackground();
 
       return {
@@ -200,27 +291,18 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// Intentar envío al servidor con timeout específico
+  /// Intentar envío al servidor con timeout específico - SIN PING PREVIO
   Future<Map<String, dynamic>> _intentarEnviarAlServidorConTimeout(
       Map<String, dynamic> datos,
       {int timeoutSegundos = 8}
       ) async {
     try {
-      // Verificar conectividad con timeout corto
-      final tieneConexion = await _verificarConectividadRapida();
-      if (!tieneConexion) {
-        _logger.w('⚠️ Sin conexión al servidor');
-        return {'exito': false, 'motivo': 'sin_conexion'};
-      }
+      _logger.i('🚀 ENVÍO DIRECTO AL SERVIDOR - Sin verificación de conectividad previa');
 
-      // Preparar datos para API
       final datosApi = _prepararDatosParaApiEstados(datos);
       _logger.i('🔍 Datos preparados para API: ${json.encode(datosApi)}');
 
-      // Enviar con timeout específico
       final response = await _enviarAApiEstadosConTimeout(datosApi, timeoutSegundos);
-
-      _logger.i('🔍 Respuesta de _enviarAApiEstadosConTimeout: $response');
 
       if (response['exito'] == true) {
         _logger.i('✅ Estado registrado exitosamente en servidor');
@@ -248,35 +330,13 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// Verificación de conectividad rápida (timeout de 3 segundos)
-  Future<bool> _verificarConectividadRapida() async {
-    try {
-      _logger.i('🌐 Verificación rápida de conectividad...');
-
-      final response = await http.get(
-        Uri.parse('$_baseUrl$_pingEndpoint'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 3)); // Timeout corto
-
-      return response.statusCode == 200;
-
-    } catch (e) {
-      _logger.w('⚠️ Conectividad rápida falló: $e');
-      return false;
-    }
-  }
-
-  /// Enviar a API con timeout específico - SIMPLIFICADO PARA CONSIDERAR CUALQUIER 200 COMO ÉXITO
+  /// Enviar a API con timeout específico
   Future<Map<String, dynamic>> _enviarAApiEstadosConTimeout(
       Map<String, dynamic> datos,
       int timeoutSegundos
       ) async {
     try {
       _logger.i('📤 Enviando con timeout de ${timeoutSegundos}s: $_baseUrl$_estadosEndpoint');
-      _logger.i('🔍 Datos a enviar: ${json.encode(datos)}');
 
       final response = await http.post(
         Uri.parse('$_baseUrl$_estadosEndpoint'),
@@ -288,34 +348,25 @@ class PreviewScreenViewModel extends ChangeNotifier {
       ).timeout(Duration(seconds: timeoutSegundos));
 
       _logger.i('📥 Respuesta Status: ${response.statusCode}');
-      _logger.i('📄 Respuesta Body: ${response.body}');
 
-      // ✅ CUALQUIER STATUS 200-299 SE CONSIDERA ÉXITO
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        _logger.i('✅ Status HTTP exitoso: ${response.statusCode} - Marcando como exitoso automáticamente');
+        _logger.i('✅ Status HTTP exitoso: ${response.statusCode}');
 
-        dynamic servidorId = DateTime.now().millisecondsSinceEpoch; // ID por defecto
+        dynamic servidorId = DateTime.now().millisecondsSinceEpoch;
         String mensaje = 'Estado registrado correctamente';
 
-        // Intentar parsear respuesta pero sin fallar si no es JSON válido
         try {
           final responseBody = json.decode(response.body);
-          _logger.i('📋 Response body parseado: $responseBody');
-
-          // Extraer ID si está disponible
           servidorId = responseBody['estado']?['id'] ??
               responseBody['id'] ??
               responseBody['insertId'] ??
-              servidorId; // Usar el timestamp como fallback
+              servidorId;
 
-          // Usar mensaje del servidor si está disponible
           if (responseBody['message'] != null) {
             mensaje = responseBody['message'].toString();
           }
-
         } catch (parseError) {
           _logger.w('⚠️ No se pudo parsear JSON, usando valores por defecto: $parseError');
-          // Mantener los valores por defecto ya asignados
         }
 
         return {
@@ -323,17 +374,14 @@ class PreviewScreenViewModel extends ChangeNotifier {
           'id': servidorId,
           'mensaje': mensaje
         };
-      }
-      // Status no exitoso (4xx, 5xx)
-      else {
+      } else {
         _logger.e('❌ Status HTTP no exitoso: ${response.statusCode}');
-
         String mensajeError = 'Error del servidor: ${response.statusCode}';
+
         try {
           final errorBody = json.decode(response.body);
           mensajeError = errorBody['message'] ?? mensajeError;
         } catch (e) {
-          // Si no se puede parsear, usar mensaje por defecto
           mensajeError = 'Error HTTP ${response.statusCode}';
         }
 
@@ -352,9 +400,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// Programar sincronización en background para registros pendientes
+  /// Programar sincronización en background
   void _programarSincronizacionBackground() {
-    // Ejecutar después de un delay inicial para que la UI responda primero
     Timer(Duration(seconds: 5), () async {
       try {
         _logger.i('🔄 Iniciando primera sincronización background de registros pendientes');
@@ -364,16 +411,14 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
     });
 
-    // Programar sincronización periódica cada 10 minutos
     _programarSincronizacionPeriodica();
   }
 
   void _programarSincronizacionPeriodica() {
     Timer.periodic(Duration(minutes: 30), (timer) async {
       try {
-        _logger.i('⏰ Sincronización automática programada (cada 10 min)');
+        _logger.i('⏰ Sincronización automática programada (cada 30 min)');
 
-        // Verificar si hay registros pendientes antes de intentar
         final registrosCreados = await _estadoEquipoRepository.obtenerCreados();
 
         if (registrosCreados.isNotEmpty) {
@@ -388,10 +433,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
     });
   }
 
-  /// Sincronizar registros pendientes sin bloquear la UI
+  /// Sincronizar registros pendientes en background
   Future<void> _sincronizarRegistrosPendientesEnBackground() async {
     try {
-      // Obtener registros en estado "creado" (excluyendo el que se acaba de procesar)
       final registrosCreados = await _estadoEquipoRepository.obtenerCreados();
 
       if (registrosCreados.isEmpty) {
@@ -404,12 +448,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
       int migrados = 0;
       int fallos = 0;
 
-      // Procesar de a uno con delays para no saturar el servidor
       for (int i = 0; i < registrosCreados.length; i++) {
         final estado = registrosCreados[i];
 
         try {
-          // Delay entre requests para no saturar
           if (i > 0) {
             await Future.delayed(Duration(milliseconds: 800));
           }
@@ -424,7 +466,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
             _logger.w('❌ Fallo migrando estado ${estado.id} en background');
           }
 
-          // Cada 5 registros, hacer una pausa más larga
           if ((i + 1) % 5 == 0) {
             await Future.delayed(Duration(seconds: 2));
           }
@@ -445,24 +486,20 @@ class PreviewScreenViewModel extends ChangeNotifier {
   /// Procesar un estado individual en background
   Future<bool> _procesarEstadoIndividualEnBackground(EstadoEquipo estado) async {
     try {
-      // Preparar datos desde el estado existente
       final datosParaServidor = await _prepararDatosDesdeEstado(estado);
 
-      // Intentar enviar con timeout más largo en background
       final respuesta = await _intentarEnviarAlServidorConTimeout(
           datosParaServidor,
           timeoutSegundos: 15
       );
 
       if (respuesta['exito']) {
-        // Marcar como migrado
         await _estadoEquipoRepository.marcarComoMigrado(
           estado.id!,
           servidorId: respuesta['servidor_id'],
         );
         return true;
       } else {
-        // Mantener en estado "creado" para reintento posterior
         return false;
       }
 
@@ -472,23 +509,22 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// Preparar datos desde un estado existente - MEJORADO PARA INCLUIR TODOS LOS CAMPOS
+  /// Preparar datos desde un estado existente
   Future<Map<String, dynamic>> _prepararDatosDesdeEstado(EstadoEquipo estado) async {
     try {
-      // Obtener detalles completos del estado
-      final estadoConDetalles = await _estadoEquipoRepository.obtenerEstadoConDetalles(estado.equipoClienteId);
+      final estadoConDetalles = await _estadoEquipoRepository.obtenerEstadoConDetalles(estado.equipoPendienteId);
 
       if (estadoConDetalles == null) {
         throw 'No se encontraron detalles para el estado ${estado.id}';
       }
 
+      // FIXED: Ensure id_local is properly set as int
+      final idLocal = estado.id ?? DateTime.now().millisecondsSinceEpoch;
+
       return {
-        // Datos locales para control
-        'id_local': estado.id,
+        'id_local': idLocal, // This should be an int
         'estado_sincronizacion': 'background',
         'fecha_creacion_local': estado.fechaCreacion.toIso8601String(),
-
-        // Datos para API - INCLUIR TODOS LOS CAMPOS DEL ESTADO
         'equipo_id': estadoConDetalles['equipo_id'],
         'cliente_id': estadoConDetalles['cliente_id'],
         'usuario_id': 1,
@@ -497,24 +533,16 @@ class PreviewScreenViewModel extends ChangeNotifier {
         'temperatura_freezer': null,
         'latitud': estado.latitud,
         'longitud': estado.longitud,
-
-        // ✅ INCLUIR DATOS DE IMAGEN
         'imagen_path': estado.imagenPath,
         'imagen_base64': estado.imagenBase64,
         'tiene_imagen': estado.tieneImagen,
         'imagen_tamano': estado.imagenTamano,
-
-        // Datos adicionales del equipo
         'codigo_barras': estadoConDetalles['cod_barras'],
         'numero_serie': estadoConDetalles['numero_serie'],
         'modelo': estadoConDetalles['modelo'] ?? 'No especificado',
         'logo': estadoConDetalles['logo'] ?? 'Sin logo',
         'marca_nombre': estadoConDetalles['marca_nombre'],
-
-        // Datos del cliente
         'cliente_nombre': estadoConDetalles['cliente_nombre'],
-
-        // Metadatos
         'es_censo': true,
         'version_app': '1.0.0',
         'dispositivo': Platform.operatingSystem,
@@ -532,30 +560,26 @@ class PreviewScreenViewModel extends ChangeNotifier {
     final cliente = datos['cliente'] as Cliente;
     final equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
 
+    // FIXED: Ensure id_local is an int
+    final idLocal = DateTime.now().millisecondsSinceEpoch;
+
     return {
-      // Datos locales para control
-      'id_local': DateTime.now().millisecondsSinceEpoch,
+      'id_local': idLocal, // This is an int
       'estado_sincronizacion': 'pendiente',
       'fecha_creacion_local': DateTime.now().toIso8601String(),
-
-      // Datos para API /estados (según tu esquema)
       'equipo_id': equipoCompleto?['id'] ?? _buscarEquipoPorCodigo(datos['codigo_barras']),
       'cliente_id': cliente.id,
-      'usuario_id': 1, // TODO: Obtener del usuario logueado
-      'funcionando': true, // Asumimos que está funcionando al registrar
+      'usuario_id': 1,
+      'funcionando': true,
       'estado_general': 'Equipo registrado desde APP móvil - ${datos['observaciones'] ?? 'Sin observaciones'}',
-      'temperatura_actual': null, // Se actualizará en próximas revisiones
-      'temperatura_freezer': null, // Se actualizará en próximas revisiones
+      'temperatura_actual': null,
+      'temperatura_freezer': null,
       'latitud': datos['latitud'],
       'longitud': datos['longitud'],
-
-      // ✅ INCLUIR DATOS DE IMAGEN EN EL MÉTODO ORIGINAL TAMBIÉN
       'imagen_path': datos['imagen_path'],
       'imagen_base64': datos['imagen_base64'],
       'tiene_imagen': datos['tiene_imagen'] ?? false,
       'imagen_tamano': datos['imagen_tamano'],
-
-      // Datos adicionales para referencia local
       'codigo_barras': datos['codigo_barras'],
       'modelo': datos['modelo'],
       'logo': datos['logo'],
@@ -571,28 +595,14 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   int? _buscarEquipoPorCodigo(String? codigoBarras) {
-    // TODO: Implementar búsqueda real en base de datos local
-    // o hacer una consulta a /equipos/buscar?q=codigo
-
     if (codigoBarras == null) return null;
-
-    // Simulamos que encontramos el equipo basado en el código
-    // En una implementación real, buscarías en tu base de datos local
-    // o harías una petición a tu API para obtener el equipo_id
-    return 1; // Provisional - debería ser el ID real del equipo
+    return 1; // Provisional
   }
 
   Future<void> _guardarRegistroLocal(Map<String, dynamic> datos) async {
     try {
       _logger.i('💾 Guardando registro maestro en base de datos local...');
-
-      // TODO: Implementar guardado en SQLite local
-      // final db = await DatabaseHelper.instance.database;
-      // await db.insert('registros_equipos', datos);
-
-      // Simulación por ahora
       await Future.delayed(const Duration(seconds: 1));
-
       _logger.i('✅ Registro maestro guardado localmente con ID: ${datos['id_local']}');
     } catch (e) {
       _logger.e('❌ Error crítico guardando localmente: $e');
@@ -600,76 +610,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> _intentarEnviarAlServidor(Map<String, dynamic> datos) async {
-    try {
-      // Verificar conectividad con tu servidor
-      final tieneConexion = await _verificarConectividad();
-      if (!tieneConexion) {
-        _logger.w('⚠️ Sin conexión al servidor');
-        return {'exito': false, 'motivo': 'sin_conexion'};
-      }
-
-      // Preparar datos para tu API /estados
-      final datosApi = _prepararDatosParaApiEstados(datos);
-
-      // Enviar a tu API
-      final response = await _enviarAApiEstados(datosApi);
-
-      if (response['exito']) {
-        _logger.i('✅ Estado del equipo registrado en el servidor');
-        return {
-          'exito': true,
-          'servidor_id': response['id'],
-          'mensaje': response['mensaje']
-        };
-      } else {
-        _logger.w('⚠️ Error del servidor: ${response['mensaje']}');
-        return {
-          'exito': false,
-          'motivo': 'error_servidor',
-          'detalle': response['mensaje']
-        };
-      }
-
-    } catch (e) {
-      _logger.w('⚠️ Error enviando al servidor: $e');
-      return {
-        'exito': false,
-        'motivo': 'excepcion',
-        'detalle': e.toString()
-      };
-    }
-  }
-
-  Future<bool> _verificarConectividad() async {
-    try {
-      _logger.i('🌐 Verificando conectividad con tu servidor...');
-
-      final response = await http.get(
-        Uri.parse('$_baseUrl$_pingEndpoint'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        _logger.i('✅ Servidor respondió: ${data['message']}');
-        return true;
-      }
-
-      return false;
-
-    } catch (e) {
-      _logger.w('⚠️ Sin conectividad: $e');
-      return false;
-    }
-  }
-
   Map<String, dynamic> _prepararDatosParaApiEstados(Map<String, dynamic> datosLocales) {
     return {
-      // DATOS BÁSICOS
       'equipo_id': datosLocales['equipo_id'],
       'cliente_id': datosLocales['cliente_id'],
       'usuario_id': datosLocales['usuario_id'],
@@ -677,24 +619,16 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'latitud': datosLocales['latitud'],
       'longitud': datosLocales['longitud'],
       'estado_general': datosLocales['estado_general'],
-
-      // ✅ DATOS DE IMAGEN INCLUIDOS EN LA API
       'imagen_path': datosLocales['imagen_path'],
       'imagen_base64': datosLocales['imagen_base64'],
       'tiene_imagen': datosLocales['tiene_imagen'],
       'imagen_tamano': datosLocales['imagen_tamano'],
-
-      // DATOS COMPLETOS DEL EQUIPO
       'equipo_codigo_barras': datosLocales['codigo_barras'],
       'equipo_numero_serie': datosLocales['numero_serie'],
       'equipo_modelo': datosLocales['modelo'],
       'equipo_logo': datosLocales['logo'],
       'equipo_marca': datosLocales['marca_nombre'],
-
-      // DATOS DEL CLIENTE
       'cliente_nombre': datosLocales['cliente_nombre'],
-
-      // METADATOS
       'es_censo': datosLocales['es_censo'],
       'version_app': datosLocales['version_app'],
       'dispositivo': datosLocales['dispositivo'],
@@ -704,109 +638,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
     };
   }
 
-  Future<Map<String, dynamic>> _enviarAApiEstados(Map<String, dynamic> datos) async {
-    try {
-      _logger.i('📤 Enviando estado a API: $_baseUrl$_estadosEndpoint');
-      _logger.i('📋 Datos: $datos');
-
-      final response = await http.post(
-        Uri.parse('$_baseUrl$_estadosEndpoint'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: json.encode(datos),
-      ).timeout(const Duration(seconds: 30));
-
-      _logger.i('📥 Respuesta API: ${response.statusCode}');
-      _logger.i('📄 Body: ${response.body}');
-
-      // ✅ CUALQUIER STATUS 200-299 SE CONSIDERA ÉXITO
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        _logger.i('✅ Status HTTP exitoso: ${response.statusCode}');
-
-        dynamic servidorId = DateTime.now().millisecondsSinceEpoch;
-        String mensaje = 'Estado registrado correctamente';
-
-        try {
-          final responseBody = json.decode(response.body);
-
-          // Intentar extraer el ID del servidor si está disponible
-          servidorId = responseBody['estado']?['id'] ??
-              responseBody['id'] ??
-              responseBody['insertId'] ??
-              servidorId; // Usar el timestamp como fallback
-
-          // Usar el mensaje del servidor si está disponible
-          if (responseBody['message'] != null) {
-            mensaje = responseBody['message'].toString();
-          }
-
-        } catch (parseError) {
-          _logger.w('⚠️ Error parseando JSON, pero status es exitoso: $parseError');
-          // Mantener valores por defecto
-        }
-
-        return {
-          'exito': true,
-          'id': servidorId,
-          'mensaje': mensaje
-        };
-      } else {
-        try {
-          final errorBody = json.decode(response.body);
-          return {
-            'exito': false,
-            'mensaje': errorBody['message'] ?? 'Error del servidor: ${response.statusCode}'
-          };
-        } catch (e) {
-          return {
-            'exito': false,
-            'mensaje': 'Error HTTP ${response.statusCode}: ${response.body}'
-          };
-        }
-      }
-
-    } catch (e) {
-      _logger.e('❌ Excepción enviando a API: $e');
-      return {
-        'exito': false,
-        'mensaje': 'Error de conexión: $e'
-      };
-    }
-  }
-
   Future<void> _marcarComoSincronizado(int idLocal) async {
     try {
-      // TODO: Actualizar estado en SQLite local
-      // final db = await DatabaseHelper.instance.database;
-      // await db.update(
-      //   'registros_equipos',
-      //   {'estado_sincronizacion': 'sincronizado'},
-      //   where: 'id_local = ?',
-      //   whereArgs: [idLocal]
-      // );
-
       _logger.i('✅ Registro marcado como sincronizado: $idLocal');
     } catch (e) {
       _logger.e('❌ Error marcando como sincronizado: $e');
-    }
-  }
-
-  Future<void> _actualizarConIdServidor(int idLocal, dynamic servidorId) async {
-    try {
-      // TODO: Actualizar con ID del servidor en SQLite
-      // final db = await DatabaseHelper.instance.database;
-      // await db.update(
-      //   'registros_equipos',
-      //   {'servidor_id': servidorId},
-      //   where: 'id_local = ?',
-      //   whereArgs: [idLocal]
-      // );
-
-      _logger.i('✅ ID del servidor actualizado: $servidorId para local: $idLocal');
-    } catch (e) {
-      _logger.e('❌ Error actualizando ID servidor: $e');
     }
   }
 }

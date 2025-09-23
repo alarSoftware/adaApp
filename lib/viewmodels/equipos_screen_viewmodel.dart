@@ -93,9 +93,9 @@ class EquipoListScreenViewModel extends ChangeNotifier {
       List<Map<String, dynamic>> equiposDB;
 
       if (query.isEmpty) {
-        // Sin filtro: cargar todos
+        // Sin filtro: cargar todos - SIN parámetro soloActivos
         _logger.i('Cargando TODOS los equipos...');
-        equiposDB = await _equipoRepository.obtenerCompletos(soloActivos: true);
+        equiposDB = await _equipoRepository.obtenerCompletos(); // CORREGIDO: sin parámetro
       } else {
         // Con filtro: usar búsqueda del Repository
         _logger.i('Usando buscarConDetalles con query: "$query"');
@@ -114,7 +114,7 @@ class EquipoListScreenViewModel extends ChangeNotifier {
         _logger.w('¡NO SE ENCONTRARON EQUIPOS!');
 
         // Hacer una prueba: cargar todos para ver si hay datos
-        final todosLosEquipos = await _equipoRepository.obtenerCompletos(soloActivos: true);
+        final todosLosEquipos = await _equipoRepository.obtenerCompletos(); // CORREGIDO: sin parámetro
         _logger.i('Prueba - Total de equipos en DB: ${todosLosEquipos.length}');
 
         if (todosLosEquipos.isNotEmpty) {
@@ -173,8 +173,8 @@ class EquipoListScreenViewModel extends ChangeNotifier {
     try {
       _logger.i('=== TEST BÚSQUEDA SIMPLE ===');
 
-      // Probar obtener todos
-      final todos = await _equipoRepository.obtenerCompletos(soloActivos: true);
+      // Probar obtener todos - SIN parámetro soloActivos
+      final todos = await _equipoRepository.obtenerCompletos(); // CORREGIDO: sin parámetro
       _logger.i('Total equipos: ${todos.length}');
 
       // Probar búsqueda con "pepsi"

@@ -37,15 +37,25 @@ class Cliente {
   }
 
   // Factory constructor desde Map (base de datos local)
+// Factory constructor desde Map (base de datos local) - VERSIÓN CORREGIDA
   factory Cliente.fromMap(Map<String, dynamic> map) {
     return Cliente(
-      id: map['id'] as int?,
-      nombre: map['nombre'] as String? ?? '',
-      codigo: map['codigo'] as int? ?? 0,
-      telefono: map['telefono'] as String? ?? '',
-      direccion: map['direccion'] as String? ?? '',
-      rucCi: map['ruc_ci'] as String? ?? '',
-      propietario: map['propietario'] as String? ?? '',
+      // Conversión segura de id - puede ser int, String, o null
+      id: map['id'] is int
+          ? map['id']
+          : int.tryParse(map['id']?.toString() ?? ''),
+
+      nombre: map['nombre']?.toString() ?? '',
+
+      // Conversión segura de codigo - puede ser int, String, o null
+      codigo: map['codigo'] is int
+          ? map['codigo'] ?? 0
+          : int.tryParse(map['codigo']?.toString() ?? '') ?? 0,
+
+      telefono: map['telefono']?.toString() ?? '',
+      direccion: map['direccion']?.toString() ?? '',
+      rucCi: map['ruc_ci']?.toString() ?? '',
+      propietario: map['propietario']?.toString() ?? '',
     );
   }
 

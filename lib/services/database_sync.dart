@@ -183,9 +183,6 @@ class DatabaseSync {
       'username': usuarioMapa['username'],
       'password': usuarioMapa['password'],
       'fullname': usuarioMapa['fullname'],
-      'sincronizado': usuarioMapa['sincronizado'] ?? 1,
-      'fecha_creacion': usuarioMapa['fecha_creacion'] ?? DateTime.now().toIso8601String(),
-      'fecha_actualizacion': usuarioMapa['fecha_actualizacion'] ?? DateTime.now().toIso8601String(),
     };
   }
 
@@ -195,8 +192,6 @@ class DatabaseSync {
     return {
       'id': marcaData['id'],
       'nombre': marcaData['marca'],
-      'activo': 1,
-      'fecha_creacion': DateTime.now().toIso8601String(),
     };
   }
 
@@ -217,8 +212,6 @@ class DatabaseSync {
     return {
       'id': logoData['id'],
       'nombre': logoData['logo'],
-      'activo': 1,
-      'fecha_creacion': DateTime.now().toIso8601String(),
     };
   }
 
@@ -229,11 +222,6 @@ class DatabaseSync {
       'id': data['id'],
       'usuario_id': data['usuario_id'],
       'cliente_id': data['cliente_id'],
-      'fecha_asignacion': data['fecha_asignacion'],
-      'activo': data['activo'] ?? 1,
-      'sincronizado': 1,
-      'fecha_creacion': data['fecha_asignacion'],
-      'fecha_actualizacion': DateTime.now().toIso8601String(),
     };
   }
 

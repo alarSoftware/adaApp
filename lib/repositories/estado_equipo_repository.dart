@@ -18,7 +18,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   String getDefaultOrderBy() => 'fecha_revision DESC';
 
   @override
-  String getBuscarWhere() => 'CAST(equipo_cliente_id AS TEXT) LIKE ?';
+  String getBuscarWhere() => 'CAST(equipo_pendiente_id AS TEXT) LIKE ?';
 
   @override
   List<dynamic> getBuscarArgs(String query) {
@@ -33,7 +33,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
 
   /// Crear nuevo estado con GPS
   Future<EstadoEquipo> crearNuevoEstado({
-    required int equipoClienteId,
+    required int equipoPendienteId,
     required bool enLocal,
     required DateTime fechaRevision,
     double? latitud,
@@ -41,7 +41,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     String? estadoCenso,
   }) async {
     final nuevoEstado = EstadoEquipo(
-      equipoClienteId: equipoClienteId,
+      equipoPendienteId: equipoPendienteId,
       enLocal: enLocal,
       fechaRevision: fechaRevision,
       fechaCreacion: DateTime.now(),
@@ -58,12 +58,12 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
 
   /// Registrar escaneo de equipo con ubicación
   Future<EstadoEquipo> registrarEscaneoEquipo({
-    required int equipoClienteId,
+    required int equipoPendienteId,
     required double latitud,
     required double longitud,
   }) async {
     final nuevoEstado = EstadoEquipo(
-      equipoClienteId: equipoClienteId,
+      equipoPendienteId: equipoPendienteId,
       enLocal: true,
       fechaRevision: DateTime.now(),
       fechaCreacion: DateTime.now(),
@@ -79,11 +79,9 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   // ========== MÉTODOS PARA MANEJO DE ESTADOS DE CENSO ==========
-
-  /// Crear nuevo estado de censo con estado 'creado' por defecto
   /// Crear nuevo estado de censo con estado 'creado' por defecto
   Future<EstadoEquipo> crearNuevoEstadoCenso({
-    required int equipoClienteId,
+    required int equipoPendienteId,
     required double latitud,
     required double longitud,
     DateTime? fechaRevision,
@@ -100,7 +98,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       final now = fechaRevision ?? DateTime.now();
 
       final nuevoEstado = EstadoEquipo(
-        equipoClienteId: equipoClienteId,
+        equipoPendienteId: equipoPendienteId,
         enLocal: enLocal,
         latitud: latitud,
         longitud: longitud,
@@ -118,7 +116,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       );
 
       final id = await insertar(nuevoEstado);
-      _logger.i('Estado CREADO ${tieneImagen ? "con imagen" : "sin imagen"} para equipo_cliente $equipoClienteId (ID: $id)');
+      _logger.i('Estado CREADO ${tieneImagen ? "con imagen" : "sin imagen"} para equipo_pendiente $equipoPendienteId (ID: $id)');
 
       return nuevoEstado.copyWith(id: id);
     } catch (e) {
@@ -302,12 +300,12 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
 
   // ========== MÉTODOS ORIGINALES EXISTENTES (SIN CAMBIOS) ==========
 
-  /// Obtener historial completo por equipo_cliente_id
+  /// Obtener historial completo por equipo_pendiente_id
   Future<List<EstadoEquipo>> obtenerHistorialCompleto(int equipoClienteId) async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
-        where: 'equipo_cliente_id = ?',
+        where: 'equipo_pendiente_id = ?',
         whereArgs: [equipoClienteId],
         orderBy: 'fecha_revision DESC',
       );
@@ -323,7 +321,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     try {
       final maps = await dbHelper.consultar(
         tableName,
-        where: 'equipo_cliente_id = ?',
+        where: 'equipo_pendiente_id = ?',
         whereArgs: [equipoClienteId],
         orderBy: 'fecha_revision DESC',
       );
@@ -339,7 +337,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     try {
       final maps = await dbHelper.consultar(
         tableName,
-        where: 'equipo_cliente_id = ?',
+        where: 'equipo_pendiente_id = ?',
         whereArgs: [equipoClienteId],
         orderBy: 'fecha_revision DESC',
         limit: 1,
@@ -356,7 +354,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     try {
       final maps = await dbHelper.consultar(
         tableName,
-        where: 'equipo_cliente_id = ?',
+        where: 'equipo_pendiente_id = ?',
         whereArgs: [equipoClienteId],
         orderBy: 'fecha_revision DESC',
         limit: limite,
@@ -428,7 +426,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     try {
       final result = await dbHelper.consultar(
         tableName,
-        where: 'equipo_cliente_id = ?',
+        where: 'equipo_pendiente_id = ?',
         whereArgs: [equipoClienteId],
       );
       return result.length;
@@ -471,30 +469,35 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-  /// Obtener estado del equipo con datos completos (con JOIN)
-  Future<Map<String, dynamic>?> obtenerEstadoConDetalles(int equipoClienteId) async {
+  Future<Map<String, dynamic>?> obtenerEstadoConDetalles(int? equipoPendienteId) async {
     try {
-      final sql = '''
-        SELECT se.*,
-               ec.equipo_id,
-               ec.cliente_id,
-               e.cod_barras,
-               e.numero_serie,
-               m.nombre as marca_nombre,
-               mo.nombre as modelo_nombre,
-               c.nombre as cliente_nombre
-        FROM Estado_Equipo se
-        JOIN equipo_cliente ec ON se.equipo_cliente_id = ec.id
-        JOIN equipos e ON ec.equipo_id = e.id
-        JOIN marcas m ON e.marca_id = m.id
-        JOIN modelos mo ON e.modelo_id = mo.id
-        JOIN clientes c ON ec.cliente_id = c.id
-        WHERE se.equipo_cliente_id = ?
-        ORDER BY se.fecha_revision DESC
-        LIMIT 1
-      ''';
+      // Si equipoPendienteId es null o 0, buscar por el estado ID actual
+      if (equipoPendienteId == null || equipoPendienteId == 0) {
+        _logger.w('equipoPendienteId is null/0, using direct approach');
+        return null; // O implementar búsqueda alternativa
+      }
 
-      final result = await dbHelper.consultarPersonalizada(sql, [equipoClienteId]);
+      final sql = '''
+      SELECT se.*,
+             ep.equipo_id,
+             ep.cliente_id,
+             e.cod_barras,
+             e.numero_serie,
+             m.nombre as marca_nombre,
+             mo.nombre as modelo_nombre,
+             c.nombre as cliente_nombre
+      FROM Estado_Equipo se
+      JOIN equipos_pendientes ep ON se.equipo_pendiente_id = ep.id
+      JOIN equipos e ON ep.equipo_id = e.id
+      JOIN marcas m ON e.marca_id = m.id
+      JOIN modelos mo ON e.modelo_id = mo.id
+      JOIN clientes c ON ep.cliente_id = c.id
+      WHERE se.id = ?  -- Cambiar a buscar por estado ID
+      ORDER BY se.fecha_revision DESC
+      LIMIT 1
+    ''';
+
+      final result = await dbHelper.consultarPersonalizada(sql, [equipoPendienteId]);
       return result.isNotEmpty ? result.first : null;
     } catch (e) {
       _logger.e('Error obteniendo estado con detalles: $e');
@@ -532,27 +535,84 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   // ========== MÉTODOS DE COMPATIBILIDAD (Para migración gradual) ==========
 
   /// Buscar equipoClienteId basado en equipoId y clienteId
-  Future<int?> buscarEquipoClienteId(int equipoId, int clienteId) async {
-    try {
-      final result = await dbHelper.consultar(
-        'equipo_cliente',
-        where: 'equipo_id = ? AND cliente_id = ? AND activo = 1',
-        whereArgs: [equipoId, clienteId],
-        limit: 1,
-      );
-      return result.isNotEmpty ? result.first['id'] as int : null;
-    } catch (e) {
-      _logger.e('Error buscando equipo_cliente_id: $e');
-      return null;
-    }
+  Future<int?> buscarEquipoPendienteId(int equipoId, int clienteId) async {
+    final result = await dbHelper.consultar(
+      'equipos_pendientes',
+      where: 'equipo_id = ? AND cliente_id = ?',
+      whereArgs: [equipoId, clienteId],
+      limit: 1,
+    );
+    return result.isNotEmpty ? result.first['id'] as int? : null;
   }
 
   /// Método de compatibilidad - buscar por equipoId y clienteId
   Future<EstadoEquipo?> obtenerUltimoEstadoPorEquipoCliente(int equipoId, int clienteId) async {
-    final equipoClienteId = await buscarEquipoClienteId(equipoId, clienteId);
-    if (equipoClienteId == null) return null;
+    final equipoPendienteId = await buscarEquipoPendienteId(equipoId, clienteId);
+    if (equipoPendienteId == null) return null;
 
-    return await obtenerUltimoEstado(equipoClienteId);
+    return await obtenerUltimoEstado(equipoPendienteId);
+  }
+
+  Future<EstadoEquipo> crearEstadoDirecto({
+    required String equipoId,
+    required int clienteId,
+    required double latitud,
+    required double longitud,
+    DateTime? fechaRevision,
+    bool enLocal = true,
+    String? observaciones,
+    String? imagenPath,
+    String? imagenBase64,
+    bool tieneImagen = false,
+    int? imagenTamano,
+  }) async {
+    try {
+      final now = fechaRevision ?? DateTime.now();
+
+      // Create the estado record directly using your database structure
+      final datosEstado = {
+        'equipo_id': equipoId,  // TEXT field
+        'cliente_id': clienteId,  // INTEGER field
+        'en_local': enLocal ? 1 : 0,
+        'latitud': latitud,
+        'longitud': longitud,
+        'fecha_revision': now.toIso8601String(),
+        'fecha_creacion': now.toIso8601String(),
+        'fecha_actualizacion': now.toIso8601String(),
+        'sincronizado': 0,
+        'imagen_path': imagenPath,
+        'imagen_base64': imagenBase64,
+        'tiene_imagen': tieneImagen ? 1 : 0,
+        'imagen_tamano': imagenTamano,
+        'estado_censo': 'creado',
+      };
+
+      final insertedId = await dbHelper.insertar(tableName, datosEstado);
+
+      _logger.i('✅ Estado creado directamente con ID: $insertedId para equipo: $equipoId, cliente: $clienteId');
+
+      // Return EstadoEquipo object with the proper ID
+      return EstadoEquipo(
+        id: insertedId, // Make sure this gets the actual inserted ID
+        equipoPendienteId: 0, // Not used in this structure
+        enLocal: enLocal,
+        latitud: latitud,
+        longitud: longitud,
+        fechaRevision: now,
+        fechaCreacion: now,
+        fechaActualizacion: now,
+        estaSincronizado: false,
+        imagenPath: imagenPath,
+        imagenBase64: imagenBase64,
+        tieneImagen: tieneImagen,
+        imagenTamano: imagenTamano,
+        estadoCenso: 'creado',
+      );
+
+    } catch (e) {
+      _logger.e('❌ Error creating estado directly: $e');
+      rethrow;
+    }
   }
 
   /// Método de compatibilidad - crear estado con equipoId y clienteId
@@ -564,14 +624,14 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     double? latitud,
     double? longitud,
   }) async {
-    final equipoClienteId = await buscarEquipoClienteId(equipoId, clienteId);
-    if (equipoClienteId == null) {
-      _logger.w('No se encontró relación equipo_cliente para equipoId: $equipoId, clienteId: $clienteId');
+    final equipoPendienteId = await buscarEquipoPendienteId(equipoId, clienteId);
+    if (equipoPendienteId == null) {
+      _logger.w('No se encontró relación equipos_pendientes para equipoId: $equipoId, clienteId: $clienteId');
       return null;
     }
 
     return await crearNuevoEstado(
-      equipoClienteId: equipoClienteId,
+      equipoPendienteId: equipoPendienteId,  // Usar el ID de equipos_pendientes
       enLocal: enLocal,
       fechaRevision: fechaRevision,
       latitud: latitud,
@@ -592,7 +652,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
   /// Crear nuevo estado de censo con imagen
   Future<EstadoEquipo> crearNuevoEstadoCensoConImagen({
-    required int equipoClienteId,
+    required int equipoPendienteId,
     required double latitud,
     required double longitud,
     DateTime? fechaRevision,
@@ -609,7 +669,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       final now = fechaRevision ?? DateTime.now();
 
       final nuevoEstado = EstadoEquipo(
-        equipoClienteId: equipoClienteId,
+        equipoPendienteId: equipoPendienteId,
         enLocal: enLocal,
         latitud: latitud,
         longitud: longitud,
@@ -627,7 +687,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       );
 
       final id = await insertar(nuevoEstado);
-      _logger.i('✅ Estado CREADO ${tieneImagen ? "con imagen" : "sin imagen"} para equipo_cliente $equipoClienteId (ID: $id)');
+      _logger.i('✅ Estado CREADO ${tieneImagen ? "con imagen" : "sin imagen"} para equipo_pendiente $equipoPendienteId (ID: $id)');
 
       return nuevoEstado.copyWith(id: id);
     } catch (e) {
@@ -762,6 +822,21 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
+  /// Obtener último estado por equipo_pendiente_id (para equipos pendientes)
+  Future<Map<String, dynamic>?> obtenerUltimoEstadoPorEquipoPendiente(int equipoPendienteId) async {
+    try {
+      final estado = await obtenerUltimoEstado(equipoPendienteId);
+      return estado?.toMap();
+    } catch (e) {
+      _logger.e('Error obteniendo último estado por equipo pendiente: $e');
+      return null;
+    }
+  }
+
+
+
+
+
   /// Validar integridad de datos de imagen
   Future<Map<String, dynamic>> validarIntegridadImagenes() async {
     try {
@@ -803,6 +878,57 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       };
     }
   }
+  /// Método corregido para obtener historial por equipo y cliente
+  Future<List<EstadoEquipo>> obtenerHistorialPorEquipoCliente(int equipoId, int clienteId) async {
+    try {
+      // Primero buscar el equipo_pendiente_id usando equipoId y clienteId
+      final equipoPendienteId = await buscarEquipoPendienteId(equipoId, clienteId);
+
+      if (equipoPendienteId == null) {
+        _logger.w('No se encontró relación equipos_pendientes para equipoId: $equipoId, clienteId: $clienteId');
+        return [];
+      }
+
+      // Usar el método existente que ya funciona correctamente
+      return await obtenerHistorialCompleto(equipoPendienteId);
+
+    } catch (e) {
+      _logger.e('Error obteniendo historial por equipo-cliente: $e');
+      return [];
+    }
+  }
+
+  Future<EstadoEquipo> crearNuevoEstadoPorEquipoCliente({
+    required int equipoId,
+    required int clienteId,
+    required bool enLocal,
+    required DateTime fechaRevision,
+    required double latitud,
+    required double longitud,
+  }) async {
+    try {
+      // First, find the equipo_pendiente_id
+      final equipoPendienteId = await buscarEquipoPendienteId(equipoId, clienteId);
+
+      if (equipoPendienteId == null) {
+        throw Exception('No se encontró relación equipos_pendientes para equipoId: $equipoId, clienteId: $clienteId');
+      }
+
+      // Use the existing method with the found equipo_pendiente_id
+      return await crearNuevoEstado(
+        equipoPendienteId: equipoPendienteId,
+        enLocal: enLocal,
+        fechaRevision: fechaRevision,
+        latitud: latitud,
+        longitud: longitud,
+      );
+
+    } catch (e) {
+      _logger.e('Error creando nuevo estado por equipo-cliente: $e');
+      rethrow;
+    }
+  }
+
 
   /// Limpiar imágenes huérfanas (opcional - para mantenimiento)
   Future<int> limpiarImagenesHuerfanas() async {

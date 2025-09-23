@@ -43,6 +43,7 @@ class SyncService {
       if (!resultadoEquipos.exito) resultado.erroresEquipos = resultadoEquipos.mensaje;
 
       // Sincronizar asignaciones
+      //TODO ronaldo limpiar codigo, refactorizar y quitar lo que no se usa
       final resultadoAsignaciones = await EquipmentSyncService.sincronizarAsignaciones();
       resultado.asignacionesSincronizadas = resultadoAsignaciones.itemsSincronizados;
       resultado.asignacionesExito = resultadoAsignaciones.exito;

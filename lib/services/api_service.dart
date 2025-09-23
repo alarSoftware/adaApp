@@ -5,31 +5,25 @@ import '../models/cliente.dart';
 import '../models/equipos.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
-import '../models/equipos_cliente.dart';
-
+import '../models/equipos_pendientes.dart';
 
 var logger = Logger();
 
 class ApiService {
-  // Cambia esta URL por tu endpoint real
   static const String baseUrl = 'https://71a489ac7ede.ngrok-free.app/adaControl/api/';
   static const String clientesEndpoint = '$baseUrl/getEdfClientes';
   static const String equiposEndpoint = '$baseUrl/getEdfEquipos';
 
-  // Timeout para las peticiones
   static const Duration timeout = Duration(seconds: 30);
 
-  // Headers comunes
   static Map<String, String> get _headers => {
     'Content-Type': 'application/json; charset=UTF-8',
     'Accept': 'application/json',
-    // 'Authorization': 'Bearer $token',
   };
 
-  // Buscar clientes por nombre o email - MEJORADO
+  // Buscar clientes por nombre o email
   static Future<BusquedaResponse> buscarClientes(String query, {int page = 1, int limit = 10}) async {
     try {
-      // Encoding de la query para manejar caracteres especiales
       final encodedQuery = Uri.encodeQueryComponent(query);
       final url = '$clientesEndpoint/buscar?q=$encodedQuery&page=$page&limit=$limit';
 
@@ -41,25 +35,21 @@ class ApiService {
       ).timeout(timeout);
 
       logger.i('Respuesta búsqueda - Status: ${response.statusCode}');
-      logger.i('Respuesta búsqueda - Body: ${response.body}');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         try {
           final Map<String, dynamic> responseData = jsonDecode(response.body);
 
-          // Procesar los clientes desde la respuesta
           List<Cliente> clientes = [];
           if (responseData.containsKey('clientes') && responseData['clientes'] is List) {
             clientes = (responseData['clientes'] as List)
                 .map((clienteJson) => Cliente.fromJson(clienteJson))
                 .toList();
           } else if (responseData.containsKey('data') && responseData['data'] is List) {
-            // Por si el servidor retorna los datos en un campo 'data'
             clientes = (responseData['data'] as List)
                 .map((clienteJson) => Cliente.fromJson(clienteJson))
                 .toList();
           } else if (responseData is List) {
-            // Por si el servidor retorna directamente un array
             clientes = (responseData as List)
                 .map((clienteJson) => Cliente.fromJson(clienteJson))
                 .toList();
@@ -83,7 +73,6 @@ class ApiService {
           );
         }
       } else {
-        // Error del servidor
         String mensajeError;
         try {
           Map<String, dynamic> errorData = jsonDecode(response.body);
@@ -114,12 +103,6 @@ class ApiService {
         mensaje: 'Tiempo de espera agotado',
         clientes: [],
       );
-    } on HttpException {
-      return BusquedaResponse(
-        exito: false,
-        mensaje: 'Error en la comunicación con el servidor',
-        clientes: [],
-      );
     } catch (e) {
       logger.e('Error inesperado en búsqueda: $e');
       return BusquedaResponse(
@@ -129,79 +112,148 @@ class ApiService {
       );
     }
   }
-  // Obtener todas las asignaciones equipo-cliente
-  static Future<BusquedaResponseEquipoCliente> obtenerTodasLasAsignaciones({int page = 1, int limit = 50}) async {
-    try {
-      const String asignacionesEndpoint = '$baseUrl/asignaciones'; // o el endpoint que tengas
-      final url = '$asignacionesEndpoint?page=$page&limit=$limit';
 
-      logger.i('Obteniendo todas las asignaciones desde: $url');
+  // CORREGIDO: Obtener equipos asignados (no asignaciones separadas)
+  static Future<BusquedaResponseEquipos> obtenerEquiposAsignados({int page = 1, int limit = 50}) async {
+    try {
+      final url = '$equiposEndpoint/asignados?page=$page&limit=$limit';
+
+      logger.i('Obteniendo equipos asignados desde: $url');
 
       final response = await http.get(
         Uri.parse(url),
         headers: _headers,
       ).timeout(timeout);
 
-      logger.i('Respuesta asignaciones - Status: ${response.statusCode}');
-      logger.i('Respuesta asignaciones - Body: ${response.body}');
+      logger.i('Respuesta equipos asignados - Status: ${response.statusCode}');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         try {
           final responseData = jsonDecode(response.body);
 
-          List<EquipoCliente> asignaciones = [];
+          List<Equipo> equipos = [];
           if (responseData is Map<String, dynamic>) {
-            if (responseData.containsKey('asignaciones') && responseData['asignaciones'] is List) {
-              asignaciones = (responseData['asignaciones'] as List)
-                  .map((asignacionJson) => EquipoCliente.fromJson(asignacionJson))
+            if (responseData.containsKey('equipos') && responseData['equipos'] is List) {
+              equipos = (responseData['equipos'] as List)
+                  .map((equipoJson) => Equipo.fromJson(equipoJson))
                   .toList();
             } else if (responseData.containsKey('data') && responseData['data'] is List) {
-              asignaciones = (responseData['data'] as List)
-                  .map((asignacionJson) => EquipoCliente.fromJson(asignacionJson))
+              equipos = (responseData['data'] as List)
+                  .map((equipoJson) => Equipo.fromJson(equipoJson))
                   .toList();
             }
           } else if (responseData is List) {
-            asignaciones = (responseData)
-                .map((asignacionJson) => EquipoCliente.fromJson(asignacionJson))
+            equipos = (responseData)
+                .map((equipoJson) => Equipo.fromJson(equipoJson))
                 .toList();
           }
 
-          return BusquedaResponseEquipoCliente(
+          return BusquedaResponseEquipos(
             exito: true,
-            mensaje: 'Asignaciones obtenidas correctamente - ${asignaciones.length} resultados',
-            asignaciones: asignaciones,
-            total: asignaciones.length,
+            mensaje: 'Equipos asignados obtenidos correctamente - ${equipos.length} resultados',
+            equipos: equipos,
+            total: equipos.length,
             pagina: page,
             totalPaginas: 1,
           );
 
         } catch (e) {
-          logger.e('Error parseando respuesta asignaciones: $e');
-          return BusquedaResponseEquipoCliente(
+          logger.e('Error parseando respuesta equipos asignados: $e');
+          return BusquedaResponseEquipos(
             exito: false,
             mensaje: 'Error procesando los datos: ${e.toString()}',
-            asignaciones: [],
+            equipos: [],
           );
         }
       } else {
-        return BusquedaResponseEquipoCliente(
+        return BusquedaResponseEquipos(
           exito: false,
           mensaje: 'Error del servidor (${response.statusCode})',
-          asignaciones: [],
+          equipos: [],
           codigoEstado: response.statusCode,
         );
       }
 
     } catch (e) {
-      return BusquedaResponseEquipoCliente(
+      return BusquedaResponseEquipos(
         exito: false,
         mensaje: 'Error: ${e.toString()}',
-        asignaciones: [],
+        equipos: [],
       );
     }
   }
 
-  // Método para obtener todos los clientes (útil para debug)
+  // NUEVO: Obtener equipos pendientes
+  static Future<BusquedaResponseEquiposPendientes> obtenerEquiposPendientes({int page = 1, int limit = 50}) async {
+    try {
+      final url = '$baseUrl/equipos-pendientes?page=$page&limit=$limit';
+
+      logger.i('Obteniendo equipos pendientes desde: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: _headers,
+      ).timeout(timeout);
+
+      logger.i('Respuesta equipos pendientes - Status: ${response.statusCode}');
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        try {
+          final responseData = jsonDecode(response.body);
+
+          List<EquiposPendientes> equiposPendientes = [];
+          if (responseData is Map<String, dynamic>) {
+            if (responseData.containsKey('equipos_pendientes') && responseData['equipos_pendientes'] is List) {
+              equiposPendientes = (responseData['equipos_pendientes'] as List)
+                  .map((equipoJson) => EquiposPendientes.fromMap(equipoJson))
+                  .toList();
+            } else if (responseData.containsKey('data') && responseData['data'] is List) {
+              equiposPendientes = (responseData['data'] as List)
+                  .map((equipoJson) => EquiposPendientes.fromMap(equipoJson))
+                  .toList();
+            }
+          } else if (responseData is List) {
+            equiposPendientes = (responseData)
+                .map((equipoJson) => EquiposPendientes.fromMap(equipoJson))
+                .toList();
+          }
+
+          return BusquedaResponseEquiposPendientes(
+            exito: true,
+            mensaje: 'Equipos pendientes obtenidos correctamente - ${equiposPendientes.length} resultados',
+            equiposPendientes: equiposPendientes,
+            total: equiposPendientes.length,
+            pagina: page,
+            totalPaginas: 1,
+          );
+
+        } catch (e) {
+          logger.e('Error parseando respuesta equipos pendientes: $e');
+          return BusquedaResponseEquiposPendientes(
+            exito: false,
+            mensaje: 'Error procesando los datos: ${e.toString()}',
+            equiposPendientes: [],
+          );
+        }
+      } else {
+        return BusquedaResponseEquiposPendientes(
+          exito: false,
+          mensaje: 'Error del servidor (${response.statusCode})',
+          equiposPendientes: [],
+          codigoEstado: response.statusCode,
+        );
+      }
+
+    } catch (e) {
+      return BusquedaResponseEquiposPendientes(
+        exito: false,
+        mensaje: 'Error: ${e.toString()}',
+        equiposPendientes: [],
+      );
+    }
+  }
+
+  // Método para obtener todos los clientes
   static Future<BusquedaResponse> obtenerTodosLosClientes({int page = 1, int limit = 50}) async {
     try {
       final url = '$clientesEndpoint?page=$page&limit=$limit';
@@ -212,9 +264,6 @@ class ApiService {
         Uri.parse(url),
         headers: _headers,
       ).timeout(timeout);
-
-      logger.i('Respuesta obtener todos - Status: ${response.statusCode}');
-      logger.i('Respuesta obtener todos - Body: ${response.body}');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         try {
@@ -354,9 +403,6 @@ class ApiService {
         headers: _headers,
       ).timeout(timeout);
 
-      logger.i('Respuesta equipos - Status: ${response.statusCode}');
-      logger.i('Respuesta equipos - Body: ${response.body}');
-
       if (response.statusCode >= 200 && response.statusCode < 300) {
         try {
           final responseData = jsonDecode(response.body);
@@ -416,7 +462,6 @@ class ApiService {
   // Procesar la respuesta del servidor
   static ApiResponse _procesarRespuesta(http.Response response, String mensajeExito) {
     logger.i('Respuesta del servidor - Status: ${response.statusCode}');
-    logger.i('Respuesta del servidor - Body: ${response.body}');
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       try {
@@ -479,7 +524,7 @@ class ApiService {
   }
 }
 
-// Clase específica para manejar respuestas de búsqueda
+// Clases de respuesta
 class BusquedaResponse {
   final bool exito;
   final String mensaje;
@@ -505,7 +550,6 @@ class BusquedaResponse {
   }
 }
 
-// Clase específica para manejar respuestas de búsqueda de equipos
 class BusquedaResponseEquipos {
   final bool exito;
   final String mensaje;
@@ -531,7 +575,6 @@ class BusquedaResponseEquipos {
   }
 }
 
-// Clase para manejar las respuestas generales de la API
 class ApiResponse {
   final bool exito;
   final String mensaje;
@@ -549,23 +592,22 @@ class ApiResponse {
   String toString() {
     return 'ApiResponse{exito: $exito, mensaje: $mensaje, codigoEstado: $codigoEstado}';
   }
-
 }
 
-// Clase específica para manejar respuestas de asignaciones equipo-cliente
-class BusquedaResponseEquipoCliente {
+// NUEVA: Clase para respuestas de equipos pendientes
+class BusquedaResponseEquiposPendientes {
   final bool exito;
   final String mensaje;
-  final List<EquipoCliente> asignaciones;
+  final List<EquiposPendientes> equiposPendientes;
   final int total;
   final int pagina;
   final int totalPaginas;
   final int? codigoEstado;
 
-  BusquedaResponseEquipoCliente({
+  BusquedaResponseEquiposPendientes({
     required this.exito,
     required this.mensaje,
-    required this.asignaciones,
+    required this.equiposPendientes,
     this.total = 0,
     this.pagina = 1,
     this.totalPaginas = 1,
@@ -574,7 +616,7 @@ class BusquedaResponseEquipoCliente {
 
   @override
   String toString() {
-    return 'BusquedaResponseEquipoCliente{exito: $exito, mensaje: $mensaje, '
-        'asignaciones: ${asignaciones.length}, total: $total}';
+    return 'BusquedaResponseEquiposPendientes{exito: $exito, mensaje: $mensaje, '
+        'equiposPendientes: ${equiposPendientes.length}, total: $total}';
   }
 }

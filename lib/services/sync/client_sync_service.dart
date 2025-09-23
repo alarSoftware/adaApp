@@ -95,7 +95,11 @@ class ClientSyncService {
         }
 
         BaseSyncService.logger.i('Guardando ${clientes.length} clientes en base de datos...');
-        await _clienteRepo.limpiarYSincronizar(clientes.cast<dynamic>());
+
+        // CORREGIDO: Usar limpiarYSincronizar con los mapas directos de los clientes
+        final clientesMapas = clientes.map((cliente) => cliente.toMap()).toList();
+        await _clienteRepo.limpiarYSincronizar(clientesMapas);
+
         BaseSyncService.logger.i('Clientes sincronizados exitosamente');
 
         return SyncResult(
@@ -165,55 +169,52 @@ class ClientSyncService {
     }
   }
 
+  // MÉTODO SIMPLIFICADO - Ya no usa sincronización de auditoría
   static Future<SyncResult> enviarClientesPendientes() async {
     try {
-      final clientesPendientes = await _clienteRepo.obtenerNoSincronizados();
+      BaseSyncService.logger.i('Verificando clientes pendientes por enviar...');
 
-      if (clientesPendientes.isEmpty) {
-        return SyncResult(
-          exito: true,
-          mensaje: 'No hay clientes pendientes por sincronizar',
-          itemsSincronizados: 0,
-        );
-      }
-
-      int exitosos = 0;
-      int fallidos = 0;
-
-      for (final cliente in clientesPendientes) {
-        try {
-          final resultado = await _enviarClienteAAPI(cliente);
-
-          if (resultado.exito) {
-            exitosos++;
-            if (cliente.id != null) {
-              await _clienteRepo.marcarComoSincronizados([cliente.id!]);
-            }
-          } else {
-            fallidos++;
-          }
-
-          await Future.delayed(const Duration(milliseconds: 200));
-        } catch (e) {
-          fallidos++;
-        }
-      }
-
-      final mensaje = fallidos == 0
-          ? 'Todos los clientes enviados correctamente ($exitosos/$exitosos)'
-          : exitosos > 0
-          ? 'Envío parcial: $exitosos exitosos, $fallidos fallidos'
-          : 'No se pudo enviar ningún cliente';
+      // Como la tabla clientes no tiene columna sincronizado,
+      // este método podría simplemente retornar que no hay pendientes
+      // O implementar otra lógica según tus necesidades de negocio
 
       return SyncResult(
-        exito: exitosos > 0,
-        mensaje: mensaje,
-        itemsSincronizados: exitosos,
+        exito: true,
+        mensaje: 'Tabla clientes no maneja estado de sincronización - todos los clientes se consideran sincronizados',
+        itemsSincronizados: 0,
       );
+
     } catch (e) {
       return SyncResult(
         exito: false,
         mensaje: 'Error inesperado: ${e.toString()}',
+        itemsSincronizados: 0,
+      );
+    }
+  }
+
+  // MÉTODO ALTERNATIVO: Si necesitas enviar clientes específicos
+  static Future<SyncResult> enviarClienteEspecifico(Cliente cliente) async {
+    try {
+      final resultado = await _enviarClienteAAPI(cliente);
+
+      if (resultado.exito) {
+        return SyncResult(
+          exito: true,
+          mensaje: 'Cliente enviado correctamente',
+          itemsSincronizados: 1,
+        );
+      } else {
+        return SyncResult(
+          exito: false,
+          mensaje: resultado.mensaje,
+          itemsSincronizados: 0,
+        );
+      }
+    } catch (e) {
+      return SyncResult(
+        exito: false,
+        mensaje: 'Error enviando cliente: ${e.toString()}',
         itemsSincronizados: 0,
       );
     }

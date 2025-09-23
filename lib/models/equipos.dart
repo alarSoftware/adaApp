@@ -1,15 +1,13 @@
 import 'dart:convert';
 
 class Equipo {
-  final int? id;
+  final String? id;
   final String? clienteId;
   final String codBarras;
   final int marcaId;
   final int modeloId;
   final String? numeroSerie;
   final int logoId;
-  final int estadoLocal;
-  final int activo;
   final DateTime fechaCreacion;
   final DateTime? fechaActualizacion;
   final int sincronizado;
@@ -27,8 +25,6 @@ class Equipo {
     required this.modeloId,
     this.numeroSerie,
     required this.logoId,
-    this.estadoLocal = 1,
-    this.activo = 1,
     DateTime? fechaCreacion,
     this.fechaActualizacion,
     this.sincronizado = 0,
@@ -40,24 +36,18 @@ class Equipo {
   factory Equipo.fromMap(Map<String, dynamic> map) {
     return Equipo(
       id: map['id'],
-      clienteId: map['cliente_id'],
+      clienteId: map['cliente_id']?.toString(),
       codBarras: map['cod_barras'] ?? '',
       marcaId: map['marca_id'] ?? 1,
       modeloId: map['modelo_id'] ?? 1,
       numeroSerie: map['numero_serie'],
       logoId: map['logo_id'] ?? 1,
-      estadoLocal: map['estado_local'] ?? 1,
-      activo: map['activo'] ?? 1,
-      fechaCreacion: map['fecha_creacion'] != null
-          ? DateTime.parse(map['fecha_creacion'])
-          : DateTime.now(),
-      fechaActualizacion: map['fecha_actualizacion'] != null
-          ? DateTime.parse(map['fecha_actualizacion'])
-          : null,
-      sincronizado: map['sincronizado'] ?? 0,
-      marcaNombre: map['marca_nombre'], // Para JOINs
+      fechaCreacion: DateTime.now(),
+      fechaActualizacion: null,
+      sincronizado: 0,
+      marcaNombre: map['marca_nombre'],
       modeloNombre: map['modelo_nombre'],
-      logoNombre: map['logo_nombre'],   // Para JOINs
+      logoNombre: map['logo_nombre'],
     );
   }
 
@@ -104,42 +94,21 @@ class Equipo {
       fechaAct = null;
     }
 
-    // Procesamos el clienteId (que SÍ debería llegar en el JSON individual)
     final clienteId = _safeParseString(json['clienteId']);
 
     return Equipo(
-      // ID: No uses json['id'] porque es string, mejor genera uno o usa null
-      id: null, // La BD asignará el ID automáticamente
-
-      // EL CÓDIGO DE BARRAS VIENE EN equipoId
+      id: _safeParseString(json['id']) ?? '',
       codBarras: _safeParseString(json['equipoId']) ?? '',
-
-      // marcaId viene como string "101", convertir a int
       marcaId: _safeParseInt(json['marcaId']),
-
-      // edfModeloId es el modelo (viene como int 102)
       modeloId: _safeParseInt(json['edfModeloId']),
-
-      // numSerie es el número de serie
       numeroSerie: _safeParseString(json['numSerie']),
-
-      // edfLogoId es el logo (viene como int 20, 24, etc.)
       logoId: _safeParseInt(json['edfLogoId']),
-
-      // clienteId debe llegar como string
       clienteId: clienteId,
-
-      // Estados basados en los campos de tu API
-      estadoLocal: json['esDisponible'] == true ? 1 : 0,
-      activo: json['esActivo'] == true ? 1 : 0,
-
       fechaCreacion: fecha,
       fechaActualizacion: fechaAct,
       sincronizado: 0, // Siempre 0 para datos que vienen de API
-
-      // Nombres para mostrar (temporal hasta hacer JOIN)
       marcaNombre: null, // Se llenará con JOIN posteriormente
-      modeloNombre: _safeParseString(json['equipo'])?.replaceAll('\n', ' '), // Limpiar saltos de línea
+      modeloNombre: _safeParseString(json['equipo'])?.replaceAll('\n', ' '),
       logoNombre: null, // Se llenará con JOIN posteriormente
     );
   }
@@ -153,12 +122,6 @@ class Equipo {
       'modelo_id': modeloId,
       'numero_serie': numeroSerie,
       'logo_id': logoId,
-      'estado_local': estadoLocal,
-      'activo': activo,
-      'fecha_creacion': fechaCreacion.toIso8601String(),
-      'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
-      'sincronizado': sincronizado,
-      // No incluir nombres en el map para DB
     };
   }
 
@@ -176,9 +139,6 @@ class Equipo {
       'numeroSerie': numeroSerie, // Para compatibilidad
       'logo_id': logoId,
       'logoId': logoId, // Para compatibilidad con API
-      'estado_local': estadoLocal,
-      'estadoLocal': estadoLocal, // Para compatibilidad
-      'activo': activo,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fechaCreacion': fechaCreacion.toIso8601String(), // Para compatibilidad
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
@@ -191,15 +151,13 @@ class Equipo {
   }
 
   Equipo copyWith({
-    int? id,
+    String? id,
     String? clienteId,
     String? codBarras,
     int? marcaId,
     int? modeloId,
     String? numeroSerie,
     int? logoId,
-    int? estadoLocal,
-    int? activo,
     DateTime? fechaCreacion,
     DateTime? fechaActualizacion,
     int? sincronizado,
@@ -215,8 +173,6 @@ class Equipo {
       modeloId: modeloId ?? this.modeloId,
       numeroSerie: numeroSerie ?? this.numeroSerie,
       logoId: logoId ?? this.logoId,
-      estadoLocal: estadoLocal ?? this.estadoLocal,
-      activo: activo ?? this.activo,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
       sincronizado: sincronizado ?? this.sincronizado,
@@ -227,17 +183,15 @@ class Equipo {
   }
 
   // Métodos de utilidad
-  bool get estaActivo => activo == 1;
   bool get estaSincronizado => sincronizado == 1;
-  bool get estaDisponible => estadoLocal == 1;
   String get nombreCompleto => '$marcaNombre $modeloNombre';
   String get nombreCompletoFallback => 'MarcaID:$marcaId ModeloID:$modeloId';
 
   @override
   String toString() {
     return 'Equipo{id: $id, clienteId: $clienteId, codBarras: $codBarras, marcaId: $marcaId, modeloId: $modeloId, '
-        'numeroSerie: $numeroSerie, logoId: $logoId, estadoLocal: $estadoLocal, '
-        'activo: $activo, sincronizado: $sincronizado, marcaNombre: $marcaNombre, '
+        'numeroSerie: $numeroSerie, logoId: $logoId, '
+        'sincronizado: $sincronizado, marcaNombre: $marcaNombre, '
         'modeloNombre: $modeloNombre, logoNombre: $logoNombre}';
   }
 
@@ -343,30 +297,6 @@ List<Equipo> parseEquiposFromDirectArray(List<dynamic> equiposJson) {
 // EJEMPLOS DE USO
 // ========================================
 
-/// Ejemplo con HTTP request
-/*
-import 'package:http/http.dart' as http;
-
-Future<List<Equipo>> obtenerEquiposDesdeAPI() async {
-  try {
-    final response = await http.get(
-      Uri.parse('tu_url_api_aqui'),
-      headers: {'Content-Type': 'application/json'},
-    );
-
-    if (response.statusCode == 200) {
-      // Usar la función de parsing
-      return parseEquiposFromApiResponse(response.body);
-    } else {
-      throw Exception('Error en la API: ${response.statusCode}');
-    }
-  } catch (e) {
-    print('Error obteniendo equipos: $e');
-    return [];
-  }
-}
-*/
-
 /// Ejemplo de uso básico
 void ejemploDeUso() {
   // Tu JSON de ejemplo
@@ -387,33 +317,23 @@ void ejemploDeUso() {
   }
 }
 
-// Modelos auxiliares para las tablas de referencia
+// ========================================
+// MODELOS AUXILIARES CORREGIDOS
+// ========================================
+
 class Marca {
   final int? id;
   final String nombre;
-  final int activo;
-  final DateTime fechaCreacion;
-  final DateTime? fechaActualizacion;
 
   Marca({
     this.id,
     required this.nombre,
-    this.activo = 1,
-    DateTime? fechaCreacion,
-    this.fechaActualizacion,
-  }) : fechaCreacion = fechaCreacion ?? DateTime.now();
+  });
 
   factory Marca.fromMap(Map<String, dynamic> map) {
     return Marca(
       id: map['id'],
       nombre: map['nombre'] ?? '',
-      activo: map['activo'] ?? 1,
-      fechaCreacion: map['fecha_creacion'] != null
-          ? DateTime.parse(map['fecha_creacion'])
-          : DateTime.now(),
-      fechaActualizacion: map['fecha_actualizacion'] != null
-          ? DateTime.parse(map['fecha_actualizacion'])
-          : null,
     );
   }
 
@@ -421,9 +341,6 @@ class Marca {
     return {
       'id': id,
       'nombre': nombre,
-      'activo': activo,
-      'fecha_creacion': fechaCreacion.toIso8601String(),
-      'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
     };
   }
 
@@ -435,32 +352,16 @@ class Marca {
 class Modelo {
   final int? id;
   final String nombre;
-  final int marcaId;
-  final int activo;
-  final DateTime fechaCreacion;
-  final DateTime? fechaActualizacion;
 
   Modelo({
     this.id,
     required this.nombre,
-    required this.marcaId,
-    this.activo = 1,
-    DateTime? fechaCreacion,
-    this.fechaActualizacion,
-  }) : fechaCreacion = fechaCreacion ?? DateTime.now();
+  });
 
   factory Modelo.fromMap(Map<String, dynamic> map) {
     return Modelo(
       id: map['id'],
       nombre: map['nombre'] ?? '',
-      marcaId: map['marca_id'] ?? 1,
-      activo: map['activo'] ?? 1,
-      fechaCreacion: map['fecha_creacion'] != null
-          ? DateTime.parse(map['fecha_creacion'])
-          : DateTime.now(),
-      fechaActualizacion: map['fecha_actualizacion'] != null
-          ? DateTime.parse(map['fecha_actualizacion'])
-          : null,
     );
   }
 
@@ -468,10 +369,6 @@ class Modelo {
     return {
       'id': id,
       'nombre': nombre,
-      'marca_id': marcaId,
-      'activo': activo,
-      'fecha_creacion': fechaCreacion.toIso8601String(),
-      'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
     };
   }
 
@@ -483,29 +380,16 @@ class Modelo {
 class Logo {
   final int? id;
   final String nombre;
-  final int activo;
-  final DateTime fechaCreacion;
-  final DateTime? fechaActualizacion;
 
   Logo({
     this.id,
     required this.nombre,
-    this.activo = 1,
-    DateTime? fechaCreacion,
-    this.fechaActualizacion,
-  }) : fechaCreacion = fechaCreacion ?? DateTime.now();
+  });
 
   factory Logo.fromMap(Map<String, dynamic> map) {
     return Logo(
       id: map['id'],
       nombre: map['nombre'] ?? '',
-      activo: map['activo'] ?? 1,
-      fechaCreacion: map['fecha_creacion'] != null
-          ? DateTime.parse(map['fecha_creacion'])
-          : DateTime.now(),
-      fechaActualizacion: map['fecha_actualizacion'] != null
-          ? DateTime.parse(map['fecha_actualizacion'])
-          : null,
     );
   }
 
@@ -513,9 +397,6 @@ class Logo {
     return {
       'id': id,
       'nombre': nombre,
-      'activo': activo,
-      'fecha_creacion': fechaCreacion.toIso8601String(),
-      'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
     };
   }
 
