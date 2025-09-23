@@ -180,22 +180,39 @@ let marcas = [
 ];
 
 let usuarios = [
-    { id: 1, nombre: 'Admin', email: 'admin@sistema.com', contraseña: 'admin123', rol: 'administrador', fecha_creacion: new Date().toISOString() },
-    { id: 2, nombre: 'Técnico 1', email: 'tecnico1@sistema.com', contraseña: 'tec123', rol: 'tecnico', fecha_creacion: new Date().toISOString() },
-    { id: 3, nombre: 'Técnico 2', email: 'tecnico2@sistema.com', contraseña: 'tec234', rol: 'tecnico', fecha_creacion: new Date().toISOString() },
-    { id: 4, nombre: 'Técnico 3', email: 'tecnico3@sistema.com', contraseña: 'tec345', rol: 'tecnico', fecha_creacion: new Date().toISOString() },
-    { id: 5, nombre: 'Supervisor', email: 'supervisor@sistema.com', contraseña: 'sup123', rol: 'supervisor', fecha_creacion: new Date().toISOString() },
-    { id: 6, nombre: 'Gerente', email: 'gerente@sistema.com', contraseña: 'ger123', rol: 'administrador', fecha_creacion: new Date().toISOString() },
-    { id: 7, nombre: 'Operador 1', email: 'operador1@sistema.com', contraseña: 'ope123', rol: 'operador', fecha_creacion: new Date().toISOString() },
-    { id: 8, nombre: 'Operador 2', email: 'operador2@sistema.com', contraseña: 'ope234', rol: 'operador', fecha_creacion: new Date().toISOString() },
-    { id: 9, nombre: 'Operador 3', email: 'operador3@sistema.com', contraseña: 'ope345', rol: 'operador', fecha_creacion: new Date().toISOString() },
-    { id: 10, nombre: 'Supervisor 2', email: 'supervisor2@sistema.com', contraseña: 'sup234', rol: 'supervisor', fecha_creacion: new Date().toISOString() },
-    { id: 11, nombre: 'Soporte 1', email: 'soporte1@sistema.com', contraseña: 'sop123', rol: 'soporte', fecha_creacion: new Date().toISOString() },
-    { id: 12, nombre: 'Soporte 2', email: 'soporte2@sistema.com', contraseña: 'sop234', rol: 'soporte', fecha_creacion: new Date().toISOString() },
-    { id: 13, nombre: 'Invitado', email: 'invitado@sistema.com', contraseña: 'inv123', rol: 'invitado', fecha_creacion: new Date().toISOString() },
-    { id: 14, nombre: 'Auditor', email: 'auditor@sistema.com', contraseña: 'aud123', rol: 'auditor', fecha_creacion: new Date().toISOString() },
-    { id: 15, nombre: 'Root', email: 'root@sistema.com', contraseña: 'root123', rol: 'administrador', fecha_creacion: new Date().toISOString() }
+  { id: 1, nombre: 'Admin', password: '{bcrypt}$2a$10$dDAdiwP9.UOG3KbtvBKDJOb7QaksV0evvrmdRzQP4DsDit4QSrpyO', rol: 'admin' },
+  { id: 2, nombre: 'Ronaldo', password: '{bcrypt}$2a$10$MojW2uA4Vg3NENS/MUIa.eJjZERfy0pHoX/SCRIXM7zE3PyH6oFR.', rol: 'vendedor' },//ronaldoRebollo
+  { id: 3, nombre: 'Armando', password: '{bcrypt}$2a$10$WbDF9Bc6qZ5rJztoFSgWz.4W1ezOwnqoNsQlERcwrv7Dg7t9ZsXx.', rol: 'vendedor' },
+  { id: 4, nombre: 'Fernando', password: 'Fernando123', rol: 'vendedor' },
+ { id: 5, nombre: 'Valeria', password: 'Valeria123', rol: 'vendedor' },
 ];
+
+let usuarioCliente = [
+  // Vendedor 2
+  { id: 1, usuario_id: 2, cliente_id: 1, fecha_asignacion: new Date().toISOString(), activo: 1 },
+  { id: 2, usuario_id: 2, cliente_id: 2, fecha_asignacion: new Date().toISOString(), activo: 1 },
+  { id: 3, usuario_id: 2, cliente_id: 3, fecha_asignacion: new Date().toISOString(), activo: 1 },
+  { id: 4, usuario_id: 2, cliente_id: 4, fecha_asignacion: new Date().toISOString(), activo: 1 },
+  
+  // Vendedor 3
+  { id: 5, usuario_id: 3, cliente_id: 5, fecha_asignacion: new Date().toISOString(), activo: 1 },
+  { id: 6, usuario_id: 3, cliente_id: 6, fecha_asignacion: new Date().toISOString(), activo: 1 },
+  { id: 7, usuario_id: 3, cliente_id: 7, fecha_asignacion: new Date().toISOString(), activo: 1 },
+  { id: 8, usuario_id: 3, cliente_id: 8, fecha_asignacion: new Date().toISOString(), activo: 1 },
+  
+  // Vendedor 4
+  { id: 9, usuario_id: 4, cliente_id: 9, fecha_asignacion: new Date().toISOString(), activo: 1 },
+  { id: 10, usuario_id: 4, cliente_id: 10, fecha_asignacion: new Date().toISOString(), activo: 1 },
+  { id: 11, usuario_id: 4, cliente_id: 11, fecha_asignacion: new Date().toISOString(), activo: 1 },
+  { id: 12, usuario_id: 4, cliente_id: 12, fecha_asignacion: new Date().toISOString(), activo: 1 },
+  
+  // Vendedor 5
+  { id: 13, usuario_id: 5, cliente_id: 13, fecha_asignacion: new Date().toISOString(), activo: 1 },
+  { id: 14, usuario_id: 5, cliente_id: 14, fecha_asignacion: new Date().toISOString(), activo: 1 },
+  { id: 15, usuario_id: 5, cliente_id: 15, fecha_asignacion: new Date().toISOString(), activo: 1 },
+  { id: 16, usuario_id: 5, cliente_id: 16, fecha_asignacion: new Date().toISOString(), activo: 1 },
+];
+
 
 let equipoCliente = [
   // Cliente 1
@@ -431,16 +448,8 @@ app.post('/equipos', (req, res) => {
 
 // USUARIOS
 app.get('/usuarios', (req, res) => {
-    const usuariosSinPassword = usuarios.map(u => ({
-        id: u.id,
-        nombre: u.nombre,
-        email: u.email,
-        rol: u.rol,
-        fecha_creacion: u.fecha_creacion
-    }));
-    
-    console.log(`📤 Enviando ${usuariosSinPassword.length} usuarios (sin contraseñas)`);
-    res.json(usuariosSinPassword);
+    console.log(`📤 Enviando ${usuarios.length} usuarios (con contraseñas)`);
+    res.json(usuarios);  // Envía todo incluyendo passwords
 });
 
 app.post('/usuarios/login', (req, res) => {
@@ -646,6 +655,150 @@ app.get('/dashboard', (req, res) => {
     console.log(`   - ${estadisticas.refrigeradores.funcionando} funcionando, ${estadisticas.refrigeradores.en_reparacion} en reparación`);
     
     res.json(estadisticas);
+});
+// Agregar esta nueva estructura de datos para Estado_Equipo
+let estadoEquipo = [
+  // Algunos datos de ejemplo que coincidan con tu modelo
+  { 
+    id: 1, 
+    equipo_cliente_id: 1, 
+    en_local: true, 
+    latitud: -25.2637, 
+    longitud: -57.5759, 
+    fecha_revision: new Date().toISOString(), 
+    fecha_creacion: new Date().toISOString(), 
+    fecha_actualizacion: new Date().toISOString(), 
+    sincronizado: true, 
+    estado_censo: 'migrado' 
+  },
+  { 
+    id: 2, 
+    equipo_cliente_id: 2, 
+    en_local: false, 
+    latitud: -25.2800, 
+    longitud: -57.6300, 
+    fecha_revision: new Date().toISOString(), 
+    fecha_creacion: new Date().toISOString(), 
+    fecha_actualizacion: new Date().toISOString(), 
+    sincronizado: true, 
+    estado_censo: 'migrado' 
+  },
+];
+
+// ENDPOINT /estados - POST (agregar después de los endpoints existentes)
+app.post('/estados', (req, res) => {
+    const { 
+        equipo_cliente_id, 
+        en_local, 
+        latitud, 
+        longitud, 
+        estado_censo = 'migrado' // Al llegar al servidor, marcamos como migrado
+    } = req.body;
+    
+    console.log(`📥 Nuevo estado de equipo recibido:`);
+    console.log(`   - Equipo Cliente ID: ${equipo_cliente_id}`);
+    console.log(`   - En Local: ${en_local ? 'SÍ' : 'NO'}`);
+    console.log(`   - Latitud: ${latitud}`);
+    console.log(`   - Longitud: ${longitud}`);
+    console.log(`   - Estado Censo: ${estado_censo}`);
+    
+    // Validaciones básicas
+    if (!equipo_cliente_id) {
+        console.log(`❌ Error: equipo_cliente_id es requerido`);
+        return res.status(400).json({
+            success: false,
+            message: 'equipo_cliente_id es requerido'
+        });
+    }
+
+    if (latitud === undefined || longitud === undefined) {
+        console.log(`❌ Error: latitud y longitud son requeridas`);
+        return res.status(400).json({
+            success: false,
+            message: 'latitud y longitud son requeridas'
+        });
+    }
+
+    // Verificar que la relación equipo_cliente existe
+    const equipoClienteExiste = equipoCliente.find(ec => ec.id === parseInt(equipo_cliente_id));
+    if (!equipoClienteExiste) {
+        console.log(`❌ Error: Relación equipo_cliente con ID ${equipo_cliente_id} no encontrada`);
+        return res.status(404).json({
+            success: false,
+            message: `Relación equipo_cliente con ID ${equipo_cliente_id} no encontrada`
+        });
+    }
+
+    // Crear nuevo estado
+    const nuevoId = estadoEquipo.length > 0 ? Math.max(...estadoEquipo.map(ee => ee.id)) + 1 : 1;
+    const fechaActual = new Date().toISOString();
+    
+    const nuevoEstado = {
+        id: nuevoId,
+        equipo_cliente_id: parseInt(equipo_cliente_id),
+        en_local: en_local === true || en_local === 1,
+        latitud: parseFloat(latitud),
+        longitud: parseFloat(longitud),
+        fecha_revision: fechaActual,
+        fecha_creacion: fechaActual,
+        fecha_actualizacion: fechaActual,
+        sincronizado: true, // Al llegar al servidor, está sincronizado
+        estado_censo: estado_censo
+    };
+    
+    estadoEquipo.push(nuevoEstado);
+    
+    // Obtener información completa para la respuesta (simulando JOIN)
+    const equipo = equipos.find(e => e.id === equipoClienteExiste.equipo_id);
+    const cliente = clientes.find(c => c.id === equipoClienteExiste.cliente_id);
+    const marca = marcas.find(m => m.id === equipo?.marca_id);
+    const modeloInfo = modelo.find(mo => mo.id === equipo?.modelo_id);
+    
+    const estadoCompleto = {
+        ...nuevoEstado,
+        // Información adicional para la respuesta
+        equipo_id: equipoClienteExiste.equipo_id,
+        cliente_id: equipoClienteExiste.cliente_id,
+        cod_barras: equipo?.cod_barras,
+        numero_serie: equipo?.numero_serie,
+        marca_nombre: marca?.nombre,
+        modelo_nombre: modeloInfo?.modelo,
+        cliente_nombre: cliente?.nombre
+    };
+
+    console.log(`✅ Estado creado exitosamente con ID: ${nuevoId}`);
+    console.log(`📋 Para equipo: ${marca?.nombre} ${modeloInfo?.modelo} - Cliente: ${cliente?.nombre}`);
+
+    res.status(201).json({
+        success: true,
+        message: 'Estado del equipo registrado correctamente',
+        estado: estadoCompleto
+    });
+});
+
+// ENDPOINT /estados - GET (opcional, para consultar estados)
+app.get('/estados', (req, res) => {
+    const { equipo_cliente_id, estado_censo } = req.query;
+    
+    let estadosFiltrados = [...estadoEquipo];
+    
+    if (equipo_cliente_id) {
+        estadosFiltrados = estadosFiltrados.filter(ee => ee.equipo_cliente_id === parseInt(equipo_cliente_id));
+    }
+    
+    if (estado_censo) {
+        estadosFiltrados = estadosFiltrados.filter(ee => ee.estado_censo === estado_censo);
+    }
+    
+    console.log(`📤 Enviando ${estadosFiltrados.length} estados de equipos`);
+    if (equipo_cliente_id) console.log(`   - Filtrado por equipo_cliente_id: ${equipo_cliente_id}`);
+    if (estado_censo) console.log(`   - Filtrado por estado_censo: ${estado_censo}`);
+    
+    res.json({
+        success: true,
+        estados: estadosFiltrados,
+        total: estadosFiltrados.length
+    });
 });
 
 // Error handling
