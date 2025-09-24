@@ -20,8 +20,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
   final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
   final EquipoPendienteRepository _equipoPendienteRepository = EquipoPendienteRepository();
 
-  static const String _baseUrl = 'https://5ccac7b809ca.ngrok-free.app/adaControl/api/';
-  static const String _estadosEndpoint = 'postCenso';
+  static const String _baseUrl = 'https://249adc5dd651.ngrok-free.app/adaControl/';
+  static const String _estadosEndpoint = 'censoActivo/insertCensoActivo';
 
   bool get isLoading => _isLoading;
   String? get statusMessage => _statusMessage;
@@ -120,7 +120,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         _logger.i('ℹ️ Equipo ya asignado - no se crea registro pendiente');
       }
 
-      // PASO 3: CREAR ESTADO DIRECTAMENTE
+      // ✅ CAMBIO 1: CREAR ESTADO CON AMBAS IMÁGENES
       _setStatusMessage('📋 Registrando estado como CREADO...');
       try {
         final estadoCreado = await _estadoEquipoRepository.crearEstadoDirecto(
@@ -131,10 +131,16 @@ class PreviewScreenViewModel extends ChangeNotifier {
           fechaRevision: DateTime.now(),
           enLocal: true,
           observaciones: datos['observaciones']?.toString(),
+          // Primera imagen
           imagenPath: datos['imagen_path'],
           imagenBase64: datos['imagen_base64'],
           tieneImagen: datos['tiene_imagen'] ?? false,
           imagenTamano: datos['imagen_tamano'],
+          // Segunda imagen
+          imagenPath2: datos['imagen_path2'],
+          imagenBase64_2: datos['imagen_base64_2'],
+          tieneImagen2: datos['tiene_imagen2'] ?? false,
+          imagenTamano2: datos['imagen_tamano2'],
         );
 
         if (estadoCreado.id != null) {
@@ -149,7 +155,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         throw 'Error creando estado en base de datos: $dbError';
       }
 
-      // PASO 4: PREPARAR DATOS PARA API
+      // ✅ CAMBIO 2: INCLUIR SEGUNDA IMAGEN EN DATOS COMPLETOS
       _setStatusMessage('📤 Preparando datos para migración...');
       Map<String, dynamic> datosCompletos;
 
@@ -170,10 +176,19 @@ class PreviewScreenViewModel extends ChangeNotifier {
           'temperatura_freezer': null,
           'latitud': datos['latitud'],
           'longitud': datos['longitud'],
+
+          // Primera imagen
           'imagen_path': datos['imagen_path'],
           'imagen_base64': datos['imagen_base64'],
           'tiene_imagen': datos['tiene_imagen'] ?? false,
           'imagen_tamano': datos['imagen_tamano'],
+
+          // Segunda imagen
+          'imagen_path2': datos['imagen_path2'],
+          'imagen_base64_2': datos['imagen_base64_2'],
+          'tiene_imagen2': datos['tiene_imagen2'] ?? false,
+          'imagen_tamano2': datos['imagen_tamano2'],
+
           'codigo_barras': equipoCompleto['cod_barras'] ?? datos['codigo_barras'],
           'numero_serie': equipoCompleto['numero_serie'] ?? datos['numero_serie'],
           'modelo': equipoCompleto['modelo_nombre'] ?? datos['modelo'],
@@ -291,9 +306,74 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<void> _sincronizarRegistrosPendientesEnBackground() async {
-    // Implementación simplificada - puedes expandir según necesites
+    try {
+      _logger.i('🔄 Iniciando sincronización automática de registros pendientes...');
+
+      final registrosPendientes = await _estadoEquipoRepository.obtenerCreados();
+
+      if (registrosPendientes.isEmpty) {
+        _logger.i('✅ No hay registros pendientes de sincronización');
+        return;
+      }
+
+      _logger.i('📋 Encontrados ${registrosPendientes.length} registros pendientes');
+
+      int exitosos = 0;
+      int fallidos = 0;
+
+      for (final registro in registrosPendientes) {
+        try {
+          final datosParaApi = {
+            'equipo_id': registro.equipoPendienteId,
+            'cliente_id': null,
+            'usuario_id': 1,
+            'funcionando': true,
+            'latitud': registro.latitud,
+            'longitud': registro.longitud,
+            'estado_general': 'Sincronización automática desde APP móvil',
+            'fecha_revision': registro.fechaRevision.toIso8601String(),
+            'en_local': registro.enLocal,
+          };
+
+          final respuesta = await _enviarAApiEstadosConTimeout(datosParaApi, 5);
+
+          if (respuesta['exito'] == true) {
+            await _estadoEquipoRepository.marcarComoMigrado(
+                registro.id!,
+                servidorId: respuesta['id']
+            );
+            exitosos++;
+            _logger.i('✅ Registro ${registro.id} sincronizado exitosamente');
+          } else {
+            await _estadoEquipoRepository.marcarComoError(
+                registro.id!,
+                'Error del servidor: ${respuesta['mensaje']}'
+            );
+            fallidos++;
+            _logger.w('⚠️ Error sincronizando registro ${registro.id}: ${respuesta['mensaje']}');
+          }
+
+        } catch (e) {
+          fallidos++;
+          _logger.e('❌ Error procesando registro ${registro.id}: $e');
+
+          if (registro.id != null) {
+            await _estadoEquipoRepository.marcarComoError(
+                registro.id!,
+                'Excepción: $e'
+            );
+          }
+        }
+      }
+
+      _logger.i('📊 Sincronización finalizada - Exitosos: $exitosos, Fallidos: $fallidos');
+
+    } catch (e) {
+      _logger.e('❌ Error en sincronización automática: $e');
+    }
   }
 
+  // ✅ CAMBIO 3: ACTUALIZAR PREPARACIÓN DE DATOS PARA INCLUIR SEGUNDA IMAGEN
   Map<String, dynamic> _prepararDatosParaEnvio(Map<String, dynamic> datos) {
     final cliente = datos['cliente'] as Cliente;
     final equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
@@ -314,6 +394,19 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'modelo': datos['modelo'],
       'logo': datos['logo'],
       'numero_serie': datos['numero_serie'],
+
+      // Primera imagen
+      'imagen_path': datos['imagen_path'],
+      'imagen_base64': datos['imagen_base64'],
+      'tiene_imagen': datos['tiene_imagen'] ?? false,
+      'imagen_tamano': datos['imagen_tamano'],
+
+      // Segunda imagen
+      'imagen_path2': datos['imagen_path2'],
+      'imagen_base64_2': datos['imagen_base64_2'],
+      'tiene_imagen2': datos['tiene_imagen2'] ?? false,
+      'imagen_tamano2': datos['imagen_tamano2'],
+
       'version_app': '1.0.0',
       'dispositivo': Platform.operatingSystem,
     };
@@ -328,6 +421,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
+  // ✅ CAMBIO 4: ACTUALIZAR API PARA INCLUIR SEGUNDA IMAGEN
   Map<String, dynamic> _prepararDatosParaApiEstados(Map<String, dynamic> datosLocales) {
     return {
       'equipo_id': datosLocales['equipo_id'],
@@ -348,6 +442,18 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'dispositivo': datosLocales['dispositivo'],
       'fecha_revision': datosLocales['fecha_revision'],
       'en_local': datosLocales['en_local'],
+
+      // Primera imagen
+      'imagen_path': datosLocales['imagen_path'],
+      'imagen_base64': datosLocales['imagen_base64'],
+      'tiene_imagen': datosLocales['tiene_imagen'],
+      'imagen_tamano': datosLocales['imagen_tamano'],
+
+      // Segunda imagen
+      'imagen_path2': datosLocales['imagen_path2'],
+      'imagen_base64_2': datosLocales['imagen_base64_2'],
+      'tiene_imagen2': datosLocales['tiene_imagen2'],
+      'imagen_tamano2': datosLocales['imagen_tamano2'],
     };
   }
 

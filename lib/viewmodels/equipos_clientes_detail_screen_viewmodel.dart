@@ -125,10 +125,13 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       if (tipoEstado == 'asignado') {
         final clienteId = equipoCliente['cliente_id'];
         if (clienteId != null) {
-          estadoActual = await _estadoEquipoRepository.obtenerUltimoEstadoPorEquipoCliente(equipoId, clienteId);
-          historialCompleto = await _estadoEquipoRepository.obtenerHistorialPorEquipoCliente(equipoId, clienteId);
+          historialCompleto = await _estadoEquipoRepository.obtenerHistorialDirectoPorEquipoCliente(
+              equipoId,
+              int.parse(clienteId.toString())
+          );
+          estadoActual = historialCompleto.isNotEmpty ? historialCompleto.first : null;
         }
-      } else {
+      }else {
         estadoActual = await _estadoEquipoRepository.obtenerUltimoEstado(equipoId);
         historialCompleto = await _estadoEquipoRepository.obtenerHistorialCompleto(equipoId);
       }

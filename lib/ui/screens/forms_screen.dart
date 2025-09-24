@@ -730,7 +730,7 @@ class _FormsScreenState extends State<FormsScreen> {
             // Foto 1
             _buildSingleImageField(
               imagen: _viewModel.imagenSeleccionada,
-              titulo: 'Foto 1',
+              titulo: 'Foto',
               onTomar: () => _viewModel.tomarFoto(esPrimeraFoto: true),
               onEliminar: () => _viewModel.eliminarImagen(esPrimeraFoto: true),
             ),
@@ -740,7 +740,7 @@ class _FormsScreenState extends State<FormsScreen> {
             // Foto 2
             _buildSingleImageField(
               imagen: _viewModel.imagenSeleccionada2,
-              titulo: 'Foto 2',
+              titulo: 'Foto',
               onTomar: () => _viewModel.tomarFoto(esPrimeraFoto: false),
               onEliminar: () => _viewModel.eliminarImagen(esPrimeraFoto: false),
             ),

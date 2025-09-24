@@ -10,7 +10,7 @@ import '../models/equipos_pendientes.dart';
 var logger = Logger();
 
 class ApiService {
-  static const String baseUrl = 'https://5ccac7b809ca.ngrok-free.app/adaControl/api/';
+  static const String baseUrl = 'https://249adc5dd651.ngrok-free.app/adaControl/api/';
   static const String clientesEndpoint = '$baseUrl/getEdfClientes';
   static const String equiposEndpoint = '$baseUrl/getEdfEquipos';
 

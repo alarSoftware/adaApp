@@ -561,18 +561,25 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     DateTime? fechaRevision,
     bool enLocal = true,
     String? observaciones,
+
+    // Primera imagen
     String? imagenPath,
     String? imagenBase64,
     bool tieneImagen = false,
     int? imagenTamano,
+
+    // Segunda imagen
+    String? imagenPath2,
+    String? imagenBase64_2,
+    bool tieneImagen2 = false,
+    int? imagenTamano2,
   }) async {
     try {
       final now = fechaRevision ?? DateTime.now();
 
-      // Create the estado record directly using your database structure
       final datosEstado = {
-        'equipo_id': equipoId,  // TEXT field
-        'cliente_id': clienteId,  // INTEGER field
+        'equipo_id': equipoId,
+        'cliente_id': clienteId,
         'en_local': enLocal ? 1 : 0,
         'latitud': latitud,
         'longitud': longitud,
@@ -580,10 +587,19 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         'fecha_creacion': now.toIso8601String(),
         'fecha_actualizacion': now.toIso8601String(),
         'sincronizado': 0,
+
+        // Primera imagen
         'imagen_path': imagenPath,
         'imagen_base64': imagenBase64,
         'tiene_imagen': tieneImagen ? 1 : 0,
         'imagen_tamano': imagenTamano,
+
+        // Segunda imagen
+        'imagen_path2': imagenPath2,
+        'imagen_base64_2': imagenBase64_2,
+        'tiene_imagen2': tieneImagen2 ? 1 : 0,
+        'imagen_tamano2': imagenTamano2,
+
         'estado_censo': 'creado',
       };
 
@@ -591,10 +607,9 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
 
       _logger.i('✅ Estado creado directamente con ID: $insertedId para equipo: $equipoId, cliente: $clienteId');
 
-      // Return EstadoEquipo object with the proper ID
       return EstadoEquipo(
-        id: insertedId, // Make sure this gets the actual inserted ID
-        equipoPendienteId: 0, // Not used in this structure
+        id: insertedId,
+        equipoPendienteId: 0,
         enLocal: enLocal,
         latitud: latitud,
         longitud: longitud,
@@ -602,10 +617,19 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         fechaCreacion: now,
         fechaActualizacion: now,
         estaSincronizado: false,
+
+        // Primera imagen
         imagenPath: imagenPath,
         imagenBase64: imagenBase64,
         tieneImagen: tieneImagen,
         imagenTamano: imagenTamano,
+
+        // Segunda imagen (si tu modelo EstadoEquipo las tiene)
+        imagenPath2: imagenPath2,
+        imagenBase64_2: imagenBase64_2,
+        tieneImagen2: tieneImagen2,
+        imagenTamano2: imagenTamano2,
+
         estadoCenso: 'creado',
       );
 
@@ -614,7 +638,6 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       rethrow;
     }
   }
-
   /// Método de compatibilidad - crear estado con equipoId y clienteId
   Future<EstadoEquipo?> crearNuevoEstadoLegacy({
     required int equipoId,
@@ -637,6 +660,24 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       latitud: latitud,
       longitud: longitud,
     );
+  }
+
+  /// Obtener historial directo por equipo_id y cliente_id (para equipos asignados)
+  Future<List<EstadoEquipo>> obtenerHistorialDirectoPorEquipoCliente(String equipoId, int clienteId) async {
+    try {
+      final maps = await dbHelper.consultar(
+        tableName,
+        where: 'equipo_id = ? AND cliente_id = ?',
+        whereArgs: [equipoId, clienteId],
+        orderBy: 'fecha_revision DESC',
+      );
+
+      _logger.i('Historial directo encontrado: ${maps.length} registros para equipo $equipoId, cliente $clienteId');
+      return maps.map((map) => fromMap(map)).toList();
+    } catch (e) {
+      _logger.e('Error obteniendo historial directo: $e');
+      return [];
+    }
   }
 
   // ========== MÉTODOS DEPRECATED ==========

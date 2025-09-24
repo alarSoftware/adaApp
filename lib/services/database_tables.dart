@@ -21,27 +21,19 @@ class DatabaseTables {
     // Aquí irían las migraciones futuras
   }
 
-  // CREACIÓN DE TABLAS ORGANIZADAS
-
   Future<void> _crearTablasMaestras(Database db) async {
-    // Tablas que no dependen de otras (se crean primero por FK)
     await db.execute(_sqlModelos());
     await db.execute(_sqlMarcas());
     await db.execute(_sqlLogo());
   }
 
   Future<void> _crearTablasPrincipales(Database db) async {
-    // Tablas que dependen de las maestras
     await db.execute(_sqlClientes());
     await db.execute(_sqlEquipos());
     await db.execute(_sqlEquiposPendientes());
     await db.execute(_sqlUsuarios());
     await db.execute(_sqlEstadoEquipo());
   }
-
-  // ================================================================
-  // DEFINICIONES SQL DE TABLAS
-  // ================================================================
 
   String _sqlModelos() => '''
     CREATE TABLE modelos (
@@ -103,7 +95,7 @@ class DatabaseTables {
     longitud REAL,
     observaciones TEXT,
     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
-    fecha_actualizacion DATETIME,  -- AGREGAR ESTA LÍNEA
+    fecha_actualizacion DATETIME,
     FOREIGN KEY (equipo_id) REFERENCES equipos (id),
     FOREIGN KEY (cliente_id) REFERENCES clientes (id)
   )
@@ -121,6 +113,7 @@ class DatabaseTables {
     )
   ''';
 
+  // ✅ ACTUALIZADO: Tabla con columnas para segunda imagen
   String _sqlEstadoEquipo() => '''
   CREATE TABLE Estado_Equipo (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -137,13 +130,13 @@ class DatabaseTables {
     imagen_base64 TEXT,
     tiene_imagen INTEGER DEFAULT 0,
     imagen_tamano INTEGER,
+    imagen_path2 TEXT,
+    imagen_base64_2 TEXT,
+    tiene_imagen2 INTEGER DEFAULT 0,
+    imagen_tamano2 INTEGER,
     estado_censo TEXT DEFAULT 'creado'
   )
 ''';
-
-  // ================================================================
-  // CREACIÓN DE ÍNDICES
-  // ================================================================
 
   Future<void> _crearIndices(Database db) async {
     await _crearIndicesClientes(db);

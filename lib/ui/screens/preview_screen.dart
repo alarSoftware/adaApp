@@ -21,28 +21,27 @@ class PreviewScreen extends StatefulWidget {
 class _PreviewScreenState extends State<PreviewScreen> {
   late PreviewScreenViewModel viewModel;
 
-  // VARIABLES PARA MANEJO DE IMAGEN
+  // ✅ CAMBIO 1: AGREGAR VARIABLES PARA SEGUNDA IMAGEN
   String? _imagePath;
   String? _imageBase64;
+  String? _imagePath2;     // NUEVA
+  String? _imageBase64_2;  // NUEVA
 
   @override
   void initState() {
     super.initState();
     viewModel = PreviewScreenViewModel();
-
-    // CARGAR IMAGEN QUE VIENE DE FORMSSCREEN
     _cargarImagenInicial();
   }
 
-  // CARGAR LA IMAGEN QUE VIENE DE LA PANTALLA ANTERIOR
+  // ✅ CAMBIO 2: ACTUALIZAR MÉTODO PARA CARGAR AMBAS IMÁGENES
   Future<void> _cargarImagenInicial() async {
+    // Cargar primera imagen
     final imagenPath = widget.datos['imagen_path'] as String?;
-
     if (imagenPath != null && imagenPath.isNotEmpty) {
       try {
         final file = File(imagenPath);
         if (await file.exists()) {
-          // Convertir a Base64 para envio
           final bytes = await file.readAsBytes();
           final base64Data = base64Encode(bytes);
 
@@ -52,7 +51,26 @@ class _PreviewScreenState extends State<PreviewScreen> {
           });
         }
       } catch (e) {
-        debugPrint('Error cargando imagen inicial: $e');
+        debugPrint('Error cargando imagen 1: $e');
+      }
+    }
+
+    // Cargar segunda imagen
+    final imagenPath2 = widget.datos['imagen_path2'] as String?;
+    if (imagenPath2 != null && imagenPath2.isNotEmpty) {
+      try {
+        final file = File(imagenPath2);
+        if (await file.exists()) {
+          final bytes = await file.readAsBytes();
+          final base64Data = base64Encode(bytes);
+
+          setState(() {
+            _imagePath2 = imagenPath2;
+            _imageBase64_2 = base64Data;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error cargando imagen 2: $e');
       }
     }
   }
@@ -63,15 +81,13 @@ class _PreviewScreenState extends State<PreviewScreen> {
     super.dispose();
   }
 
-  // AGREGAR DATOS DE IMAGEN ANTES DE ENVIAR
+  // ✅ CAMBIO 3: ACTUALIZAR MÉTODO DE CONFIRMACIÓN PARA INCLUIR SEGUNDA IMAGEN
   Future<void> _confirmarRegistro() async {
-    // Agregar datos de imagen a los datos del registro
     final datosCompletos = Map<String, dynamic>.from(widget.datos);
 
+    // Primera imagen
     if (_imagePath != null && _imageBase64 != null) {
-      // Calcular tamano
       final bytes = base64Decode(_imageBase64!);
-
       datosCompletos['imagen_path'] = _imagePath;
       datosCompletos['imagen_base64'] = _imageBase64;
       datosCompletos['tiene_imagen'] = true;
@@ -81,6 +97,20 @@ class _PreviewScreenState extends State<PreviewScreen> {
       datosCompletos['imagen_path'] = null;
       datosCompletos['imagen_base64'] = null;
       datosCompletos['imagen_tamano'] = null;
+    }
+
+    // Segunda imagen
+    if (_imagePath2 != null && _imageBase64_2 != null) {
+      final bytes2 = base64Decode(_imageBase64_2!);
+      datosCompletos['imagen_path2'] = _imagePath2;
+      datosCompletos['imagen_base64_2'] = _imageBase64_2;
+      datosCompletos['tiene_imagen2'] = true;
+      datosCompletos['imagen_tamano2'] = bytes2.length;
+    } else {
+      datosCompletos['tiene_imagen2'] = false;
+      datosCompletos['imagen_path2'] = null;
+      datosCompletos['imagen_base64_2'] = null;
+      datosCompletos['imagen_tamano2'] = null;
     }
 
     final resultado = await viewModel.confirmarRegistro(datosCompletos);
@@ -134,16 +164,18 @@ class _PreviewScreenState extends State<PreviewScreen> {
           _buildUbicacionCard(),
           const SizedBox(height: 16),
 
-          // SECCION DE IMAGEN
-          _buildImagenCard(),
+          // ✅ CAMBIO 4: AGREGAR SEGUNDA TARJETA DE IMAGEN
+          _buildImagenCard(_imagePath, _imageBase64, 'Primera foto', 1),
+          const SizedBox(height: 16),
+          _buildImagenCard(_imagePath2, _imageBase64_2, 'Segunda Foto', 2),
           const SizedBox(height: 16),
         ],
       ),
     );
   }
 
-  // TARJETA DE IMAGEN CON OPCION DE VER COMPLETA
-  Widget _buildImagenCard() {
+  // ✅ CAMBIO 5: MÉTODO REUTILIZABLE PARA MOSTRAR CUALQUIER IMAGEN
+  Widget _buildImagenCard(String? imagePath, String? imageBase64, String titulo, int numero) {
     return Card(
       elevation: 2,
       color: AppColors.surface,
@@ -164,13 +196,13 @@ class _PreviewScreenState extends State<PreviewScreen> {
               children: [
                 Icon(
                   Icons.camera_alt,
-                  color: AppColors.secondary,
+                  color: numero == 1 ? AppColors.secondary : AppColors.primary,
                   size: 24,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Imagen del Equipo',
+                    titulo,
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -179,7 +211,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (_imagePath != null)
+                if (imagePath != null)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -207,10 +239,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
             ),
             Divider(height: 20, color: AppColors.border),
 
-            // SI HAY IMAGEN, MOSTRAR PREVIEW CON OPCION DE VER COMPLETA
-            if (_imagePath != null) ...[
+            if (imagePath != null) ...[
               GestureDetector(
-                onTap: () => _verImagenCompleta(),
+                onTap: () => _verImagenCompleta(imagePath),
                 child: Container(
                   width: double.infinity,
                   height: 200,
@@ -223,7 +254,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.file(
-                          File(_imagePath!),
+                          File(imagePath),
                           width: double.infinity,
                           height: double.infinity,
                           fit: BoxFit.cover,
@@ -246,7 +277,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
                           },
                         ),
                       ),
-                      // OVERLAY PARA INDICAR QUE SE PUEDE TOCAR
                       Positioned(
                         top: 8,
                         right: 8,
@@ -279,8 +309,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
               ),
               const SizedBox(height: 8),
 
-              // INFO DE LA IMAGEN
-              if (_imageBase64 != null) ...[
+              if (imageBase64 != null) ...[
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -293,7 +322,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Imagen preparada para envio (${(base64Decode(_imageBase64!).length / (1024 * 1024)).toStringAsFixed(1)} MB). Toca para ver completa.',
+                          'Imagen preparada para envio (${(base64Decode(imageBase64).length / (1024 * 1024)).toStringAsFixed(1)} MB). Toca para ver completa.',
                           style: TextStyle(
                             color: AppColors.primary,
                             fontSize: 12,
@@ -306,7 +335,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
                 ),
               ],
             ] else ...[
-              // SI NO HAY IMAGEN, MOSTRAR MENSAJE
               Container(
                 width: double.infinity,
                 height: 120,
@@ -354,10 +382,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
-  // METODO PARA VER IMAGEN COMPLETA
-  void _verImagenCompleta() {
-    if (_imagePath == null) return;
-
+  // ✅ CAMBIO 6: ACTUALIZAR PARA RECIBIR PATH COMO PARÁMETRO
+  void _verImagenCompleta(String imagePath) {
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -366,7 +392,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
         insetPadding: const EdgeInsets.all(20),
         child: Stack(
           children: [
-            // IMAGEN A PANTALLA COMPLETA
             Center(
               child: InteractiveViewer(
                 child: Container(
@@ -383,15 +408,13 @@ class _PreviewScreenState extends State<PreviewScreen> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Image.file(
-                      File(_imagePath!),
+                      File(imagePath),
                       fit: BoxFit.contain,
                     ),
                   ),
                 ),
               ),
             ),
-
-            // BOTON DE CERRAR
             Positioned(
               top: 40,
               right: 20,
@@ -643,9 +666,22 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
+  // ✅ CAMBIO 7: ACTUALIZAR TEXTO DEL BOTÓN SEGÚN CANTIDAD DE IMÁGENES
   Widget _buildBottomButtons() {
     return Consumer<PreviewScreenViewModel>(
       builder: (context, vm, child) {
+        // Contar imágenes
+        int cantidadImagenes = 0;
+        if (_imagePath != null) cantidadImagenes++;
+        if (_imagePath2 != null) cantidadImagenes++;
+
+        String textoBoton = 'Confirmar Registro';
+        if (cantidadImagenes == 1) {
+          textoBoton = 'Confirmar con 1 Imagen';
+        } else if (cantidadImagenes == 2) {
+          textoBoton = 'Confirmar con 2 Imágenes';
+        }
+
         return SafeArea(
           child: Container(
             padding: const EdgeInsets.all(16),
@@ -663,7 +699,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Mostrar mensaje de estado si existe
                 if (vm.statusMessage != null) ...[
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -757,7 +792,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                             const SizedBox(width: 8),
                             Flexible(
                               child: Text(
-                                _imagePath != null ? 'Confirmar con Imagen' : 'Confirmar Registro',
+                                textoBoton,
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -875,8 +910,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
           actions: [
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop(); // Cerrar dialogo
-                Navigator.of(context).pop(false); // Solo regresar a FormsScreen
+                Navigator.of(context).pop();
+                Navigator.of(context).pop(false);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.info,

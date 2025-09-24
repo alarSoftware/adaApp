@@ -23,16 +23,16 @@ class ClienteDetailScreen extends StatefulWidget {
 }
 
 class _ClienteDetailScreenState extends State<ClienteDetailScreen>
-    with TickerProviderStateMixin { // AGREGADO: Para TabController
+    with TickerProviderStateMixin {
   late ClienteDetailScreenViewModel _viewModel;
   late StreamSubscription<ClienteDetailUIEvent> _eventSubscription;
-  late TabController _tabController; // NUEVO: Controller para tabs
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _viewModel = ClienteDetailScreenViewModel();
-    _tabController = TabController(length: 2, vsync: this); // NUEVO: 2 tabs
+    _tabController = TabController(length: 2, vsync: this);
     _setupEventListener();
     _viewModel.initialize(widget.cliente);
   }
@@ -40,7 +40,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   @override
   void dispose() {
     _eventSubscription.cancel();
-    _tabController.dispose(); // NUEVO: Limpiar controller
+    _tabController.dispose();
     _viewModel.dispose();
     super.dispose();
   }
@@ -77,7 +77,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
       ),
     );
     if (result == true) {
-      // Censo completado exitosamente: refrescar datos y mostrar mensaje
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Censo completado exitosamente'),
@@ -85,16 +84,12 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
           duration: Duration(seconds: 3),
         ),
       );
-      // Refrescar los equipos del cliente
       await _viewModel.refresh();
     }
-
-    // Notificar al ViewModel del resultado
     _viewModel.onNavigationResult(result);
   }
 
   void _navigateToEquipoDetail(dynamic equipoData) {
-    // CORREGIDO: Usar el tipo_estado que viene del ViewModel
     final isAsignado = equipoData['tipo_estado'] == 'asignado';
 
     logger.i('Navegando a detalle de equipo:');
@@ -103,7 +98,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     logger.i('- Es asignado: $isAsignado');
 
     if (isAsignado) {
-      // Equipos asignados: ir a pantalla completa para gestionar ubicación
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -113,7 +107,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
         ),
       ).then((_) => _viewModel.refresh());
     } else {
-      // Equipos pendientes: solo mostrar diálogo informativo
       _showEquipoDetailsDialog(equipoData);
     }
   }
@@ -148,13 +141,8 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                 _buildDetalleRow('Logo', equipoData['logo_nombre'] ?? 'Sin logo'),
                 if (equipoData['numero_serie'] != null && equipoData['numero_serie'].toString().isNotEmpty)
                   _buildDetalleRow('Número de Serie', equipoData['numero_serie']),
-
-                // Estado pendiente con color naranja
                 _buildEstadoRow('Pendiente', AppColors.warning),
-
                 _buildDetalleRow('Cliente', widget.cliente.nombre),
-
-                // Nota explicativa
                 Padding(
                   padding: const EdgeInsets.only(top: 16),
                   child: Container(
@@ -198,7 +186,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     );
   }
 
-  // Helper para mostrar estado con color
   Widget _buildEstadoRow(String estado, Color color) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -235,7 +222,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     );
   }
 
-  // Helper para filas normales
   Widget _buildDetalleRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -270,16 +256,11 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // Card del cliente (fijo arriba)
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: _buildClienteInfoCard(),
             ),
-
-            // NUEVA SECCIÓN: TabBar
             _buildTabBar(),
-
-            // NUEVA SECCIÓN: Contenido de tabs
             Expanded(
               child: _buildTabBarView(),
             ),
@@ -387,7 +368,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     );
   }
 
-  // NUEVO: Construir TabBar
+  // OPTIMIZADO: TabBar con textos más cortos y responsive
   Widget _buildTabBar() {
     return ListenableBuilder(
       listenable: _viewModel,
@@ -402,37 +383,29 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
             indicatorWeight: 3,
             labelStyle: const TextStyle(
               fontWeight: FontWeight.w600,
-              fontSize: 14,
+              fontSize: 13, // Reducido de 14
             ),
             unselectedLabelStyle: const TextStyle(
               fontWeight: FontWeight.w500,
-              fontSize: 14,
+              fontSize: 13, // Reducido de 14
             ),
             tabs: [
               Tab(
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.check_circle_outline, size: 18),
-                    const SizedBox(width: 8),
-                    Text('Asignados'),
-                    if (_viewModel.equiposAsignadosCount > 0) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.success,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '${_viewModel.equiposAsignadosCount}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                    Icon(Icons.check_circle_outline, size: 16), // Reducido de 18
+                    const SizedBox(width: 6), // Reducido de 8
+                    // CAMBIADO: Texto más corto
+                    Flexible(
+                      child: Text(
+                        'Asignados',
+                        overflow: TextOverflow.ellipsis,
                       ),
+                    ),
+                    if (_viewModel.equiposAsignadosCount > 0) ...[
+                      const SizedBox(width: 4), // Reducido de 6
+                      _buildCountBadge(_viewModel.equiposAsignadosCount, AppColors.success),
                     ],
                   ],
                 ),
@@ -441,26 +414,18 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.pending_outlined, size: 18),
-                    const SizedBox(width: 8),
-                    Text('Pendientes'),
-                    if (_viewModel.equiposPendientesCount > 0) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.warning,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '${_viewModel.equiposPendientesCount}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                    Icon(Icons.pending_outlined, size: 16), // Reducido de 18
+                    const SizedBox(width: 6), // Reducido de 8
+                    // CAMBIADO: Texto más corto
+                    Flexible(
+                      child: Text(
+                        'Pendientes',
+                        overflow: TextOverflow.ellipsis,
                       ),
+                    ),
+                    if (_viewModel.equiposPendientesCount > 0) ...[
+                      const SizedBox(width: 4), // Reducido de 6
+                      _buildCountBadge(_viewModel.equiposPendientesCount, AppColors.warning),
                     ],
                   ],
                 ),
@@ -472,7 +437,27 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     );
   }
 
-  // NUEVO: Construir contenido de tabs
+  // NUEVO: Badge de contador más compacto
+  Widget _buildCountBadge(int count, Color color) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 20), // Ancho mínimo
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        count > 99 ? '99+' : '$count', // Limitar a 99+
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11, // Reducido de 12
+          fontWeight: FontWeight.bold,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
   Widget _buildTabBarView() {
     return ListenableBuilder(
       listenable: _viewModel,
@@ -488,7 +473,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
         return TabBarView(
           controller: _tabController,
           children: [
-            // TAB 1: Equipos Asignados
             _buildEquiposTab(
               equipos: _viewModel.equiposAsignadosList,
               isAsignado: true,
@@ -496,8 +480,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
               emptySubtitle: 'Este cliente no tiene equipos asignados actualmente',
               emptyIcon: Icons.check_circle_outline,
             ),
-
-            // TAB 2: Equipos Pendientes
             _buildEquiposTab(
               equipos: _viewModel.equiposPendientesList,
               isAsignado: false,
@@ -511,7 +493,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     );
   }
 
-  // NUEVO: Método unificado para construir cada tab
   Widget _buildEquiposTab({
     required List<Map<String, dynamic>> equipos,
     required bool isAsignado,
@@ -541,7 +522,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     );
   }
 
-  // NUEVO: Empty state específico para cada tab
   Widget _buildEmptyStateForTab({
     required String title,
     required String subtitle,
@@ -605,7 +585,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     );
   }
 
-  // NUEVO: Card individual de equipo
+  // OPTIMIZADO: Card con textos más cortos y mejor manejo de overflow
   Widget _buildEquipoCard(Map<String, dynamic> equipoData, {required bool isAsignado}) {
     final equipoColor = isAsignado ? AppColors.success : AppColors.warning;
     final borderColor = isAsignado ? AppColors.borderSuccess : AppColors.borderWarning;
@@ -630,7 +610,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                // Icono del equipo
                 Container(
                   width: 56,
                   height: 56,
@@ -645,20 +624,17 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                   ),
                 ),
                 const SizedBox(width: 16),
-
-                // Info del equipo
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Título y badge
                       Row(
                         children: [
                           Expanded(
                             child: Text(
                               _viewModel.getEquipoTitle(equipoData),
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: 15, // Reducido de 16
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.textPrimary,
                               ),
@@ -666,64 +642,48 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: backgroundColor,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: borderColor),
-                            ),
-                            child: Text(
-                              isAsignado ? 'ASIGNADO' : 'PENDIENTE',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: equipoColor,
-                              ),
-                            ),
-                          ),
+                          const SizedBox(width: 8),
+                          // OPTIMIZADO: Badge más compacto
+                          _buildStatusBadge(isAsignado, backgroundColor, borderColor, equipoColor),
                         ],
                       ),
-
                       const SizedBox(height: 4),
-
-                      // Código de barras
                       if (_viewModel.getEquipoBarcode(equipoData) != null)
                         Text(
                           _viewModel.getEquipoBarcode(equipoData)!,
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13, // Reducido de 14
                             color: AppColors.textSecondary,
                             fontFamily: 'monospace',
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-
-                      // Logo
                       if (_viewModel.getEquipoLogo(equipoData) != null) ...[
                         const SizedBox(height: 2),
                         Text(
-                          'Logo: ${_viewModel.getEquipoLogo(equipoData)}',
+                          _viewModel.getEquipoLogo(equipoData)!,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11, // Reducido de 12
                             color: AppColors.textTertiary,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
-
-                      // Fecha (solo para asignados)
                       if (isAsignado) ...[
                         const SizedBox(height: 6),
                         Row(
                           children: [
                             Icon(Icons.access_time, size: 14, color: AppColors.textTertiary),
                             const SizedBox(width: 4),
-                            Text(
-                              _viewModel.getEquipoFechaCensado(equipoData),
-                              style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                            Expanded(
+                              child: Text(
+                                _viewModel.getEquipoFechaCensado(equipoData),
+                                style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
@@ -731,12 +691,32 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                     ],
                   ),
                 ),
-
-                // Flecha
+                const SizedBox(width: 8),
                 Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textTertiary),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // NUEVO: Badge de estado más compacto
+  Widget _buildStatusBadge(bool isAsignado, Color backgroundColor, Color borderColor, Color textColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), // Más compacto
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor, width: 0.5),
+      ),
+      child: Text(
+        isAsignado ? 'OK' : 'PEND', // CAMBIADO: Texto ultra corto
+        style: TextStyle(
+          fontSize: 9, // Reducido de 10
+          fontWeight: FontWeight.bold,
+          color: textColor,
+          letterSpacing: 0.3,
         ),
       ),
     );

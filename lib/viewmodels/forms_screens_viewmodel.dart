@@ -610,8 +610,13 @@ class FormsScreenViewModel extends ChangeNotifier {
       'logo_id': _logoSeleccionado,
       'logo': logoSeleccionado['nombre'],
       'numero_serie': numeroSerieController.text.trim(),
+
+      // Primera imagen
       'imagen_path': _imagenSeleccionada?.path,
-      'imagen_path_2': _imagenSeleccionada2?.path,  // NUEVA
+
+      // Segunda imagen - CORREGIDO: sin guion bajo
+      'imagen_path2': _imagenSeleccionada2?.path,
+
       'latitud': ubicacion['latitud'],
       'longitud': ubicacion['longitud'],
       'fecha_registro': DateTime.now().toIso8601String(),
