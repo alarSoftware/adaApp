@@ -71,20 +71,20 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   // ========== NUEVOS CAMPOS PARA DROPDOWN ==========
   bool? _estadoUbicacionEquipo;
   bool _hasUnsavedChanges = false;
-  int _estadoLocalActual; // Variable para mantener el estado actual
+  int _estadoLocalActual;
 
   // ========== STREAMS PARA EVENTOS ==========
   final StreamController<EquiposClienteDetailUIEvent> _eventController =
   StreamController<EquiposClienteDetailUIEvent>.broadcast();
   Stream<EquiposClienteDetailUIEvent> get uiEvents => _eventController.stream;
 
-  // ========== CONSTRUCTOR CORREGIDO ==========
+  // ========== CONSTRUCTOR ==========
   EquiposClienteDetailScreenViewModel(
       dynamic equipoCliente,
       this._estadoEquipoRepository,
       this._equipoRepository,
       ) : _state = EquiposClienteDetailState(equipoCliente: equipoCliente),
-        _estadoLocalActual = _determinarEstadoInicial(equipoCliente) { // FIXED: Use helper method
+        _estadoLocalActual = _determinarEstadoInicial(equipoCliente) {
     _initializeState();
     _loadInitialState();
     _logDebugInfo();
@@ -93,20 +93,17 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   // ========== HELPER METHOD ==========
   static int _determinarEstadoInicial(dynamic equipoCliente) {
     final tipoEstado = equipoCliente['tipo_estado']?.toString();
-
     if (tipoEstado == 'asignado') {
-      return 1; // En local by default for assigned equipment
+      return 1;
     } else {
-      return 0; // Fuera del local for pending equipment
+      return 0;
     }
   }
 
   // ========== INICIALIZAR ESTADO DEL DROPDOWN ==========
   void _initializeState() {
-    // _estadoLocalActual is already initialized in constructor
     _estadoUbicacionEquipo = _estadoLocalActual == 1;
     _hasUnsavedChanges = false;
-
     _logger.i('Estado inicial - _estadoLocalActual: $_estadoLocalActual');
     _logger.i('Estado inicial - _estadoUbicacionEquipo: $_estadoUbicacionEquipo');
   }
@@ -121,27 +118,23 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      // UPDATED: Determine method based on tipo_estado
       final tipoEstado = equipoCliente['tipo_estado']?.toString();
       EstadoEquipo? estadoActual;
       List<EstadoEquipo> historialCompleto = [];
 
       if (tipoEstado == 'asignado') {
-        // For assigned equipment, use equipo_id + cliente_id
         final clienteId = equipoCliente['cliente_id'];
         if (clienteId != null) {
           estadoActual = await _estadoEquipoRepository.obtenerUltimoEstadoPorEquipoCliente(equipoId, clienteId);
           historialCompleto = await _estadoEquipoRepository.obtenerHistorialPorEquipoCliente(equipoId, clienteId);
         }
       } else {
-        // For pending equipment, use equipo_pendiente_id directly
         estadoActual = await _estadoEquipoRepository.obtenerUltimoEstado(equipoId);
         historialCompleto = await _estadoEquipoRepository.obtenerHistorialCompleto(equipoId);
       }
 
       final ultimos5 = historialCompleto.take(5).toList();
 
-      // Update current state based on actual history
       if (estadoActual != null) {
         _estadoLocalActual = estadoActual.enLocal ? 1 : 0;
         _estadoUbicacionEquipo = estadoActual.enLocal;
@@ -154,7 +147,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       );
 
       notifyListeners();
-
       _logger.i('✅ Historial cargado: ${historialCompleto.length} registros totales, mostrando ${ultimos5.length}');
 
     } catch (e) {
@@ -166,14 +158,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   EquiposClienteDetailState get state => _state;
   dynamic get equipoCliente => _state.equipoCliente;
   bool get isProcessing => _state.isProcessing;
-
-  // UPDATED: Remove dependency on 'activo' field
-  bool get isEquipoActivo {
-    // All equipment that appears in queries is considered active
-    return true;
-  }
-
-  // ========== NUEVOS GETTERS PARA DROPDOWN ==========
+  bool get isEquipoActivo => true;
   bool? get estadoUbicacionEquipo => _estadoUbicacionEquipo;
   bool get hasUnsavedChanges => _hasUnsavedChanges;
   bool get saveButtonEnabled => _estadoUbicacionEquipo != null && _hasUnsavedChanges;
@@ -184,7 +169,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     return 'Guardar cambios';
   }
 
-  // GETTERS PARA HISTORIAL
   List<EstadoEquipo> get historialUltimos5 => _state.historialUltimos5;
   List<EstadoEquipo> get historialCompleto => _state.historialCambios;
   int get totalCambios => _state.historialCambios.length;
@@ -195,14 +179,12 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     super.dispose();
   }
 
-  // ========== NUEVO MÉTODO PARA DROPDOWN ==========
+  // ========== MÉTODOS PARA DROPDOWN ==========
   void cambiarUbicacionEquipo(bool? nuevaUbicacion) {
     if (_estadoUbicacionEquipo != nuevaUbicacion) {
       _estadoUbicacionEquipo = nuevaUbicacion;
-
       final estadoActual = _estadoLocalActual == 1;
       _hasUnsavedChanges = _estadoUbicacionEquipo != estadoActual;
-
       notifyListeners();
       _logger.i('🔄 Dropdown cambiado a: $nuevaUbicacion (pendiente de guardar)');
     }
@@ -221,7 +203,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      // UPDATED: Use appropriate method based on tipo_estado
       final tipoEstado = equipoCliente['tipo_estado']?.toString();
       List<EstadoEquipo> historialCompleto = [];
 
@@ -246,7 +227,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       );
 
       notifyListeners();
-
       _logger.i('✅ Historial recargado: ${historialCompleto.length} registros');
 
     } catch (e) {
@@ -254,7 +234,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== GUARDAR CAMBIOS ACTUALIZADO ==========
+  // ========== GUARDAR CAMBIOS - CORREGIDO ==========
   Future<void> saveAllChanges() async {
     if (_estadoUbicacionEquipo == null) {
       _eventController.add(ShowMessageEvent(
@@ -298,32 +278,32 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      if (equipoCliente['id'] == null) {
-        _logger.w('No se puede crear estado: equipoCliente id es null');
-        return;
-      }
-
-      // UPDATED: Use appropriate method based on tipo_estado
       final tipoEstado = equipoCliente['tipo_estado']?.toString();
       EstadoEquipo nuevoEstado;
 
       if (tipoEstado == 'asignado') {
-        // For assigned equipment, create state with equipo_id + cliente_id
         final clienteId = equipoCliente['cliente_id'];
         if (clienteId == null) {
           throw Exception('Cliente ID requerido para equipos asignados');
         }
 
-        nuevoEstado = await _estadoEquipoRepository.crearNuevoEstadoPorEquipoCliente(
-          equipoId: int.parse(equipoCliente['id'].toString()),
+        final equipoId = equipoCliente['id']?.toString();
+        if (equipoId == null || equipoId.isEmpty) {
+          throw Exception('ID del equipo no disponible');
+        }
+
+
+        _logger.i('Usando equipoId: $equipoId');
+
+        nuevoEstado = await _estadoEquipoRepository.crearEstadoDirecto(
+          equipoId: equipoId,
           clienteId: int.parse(clienteId.toString()),
-          enLocal: _estadoUbicacionEquipo!,
-          fechaRevision: DateTime.now(),
           latitud: position.latitude,
           longitud: position.longitude,
+          fechaRevision: DateTime.now(),
+          enLocal: _estadoUbicacionEquipo!,
         );
       } else {
-        // For pending equipment, use equipo_pendiente_id
         nuevoEstado = await _estadoEquipoRepository.crearNuevoEstado(
           equipoPendienteId: equipoCliente['id'],
           enLocal: _estadoUbicacionEquipo!,
@@ -333,11 +313,9 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         );
       }
 
-      // Update local state
       _estadoLocalActual = _estadoUbicacionEquipo! ? 1 : 0;
       _hasUnsavedChanges = false;
 
-      // Update local history
       final historialActualizado = [nuevoEstado, ..._state.historialCambios];
       final ultimos5Actualizado = historialActualizado.take(5).toList();
 
@@ -477,7 +455,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     return 'No disponible';
   }
 
-  // UPDATED: getEstadoText without using deprecated fields
   String getEstadoText() {
     final tipoEstado = equipoCliente['tipo_estado']?.toString();
 

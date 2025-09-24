@@ -535,11 +535,11 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   // ========== MÉTODOS DE COMPATIBILIDAD (Para migración gradual) ==========
 
   /// Buscar equipoClienteId basado en equipoId y clienteId
-  Future<int?> buscarEquipoPendienteId(int equipoId, int clienteId) async {
+  Future<int?> buscarEquipoPendienteId(dynamic equipoId, int clienteId) async {
     final result = await dbHelper.consultar(
       'equipos_pendientes',
       where: 'equipo_id = ? AND cliente_id = ?',
-      whereArgs: [equipoId, clienteId],
+      whereArgs: [equipoId.toString(), clienteId],  // Convertir a String siempre
       limit: 1,
     );
     return result.isNotEmpty ? result.first['id'] as int? : null;
@@ -899,7 +899,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   Future<EstadoEquipo> crearNuevoEstadoPorEquipoCliente({
-    required int equipoId,
+    required String equipoId,  // CAMBIO: String en lugar de int
     required int clienteId,
     required bool enLocal,
     required DateTime fechaRevision,
@@ -907,14 +907,19 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     required double longitud,
   }) async {
     try {
-      // First, find the equipo_pendiente_id
-      final equipoPendienteId = await buscarEquipoPendienteId(equipoId, clienteId);
+      final result = await dbHelper.consultar(
+        'equipos_pendientes',
+        where: 'equipo_id = ? AND cliente_id = ?',
+        whereArgs: [equipoId, clienteId],
+        limit: 1,
+      );
+
+      final equipoPendienteId = result.isNotEmpty ? result.first['id'] as int? : null;
 
       if (equipoPendienteId == null) {
         throw Exception('No se encontró relación equipos_pendientes para equipoId: $equipoId, clienteId: $clienteId');
       }
 
-      // Use the existing method with the found equipo_pendiente_id
       return await crearNuevoEstado(
         equipoPendienteId: equipoPendienteId,
         enLocal: enLocal,
@@ -928,7 +933,6 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       rethrow;
     }
   }
-
 
   /// Limpiar imágenes huérfanas (opcional - para mantenimiento)
   Future<int> limpiarImagenesHuerfanas() async {

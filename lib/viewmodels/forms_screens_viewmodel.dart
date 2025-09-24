@@ -73,6 +73,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   Cliente? _cliente;
   File? _imagenSeleccionada;
 
+
   // VARIABLES PARA PASAR AL PREVIEW
   Map<String, dynamic>? _equipoCompleto;
   bool _equipoYaAsignado = false;
