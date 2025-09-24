@@ -20,7 +20,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
   final EquipoPendienteRepository _equipoPendienteRepository = EquipoPendienteRepository();
 
-  static const String _baseUrl = 'https://d5d280321404.ngrok-free.app/adaControl/api/';
+  static const String _baseUrl = 'https://5ccac7b809ca.ngrok-free.app/adaControl/api/';
   static const String _estadosEndpoint = 'postCenso';
 
   bool get isLoading => _isLoading;
