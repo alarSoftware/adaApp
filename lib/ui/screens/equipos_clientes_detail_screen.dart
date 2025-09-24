@@ -305,16 +305,10 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
     infoItems.addAll([
       {
         'label': 'Fecha de Asignación',
-        'value': _viewModel.getFechaAsignacionText(),
+        'value': _viewModel.getLogoText(),
       },
     ]);
 
-    if (_viewModel.shouldShowFechaRetiro()) {
-      infoItems.add({
-        'label': 'Fecha de Retiro',
-        'value': _viewModel.getFechaRetiroText(),
-      });
-    }
 
     return Column(
       children: [

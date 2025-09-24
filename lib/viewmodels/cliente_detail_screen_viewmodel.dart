@@ -240,7 +240,6 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   String getEquipoFechaCensado(Map<String, dynamic> equipoData) {
-    // Para equipos asignados: usar fecha_creacion
     // Para equipos pendientes: usar fecha_censo
     final fechaStr = equipoData['fecha_censo'] ?? equipoData['fecha_creacion'] ?? equipoData['fecha_actualizacion'];
     if (fechaStr != null) {

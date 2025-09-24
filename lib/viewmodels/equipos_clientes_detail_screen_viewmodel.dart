@@ -411,9 +411,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         equipoCliente['cod_barras']!.isNotEmpty;
   }
 
-  bool shouldShowFechaRetiro() {
-    return false;
-  }
 
   String getMarcaText() {
     return equipoCliente['marca_nombre'] ?? '';
@@ -427,18 +424,8 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     return equipoCliente['cod_barras'] ?? '';
   }
 
-  String getFechaAsignacionText() {
-    final fechaString = equipoCliente['fecha_creacion'];
-    if (fechaString == null) return 'No disponible';
-
-    try {
-      final fecha = DateTime.parse(fechaString);
-      return '${fecha.day.toString().padLeft(2, '0')}/'
-          '${fecha.month.toString().padLeft(2, '0')}/'
-          '${fecha.year}';
-    } catch (e) {
-      return 'No disponible';
-    }
+  String getLogoText() {
+    return equipoCliente['logo_nombre'] ?? '';
   }
 
   String getTiempoAsignadoText() {
