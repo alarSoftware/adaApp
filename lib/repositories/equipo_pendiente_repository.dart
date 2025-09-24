@@ -62,7 +62,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
   }
 
   /// Buscar ID del registro pendiente (para EstadoEquipoRepository)
-  Future<int?> buscarEquipoPendienteId(int equipoId, int clienteId) async {
+  Future<int?> buscarEquipoPendienteId(dynamic equipoId, int clienteId) async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
@@ -80,32 +80,37 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
 
   /// Procesar escaneo de censo - crear registro pendiente
   Future<int> procesarEscaneoCenso({
-    required int equipoId,
+    required dynamic equipoId, // Acepta String o int
     required int clienteId,
   }) async {
     try {
       final now = DateTime.now();
 
+      // Convertir a String para almacenar (ya que la columna es TEXT)
+      final equipoIdString = equipoId.toString();
+
+      _logger.i('Procesando censo - equipoId: $equipoIdString, clienteId: $clienteId');
+
       // Verificar si ya existe
-      final existe = await buscarEquipoPendienteId(equipoId, clienteId);
+      final existe = await buscarEquipoPendienteId(equipoIdString, clienteId);
       if (existe != null) {
-        _logger.i('Ya existe registro pendiente para equipoId: $equipoId, clienteId: $clienteId');
+        _logger.i('Ya existe registro pendiente para equipoId: $equipoIdString, clienteId: $clienteId');
         return existe;
       }
 
       // Crear nuevo registro
       final datos = {
-        'equipo_id': equipoId,
+        'equipo_id': equipoIdString, // Guardar como String
         'cliente_id': clienteId,
         'fecha_censo': now.toIso8601String(),
         'usuario_censo_id': 1,
-        'latitud': 0.0, // Se actualizará con GPS real
-        'longitud': 0.0, // Se actualizará con GPS real
+        'latitud': 0.0,
+        'longitud': 0.0,
         'observaciones': 'Registro creado desde censo móvil',
       };
 
       final id = await crear(datos);
-      _logger.i('Registro pendiente creado: Equipo $equipoId → Cliente $clienteId (ID: $id)');
+      _logger.i('Registro pendiente creado: Equipo $equipoIdString → Cliente $clienteId (ID: $id)');
       return id;
     } catch (e) {
       _logger.e('Error procesando escaneo de censo: $e');
