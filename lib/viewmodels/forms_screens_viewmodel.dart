@@ -72,6 +72,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   int? _logoSeleccionado;
   Cliente? _cliente;
   File? _imagenSeleccionada;
+  File? _imagenSeleccionada2;
 
 
   // VARIABLES PARA PASAR AL PREVIEW
@@ -85,6 +86,8 @@ class FormsScreenViewModel extends ChangeNotifier {
   List<Map<String, dynamic>> get logos => _logos;
   int? get logoSeleccionado => _logoSeleccionado;
   File? get imagenSeleccionada => _imagenSeleccionada;
+  File? get imagenSeleccionada2 => _imagenSeleccionada2;
+
   Stream<FormsUIEvent> get uiEvents => _eventController.stream;
 
   late final StreamController<FormsUIEvent> _eventController;
@@ -381,14 +384,14 @@ class FormsScreenViewModel extends ChangeNotifier {
   // LÓGICA DE NEGOCIO - IMÁGENES
   // ===============================
 
-  Future<void> tomarFoto() async {
+  Future<void> tomarFoto({bool esPrimeraFoto = true}) async {
     try {
-      _logger.i('Iniciando captura de foto...');
+      _logger.i('Iniciando captura de foto ${esPrimeraFoto ? "1" : "2"}...');
 
       final File? foto = await _imageService.tomarFoto();
 
       if (foto != null) {
-        await _procesarImagenSeleccionada(foto);
+        await _procesarImagenSeleccionada(foto, esPrimeraFoto: esPrimeraFoto);
       } else {
         _logger.i('Usuario canceló la captura de foto');
       }
@@ -398,37 +401,45 @@ class FormsScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> _procesarImagenSeleccionada(File imagen) async {
+  Future<void> _procesarImagenSeleccionada(File imagen, {bool esPrimeraFoto = true}) async {
     try {
-      // Validar que sea una imagen válida
       if (!_imageService.esImagenValida(imagen)) {
         _showError('El archivo seleccionado no es una imagen válida');
         return;
       }
 
-      // Verificar tamaño de imagen
       final double tamanoMB = await _imageService.obtenerTamanoImagen(imagen);
       if (tamanoMB > 15.0) {
         _showError('La imagen es demasiado grande (${tamanoMB.toStringAsFixed(1)}MB). Máximo 15MB.');
         return;
       }
 
-      // Guardar imagen en el directorio de la app
       final String codigoEquipo = codigoBarrasController.text.trim().isEmpty
           ? 'temp_${DateTime.now().millisecondsSinceEpoch}'
           : codigoBarrasController.text.trim();
 
-      final File imagenGuardada = await _imageService.guardarImagenEnApp(imagen, codigoEquipo);
+      // Agregar sufijo para diferenciar las fotos
+      final String sufijo = esPrimeraFoto ? '_foto1' : '_foto2';
+      final File imagenGuardada = await _imageService.guardarImagenEnApp(
+          imagen,
+          '$codigoEquipo$sufijo'
+      );
 
       // Eliminar imagen anterior si existe
-      if (_imagenSeleccionada != null) {
-        await _imageService.eliminarImagen(_imagenSeleccionada!);
+      if (esPrimeraFoto) {
+        if (_imagenSeleccionada != null) {
+          await _imageService.eliminarImagen(_imagenSeleccionada!);
+        }
+        _imagenSeleccionada = imagenGuardada;
+      } else {
+        if (_imagenSeleccionada2 != null) {
+          await _imageService.eliminarImagen(_imagenSeleccionada2!);
+        }
+        _imagenSeleccionada2 = imagenGuardada;
       }
 
-      _imagenSeleccionada = imagenGuardada;
-      _logger.i('Imagen procesada exitosamente: ${imagenGuardada.path}');
-
-      _showSuccess('Imagen agregada correctamente (${tamanoMB.toStringAsFixed(1)}MB)');
+      _logger.i('Imagen ${esPrimeraFoto ? "1" : "2"} procesada: ${imagenGuardada.path}');
+      _showSuccess('Foto ${esPrimeraFoto ? "1" : "2"} agregada (${tamanoMB.toStringAsFixed(1)}MB)');
       notifyListeners();
 
     } catch (e) {
@@ -442,18 +453,35 @@ class FormsScreenViewModel extends ChangeNotifier {
       try {
         await _imageService.eliminarImagen(_imagenSeleccionada!);
       } catch (e) {
-        _logger.w('No se pudo eliminar imagen temporal: $e');
+        _logger.w('No se pudo eliminar imagen temporal 1: $e');
       }
       _imagenSeleccionada = null;
     }
+
+    if (_imagenSeleccionada2 != null) {
+      try {
+        await _imageService.eliminarImagen(_imagenSeleccionada2!);
+      } catch (e) {
+        _logger.w('No se pudo eliminar imagen temporal 2: $e');
+      }
+      _imagenSeleccionada2 = null;
+    }
   }
 
-  Future<void> eliminarImagen() async {
-    if (_imagenSeleccionada != null) {
+  Future<void> eliminarImagen({bool esPrimeraFoto = true}) async {
+    final imagen = esPrimeraFoto ? _imagenSeleccionada : _imagenSeleccionada2;
+
+    if (imagen != null) {
       try {
-        await _imageService.eliminarImagen(_imagenSeleccionada!);
-        _imagenSeleccionada = null;
-        _showWarning('Imagen eliminada');
+        await _imageService.eliminarImagen(imagen);
+
+        if (esPrimeraFoto) {
+          _imagenSeleccionada = null;
+        } else {
+          _imagenSeleccionada2 = null;
+        }
+
+        _showWarning('Foto ${esPrimeraFoto ? "1" : "2"} eliminada');
         notifyListeners();
       } catch (e) {
         _logger.e('Error eliminando imagen: $e');
@@ -583,6 +611,7 @@ class FormsScreenViewModel extends ChangeNotifier {
       'logo': logoSeleccionado['nombre'],
       'numero_serie': numeroSerieController.text.trim(),
       'imagen_path': _imagenSeleccionada?.path,
+      'imagen_path_2': _imagenSeleccionada2?.path,  // NUEVA
       'latitud': ubicacion['latitud'],
       'longitud': ubicacion['longitud'],
       'fecha_registro': DateTime.now().toIso8601String(),

@@ -1,4 +1,6 @@
 // ui/screens/forms_screen.dart
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:ada_app/models/cliente.dart';
@@ -716,7 +718,7 @@ class _FormsScreenState extends State<FormsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Imagen del equipo:',
+              'Imágenes del equipo:',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
@@ -725,57 +727,96 @@ class _FormsScreenState extends State<FormsScreen> {
             ),
             const SizedBox(height: 8),
 
-            // Vista previa de la imagen
-            if (_viewModel.imagenSeleccionada != null) ...[
-              Container(
-                height: 200,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(
-                    _viewModel.imagenSeleccionada!,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            // Solo botón de cámara
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _viewModel.tomarFoto,
-                icon: const Icon(Icons.camera_alt),
-                label: const Text('Tomar foto del equipo'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  side: BorderSide(color: AppColors.primary),
-                  foregroundColor: AppColors.primary,
-                ),
-              ),
+            // Foto 1
+            _buildSingleImageField(
+              imagen: _viewModel.imagenSeleccionada,
+              titulo: 'Foto 1',
+              onTomar: () => _viewModel.tomarFoto(esPrimeraFoto: true),
+              onEliminar: () => _viewModel.eliminarImagen(esPrimeraFoto: true),
             ),
 
-            if (_viewModel.imagenSeleccionada != null) ...[
-              const SizedBox(height: 8),
-              Center(
-                child: TextButton.icon(
-                  onPressed: _viewModel.eliminarImagen,
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  label: const Text('Eliminar imagen'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.error,
-                  ),
-                ),
-              ),
-            ],
+            const SizedBox(height: 16),
+
+            // Foto 2
+            _buildSingleImageField(
+              imagen: _viewModel.imagenSeleccionada2,
+              titulo: 'Foto 2',
+              onTomar: () => _viewModel.tomarFoto(esPrimeraFoto: false),
+              onEliminar: () => _viewModel.eliminarImagen(esPrimeraFoto: false),
+            ),
           ],
         );
       },
+    );
+  }
+  Widget _buildSingleImageField({
+    required File? imagen,
+    required String titulo,
+    required VoidCallback onTomar,
+    required VoidCallback onEliminar,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          titulo,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Vista previa de la imagen
+        if (imagen != null) ...[
+          Container(
+            height: 180,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(
+                imagen,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+
+        // Botón de cámara
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: onTomar,
+            icon: Icon(imagen != null ? Icons.camera_alt : Icons.add_a_photo),
+            label: Text(imagen != null ? 'Cambiar $titulo' : 'Tomar $titulo'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              side: BorderSide(color: AppColors.primary),
+              foregroundColor: AppColors.primary,
+            ),
+          ),
+        ),
+
+        if (imagen != null) ...[
+          const SizedBox(height: 8),
+          Center(
+            child: TextButton.icon(
+              onPressed: onEliminar,
+              icon: const Icon(Icons.delete_outline, size: 18),
+              label: Text('Eliminar $titulo'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.error,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
