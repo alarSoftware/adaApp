@@ -1,4 +1,3 @@
-// ui/screens/cliente_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/viewmodels/cliente_detail_screen_viewmodel.dart';
@@ -368,7 +367,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     );
   }
 
-  // OPTIMIZADO: TabBar con textos más cortos y responsive
   Widget _buildTabBar() {
     return ListenableBuilder(
       listenable: _viewModel,
@@ -383,20 +381,19 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
             indicatorWeight: 3,
             labelStyle: const TextStyle(
               fontWeight: FontWeight.w600,
-              fontSize: 13, // Reducido de 14
+              fontSize: 13,
             ),
             unselectedLabelStyle: const TextStyle(
               fontWeight: FontWeight.w500,
-              fontSize: 13, // Reducido de 14
+              fontSize: 13,
             ),
             tabs: [
               Tab(
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.check_circle_outline, size: 16), // Reducido de 18
-                    const SizedBox(width: 6), // Reducido de 8
-                    // CAMBIADO: Texto más corto
+                    Icon(Icons.check_circle_outline, size: 16),
+                    const SizedBox(width: 6),
                     Flexible(
                       child: Text(
                         'Asignados',
@@ -404,7 +401,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                       ),
                     ),
                     if (_viewModel.equiposAsignadosCount > 0) ...[
-                      const SizedBox(width: 4), // Reducido de 6
+                      const SizedBox(width: 4),
                       _buildCountBadge(_viewModel.equiposAsignadosCount, AppColors.success),
                     ],
                   ],
@@ -414,9 +411,8 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.pending_outlined, size: 16), // Reducido de 18
-                    const SizedBox(width: 6), // Reducido de 8
-                    // CAMBIADO: Texto más corto
+                    Icon(Icons.pending_outlined, size: 16),
+                    const SizedBox(width: 6),
                     Flexible(
                       child: Text(
                         'Pendientes',
@@ -424,7 +420,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                       ),
                     ),
                     if (_viewModel.equiposPendientesCount > 0) ...[
-                      const SizedBox(width: 4), // Reducido de 6
+                      const SizedBox(width: 4),
                       _buildCountBadge(_viewModel.equiposPendientesCount, AppColors.warning),
                     ],
                   ],
@@ -437,20 +433,19 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     );
   }
 
-  // NUEVO: Badge de contador más compacto
   Widget _buildCountBadge(int count, Color color) {
     return Container(
-      constraints: const BoxConstraints(minWidth: 20), // Ancho mínimo
+      constraints: const BoxConstraints(minWidth: 20),
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
-        count > 99 ? '99+' : '$count', // Limitar a 99+
+        count > 99 ? '99+' : '$count',
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 11, // Reducido de 12
+          fontSize: 11,
           fontWeight: FontWeight.bold,
         ),
         textAlign: TextAlign.center,
@@ -585,7 +580,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     );
   }
 
-  // OPTIMIZADO: Card con textos más cortos y mejor manejo de overflow
   Widget _buildEquipoCard(Map<String, dynamic> equipoData, {required bool isAsignado}) {
     final equipoColor = isAsignado ? AppColors.success : AppColors.warning;
     final borderColor = isAsignado ? AppColors.borderSuccess : AppColors.borderWarning;
@@ -632,9 +626,9 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                         children: [
                           Expanded(
                             child: Text(
-                              _viewModel.getEquipoTitle(equipoData),
+                              _getFormattedEquipoTitle(equipoData),
                               style: TextStyle(
-                                fontSize: 15, // Reducido de 16
+                                fontSize: 15,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.textPrimary,
                               ),
@@ -643,8 +637,8 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                             ),
                           ),
                           const SizedBox(width: 8),
-                          // OPTIMIZADO: Badge más compacto
-                          _buildStatusBadge(isAsignado, backgroundColor, borderColor, equipoColor),
+                          // Solo icono de sincronización
+                          _buildSyncIcon(equipoData),
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -652,7 +646,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                         Text(
                           _viewModel.getEquipoBarcode(equipoData)!,
                           style: TextStyle(
-                            fontSize: 13, // Reducido de 14
+                            fontSize: 13,
                             color: AppColors.textSecondary,
                             fontFamily: 'monospace',
                           ),
@@ -664,7 +658,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                         Text(
                           _viewModel.getEquipoLogo(equipoData)!,
                           style: TextStyle(
-                            fontSize: 11, // Reducido de 12
+                            fontSize: 11,
                             color: AppColors.textTertiary,
                           ),
                           maxLines: 1,
@@ -701,24 +695,83 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     );
   }
 
-  // NUEVO: Badge de estado más compacto
-  Widget _buildStatusBadge(bool isAsignado, Color backgroundColor, Color borderColor, Color textColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), // Más compacto
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: borderColor, width: 0.5),
-      ),
-      child: Text(
-        isAsignado ? 'OK' : 'PEND', // CAMBIADO: Texto ultra corto
-        style: TextStyle(
-          fontSize: 9, // Reducido de 10
-          fontWeight: FontWeight.bold,
-          color: textColor,
-          letterSpacing: 0.3,
-        ),
-      ),
+  // Método helper para formatear el título del equipo sin espacios excesivos
+  String _getFormattedEquipoTitle(Map<String, dynamic> equipoData) {
+    final marca = equipoData['marca_nombre']?.toString()?.trim() ?? '';
+    final modelo = equipoData['modelo_nombre']?.toString()?.trim() ?? '';
+
+    // Si tenemos marca y modelo, los unimos con un solo espacio
+    if (marca.isNotEmpty && modelo.isNotEmpty) {
+      return '$marca $modelo';
+    } else if (marca.isNotEmpty) {
+      return marca;
+    } else if (modelo.isNotEmpty) {
+      return modelo;
+    } else {
+      // Fallback al método original si no hay marca ni modelo
+      return _viewModel.getEquipoTitle(equipoData);
+    }
+  }
+
+  // ICONO DE SINCRONIZACIÓN - USANDO DATOS REALES DE ESTADO_EQUIPO
+  Widget _buildSyncIcon(Map<String, dynamic> equipoData) {
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _viewModel.getEstadoCensoInfo(equipoData),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data == null) {
+          return SizedBox.shrink();
+        }
+
+        final estadoInfo = snapshot.data!;
+        Color iconColor;
+        IconData icon;
+        String tooltip;
+
+        // Verificar el campo 'migrado' de la tabla estado_equipo
+        final migrado = estadoInfo['migrado']?.toString().toLowerCase() == 'migrado' ||
+            estadoInfo['migrado']?.toString() == '1' ||
+            estadoInfo['migrado'] == 1 ||
+            estadoInfo['migrado'] == true;
+
+        // Verificar el campo 'creado' de la tabla estado_equipo
+        final creado = estadoInfo['creado']?.toString().toLowerCase() == 'creado' ||
+            estadoInfo['creado']?.toString() == '1' ||
+            estadoInfo['creado'] == 1 ||
+            estadoInfo['creado'] == true;
+
+        if (migrado) {
+          iconColor = AppColors.success;
+          icon = Icons.cloud_done;
+          tooltip = 'Sincronizado con servidor';
+        } else if (creado) {
+          iconColor = AppColors.warning;
+          icon = Icons.cloud_upload;
+          tooltip = 'Creado, pendiente de migrar';
+        } else {
+          // Si no hay estado definido, no mostrar nada
+          return SizedBox.shrink();
+        }
+
+        return Tooltip(
+          message: tooltip,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: iconColor.withOpacity(0.3),
+                width: 0.5,
+              ),
+            ),
+            child: Icon(
+              icon,
+              size: 14,
+              color: iconColor,
+            ),
+          ),
+        );
+      },
     );
   }
 

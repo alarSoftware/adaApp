@@ -84,6 +84,7 @@ class EstadoEquipo {
   factory EstadoEquipo.fromMap(Map<String, dynamic> map) {
     return EstadoEquipo(
       id: map['id'] as int?,
+      //TODO cambiar equipoPendienteId por cliente ID y equipo ID
       equipoPendienteId: map['equipo_pendiente_id'] as int? ?? 0,
       enLocal: (map['en_local'] as int?) == 1,
       latitud: map['latitud'] as double?,

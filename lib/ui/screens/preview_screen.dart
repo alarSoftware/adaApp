@@ -176,7 +176,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
           const SizedBox(height: 16),
 
           // ✅ CAMBIO 4: AGREGAR SEGUNDA TARJETA DE IMAGEN
-          _buildImagenCard(_imagePath, _imageBase64, 'Primera fo', 1),
+          _buildImagenCard(_imagePath, _imageBase64, 'Primera Foto', 1),
           const SizedBox(height: 16),
           _buildImagenCard(_imagePath2, _imageBase64_2, 'Segunda Foto', 2),
           const SizedBox(height: 16),

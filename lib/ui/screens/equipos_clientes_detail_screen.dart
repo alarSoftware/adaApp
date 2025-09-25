@@ -304,7 +304,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
 
     infoItems.addAll([
       {
-        'label': 'Fecha de Asignación',
+        'label': 'Logo',
         'value': _viewModel.getLogoText(),
       },
     ]);

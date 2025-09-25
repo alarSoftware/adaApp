@@ -297,23 +297,21 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
   // ========== MÉTODOS PARA OBTENER ESTADO DE CENSO ==========
   Future<Map<String, dynamic>?> getEstadoCensoInfo(Map<String, dynamic> equipoData) async {
     try {
-      final equipoId = equipoData['id'] as int?;
-      final clienteId = _cliente?.id;
+      final equipoId = int.tryParse(equipoData['id']?.toString() ?? '');
+      final clienteId = int.tryParse(_cliente?.id?.toString() ?? '');
 
       if (equipoId == null || clienteId == null) return null;
 
-      // Determinar si es equipo asignado o pendiente
       final estado = equipoData['estado']?.toString().toLowerCase();
 
       if (estado == 'pendiente') {
-        // Para equipos pendientes, buscar el último estado en Estado_Equipo
-        final equipoPendienteId = equipoData['id']; // ID del registro en equipos_pendientes
-        final ultimoEstado = await _estadoEquipoRepository.obtenerUltimoEstadoPorEquipoPendiente(equipoPendienteId);
+        // Para equipos pendientes, usar el método que existe
+        final ultimoEstado = await _estadoEquipoRepository.obtenerUltimoEstadoPorEquipoPendiente(equipoId);
         return ultimoEstado;
       } else if (estado == 'asignado') {
-        // Para equipos asignados, buscar directamente por equipo_id y cliente_id
-        final ultimoEstado = await _estadoEquipoRepository.obtenerUltimoEstadoPorEquipoCliente(equipoId, clienteId);
-        return ultimoEstado?.toMap();
+        // CAMBIO: Para equipos asignados, usar el método correcto que consulta por equipo_id y cliente_id
+        final ultimoEstado = await _estadoEquipoRepository.obtenerHistorialDirectoPorEquipoCliente(equipoId.toString(), clienteId);
+        return ultimoEstado.isNotEmpty ? ultimoEstado.first.toMap() : null;
       }
 
       return null;
