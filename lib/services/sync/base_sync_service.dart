@@ -5,10 +5,11 @@ import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 
 abstract class BaseSyncService {
-  static const String baseUrl = 'https://249adc5dd651.ngrok-free.app/adaControl/api';
+  static const String baseUrl = 'https://ada-api.loca.lt/adaControl/api';
   static const Duration timeout = Duration(minutes: 5);
 
   static final Logger logger = Logger();
+
 
   static Map<String, String> get headers => {
     'Content-Type': 'application/json; charset=UTF-8',

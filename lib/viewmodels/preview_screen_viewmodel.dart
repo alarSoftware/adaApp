@@ -14,20 +14,27 @@ final _logger = Logger();
 
 class PreviewScreenViewModel extends ChangeNotifier {
   bool _isLoading = false;
+  bool _isSaving = false;
   String? _statusMessage;
 
   final EquipoRepository _equipoRepository = EquipoRepository();
   final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
   final EquipoPendienteRepository _equipoPendienteRepository = EquipoPendienteRepository();
 
-  static const String _baseUrl = 'https://249adc5dd651.ngrok-free.app/adaControl/';
+  static const String _baseUrl = 'https://ada-api.loca.lt/adaControl/';
   static const String _estadosEndpoint = 'censoActivo/insertCensoActivo';
 
   bool get isLoading => _isLoading;
+  bool get isSaving => _isSaving;
   String? get statusMessage => _statusMessage;
 
   void _setLoading(bool loading) {
     _isLoading = loading;
+    notifyListeners();
+  }
+
+  void _setSaving(bool saving) {        // ← NUEVO método
+    _isSaving = saving;
     notifyListeners();
   }
 
@@ -79,7 +86,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> confirmarRegistro(Map<String, dynamic> datos) async {
-    _setLoading(true);
+    _setSaving(true);
     _setStatusMessage(null);
     int? estadoIdActual;
 
@@ -252,7 +259,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       _logger.e('❌ Error crítico en confirmación de registro: $e');
       return {'success': false, 'error': 'Error guardando registro: $e'};
     } finally {
-      _setLoading(false);
+      _setSaving(false);
     }
   }
 

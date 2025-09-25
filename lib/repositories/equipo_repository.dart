@@ -103,26 +103,42 @@ class EquipoRepository extends BaseRepository<Equipo> {
   // ================================
 
   /// Verificar si un equipo está asignado a un cliente específico
-  // EN EquipoRepository - CAMBIAR la firma del método:
   Future<bool> verificarAsignacionEquipoCliente(String equipoId, int clienteId) async {
     try {
-      final result = await dbHelper.consultar(
-        tableName,
+      // Verificar si el equipo está ASIGNADO en la tabla equipos
+      final resultEquipos = await dbHelper.consultar(
+        'equipos',
         where: 'id = ? AND cliente_id = ?',
-        whereArgs: [equipoId, clienteId.toString()], // equipoId ya es String
+        whereArgs: [equipoId, clienteId.toString()],
         limit: 1,
       );
 
-      final estaAsignado = result.isNotEmpty;
-      _logger.d('Equipo $equipoId ${estaAsignado ? "SÍ" : "NO"} está asignado al cliente $clienteId');
+      if (resultEquipos.isNotEmpty) {
+        _logger.d('Equipo $equipoId YA está asignado al cliente $clienteId en tabla equipos');
+        return true;
+      }
 
-      return estaAsignado;
+      // Si no está en equipos, verificar si está PENDIENTE
+      final resultPendientes = await dbHelper.consultar(
+        'equipos_pendientes',
+        where: 'equipo_id = ? AND cliente_id = ?',
+        whereArgs: [equipoId, clienteId],
+        limit: 1,
+      );
+
+      if (resultPendientes.isNotEmpty) {
+        _logger.d('Equipo $equipoId está PENDIENTE para el cliente $clienteId');
+        return false; // Está pendiente, NO asignado definitivamente
+      }
+
+      _logger.d('Equipo $equipoId NO tiene relación con cliente $clienteId');
+      return false;
+
     } catch (e) {
       _logger.e('Error verificando asignación equipo $equipoId - cliente $clienteId: $e');
       return false;
     }
   }
-
   /// Verificar si existe relación equipo-cliente
   Future<bool> existeRelacionEquipoCliente(int equipoId, int clienteId) async {
     try {
@@ -190,8 +206,6 @@ class EquipoRepository extends BaseRepository<Equipo> {
         tableName,
         {
           'cliente_id': clienteId.toString(),
-          // ❌ Remover: 'fecha_actualizacion': now.toIso8601String(),
-          // ❌ Remover: 'sincronizado': 0,
         },
         where: 'id = ?',
         whereArgs: [equipoId],
@@ -227,8 +241,6 @@ class EquipoRepository extends BaseRepository<Equipo> {
           tableName,
           {
             'cliente_id': clienteId.toString(),
-            // ❌ Remover: 'fecha_actualizacion': now.toIso8601String(),
-            // ❌ Remover: 'sincronizado': 0,
           },
           where: 'id = ?',
           whereArgs: [equipoId],

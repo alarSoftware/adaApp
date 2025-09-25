@@ -127,6 +127,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     final Cliente cliente = widget.datos['cliente'];
 
@@ -135,7 +136,17 @@ class _PreviewScreenState extends State<PreviewScreen> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: _buildAppBar(),
-        body: _buildBody(cliente),
+        body: Stack(
+          children: [
+            _buildBody(cliente),
+            Consumer<PreviewScreenViewModel>(
+              builder: (context, vm, child) {
+                if (!vm.isSaving) return const SizedBox.shrink();
+                return _buildSavingOverlay();
+              },
+            ),
+          ],
+        ),
         bottomNavigationBar: _buildBottomButtons(),
       ),
     );
@@ -165,7 +176,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
           const SizedBox(height: 16),
 
           // ✅ CAMBIO 4: AGREGAR SEGUNDA TARJETA DE IMAGEN
-          _buildImagenCard(_imagePath, _imageBase64, 'Primera foto', 1),
+          _buildImagenCard(_imagePath, _imageBase64, 'Primera fo', 1),
           const SizedBox(height: 16),
           _buildImagenCard(_imagePath2, _imageBase64_2, 'Segunda Foto', 2),
           const SizedBox(height: 16),
@@ -383,6 +394,58 @@ class _PreviewScreenState extends State<PreviewScreen> {
   }
 
   // ✅ CAMBIO 6: ACTUALIZAR PARA RECIBIR PATH COMO PARÁMETRO
+  Widget _buildSavingOverlay() {
+    return Container(
+      color: Colors.black54,
+      child: Center(
+        child: Card(
+          color: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 4,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Procesando Censo',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Consumer<PreviewScreenViewModel>(
+                  builder: (context, vm, child) {
+                    return Text(
+                      vm.statusMessage ?? 'Guardando datos...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _verImagenCompleta(String imagePath) {
     showDialog(
       context: context,
@@ -731,7 +794,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: vm.isLoading ? null : () => Navigator.of(context).pop(),
+                        onPressed: vm.isSaving ? null : () => Navigator.of(context).pop(),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           side: BorderSide(color: AppColors.border),
@@ -754,7 +817,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     Expanded(
                       flex: 2,
                       child: ElevatedButton(
-                        onPressed: vm.isLoading ? null : _confirmarRegistro,
+                        onPressed: vm.isSaving ? null : _confirmarRegistro,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.success,
                           foregroundColor: AppColors.onPrimary,
@@ -764,7 +827,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                           ),
                           elevation: 2,
                         ),
-                        child: vm.isLoading
+                        child: vm.isSaving
                             ? Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [

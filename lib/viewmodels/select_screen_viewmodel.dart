@@ -88,6 +88,7 @@ class SelectScreenViewModel extends ChangeNotifier {
 
   // ========== ESTADO INTERNO ==========
   bool _isSyncing = false;
+  bool _isTestingConnection = false; // NUEVO: Estado separado para prueba de conexión
   ConnectionStatus _connectionStatus = ConnectionStatus(
     hasInternet: false,
     hasApiConnection: false,
@@ -109,6 +110,7 @@ class SelectScreenViewModel extends ChangeNotifier {
 
   // ========== GETTERS PÚBLICOS ==========
   bool get isSyncing => _isSyncing;
+  bool get isTestingConnection => _isTestingConnection; // NUEVO: Getter para prueba de conexión
   ConnectionStatus get connectionStatus => _connectionStatus;
   bool get isConnected => _connectionStatus.hasInternet && _connectionStatus.hasApiConnection;
 
@@ -334,7 +336,7 @@ class SelectScreenViewModel extends ChangeNotifier {
 
   /// Ejecuta la sincronización (después de confirmación)
   Future<void> executeSync() async {
-    _setLoading(true);
+    _setSyncLoading(true); // CAMBIO: Usar método específico para sync
 
     try {
       final resultado = await SyncService.sincronizarTodosLosDatos();
@@ -355,13 +357,13 @@ class SelectScreenViewModel extends ChangeNotifier {
     } catch (e) {
       _eventController.add(ShowErrorEvent('Error inesperado: $e'));
     } finally {
-      _setLoading(false);
+      _setSyncLoading(false); // CAMBIO: Usar método específico para sync
     }
   }
 
   /// Prueba la conexión manualmente
   Future<void> testConnection() async {
-    _setLoading(true);
+    _setConnectionTestLoading(true); // CAMBIO: Usar método específico para prueba
 
     try {
       final response = await SyncService.probarConexion();
@@ -384,7 +386,7 @@ class SelectScreenViewModel extends ChangeNotifier {
         );
       }
     } finally {
-      _setLoading(false);
+      _setConnectionTestLoading(false); // CAMBIO: Usar método específico para prueba
     }
   }
 
@@ -395,7 +397,7 @@ class SelectScreenViewModel extends ChangeNotifier {
 
   /// Ejecuta el borrado de la base de datos
   Future<void> executeDeleteDatabase() async {
-    _setLoading(true);
+    _setSyncLoading(true); // CAMBIO: Usar método específico para sync (porque es una operación importante)
 
     try {
       final clienteRepo = ClienteRepository();
@@ -419,7 +421,7 @@ class SelectScreenViewModel extends ChangeNotifier {
     } catch (e) {
       _eventController.add(ShowErrorEvent('Error al borrar la base de datos: $e'));
     } finally {
-      _setLoading(false);
+      _setSyncLoading(false); // CAMBIO: Usar método específico para sync
     }
   }
 
@@ -434,8 +436,15 @@ class SelectScreenViewModel extends ChangeNotifier {
   }
 
   // ========== MÉTODOS PRIVADOS ==========
-  void _setLoading(bool loading) {
+
+  // CAMBIO: Métodos específicos para cada tipo de loading
+  void _setSyncLoading(bool loading) {
     _isSyncing = loading;
+    notifyListeners();
+  }
+
+  void _setConnectionTestLoading(bool loading) {
+    _isTestingConnection = loading;
     notifyListeners();
   }
 

@@ -6,7 +6,6 @@ import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/repositories/logo_repository.dart';
 import 'package:logger/logger.dart';
 import 'package:barcode_scan2/barcode_scan2.dart';
-import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/services/image_service.dart';
 import 'package:ada_app/services/location_service.dart';
 import 'dart:io';
@@ -250,29 +249,20 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
   Future<void> _verificarAsignacionEquipo(Map<String, dynamic> equipo) async {
     try {
-      // Convertir IDs a int de manera directa
-      int equipoId;
-      int clienteId;
+      // equipoId es STRING (código de barras), NO convertir a int
+      final String equipoId = equipo['id'].toString();
 
-      // Manejar equipo['id']
-      if (equipo['id'] is int) {
-        equipoId = equipo['id'];
-      } else {
-        equipoId = int.parse(equipo['id'].toString());
-      }
+      // clienteId sí es int
+      final int clienteId = _cliente!.id is int
+          ? _cliente!.id!
+          : int.parse(_cliente!.id!.toString());
 
-      // Manejar cliente.id
-      if (_cliente!.id! is int) {
-        clienteId = _cliente!.id!;
-      } else {
-        clienteId = int.parse(_cliente!.id!.toString());
-      }
+      _logger.i('Verificando asignación - EquipoID: "$equipoId" (String), ClienteID: $clienteId (int)');
 
-      _logger.i('Verificando asignación - EquipoID: $equipoId, ClienteID: $clienteId');
-
+      // Pasar equipoId como String (código de barras) y clienteId como int
       _equipoYaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(
-          equipo['id'].toString(),  // Mantener como String
-          clienteId  // Solo clienteId como int
+          equipoId,      // String - código de barras
+          clienteId      // int - ID del cliente
       );
 
       _logger.i('Resultado verificación: $_equipoYaAsignado');
@@ -339,11 +329,11 @@ class FormsScreenViewModel extends ChangeNotifier {
     final clienteIdEquipo = equipo['cliente_id'];
 
     if (_equipoYaAsignado) {
-      _showSuccess('Equipo $nombreEquipo - YA ASIGNADO ✓');
+      _showSuccess('Equipo ya registrado');
     } else if (clienteIdEquipo != null && clienteIdEquipo.toString() != '0' && clienteIdEquipo.toString().isNotEmpty) {
-      _showWarning('Equipo $nombreEquipo - PERTENECE A OTRO CLIENTE (quedará PENDIENTE)');
+      _showWarning('Pendiente');
     } else {
-      _showInfo('Equipo $nombreEquipo - SIN ASIGNAR (quedará PENDIENTE)');
+      _showInfo('Equipo disponible');
     }
   }
 
@@ -569,12 +559,34 @@ class FormsScreenViewModel extends ChangeNotifier {
     return null;
   }
 
+  String? validarFotos() {
+    // Si el equipo YA está asignado al cliente, las fotos son OPCIONALES
+    if (_equipoYaAsignado) {
+      return null; // No hay error, las fotos son opcionales
+    }
+
+    // Si es equipo PENDIENTE o NUEVO, al menos UNA foto es OBLIGATORIA
+    if (_imagenSeleccionada == null && _imagenSeleccionada2 == null) {
+      return 'Debe tomar al menos una foto del equipo';
+    }
+
+    return null; // Todo OK
+  }
+
+
   // ===============================
   // LÓGICA DE NEGOCIO - NAVEGACIÓN
   // ===============================
 
   Future<void> continuarAPreview(GlobalKey<FormState> formKey) async {
     if (!formKey.currentState!.validate()) {
+      return;
+    }
+
+    // VALIDAR FOTOS ANTES DE CONTINUAR
+    final errorFotos = validarFotos();
+    if (errorFotos != null) {
+      _showError(errorFotos);
       return;
     }
 
@@ -680,7 +692,10 @@ class FormsScreenViewModel extends ChangeNotifier {
   // GETTERS PARA LA UI
   // ===============================
 
+
+
   String get titleText => _isCensoMode ? 'Censo de Equipos' : 'Agregar Nuevo Equipo';
+
 
   String get modeTitle => _isCensoMode ? 'Modo: Censo de Equipos' : 'Modo: Registro Nuevo Equipo';
 
@@ -705,6 +720,12 @@ class FormsScreenViewModel extends ChangeNotifier {
   String get logoHint => _isCensoMode
       ? 'Se completará automáticamente'
       : 'Seleccionar logo';
+
+  String get fotoRequerimiento => _equipoYaAsignado
+      ? 'Fotos (Opcional)'
+      : 'Fotos (Requerida al menos 1)';
+
+  bool get sonFotosObligatorias => !_equipoYaAsignado;
 
   String get buttonText => _isCensoMode ? 'Registrar Censo' : 'Registrar Nuevo';
 

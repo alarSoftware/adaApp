@@ -304,6 +304,63 @@ class _SelectScreenState extends State<SelectScreen> {
     );
   }
 
+  Widget _buildSyncOverlay() {
+    return Container(
+      color: Colors.black54,
+      child: Center(
+        child: Card(
+          color: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 4,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                ),
+                SizedBox(height: 24),
+                Text(
+                  'Sincronizando Datos',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                SizedBox(height: 12),
+                Text(
+                  'Descargando clientes y equipos...',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Por favor no cierres la aplicación',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildConnectionStatus() {
     return ListenableBuilder(
       listenable: _viewModel,
@@ -400,13 +457,24 @@ class _SelectScreenState extends State<SelectScreen> {
                 itemBuilder: (BuildContext context) => [
                   PopupMenuItem<String>(
                     value: 'probar_conexion',
-                    enabled: !_viewModel.isSyncing,
+                    // CAMBIO: Ahora deshabilita solo si está probando conexión O sincronizando
+                    enabled: !_viewModel.isTestingConnection && !_viewModel.isSyncing,
                     child: Row(
                       children: [
-                        Icon(Icons.wifi_find, color: AppColors.success),
+                        // CAMBIO: Mostrar spinner si está probando conexión
+                        _viewModel.isTestingConnection
+                            ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.success),
+                          ),
+                        )
+                            : Icon(Icons.wifi_find, color: AppColors.success),
                         SizedBox(width: 8),
                         Text(
-                          'Probar Conexión',
+                          _viewModel.isTestingConnection ? 'Probando...' : 'Probar Conexión',
                           style: TextStyle(color: AppColors.textPrimary),
                         ),
                       ],
@@ -414,7 +482,7 @@ class _SelectScreenState extends State<SelectScreen> {
                   ),
                   PopupMenuItem<String>(
                     value: 'borrar_bd',
-                    enabled: !_viewModel.isSyncing,
+                    enabled: !_viewModel.isSyncing && !_viewModel.isTestingConnection,
                     child: Row(
                       children: [
                         Icon(Icons.delete_forever, color: AppColors.error),
@@ -433,135 +501,151 @@ class _SelectScreenState extends State<SelectScreen> {
         ],
       ),
 
-      body: SafeArea(
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24.0),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                AppColors.containerBackground,
-                AppColors.background,
-              ],
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 24.0),
-                child: Card(
-                  color: AppColors.surface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: AppColors.border),
-                  ),
-                  elevation: 4,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: ListenableBuilder(
-                      listenable: _viewModel,
-                      builder: (context, child) {
-                        return Row(
-                          children: [
-                            if (_viewModel.isLoadingUser) ...[
-                              SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                                ),
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Cargando usuario...',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ] else
-                              Text(
-                                'Hola, ${_viewModel.userDisplayName}',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _buildMenuButton(
-                          context,
-                          label: 'Clientes',
-                          icon: Icons.people,
-                          color: AppColors.primary,
-                          routeName: '/clienteLista',
-                        ),
-                        _buildMenuButton(
-                          context,
-                          label: 'Equipos',
-                          icon: Icons.kitchen,
-                          color: AppColors.primary,
-                          page: const EquipoListScreen(),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _buildMenuButton(
-                          context,
-                          label: 'Modelos',
-                          icon: Icons.branding_watermark,
-                          color: AppColors.primary,
-                          page: const ModelosScreen(),
-                        ),
-                        _buildMenuButton(
-                          context,
-                          label: 'Logos',
-                          icon: Icons.newspaper,
-                          color: AppColors.primary,
-                          page: const LogosScreen(),
-                        ),
-                      ],
-                    ),
+      body: Stack(  // CAMBIO: Envolver en Stack
+        children: [
+          // Contenido principal
+          SafeArea(
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24.0),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.containerBackground,
+                    AppColors.background,
                   ],
                 ),
               ),
-              TextButton.icon(
-                onPressed: () {
-                  Navigator.pushReplacementNamed(context, '/login');
-                },
-                icon: Icon(Icons.logout, color: AppColors.textSecondary),
-                label: Text(
-                  'Cerrar Sesión',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 24.0),
+                    child: Card(
+                      color: AppColors.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: AppColors.border),
+                      ),
+                      elevation: 4,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: ListenableBuilder(
+                          listenable: _viewModel,
+                          builder: (context, child) {
+                            return Row(
+                              children: [
+                                if (_viewModel.isLoadingUser) ...[
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Cargando usuario...',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ] else
+                                  Text(
+                                    'Hola, ${_viewModel.userDisplayName}',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildMenuButton(
+                              context,
+                              label: 'Clientes',
+                              icon: Icons.people,
+                              color: AppColors.primary,
+                              routeName: '/clienteLista',
+                            ),
+                            _buildMenuButton(
+                              context,
+                              label: 'Equipos',
+                              icon: Icons.kitchen,
+                              color: AppColors.primary,
+                              page: const EquipoListScreen(),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildMenuButton(
+                              context,
+                              label: 'Modelos',
+                              icon: Icons.branding_watermark,
+                              color: AppColors.primary,
+                              page: const ModelosScreen(),
+                            ),
+                            _buildMenuButton(
+                              context,
+                              label: 'Logos',
+                              icon: Icons.newspaper,
+                              color: AppColors.primary,
+                              page: const LogosScreen(),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pushReplacementNamed(context, '/login');
+                    },
+                    icon: Icon(Icons.logout, color: AppColors.textSecondary),
+                    label: Text(
+                      'Cerrar Sesión',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+
+          // CAMBIO IMPORTANTE: Overlay de sincronización SOLO aparece para sincronización
+          ListenableBuilder(
+            listenable: _viewModel,
+            builder: (context, child) {
+              // SOLO mostrar overlay si está sincronizando, NO si está probando conexión
+              if (!_viewModel.isSyncing) return const SizedBox.shrink();
+
+              return _buildSyncOverlay();
+            },
+          ),
+        ],
       ),
     );
   }
