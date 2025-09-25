@@ -43,6 +43,7 @@ class EstadoEquipo {
   final DateTime? fechaActualizacion;
   final bool estaSincronizado;
   final String? estadoCenso;
+  final String? observaciones;
 
   // Primera imagen
   final String? imagenPath;
@@ -67,6 +68,7 @@ class EstadoEquipo {
     this.fechaActualizacion,
     this.estaSincronizado = false,
     this.estadoCenso,
+    this.observaciones,
     // Primera imagen
     this.imagenPath,
     this.imagenBase64,
@@ -107,6 +109,7 @@ class EstadoEquipo {
       tieneImagen2: (map['tiene_imagen2'] as int?) == 1,
       imagenTamano2: map['imagen_tamano2'] as int?,
       estadoCenso: map['estado_censo'] as String?,
+      observaciones: map ['observaciones'] as String?
     );
   }
 
@@ -121,6 +124,7 @@ class EstadoEquipo {
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
       'sincronizado': estaSincronizado ? 1 : 0,
+      'observaciones': observaciones,
       // Primera imagen
       'imagen_path': imagenPath,
       'imagen_base64': imagenBase64,
@@ -152,6 +156,7 @@ class EstadoEquipo {
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
       'sincronizado': estaSincronizado,
       'estado_censo': estadoCenso,
+      'observaciones': observaciones,
       // Primera imagen
       'imagen_path': imagenPath,
       'tiene_imagen': tieneImagen,
@@ -174,6 +179,7 @@ class EstadoEquipo {
     DateTime? fechaActualizacion,
     bool? estaSincronizado,
     String? estadoCenso,
+    String? observaciones,
     // Primera imagen
     String? imagenPath,
     String? imagenBase64,
@@ -196,6 +202,7 @@ class EstadoEquipo {
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
       estaSincronizado: estaSincronizado ?? this.estaSincronizado,
       estadoCenso: estadoCenso ?? this.estadoCenso,
+      observaciones: observaciones ?? this.observaciones,
       // Primera imagen
       imagenPath: imagenPath ?? this.imagenPath,
       imagenBase64: imagenBase64 ?? this.imagenBase64,

@@ -455,6 +455,8 @@ class _FormsScreenState extends State<FormsScreen> {
             _buildSerieField(),
             const SizedBox(height: 16,),
             _buildImagenField(),
+            const SizedBox(height: 16,),
+            _buildObservacionesField(),
           ],
         ),
       ),
@@ -819,6 +821,23 @@ class _FormsScreenState extends State<FormsScreen> {
       ],
     );
   }
+  Widget _buildObservacionesField() {
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, child) {
+        return _buildTextField(
+          controller: _viewModel.observacionesController,
+          label: _viewModel.observacionesLabel,
+          hint: _viewModel.observacionesHint,
+          icon: Icons.comment_outlined,
+          maxLines: 3, // Permitir múltiples líneas
+          enabled: _viewModel.observacionesEnabled, // Siempre habilitado
+          // No usar backgroundColor para que se vea diferente a los campos deshabilitados
+        );
+      },
+    );
+  }
+
 
   Widget _buildBottomButtons() {
     return SafeArea(

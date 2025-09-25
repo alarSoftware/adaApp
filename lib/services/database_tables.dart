@@ -126,6 +126,7 @@ class DatabaseTables {
     fecha_creacion TEXT,
     fecha_actualizacion TEXT,
     sincronizado INTEGER DEFAULT 0,
+    observaciones TEXT,
     imagen_path TEXT,
     imagen_base64 TEXT,
     tiene_imagen INTEGER DEFAULT 0,

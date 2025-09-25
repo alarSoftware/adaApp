@@ -107,6 +107,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         fechaActualizacion: now,
         estaSincronizado: false,
         estadoCenso: EstadoEquipoCenso.creado.valor,
+        observaciones: observaciones, // AGREGAR ESTA LÍNEA
 
         // Campos de imagen
         imagenPath: imagenPath,
@@ -587,6 +588,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         'fecha_creacion': now.toIso8601String(),
         'fecha_actualizacion': now.toIso8601String(),
         'sincronizado': 0,
+        'observaciones': observaciones, // AGREGAR ESTA LÍNEA
 
         // Primera imagen
         'imagen_path': imagenPath,
@@ -605,7 +607,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
 
       final insertedId = await dbHelper.insertar(tableName, datosEstado);
 
-      _logger.i('✅ Estado creado directamente con ID: $insertedId para equipo: $equipoId, cliente: $clienteId');
+      _logger.i('Estado creado directamente con ID: $insertedId para equipo: $equipoId, cliente: $clienteId');
 
       return EstadoEquipo(
         id: insertedId,
@@ -617,6 +619,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         fechaCreacion: now,
         fechaActualizacion: now,
         estaSincronizado: false,
+        observaciones: observaciones, // AGREGAR ESTA LÍNEA
 
         // Primera imagen
         imagenPath: imagenPath,
@@ -624,7 +627,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         tieneImagen: tieneImagen,
         imagenTamano: imagenTamano,
 
-        // Segunda imagen (si tu modelo EstadoEquipo las tiene)
+        // Segunda imagen
         imagenPath2: imagenPath2,
         imagenBase64_2: imagenBase64_2,
         tieneImagen2: tieneImagen2,
@@ -634,7 +637,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       );
 
     } catch (e) {
-      _logger.e('❌ Error creating estado directly: $e');
+      _logger.e('Error creating estado directly: $e');
       rethrow;
     }
   }

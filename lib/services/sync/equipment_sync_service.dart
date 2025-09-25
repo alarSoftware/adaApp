@@ -299,60 +299,6 @@ class EquipmentSyncService extends BaseSyncService {
     }
   }
 
-  static Future<SyncResult> sincronizarAsignaciones() async {
-    try {
-      final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/asignaciones'),
-        headers: BaseSyncService.headers,
-      ).timeout(BaseSyncService.timeout);
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final List<dynamic> asignacionesData = BaseSyncService.parseResponse(response.body);
-
-        if (asignacionesData.isEmpty) {
-          return SyncResult(
-            exito: true,
-            mensaje: 'No hay asignaciones en el servidor',
-            itemsSincronizados: 0,
-          );
-        }
-
-        final asignacionesLimpias = asignacionesData.map((asignacion) {
-          return {
-            'id': asignacion['id'],
-            'equipo_id': asignacion['equipo_id'],
-            'cliente_id': asignacion['cliente_id'],
-            'estado': asignacion['estado'] ?? 'asignado',
-            'fecha_asignacion': asignacion['fecha_asignacion'],
-            'fecha_retiro': asignacion['fecha_retiro'],
-          };
-        }).toList();
-
-        await _equipoClienteRepo.limpiarYSincronizar(asignacionesLimpias);
-
-        return SyncResult(
-          exito: true,
-          mensaje: 'Asignaciones sincronizadas correctamente',
-          itemsSincronizados: asignacionesLimpias.length,
-          totalEnAPI: asignacionesLimpias.length,
-        );
-      } else {
-        final mensaje = BaseSyncService.extractErrorMessage(response);
-        return SyncResult(
-          exito: false,
-          mensaje: mensaje,
-          itemsSincronizados: 0,
-        );
-      }
-    } catch (e) {
-      return SyncResult(
-        exito: false,
-        mensaje: BaseSyncService.getErrorMessage(e),
-        itemsSincronizados: 0,
-      );
-    }
-  }
-
   static Future<int> subirRegistrosEquipos() async {
     try {
       final registrosPendientes = await _dbHelper.consultar(

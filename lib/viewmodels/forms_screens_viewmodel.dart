@@ -62,6 +62,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   final TextEditingController codigoBarrasController = TextEditingController();
   final TextEditingController modeloController = TextEditingController();
   final TextEditingController numeroSerieController = TextEditingController();
+  final TextEditingController observacionesController = TextEditingController(); // NUEVO
 
   // Estado privado
   bool _isCensoMode = true;
@@ -110,6 +111,7 @@ class FormsScreenViewModel extends ChangeNotifier {
     codigoBarrasController.dispose();
     modeloController.dispose();
     numeroSerieController.dispose();
+    observacionesController.dispose();
     _eventController.close();
     super.dispose();
   }
@@ -517,6 +519,7 @@ class FormsScreenViewModel extends ChangeNotifier {
 
   void limpiarFormulario() {
     codigoBarrasController.clear();
+    observacionesController.clear();
     _limpiarDatosAutocompletados();
     _isCensoMode = true;
     notifyListeners();
@@ -622,6 +625,7 @@ class FormsScreenViewModel extends ChangeNotifier {
       'logo_id': _logoSeleccionado,
       'logo': logoSeleccionado['nombre'],
       'numero_serie': numeroSerieController.text.trim(),
+      'observaciones': observacionesController.text.trim(),
 
       // Primera imagen
       'imagen_path': _imagenSeleccionada?.path,
@@ -725,11 +729,21 @@ class FormsScreenViewModel extends ChangeNotifier {
       ? 'Fotos (Opcional)'
       : 'Fotos (Requerida al menos 1)';
 
+
+  String get observacionesHint => _isCensoMode
+      ? 'Comentarios u observaciones...'
+      : 'Comentarios u observaciones...';
+
+  String get observacionesLabel => 'Observaciones';
+
+
   bool get sonFotosObligatorias => !_equipoYaAsignado;
 
   String get buttonText => _isCensoMode ? 'Registrar Censo' : 'Registrar Nuevo';
 
   IconData get buttonIcon => _isCensoMode ? Icons.assignment : Icons.add_box;
+
+  bool get observacionesEnabled => true;
 
   bool get shouldShowCamera => _isCensoMode;
 

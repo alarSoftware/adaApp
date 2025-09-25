@@ -42,12 +42,6 @@ class SyncService {
       resultado.equiposExito = resultadoEquipos.exito;
       if (!resultadoEquipos.exito) resultado.erroresEquipos = resultadoEquipos.mensaje;
 
-      // Sincronizar asignaciones
-      //TODO ronaldo limpiar codigo, refactorizar y quitar lo que no se usa
-      final resultadoAsignaciones = await EquipmentSyncService.sincronizarAsignaciones();
-      resultado.asignacionesSincronizadas = resultadoAsignaciones.itemsSincronizados;
-      resultado.asignacionesExito = resultadoAsignaciones.exito;
-      if (!resultadoAsignaciones.exito) resultado.erroresAsignaciones = resultadoAsignaciones.mensaje;
 
       // Evaluar resultado general
       final exitosos = [resultado.clientesExito, resultado.equiposExito, resultado.asignacionesExito];
@@ -89,7 +83,7 @@ class SyncService {
   }
 
   static Future<SyncResult> sincronizarEquipos() => EquipmentSyncService.sincronizarEquipos();
-  static Future<SyncResult> sincronizarAsignaciones() => EquipmentSyncService.sincronizarAsignaciones();
+  // static Future<SyncResult> sincronizarAsignaciones() => EquipmentSyncService.sincronizarAsignaciones();
 
   // Métodos de envío
   static Future<SyncResult> enviarClientesPendientes() => ClientSyncService.enviarClientesPendientes();

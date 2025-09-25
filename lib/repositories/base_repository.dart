@@ -56,7 +56,7 @@ abstract class BaseRepository<T> {
       where: getBuscarWhere(),
       whereArgs: getBuscarArgs(query),
       orderBy: getDefaultOrderBy(),
-      limit: 50,
+      limit: 100,
     );
     return maps.map((map) => fromMap(map)).toList();
   }

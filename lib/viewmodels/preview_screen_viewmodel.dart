@@ -395,6 +395,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'usuario_id': 1,
       'funcionando': true,
       'estado_general': 'Equipo registrado desde APP móvil - ${datos['observaciones'] ?? 'Sin observaciones'}',
+      'observaciones': datos['observaciones'], // AGREGAR ESTA LÍNEA
       'latitud': datos['latitud'],
       'longitud': datos['longitud'],
       'codigo_barras': datos['codigo_barras'],
@@ -438,6 +439,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'latitud': datosLocales['latitud'],
       'longitud': datosLocales['longitud'],
       'estado_general': datosLocales['estado_general'],
+      'observaciones': datosLocales['observaciones'], // AGREGAR ESTA LÍNEA
       'equipo_codigo_barras': datosLocales['codigo_barras'],
       'equipo_numero_serie': datosLocales['numero_serie'],
       'equipo_modelo': datosLocales['modelo'],
