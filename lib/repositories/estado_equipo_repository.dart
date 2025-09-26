@@ -139,13 +139,32 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         whereArgs: [equipoId, clienteId],
         orderBy: 'fecha_revision DESC',
       );
-      return maps.map((map) => fromMap(map)).toList();
+
+      print('🔍 Datos raw de BD: ${maps.length} registros');
+      for (int i = 0; i < maps.length && i < 2; i++) {
+        print('Registro $i: ${maps[i]}');
+      }
+
+      List<EstadoEquipo> resultado = [];
+      for (int i = 0; i < maps.length; i++) {
+        try {
+          final estado = fromMap(maps[i]);
+          resultado.add(estado);
+          print('✅ Registro $i mapeado correctamente');
+        } catch (e) {
+          print('❌ Error mapeando registro $i: $e');
+          print('   Datos del registro: ${maps[i]}');
+        }
+      }
+
+      print('🔧 Después del mapeo: ${resultado.length} estados');
+      return resultado;
+
     } catch (e) {
       _logger.e('Error al obtener historial completo: $e');
       return [];
     }
   }
-
   /// Obtener últimos N cambios por equipo_id y cliente_id
   Future<List<EstadoEquipo>> obtenerUltimosCambios(String equipoId, int clienteId, {int limite = 5}) async {
     try {

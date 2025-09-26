@@ -96,157 +96,19 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     logger.i('- Tipo estado: ${equipoData['tipo_estado']}');
     logger.i('- Es asignado: $isAsignado');
 
-    if (isAsignado) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => EquiposClientesDetailScreen(
-            equipoCliente: equipoData,
-          ),
+    // CAMBIO: Ambos tipos van a la misma pantalla
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EquiposClientesDetailScreen(
+          equipoCliente: equipoData,
         ),
-      ).then((_) => _viewModel.refresh());
-    } else {
-      _showEquipoDetailsDialog(equipoData);
-    }
-  }
-
-  void _showEquipoDetailsDialog(dynamic equipoData) {
-    final nombreCompleto = _viewModel.getEquipoTitle(equipoData);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Text(
-          nombreCompleto,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildDetalleRow('Código', equipoData['cod_barras'] ?? 'N/A'),
-                _buildDetalleRow('Marca', equipoData['marca_nombre'] ?? 'Sin marca'),
-                _buildDetalleRow('Modelo', equipoData['modelo_nombre'] ?? 'Sin modelo'),
-                _buildDetalleRow('Logo', equipoData['logo_nombre'] ?? 'Sin logo'),
-                if (equipoData['numero_serie'] != null && equipoData['numero_serie'].toString().isNotEmpty)
-                  _buildDetalleRow('Número de Serie', equipoData['numero_serie']),
-                _buildEstadoRow('Pendiente', AppColors.warning),
-                _buildDetalleRow('Cliente', widget.cliente.nombre),
-                Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.warningContainer,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.warning.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, color: AppColors.warning, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Este equipo está pendiente de confirmación',
-                            style: TextStyle(
-                              color: AppColors.warning,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.primary,
-            ),
-            child: const Text('Cerrar'),
-          ),
-        ],
       ),
-    );
+    ).then((_) => _viewModel.refresh());
   }
 
-  Widget _buildEstadoRow(String estado, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              'Estado:',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              estado,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildDetalleRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(color: AppColors.textPrimary),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {

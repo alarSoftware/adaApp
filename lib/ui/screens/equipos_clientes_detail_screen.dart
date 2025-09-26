@@ -104,29 +104,31 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
         backgroundColor: AppColors.appBarBackground,
         foregroundColor: AppColors.appBarForeground,
         actions: [
-          ListenableBuilder(
-            listenable: _viewModel,
-            builder: (context, child) {
-              final canSave = _viewModel.saveButtonEnabled;
-              final buttonText = _viewModel.saveButtonText;
+          // SOLO MOSTRAR BOTÓN DE GUARDAR PARA EQUIPOS ACTIVOS/ASIGNADOS
+          if (_viewModel.isEquipoActivo)
+            ListenableBuilder(
+              listenable: _viewModel,
+              builder: (context, child) {
+                final canSave = _viewModel.saveButtonEnabled;
+                final buttonText = _viewModel.saveButtonText;
 
-              return TextButton.icon(
-                onPressed: canSave ? _showSaveConfirmation : null,
-                icon: Icon(
-                  Icons.save,
-                  color: canSave ? AppColors.onPrimary : AppColors.onPrimary.withValues(alpha: 0.5),
-                  size: 20,
-                ),
-                label: Text(
-                  buttonText,
-                  style: TextStyle(
+                return TextButton.icon(
+                  onPressed: canSave ? _showSaveConfirmation : null,
+                  icon: Icon(
+                    Icons.save,
                     color: canSave ? AppColors.onPrimary : AppColors.onPrimary.withValues(alpha: 0.5),
-                    fontWeight: FontWeight.w600,
+                    size: 20,
                   ),
-                ),
-              );
-            },
-          ),
+                  label: Text(
+                    buttonText,
+                    style: TextStyle(
+                      color: canSave ? AppColors.onPrimary : AppColors.onPrimary.withValues(alpha: 0.5),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                );
+              },
+            ),
           SizedBox(width: 8),
         ],
       ),
@@ -401,11 +403,6 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
             // Mostrar historial para TODOS los equipos (activos e inactivos)
             _buildHistorialCard(),
 
-            // Mostrar mensaje de equipo inactivo después del historial
-            if (!_viewModel.isEquipoActivo) ...[
-              SizedBox(height: 20),
-              _buildInactiveEquipoCard(),
-            ],
           ],
         );
       },
@@ -1083,41 +1080,6 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
             Icons.arrow_forward_ios,
             size: 14,
             color: AppColors.textSecondary,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInactiveEquipoCard() {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.errorContainer,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderError),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.info_outline, size: 40, color: AppColors.error),
-          SizedBox(height: 8),
-          Text(
-            _viewModel.getInactiveEquipoTitle(),
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.error,
-            ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            _viewModel.getInactiveEquipoSubtitle(),
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.error,
-            ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),

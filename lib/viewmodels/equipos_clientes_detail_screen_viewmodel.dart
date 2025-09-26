@@ -114,7 +114,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
   Future<void> _loadInitialState() async {
     try {
-      final equipoId = equipoCliente['id'];
+      final equipoId = equipoCliente['cod_barras'];
       final clienteId = equipoCliente['cliente_id'];
 
       print('🔍 BUSCANDO HISTORIAL PARA:');
@@ -549,14 +549,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       'equipoCodigo': equipoCliente['cod_barras'] ?? 'Sin código',
       'clienteNombre': 'Cliente ID: ${equipoCliente['cliente_id'] ?? "No asignado"}',
     };
-  }
-
-  String getInactiveEquipoTitle() {
-    return 'Equipo no activo';
-  }
-
-  String getInactiveEquipoSubtitle() {
-    return 'Este equipo ya no está asignado activamente a este cliente';
   }
 
   void _logDebugInfo() {
