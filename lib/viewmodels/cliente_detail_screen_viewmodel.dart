@@ -297,24 +297,53 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
   // ========== MÉTODOS PARA OBTENER ESTADO DE CENSO ==========
   Future<Map<String, dynamic>?> getEstadoCensoInfo(Map<String, dynamic> equipoData) async {
     try {
-      final equipoId = int.tryParse(equipoData['id']?.toString() ?? '');
       final clienteId = int.tryParse(_cliente?.id?.toString() ?? '');
-
-      if (equipoId == null || clienteId == null) return null;
-
-      final estado = equipoData['estado']?.toString().toLowerCase();
-
-      if (estado == 'pendiente') {
-        // Para equipos pendientes, usar el método que existe
-        final ultimoEstado = await _estadoEquipoRepository.obtenerUltimoEstadoPorEquipoPendiente(equipoId);
-        return ultimoEstado;
-      } else if (estado == 'asignado') {
-        // CAMBIO: Para equipos asignados, usar el método correcto que consulta por equipo_id y cliente_id
-        final ultimoEstado = await _estadoEquipoRepository.obtenerHistorialDirectoPorEquipoCliente(equipoId.toString(), clienteId);
-        return ultimoEstado.isNotEmpty ? ultimoEstado.first.toMap() : null;
+      if (clienteId == null) {
+        _logger.w('Cliente ID nulo');
+        return null;
       }
 
-      return null;
+      // IMPORTANTE: Determinar si es asignado o pendiente desde equipoData
+      final tipoEstado = equipoData['tipo_estado']?.toString() ??
+          equipoData['estado']?.toString();
+
+      _logger.i('Buscando estado_censo para equipo ${equipoData['cod_barras']}, tipo: $tipoEstado');
+
+      Map<String, dynamic>? resultado;
+
+      if (tipoEstado == 'pendiente') {
+// Para equipos pendientes, buscar por equipo_id y cliente_id también
+        final equipoId = equipoData['equipo_id']?.toString() ??
+            equipoData['id']?.toString();
+
+        if (equipoId != null && equipoId.isNotEmpty) {
+          final ultimoEstado = await _estadoEquipoRepository.obtenerUltimoEstado(
+            equipoId,  // usar directamente como String
+            clienteId,
+          );
+          resultado = ultimoEstado?.toMap();
+        }
+
+      } else if (tipoEstado == 'asignado') {
+        // Para equipos asignados, buscar en Estado_Equipo por equipo_id y cliente_id
+        final equipoId = equipoData['equipo_id']?.toString() ??
+            equipoData['id']?.toString();
+        if (equipoId != null) {
+          final historial = await _estadoEquipoRepository.obtenerHistorialDirectoPorEquipoCliente(equipoId, clienteId);
+          if (historial.isNotEmpty) {
+            resultado = historial.first.toMap();
+          }
+        }
+      }
+
+      if (resultado != null) {
+        _logger.i('Estado_censo encontrado: ${resultado['estado_censo']}, sincronizado: ${resultado['sincronizado']}');
+      } else {
+        _logger.w('No se encontró registro en Estado_Equipo para ${equipoData['cod_barras']}');
+      }
+
+      return resultado;
+
     } catch (e) {
       _logger.e('Error obteniendo estado censo: $e');
       return null;

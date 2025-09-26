@@ -8,11 +8,14 @@ import 'dart:convert';
 
 class PreviewScreen extends StatefulWidget {
   final Map<String, dynamic> datos;
+  final dynamic historialItem; // ← NUEVO PARÁMETRO
 
   const PreviewScreen({
     super.key,
     required this.datos,
+    this.historialItem, // ← PARÁMETRO OPCIONAL
   });
+
 
   @override
   State<PreviewScreen> createState() => _PreviewScreenState();
@@ -35,11 +38,21 @@ class _PreviewScreenState extends State<PreviewScreen> {
   }
 
   // ✅ CAMBIO 2: ACTUALIZAR MÉTODO PARA CARGAR AMBAS IMÁGENES
+// REEMPLAZAR el método _cargarImagenInicial() actual con este:
+
   Future<void> _cargarImagenInicial() async {
-    // Cargar primera imagen
-    final imagenPath = widget.datos['imagen_path'] as String?;
-    if (imagenPath != null && imagenPath.isNotEmpty) {
-      try {
+    // ==== CARGAR PRIMERA IMAGEN ====
+    await _cargarImagen1();
+
+    // ==== CARGAR SEGUNDA IMAGEN ====
+    await _cargarImagen2();
+  }
+
+  Future<void> _cargarImagen1() async {
+    try {
+      // OPCIÓN 1: Imagen desde archivo (path)
+      final imagenPath = widget.datos['imagen_path'] as String?;
+      if (imagenPath != null && imagenPath.isNotEmpty) {
         final file = File(imagenPath);
         if (await file.exists()) {
           final bytes = await file.readAsBytes();
@@ -49,16 +62,46 @@ class _PreviewScreenState extends State<PreviewScreen> {
             _imagePath = imagenPath;
             _imageBase64 = base64Data;
           });
-        }
-      } catch (e) {
-        debugPrint('Error cargando imagen 1: $e');
-      }
-    }
 
-    // Cargar segunda imagen
-    final imagenPath2 = widget.datos['imagen_path2'] as String?;
-    if (imagenPath2 != null && imagenPath2.isNotEmpty) {
-      try {
+          debugPrint('✅ Imagen 1 cargada desde archivo: $imagenPath');
+          return; // Si se cargó desde archivo, no buscar en base64
+        } else {
+          debugPrint('⚠️ Archivo de imagen 1 no encontrado: $imagenPath');
+        }
+      }
+
+      // OPCIÓN 2: Imagen desde base64 (base de datos)
+      final imagenBase64DB = widget.datos['imagen_base64'] as String?;
+      if (imagenBase64DB != null && imagenBase64DB.isNotEmpty) {
+        // Verificar que sea base64 válido
+        try {
+          final bytes = base64Decode(imagenBase64DB);
+          if (bytes.isNotEmpty) {
+            setState(() {
+              _imagePath = null; // No hay archivo físico
+              _imageBase64 = imagenBase64DB;
+            });
+
+            debugPrint('✅ Imagen 1 cargada desde base64 (${bytes.length} bytes)');
+            return;
+          }
+        } catch (e) {
+          debugPrint('⚠️ Error decodificando base64 imagen 1: $e');
+        }
+      }
+
+      debugPrint('ℹ️ No se encontró imagen 1 válida');
+
+    } catch (e) {
+      debugPrint('❌ Error cargando imagen 1: $e');
+    }
+  }
+
+  Future<void> _cargarImagen2() async {
+    try {
+      // OPCIÓN 1: Imagen desde archivo (path)
+      final imagenPath2 = widget.datos['imagen_path2'] as String?;
+      if (imagenPath2 != null && imagenPath2.isNotEmpty) {
         final file = File(imagenPath2);
         if (await file.exists()) {
           final bytes = await file.readAsBytes();
@@ -68,10 +111,38 @@ class _PreviewScreenState extends State<PreviewScreen> {
             _imagePath2 = imagenPath2;
             _imageBase64_2 = base64Data;
           });
+
+          debugPrint('✅ Imagen 2 cargada desde archivo: $imagenPath2');
+          return; // Si se cargó desde archivo, no buscar en base64
+        } else {
+          debugPrint('⚠️ Archivo de imagen 2 no encontrado: $imagenPath2');
         }
-      } catch (e) {
-        debugPrint('Error cargando imagen 2: $e');
       }
+
+      // OPCIÓN 2: Imagen desde base64 (base de datos)
+      final imagenBase64DB_2 = widget.datos['imagen_base64_2'] as String?;
+      if (imagenBase64DB_2 != null && imagenBase64DB_2.isNotEmpty) {
+        // Verificar que sea base64 válido
+        try {
+          final bytes = base64Decode(imagenBase64DB_2);
+          if (bytes.isNotEmpty) {
+            setState(() {
+              _imagePath2 = null; // No hay archivo físico
+              _imageBase64_2 = imagenBase64DB_2;
+            });
+
+            debugPrint('✅ Imagen 2 cargada desde base64 (${bytes.length} bytes)');
+            return;
+          }
+        } catch (e) {
+          debugPrint('⚠️ Error decodificando base64 imagen 2: $e');
+        }
+      }
+
+      debugPrint('ℹ️ No se encontró imagen 2 válida');
+
+    } catch (e) {
+      debugPrint('❌ Error cargando imagen 2: $e');
     }
   }
 
@@ -153,8 +224,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
   }
 
   PreferredSizeWidget _buildAppBar() {
+    final esHistorial = widget.datos['es_historial'] == true;
+
     return AppBar(
-      title: const Text('Confirmar Registro'),
+      title: Text(esHistorial ? 'Detalle del Historial' : 'Confirmar Registro'),
       backgroundColor: AppColors.primary,
       foregroundColor: AppColors.onPrimary,
       elevation: 2,
@@ -163,11 +236,16 @@ class _PreviewScreenState extends State<PreviewScreen> {
   }
 
   Widget _buildBody(Cliente cliente) {
+    final esHistorial = widget.datos['es_historial'] == true;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Mostrar indicador si es historial
+          if (esHistorial) _buildHistorialIndicator(),
+
           _buildClienteCard(cliente),
           const SizedBox(height: 16),
           _buildEquipoCard(),
@@ -175,7 +253,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
           _buildUbicacionCard(),
           const SizedBox(height: 16),
 
-          // ✅ CAMBIO 4: AGREGAR SEGUNDA TARJETA DE IMAGEN
           _buildImagenCard(_imagePath, _imageBase64, 'Primera Foto', 1),
           const SizedBox(height: 16),
           _buildImagenCard(_imagePath2, _imageBase64_2, 'Segunda Foto', 2),
@@ -186,7 +263,13 @@ class _PreviewScreenState extends State<PreviewScreen> {
   }
 
   // ✅ CAMBIO 5: MÉTODO REUTILIZABLE PARA MOSTRAR CUALQUIER IMAGEN
+// REEMPLAZAR _buildImagenCard() y métodos relacionados:
+
   Widget _buildImagenCard(String? imagePath, String? imageBase64, String titulo, int numero) {
+    // Determinar si hay imagen disponible
+    final tieneImagen = (imagePath != null && imagePath.isNotEmpty) ||
+        (imageBase64 != null && imageBase64.isNotEmpty);
+
     return Card(
       elevation: 2,
       color: AppColors.surface,
@@ -203,6 +286,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header
             Row(
               children: [
                 Icon(
@@ -222,7 +306,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (imagePath != null)
+                if (tieneImagen)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -235,9 +319,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
                       children: [
                         Icon(Icons.check_circle, color: Colors.green, size: 16),
                         const SizedBox(width: 4),
-                        const Text(
-                          'Incluida',
-                          style: TextStyle(
+                        Text(
+                          imagePath != null ? 'Archivo' : 'Base64',
+                          style: const TextStyle(
                             color: Colors.green,
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -250,9 +334,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
             ),
             Divider(height: 20, color: AppColors.border),
 
-            if (imagePath != null) ...[
+            // Contenido de la imagen
+            if (tieneImagen) ...[
               GestureDetector(
-                onTap: () => _verImagenCompleta(imagePath),
+                onTap: () => _verImagenCompleta(imagePath, imageBase64),
                 child: Container(
                   width: double.infinity,
                   height: 200,
@@ -264,29 +349,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          File(imagePath),
-                          width: double.infinity,
-                          height: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: Colors.grey[200],
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.error, color: Colors.grey[600]),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Error cargando imagen',
-                                    style: TextStyle(color: Colors.grey[600]),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
+                        child: _buildImageWidget(imagePath, imageBase64),
                       ),
                       Positioned(
                         top: 8,
@@ -320,32 +383,32 @@ class _PreviewScreenState extends State<PreviewScreen> {
               ),
               const SizedBox(height: 8),
 
-              if (imageBase64 != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info, color: AppColors.primary, size: 16),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Imagen preparada para envio (${(base64Decode(imageBase64).length / (1024 * 1024)).toStringAsFixed(1)} MB). Toca para ver completa.',
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 12,
-                          ),
-                          overflow: TextOverflow.visible,
-                        ),
-                      ),
-                    ],
-                  ),
+              // Info de la imagen
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-              ],
+                child: Row(
+                  children: [
+                    Icon(Icons.info, color: AppColors.primary, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _getImageInfo(imagePath, imageBase64),
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                        ),
+                        overflow: TextOverflow.visible,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ] else ...[
+              // Sin imagen
               Container(
                 width: double.infinity,
                 height: 120,
@@ -374,7 +437,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
-                        'Use "Volver a Editar" para agregar una',
+                        widget.datos['es_historial'] == true
+                            ? 'No se capturó imagen en este registro'
+                            : 'Use "Volver a Editar" para agregar una',
                         style: TextStyle(
                           color: Colors.grey[500],
                           fontSize: 12,
@@ -387,6 +452,150 @@ class _PreviewScreenState extends State<PreviewScreen> {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+// NUEVO: Widget para mostrar imagen desde archivo o base64
+  Widget _buildImageWidget(String? imagePath, String? imageBase64) {
+    // Prioridad: archivo físico primero, luego base64
+    if (imagePath != null && imagePath.isNotEmpty) {
+      return Image.file(
+        File(imagePath),
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          // Si falla el archivo, intentar con base64
+          if (imageBase64 != null && imageBase64.isNotEmpty) {
+            return _buildBase64Image(imageBase64);
+          }
+          return _buildErrorWidget();
+        },
+      );
+    } else if (imageBase64 != null && imageBase64.isNotEmpty) {
+      return _buildBase64Image(imageBase64);
+    } else {
+      return _buildErrorWidget();
+    }
+  }
+
+// NUEVO: Widget para imagen base64
+  Widget _buildBase64Image(String base64Data) {
+    try {
+      final bytes = base64Decode(base64Data);
+      return Image.memory(
+        bytes,
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildErrorWidget();
+        },
+      );
+    } catch (e) {
+      debugPrint('Error decodificando base64: $e');
+      return _buildErrorWidget();
+    }
+  }
+
+// NUEVO: Widget de error
+  Widget _buildErrorWidget() {
+    return Container(
+      color: Colors.grey[200],
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error, color: Colors.grey[600]),
+          const SizedBox(height: 8),
+          Text(
+            'Error cargando imagen',
+            style: TextStyle(color: Colors.grey[600]),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+// NUEVO: Información de la imagen
+  String _getImageInfo(String? imagePath, String? imageBase64) {
+    if (imagePath != null && imagePath.isNotEmpty) {
+      // Imagen desde archivo
+      if (imageBase64 != null) {
+        try {
+          final bytes = base64Decode(imageBase64);
+          final mb = (bytes.length / (1024 * 1024)).toStringAsFixed(1);
+          return 'Imagen desde archivo (${mb} MB). Toca para ver completa.';
+        } catch (e) {
+          return 'Imagen desde archivo. Toca para ver completa.';
+        }
+      }
+      return 'Imagen desde archivo. Toca para ver completa.';
+    } else if (imageBase64 != null && imageBase64.isNotEmpty) {
+      // Imagen desde base64
+      try {
+        final bytes = base64Decode(imageBase64);
+        final mb = (bytes.length / (1024 * 1024)).toStringAsFixed(1);
+        return 'Imagen desde base de datos (${mb} MB). Toca para ver completa.';
+      } catch (e) {
+        return 'Imagen desde base de datos. Toca para ver completa.';
+      }
+    }
+    return 'Sin información de imagen disponible.';
+  }
+
+// ACTUALIZAR: Método para ver imagen completa
+  void _verImagenCompleta(String? imagePath, String? imageBase64) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: _buildImageWidget(imagePath, imageBase64),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -446,62 +655,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
-  void _verImagenCompleta(String imagePath) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(20),
-        child: Stack(
-          children: [
-            Center(
-              child: InteractiveViewer(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.5),
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      File(imagePath),
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 40,
-              right: 20,
-              child: GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.close,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildClienteCard(Cliente cliente) {
     return Card(
@@ -731,6 +885,61 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   // ✅ CAMBIO 7: ACTUALIZAR TEXTO DEL BOTÓN SEGÚN CANTIDAD DE IMÁGENES
   Widget _buildBottomButtons() {
+    final esHistorial = widget.datos['es_historial'] == true;
+
+    // Si es historial, solo mostrar botón de volver
+    if (esHistorial) {
+      return SafeArea(
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.shadowLight,
+                spreadRadius: 1,
+                blurRadius: 5,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.arrow_back, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Volver al Historial',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Código original para casos normales (no historial)
     return Consumer<PreviewScreenViewModel>(
       builder: (context, vm, child) {
         // Contar imágenes
@@ -876,6 +1085,42 @@ class _PreviewScreenState extends State<PreviewScreen> {
       },
     );
   }
+  Widget _buildHistorialIndicator() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.history,
+            color: AppColors.primary,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Vista de historial - Solo lectura',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
 
   Future<void> _mostrarDialogoErrorConfirmacion(String error) async {
     return showDialog<void>(

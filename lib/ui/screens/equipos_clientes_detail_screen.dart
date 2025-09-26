@@ -4,12 +4,14 @@ import 'package:ada_app/viewmodels/equipos_clientes_detail_screen_viewmodel.dart
 import 'package:ada_app/repositories/estado_equipo_repository.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'dart:async';
-import '../widgets/gps_navigation_widget.dart';
 import 'package:flutter/services.dart';
+import 'package:ada_app/ui/screens/preview_screen.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
+import 'package:ada_app/repositories/cliente_repository.dart';
+
 
 class EquiposClientesDetailScreen extends StatefulWidget {
-  final dynamic equipoCliente;  // Cambiar de EquipoCliente a dynamic
+  final dynamic equipoCliente;
 
   const EquiposClientesDetailScreen({
     super.key,
@@ -388,23 +390,28 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
     return ListenableBuilder(
       listenable: _viewModel,
       builder: (context, child) {
-        if (_viewModel.isEquipoActivo) {
-          return Column(
-            children: [
-              // Control de ubicación del equipo
+        return Column(
+          children: [
+            // Mostrar control de ubicación solo para equipos activos
+            if (_viewModel.isEquipoActivo) ...[
               _buildLocationControlCard(),
-
-              // SECCIÓN DEL HISTORIAL
               SizedBox(height: 20),
-              _buildHistorialCard(),
             ],
-          );
-        } else {
-          return _buildInactiveEquipoCard();
-        }
+
+            // Mostrar historial para TODOS los equipos (activos e inactivos)
+            _buildHistorialCard(),
+
+            // Mostrar mensaje de equipo inactivo después del historial
+            if (!_viewModel.isEquipoActivo) ...[
+              SizedBox(height: 20),
+              _buildInactiveEquipoCard(),
+            ],
+          ],
+        );
       },
     );
   }
+
   Widget _buildLocationControlCard() {
     return ListenableBuilder(
       listenable: _viewModel,
@@ -481,7 +488,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                     maxWidth: double.infinity,
                   ),
                   child: DropdownButtonFormField<bool?>(
-                    value: estadoUbicacion,
+                    initialValue: estadoUbicacion,
                     isExpanded: true, // IMPORTANTE: Previene overflow
                     decoration: InputDecoration(
                       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -697,7 +704,6 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
       ),
     );
   }
-
   Widget _buildHistorialList(List<dynamic> historial) {
     return Container(
       decoration: BoxDecoration(
@@ -719,11 +725,224 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
           final cambio = historial[index];
           final isFirst = index == 0;
 
-          return _buildHistorialItem(cambio, isFirst);
+          return InkWell(
+            onTap: () => _navegarAPreview(cambio), // ← CAMBIO AQUÍ
+            borderRadius: BorderRadius.circular(12),
+            child: _buildHistorialItem(cambio, isFirst),
+          );
         },
       ),
     );
   }
+
+  void _navegarAPreview(dynamic historialItem) async {
+    try {
+      // Debug: Log de los datos antes de procesarlos
+      print('=== DEBUG _navegarAPreview ===');
+      print('historialItem: ${historialItem.toString()}');
+      print('equipoCliente keys: ${widget.equipoCliente.keys.toList()}');
+      print('cliente_id type: ${widget.equipoCliente['cliente_id'].runtimeType}');
+      print('cliente_id value: ${widget.equipoCliente['cliente_id']}');
+
+      // Mostrar indicador de carga mientras se consulta la BD
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      // Preparar datos para PreviewScreen consultando la base de datos
+      final datosParaPreview = await _prepararDatosHistorialParaPreview(historialItem);
+
+      // Cerrar indicador de carga
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      print('Datos preparados exitosamente, navegando...');
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PreviewScreen(datos: datosParaPreview),
+        ),
+      );
+    } catch (e, stackTrace) {
+      // Cerrar indicador de carga si está abierto
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      // Log detallado del error
+      print('ERROR en _navegarAPreview: $e');
+      print('StackTrace: $stackTrace');
+      print('historialItem data: $historialItem');
+      print('equipoCliente data: ${widget.equipoCliente}');
+
+      // Mostrar error más específico al usuario
+      String errorMessage = 'Error al cargar detalles del historial';
+      if (e.toString().contains('Cliente no encontrado')) {
+        errorMessage = 'Cliente no encontrado en la base de datos';
+      } else if (e.toString().contains('ID de cliente inválido')) {
+        errorMessage = 'ID de cliente inválido';
+      } else if (e.toString().contains('int')) {
+        errorMessage = 'Error de tipo de datos en el historial';
+      } else if (e.toString().contains('null')) {
+        errorMessage = 'Datos faltantes en el registro del historial';
+      } else {
+        errorMessage = 'Error al cargar detalles: ${e.toString()}';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(errorMessage),
+              SizedBox(height: 4),
+              Text(
+                'Detalles técnicos: ${e.toString()}',
+                style: TextStyle(fontSize: 12, color: Colors.white70),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.all(16),
+          duration: Duration(seconds: 5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> _prepararDatosHistorialParaPreview(dynamic historialItem) async {
+    try {
+      print('DEBUG: Iniciando _prepararDatosHistorialParaPreview con consulta a BD');
+
+      // Obtener cliente_id del equipo
+      final clienteIdRaw = widget.equipoCliente['cliente_id'];
+
+      print('DEBUG: clienteIdRaw = $clienteIdRaw (tipo: ${clienteIdRaw.runtimeType})');
+
+      // Convertir clienteId a int para la consulta
+      int? clienteIdInt;
+      try {
+        if (clienteIdRaw == null) {
+          throw Exception('cliente_id es null');
+        } else if (clienteIdRaw is int) {
+          clienteIdInt = clienteIdRaw;
+        } else {
+          clienteIdInt = int.tryParse(clienteIdRaw.toString());
+          if (clienteIdInt == null) {
+            throw Exception('No se pudo convertir cliente_id a int: $clienteIdRaw');
+          }
+        }
+      } catch (e) {
+        print('DEBUG: Error convirtiendo clienteId: $e');
+        throw Exception('ID de cliente inválido: $clienteIdRaw');
+      }
+
+      print('DEBUG: Consultando cliente con ID: $clienteIdInt');
+
+      // Consultar cliente desde la base de datos
+      final clienteRepository = ClienteRepository();
+      final cliente = await clienteRepository.obtenerPorId(clienteIdInt);
+
+      if (cliente == null) {
+        throw Exception('Cliente no encontrado en la base de datos con ID: $clienteIdInt');
+      }
+
+      print('DEBUG: Cliente encontrado: ${cliente.toString()}');
+
+      // Preparar datos del equipo completo
+      final equipoIdRaw = widget.equipoCliente['equipo_id'] ?? widget.equipoCliente['id'];
+      String equipoIdStr = equipoIdRaw?.toString() ?? '';
+
+      print('DEBUG: equipoIdStr = $equipoIdStr');
+
+      final equipoCompleto = {
+        'id': equipoIdStr,
+        'cod_barras': widget.equipoCliente['cod_barras']?.toString() ?? '',
+        'numero_serie': widget.equipoCliente['numero_serie']?.toString() ?? '',
+        'modelo_nombre': widget.equipoCliente['modelo_nombre']?.toString() ?? '',
+        'logo_nombre': widget.equipoCliente['logo_nombre']?.toString() ?? '',
+        'marca_nombre': widget.equipoCliente['marca_nombre']?.toString() ?? '',
+      };
+
+      print('DEBUG: equipoCompleto creado');
+
+      // Preparar datos del historial de forma segura
+      dynamic latitudSafe, longitudSafe, fechaRevisionSafe, enLocalSafe;
+      try {
+        latitudSafe = historialItem?.latitud;
+        longitudSafe = historialItem?.longitud;
+        fechaRevisionSafe = historialItem?.fechaRevision;
+        enLocalSafe = historialItem?.enLocal ?? false;
+      } catch (e) {
+        print('DEBUG: Error accediendo datos del historial: $e');
+        latitudSafe = null;
+        longitudSafe = null;
+        fechaRevisionSafe = null;
+        enLocalSafe = false;
+      }
+
+      print('DEBUG: Datos del historial extraídos - lat: $latitudSafe, lon: $longitudSafe, fecha: $fechaRevisionSafe, enLocal: $enLocalSafe');
+
+      final datosFinales = {
+        'cliente': cliente, // Cliente real desde la base de datos
+        'equipo_completo': equipoCompleto,
+        'latitud': latitudSafe,
+        'longitud': longitudSafe,
+        'fecha_registro': fechaRevisionSafe?.toString(),
+        'timestamp_gps': fechaRevisionSafe?.toString(),
+
+        // Datos del equipo con conversión segura
+        'codigo_barras': widget.equipoCliente['cod_barras']?.toString() ?? 'No especificado',
+        'modelo': widget.equipoCliente['modelo_nombre']?.toString() ?? 'No especificado',
+        'logo': widget.equipoCliente['logo_nombre']?.toString() ?? 'No especificado',
+        'numero_serie': widget.equipoCliente['numero_serie']?.toString() ?? 'No especificado',
+
+        // Observaciones del historial
+        'observaciones': 'Revisión histórica - ${enLocalSafe ? "En local" : "Fuera del local"}',
+
+        // Imágenes del historial (si existen)
+        'imagen_path': historialItem?.imagenPath?.toString(),
+        'imagen_base64': historialItem?.imagenBase64?.toString(),
+        'tiene_imagen': historialItem?.tieneImagen ?? false,
+        'imagen_tamano': historialItem?.imagenTamano,
+
+        // Segunda imagen (si existe)
+        'imagen_path2': historialItem?.imagenPath2?.toString(),
+        'imagen_base64_2': historialItem?.imagenBase64_2?.toString(),
+        'tiene_imagen2': historialItem?.tieneImagen2 ?? false,
+        'imagen_tamano2': historialItem?.imagenTamano2,
+
+        // Identificar que es desde historial
+        'es_censo': false,
+        'es_historial': true,
+        'historial_item': historialItem,
+      };
+
+      print('DEBUG: Datos finales preparados exitosamente con cliente real desde BD');
+      return datosFinales;
+
+    } catch (e, stackTrace) {
+      // Log detallado del error para debugging
+      print('ERROR CRÍTICO en _prepararDatosHistorialParaPreview: $e');
+      print('StackTrace: $stackTrace');
+      print('historialItem: $historialItem');
+      print('equipoCliente: ${widget.equipoCliente}');
+      rethrow; // Re-lanzar el error para que sea capturado por el SnackBar
+    }
+  }
+
+
   Widget _buildHistorialItem(dynamic cambio, bool isFirst) {
     final enLocal = cambio.enLocal;
     final fecha = cambio.fechaRevision;
@@ -731,171 +950,141 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
     final statusIcon = enLocal ? Icons.store : Icons.location_off;
     final statusText = enLocal ? 'EN LOCAL' : 'FUERA DEL LOCAL';
 
-    // Información de ubicación GPS
+    // Información de ubicación GPS (solo para mostrar información)
     final tieneUbicacion = cambio.latitud != null && cambio.longitud != null;
-    final latitud = cambio.latitud;
-    final longitud = cambio.longitud;
 
-    return GestureDetector(
-      onTap: tieneUbicacion ? () => GPSNavigationWidget.abrirUbicacionEnMapa(context, latitud!, longitud!) : null,
-      child: Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isFirst
-              ? statusColor.withValues(alpha: 0.08)
-              : Colors.transparent,
-        ),
-        child: Row(
-          children: [
-            // Indicador visual
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-                border: isFirst
-                    ? Border.all(color: statusColor, width: 2)
-                    : null,
-              ),
-              child: Icon(
-                statusIcon,
-                color: statusColor,
-                size: 20,
-              ),
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isFirst
+            ? statusColor.withValues(alpha: 0.08)
+            : Colors.transparent,
+      ),
+      child: Row(
+        children: [
+          // Indicador visual
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+              border: isFirst
+                  ? Border.all(color: statusColor, width: 2)
+                  : null,
             ),
+            child: Icon(
+              statusIcon,
+              color: statusColor,
+              size: 20,
+            ),
+          ),
 
-            SizedBox(width: 12),
+          SizedBox(width: 12),
 
-            // Información del cambio
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
+          // Información del cambio
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        statusText,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isFirst) ...[
+                      SizedBox(width: 8),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         child: Text(
-                          statusText,
+                          'ACTUAL',
                           style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: statusColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (isFirst) ...[
-                        SizedBox(width: 8),
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'ACTUAL',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
-                  ),
-                  SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.access_time,
-                        size: 14,
+                  ],
+                ),
+                SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.access_time,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      _viewModel.formatearFechaHistorial(fecha),
+                      style: TextStyle(
+                        fontSize: 12,
                         color: AppColors.textSecondary,
                       ),
-                      SizedBox(width: 4),
-                      Text(
-                        _viewModel.formatearFechaHistorial(fecha),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  // Indicador de ubicación clickeable
-                  if (tieneUbicacion) ...[
-                    SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          size: 14,
-                          color: AppColors.primary,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          'Toca para ver ubicación',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w500,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ],
                     ),
                   ],
-                ],
-              ),
-            ),
-
-            // Indicadores en columna
-            Column(
-              children: [
-                // Indicador de sincronización
-                if (!cambio.estaSincronizado)
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: AppColors.warning,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                // Indicador GPS mejorado
-                if (tieneUbicacion) ...[
-                  SizedBox(height: 4),
-                  Container(
-                    padding: EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: AppColors.success.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: AppColors.success.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.gps_fixed,
-                      size: 12,
-                      color: AppColors.success,
-                    ),
-                  ),
-                ],
+                ),
               ],
             ),
+          ),
 
-            // Flecha indicando que es clickeable
-            if (tieneUbicacion) ...[
-              SizedBox(width: 8),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 14,
-                color: AppColors.textSecondary,
-              ),
+          // Indicadores en columna
+          Column(
+            children: [
+              // Indicador de sincronización
+              if (!cambio.estaSincronizado)
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: AppColors.warning,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              // Indicador GPS (solo visual)
+              if (tieneUbicacion) ...[
+                SizedBox(height: 4),
+                Container(
+                  padding: EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: AppColors.success.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.gps_fixed,
+                    size: 12,
+                    color: AppColors.success,
+                  ),
+                ),
+              ],
             ],
-          ],
-        ),
+          ),
+
+          // Flecha indicando que es clickeable para preview
+          SizedBox(width: 8),
+          Icon(
+            Icons.arrow_forward_ios,
+            size: 14,
+            color: AppColors.textSecondary,
+          ),
+        ],
       ),
     );
   }

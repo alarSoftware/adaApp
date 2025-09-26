@@ -6,7 +6,6 @@ import 'dart:io';
 import '../../models/cliente.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/repositories/estado_equipo_repository.dart';
-import 'package:ada_app/models/estado_equipo.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'dart:async';
 
@@ -130,7 +129,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       // ✅ CAMBIO 1: CREAR ESTADO CON AMBAS IMÁGENES
       _setStatusMessage('📋 Registrando estado como CREADO...');
       try {
-        final estadoCreado = await _estadoEquipoRepository.crearEstadoDirecto(
+        final estadoCreado = await _estadoEquipoRepository.crearNuevoEstado(
           equipoId: equipoId,
           clienteId: clienteId,
           latitud: datos['latitud'],
@@ -331,8 +330,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
       for (final registro in registrosPendientes) {
         try {
           final datosParaApi = {
-            'equipo_id': registro.equipoPendienteId,
-            'cliente_id': null,
+            'equipo_id': registro.equipoId,
+            'cliente_id': registro.clienteId,
             'usuario_id': 1,
             'funcionando': true,
             'latitud': registro.latitud,

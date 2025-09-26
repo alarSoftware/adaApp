@@ -34,7 +34,8 @@ extension EstadoEquipoCensoExtension on EstadoEquipoCenso {
 
 class EstadoEquipo {
   final int? id;
-  final int equipoPendienteId;
+  final String equipoId;      // ← CAMBIO: String en lugar de int equipoPendienteId
+  final int clienteId;        // ← CAMBIO: Nuevo campo
   final bool enLocal;
   final double? latitud;
   final double? longitud;
@@ -59,7 +60,8 @@ class EstadoEquipo {
 
   EstadoEquipo({
     this.id,
-    required this.equipoPendienteId,
+    required this.equipoId,     // ← CAMBIO
+    required this.clienteId,    // ← CAMBIO
     required this.enLocal,
     this.latitud,
     this.longitud,
@@ -83,10 +85,10 @@ class EstadoEquipo {
 
   factory EstadoEquipo.fromMap(Map<String, dynamic> map) {
     return EstadoEquipo(
-      id: map['id'] as int?,
-      //TODO cambiar equipoPendienteId por cliente ID y equipo ID
-      equipoPendienteId: map['equipo_pendiente_id'] as int? ?? 0,
-      enLocal: (map['en_local'] as int?) == 1,
+        id: map['id'] as int?,
+        equipoId: map['equipo_id'] as String? ?? '0',        // ← CAMBIO
+        clienteId: map['cliente_id'] as int? ?? 0,           // ← CAMBIO
+        enLocal: (map['en_local'] as int?) == 1,
       latitud: map['latitud'] as double?,
       longitud: map['longitud'] as double?,
       fechaRevision: map['fecha_revision'] != null
@@ -117,7 +119,8 @@ class EstadoEquipo {
   Map<String, dynamic> toMap() {
     final map = {
       'id': id,
-      'equipo_pendiente_id': equipoPendienteId,
+      'equipo_id': equipoId,        // ← CAMBIO
+      'cliente_id': clienteId,
       'en_local': enLocal ? 1 : 0,
       'latitud': latitud,
       'longitud': longitud,
@@ -148,7 +151,8 @@ class EstadoEquipo {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'equipo_cliente_id': equipoPendienteId,
+      'equipo_id': equipoId,        // ← CAMBIO
+      'cliente_id': clienteId,
       'en_local': enLocal,
       'latitud': latitud,
       'longitud': longitud,
@@ -194,7 +198,8 @@ class EstadoEquipo {
   }) {
     return EstadoEquipo(
       id: id ?? this.id,
-      equipoPendienteId: equipoClienteId ?? this.equipoPendienteId,
+      equipoId: equipoId,
+      clienteId: clienteId,
       enLocal: enLocal ?? this.enLocal,
       latitud: latitud ?? this.latitud,
       longitud: longitud ?? this.longitud,

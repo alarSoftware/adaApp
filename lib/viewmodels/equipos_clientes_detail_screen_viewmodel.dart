@@ -109,12 +109,21 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   // CARGAR ESTADO INICIAL Y HISTORIAL
+// CARGAR ESTADO INICIAL Y HISTORIAL
+// Reemplaza el método _loadInitialState en tu ViewModel
+
   Future<void> _loadInitialState() async {
     try {
       final equipoId = equipoCliente['id'];
+      final clienteId = equipoCliente['cliente_id'];
 
-      if (equipoId == null) {
-        _logger.w('No se encontró ID del equipo');
+      print('🔍 BUSCANDO HISTORIAL PARA:');
+      print('   equipoId: $equipoId (tipo: ${equipoId.runtimeType})');
+      print('   clienteId: $clienteId (tipo: ${clienteId.runtimeType})');
+      print('   tipo_estado: ${equipoCliente['tipo_estado']}');
+
+      if (equipoId == null || clienteId == null) {
+        _logger.w('No se encontró ID del equipo o cliente');
         return;
       }
 
@@ -122,38 +131,127 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       EstadoEquipo? estadoActual;
       List<EstadoEquipo> historialCompleto = [];
 
-      if (tipoEstado == 'asignado') {
-        final clienteId = equipoCliente['cliente_id'];
-        if (clienteId != null) {
-          historialCompleto = await _estadoEquipoRepository.obtenerHistorialDirectoPorEquipoCliente(
+      _logger.i(
+          '📋 Cargando historial para equipo: $equipoId, cliente: $clienteId, tipo: $tipoEstado');
+
+      // CAMBIO 1: Usar el mismo método para ambos casos
+      try {
+        // Intentar obtener historial directo primero (funciona para asignados y censados)
+        historialCompleto =
+        await _estadoEquipoRepository.obtenerHistorialDirectoPorEquipoCliente(
+            equipoId,
+            int.parse(clienteId.toString())
+        );
+
+        _logger.i('📈 Historial directo obtenido: ${historialCompleto
+            .length} registros');
+      } catch (e) {
+        _logger.w(
+            '⚠️ Error con historial directo, intentando método alternativo: $e');
+
+        // Fallback: usar método alternativo
+        try {
+          historialCompleto =
+          await _estadoEquipoRepository.obtenerHistorialCompleto(
+              equipoId.toString(),
+              int.parse(clienteId.toString())
+          );
+          _logger.i('📈 Historial alternativo obtenido: ${historialCompleto
+              .length} registros');
+        } catch (e2) {
+          _logger.e('❌ Error con ambos métodos de historial: $e2');
+          historialCompleto = [];
+        }
+      }
+
+      // CAMBIO 2: Obtener estado actual del primer elemento del historial
+      estadoActual =
+      historialCompleto.isNotEmpty ? historialCompleto.first : null;
+
+      // CAMBIO 3: Si no hay historial, intentar obtener último estado individualmente
+      if (estadoActual == null && tipoEstado == 'asignado') {
+        try {
+          estadoActual = await _estadoEquipoRepository.obtenerUltimoEstado(
               equipoId,
               int.parse(clienteId.toString())
           );
-          estadoActual = historialCompleto.isNotEmpty ? historialCompleto.first : null;
+          _logger.i('📍 Estado individual obtenido para equipo asignado');
+
+          // Si se obtuvo un estado individual, agregarlo al historial
+          if (estadoActual != null) {
+            historialCompleto = [estadoActual];
+          }
+        } catch (e) {
+          _logger.w('⚠️ No se pudo obtener estado individual: $e');
         }
-      }else {
-        estadoActual = await _estadoEquipoRepository.obtenerUltimoEstado(equipoId);
-        historialCompleto = await _estadoEquipoRepository.obtenerHistorialCompleto(equipoId);
       }
 
-      final ultimos5 = historialCompleto.take(5).toList();
-
+      // CAMBIO 4: Determinar estado local actual basado en historial o tipo
       if (estadoActual != null) {
         _estadoLocalActual = estadoActual.enLocal ? 1 : 0;
-        _estadoUbicacionEquipo = estadoActual.enLocal;
+        _logger.i(
+            '🏠 Estado local determinado por historial: $_estadoLocalActual (${estadoActual
+                .enLocal ? "En local" : "Fuera del local"})');
+      } else {
+        // Fallback al tipo de estado original
+        _estadoLocalActual = tipoEstado == 'asignado' ? 1 : 0;
+        _logger.i('🏠 Estado local por defecto: $_estadoLocalActual');
       }
 
+      // CAMBIO 5: Actualizar el estado del dropdown
+      _estadoUbicacionEquipo = _estadoLocalActual == 1;
+
+      // CAMBIO 6: Tomar últimos 5 para la UI
+      final ultimos5 = historialCompleto.take(5).toList();
+
+      // CAMBIO 7: Actualizar el estado interno
       _state = _state.copyWith(
-        equipoEnLocal: estadoActual?.enLocal ?? (_estadoLocalActual == 1),
         historialCambios: historialCompleto,
         historialUltimos5: ultimos5,
+        equipoEnLocal: _estadoLocalActual == 1,
       );
 
       notifyListeners();
-      _logger.i('✅ Historial cargado: ${historialCompleto.length} registros totales, mostrando ${ultimos5.length}');
 
+      // CAMBIO 8: Log detallado del resultado
+      _logger.i('✅ Estado inicial cargado:');
+      _logger.i(
+          '   - Historial completo: ${historialCompleto.length} registros');
+      _logger.i('   - Últimos 5: ${ultimos5.length} registros');
+      _logger.i('   - Estado actual: ${estadoActual != null
+          ? "Encontrado"
+          : "No encontrado"}');
+      _logger.i('   - Estado local actual: $_estadoLocalActual');
+      _logger.i('   - Estado dropdown: $_estadoUbicacionEquipo');
+
+      // Debug: mostrar detalles de los registros
+      for (int i = 0; i < ultimos5.length; i++) {
+        final registro = ultimos5[i];
+        _logger.i('   Registro $i: ${registro.enLocal
+            ? "En local"
+            : "Fuera"} - ${registro.fechaRevision}');
+      }
     } catch (e) {
-      _logger.e('❌ Error cargando estado inicial: $e');
+      _logger.e('❌ Error crítico cargando estado inicial: $e');
+
+      // Estado de emergencia
+      _estadoLocalActual = equipoCliente['tipo_estado'] == 'asignado' ? 1 : 0;
+      _estadoUbicacionEquipo = _estadoLocalActual == 1;
+
+      _state = _state.copyWith(
+        historialCambios: [],
+        historialUltimos5: [],
+        equipoEnLocal: _estadoLocalActual == 1,
+      );
+
+      notifyListeners();
+    }
+    print('📊 RESULTADOS:');
+    print('   historialCompleto.length: ${historialCompleto.length}');
+    for (int i = 0; i < historialCompleto.length; i++) {
+      final h = historialCompleto[i];
+      print('   [$i] id:${h.id}, enLocal:${h.enLocal}, sync:${h
+          .estaSincronizado}');
     }
   }
 
@@ -161,7 +259,10 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   EquiposClienteDetailState get state => _state;
   dynamic get equipoCliente => _state.equipoCliente;
   bool get isProcessing => _state.isProcessing;
-  bool get isEquipoActivo => true;
+  bool get isEquipoActivo {
+    final tipoEstado = equipoCliente['tipo_estado']?.toString();
+    return tipoEstado == 'asignado';
+  }
   bool? get estadoUbicacionEquipo => _estadoUbicacionEquipo;
   bool get hasUnsavedChanges => _hasUnsavedChanges;
   bool get saveButtonEnabled => _estadoUbicacionEquipo != null && _hasUnsavedChanges;
@@ -212,13 +313,14 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       if (tipoEstado == 'asignado') {
         final clienteId = equipoCliente['cliente_id'];
         if (clienteId != null) {
-          historialCompleto = await _estadoEquipoRepository.obtenerHistorialPorEquipoCliente(
+          historialCompleto = await _estadoEquipoRepository.obtenerHistorialCompleto(
               equipoCliente['id'], clienteId
           );
         }
       } else {
         historialCompleto = await _estadoEquipoRepository.obtenerHistorialCompleto(
-            equipoCliente['id']
+          equipoCliente['id'].toString(),
+          int.parse(equipoCliente['cliente_id'].toString()),
         );
       }
 
@@ -281,40 +383,24 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      final tipoEstado = equipoCliente['tipo_estado']?.toString();
-      EstadoEquipo nuevoEstado;
+      // SIMPLIFICADO: Un solo método para ambos tipos
+      final clienteId = equipoCliente['cliente_id'];
+      final equipoId = equipoCliente['id']?.toString();
 
-      if (tipoEstado == 'asignado') {
-        final clienteId = equipoCliente['cliente_id'];
-        if (clienteId == null) {
-          throw Exception('Cliente ID requerido para equipos asignados');
-        }
-
-        final equipoId = equipoCliente['id']?.toString();
-        if (equipoId == null || equipoId.isEmpty) {
-          throw Exception('ID del equipo no disponible');
-        }
-
-
-        _logger.i('Usando equipoId: $equipoId');
-
-        nuevoEstado = await _estadoEquipoRepository.crearEstadoDirecto(
-          equipoId: equipoId,
-          clienteId: int.parse(clienteId.toString()),
-          latitud: position.latitude,
-          longitud: position.longitude,
-          fechaRevision: DateTime.now(),
-          enLocal: _estadoUbicacionEquipo!,
-        );
-      } else {
-        nuevoEstado = await _estadoEquipoRepository.crearNuevoEstado(
-          equipoPendienteId: equipoCliente['id'],
-          enLocal: _estadoUbicacionEquipo!,
-          fechaRevision: DateTime.now(),
-          latitud: position.latitude,
-          longitud: position.longitude,
-        );
+      if (clienteId == null || equipoId == null || equipoId.isEmpty) {
+        throw Exception('ID del equipo o cliente no disponible');
       }
+
+      _logger.i('Usando equipoId: $equipoId, clienteId: $clienteId');
+
+      final nuevoEstado = await _estadoEquipoRepository.crearNuevoEstado(
+        equipoId: equipoId,
+        clienteId: int.parse(clienteId.toString()),
+        enLocal: _estadoUbicacionEquipo!,
+        fechaRevision: DateTime.now(),
+        latitud: position.latitude,
+        longitud: position.longitude,
+      );
 
       _estadoLocalActual = _estadoUbicacionEquipo! ? 1 : 0;
       _hasUnsavedChanges = false;

@@ -715,64 +715,103 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
 
   // ICONO DE SINCRONIZACIÓN - USANDO DATOS REALES DE ESTADO_EQUIPO
   Widget _buildSyncIcon(Map<String, dynamic> equipoData) {
-    return FutureBuilder<Map<String, dynamic>?>(
-      future: _viewModel.getEstadoCensoInfo(equipoData),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data == null) {
-          return SizedBox.shrink();
-        }
+    final tipoEstado = equipoData['tipo_estado']?.toString();
 
-        final estadoInfo = snapshot.data!;
-        Color iconColor;
-        IconData icon;
-        String tooltip;
-
-        // Verificar el campo 'migrado' de la tabla estado_equipo
-        final migrado = estadoInfo['migrado']?.toString().toLowerCase() == 'migrado' ||
-            estadoInfo['migrado']?.toString() == '1' ||
-            estadoInfo['migrado'] == 1 ||
-            estadoInfo['migrado'] == true;
-
-        // Verificar el campo 'creado' de la tabla estado_equipo
-        final creado = estadoInfo['creado']?.toString().toLowerCase() == 'creado' ||
-            estadoInfo['creado']?.toString() == '1' ||
-            estadoInfo['creado'] == 1 ||
-            estadoInfo['creado'] == true;
-
-        if (migrado) {
-          iconColor = AppColors.success;
-          icon = Icons.cloud_done;
-          tooltip = 'Sincronizado con servidor';
-        } else if (creado) {
-          iconColor = AppColors.warning;
-          icon = Icons.cloud_upload;
-          tooltip = 'Creado, pendiente de migrar';
-        } else {
-          // Si no hay estado definido, no mostrar nada
-          return SizedBox.shrink();
-        }
-
-        return Tooltip(
-          message: tooltip,
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: iconColor.withOpacity(0.3),
-                width: 0.5,
-              ),
-            ),
-            child: Icon(
-              icon,
-              size: 14,
-              color: iconColor,
+    if (tipoEstado == 'asignado') {
+      // Para equipos asignados (de API), mostrar icono fijo de "sincronizado"
+      return Tooltip(
+        message: 'Equipo sincronizado desde servidor',
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: AppColors.success.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: AppColors.success.withOpacity(0.3),
+              width: 0.5,
             ),
           ),
-        );
-      },
-    );
+          child: Icon(
+            Icons.cloud_done,
+            size: 14,
+            color: AppColors.success,
+          ),
+        ),
+      );
+    } else {
+      // Para equipos pendientes, usar FutureBuilder para verificar estado real
+      return FutureBuilder<Map<String, dynamic>?>(
+        future: _viewModel.getEstadoCensoInfo(equipoData),
+        builder: (context, snapshot) {
+          // Debug: Agregar logs para ver qué datos llegan
+          if (snapshot.hasData && snapshot.data != null) {
+            logger.i('Estado info para ${equipoData['cod_barras']}: ${snapshot.data}');
+          }
+
+          if (!snapshot.hasData || snapshot.data == null) {
+            return SizedBox.shrink();
+          }
+
+          final estadoInfo = snapshot.data!;
+          Color iconColor;
+          IconData icon;
+          String tooltip;
+
+          // CORRECCIÓN: Buscar en el campo correcto 'estado_censo' de la tabla Estado_Equipo
+          final estadoCenso = estadoInfo['estado_censo']?.toString().toLowerCase();
+
+          // También verificar el campo 'sincronizado' si existe (equivalente a migrado)
+          final sincronizado = estadoInfo['sincronizado']?.toString() == '1' ||
+              estadoInfo['sincronizado'] == 1 ||
+              estadoInfo['sincronizado'] == true ||
+              estadoInfo['esta_sincronizado'] == true; // Por si usa el nombre del modelo
+
+          logger.i('Estado censo: $estadoCenso, Sincronizado: $sincronizado');
+
+          // Lógica correcta usando estado_censo:
+          if (estadoCenso == 'migrado' || sincronizado) {
+            // Datos ya enviados al servidor
+            iconColor = AppColors.success;
+            icon = Icons.cloud_done;
+            tooltip = 'Sincronizado con servidor';
+          } else if (estadoCenso == 'creado') {
+            // Creado localmente pero no enviado al servidor
+            iconColor = AppColors.warning;
+            icon = Icons.cloud_upload;
+            tooltip = 'Pendiente de sincronizar';
+          } else if (estadoCenso == 'error') {
+            // Error en la sincronización
+            iconColor = AppColors.error;
+            icon = Icons.cloud_off;
+            tooltip = 'Error en sincronización';
+          } else {
+            // Si no hay estado_censo válido, no mostrar icono
+            logger.w('No se encontró estado_censo válido: $estadoCenso');
+            return SizedBox.shrink();
+          }
+
+          return Tooltip(
+            message: tooltip,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: iconColor.withOpacity(0.3),
+                  width: 0.5,
+                ),
+              ),
+              child: Icon(
+                icon,
+                size: 14,
+                color: iconColor,
+              ),
+            ),
+          );
+        },
+      );
+    }
   }
 
   Widget _buildLoadingState() {
