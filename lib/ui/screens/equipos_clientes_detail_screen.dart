@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/equipos_clientes_detail_screen_viewmodel.dart';
-import 'package:ada_app/repositories/estado_equipo_repository.dart';
+import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
@@ -43,11 +43,11 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
       final tablas = await db.obtenerNombresTablas();
       print('Tablas disponibles: $tablas');
 
-      if (tablas.contains('Estado_Equipo')) {
-        final esquema = await db.obtenerEsquemaTabla('Estado_Equipo');
-        print('Esquema Estado_Equipo: $esquema');
+      if (tablas.contains('censo_activo')) {
+        final esquema = await db.obtenerEsquemaTabla('censo_activo');
+        print('Esquema censo_activo: $esquema');
       } else {
-        print('Tabla Estado_Equipo NO existe');
+        print('Tabla censo_activo NO existe');
       }
     } catch (e) {
       print('Error verificando DB: $e');

@@ -6,8 +6,8 @@ import '../models/cliente.dart';
 import '../models/equipos.dart';
 import '../repositories/equipo_repository.dart';
 import '../repositories/equipo_pendiente_repository.dart'; // AGREGAR: Repository para equipos pendientes
-import '../repositories/estado_equipo_repository.dart';
-import 'package:ada_app/models/estado_equipo.dart';
+import '../repositories/censo_activo_repository.dart';
+import 'package:ada_app/models/censo_activo.dart';
 
 // ========== EVENTOS PARA LA UI ==========
 abstract class ClienteDetailUIEvent {}
@@ -339,7 +339,7 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
       if (resultado != null) {
         _logger.i('Estado_censo encontrado: ${resultado['estado_censo']}, sincronizado: ${resultado['sincronizado']}');
       } else {
-        _logger.w('No se encontró registro en Estado_Equipo para ${equipoData['cod_barras']}');
+        _logger.w('No se encontró registro en censo_activo para ${equipoData['cod_barras']}');
       }
 
       return resultado;

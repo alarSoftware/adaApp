@@ -1,4 +1,4 @@
-import '../models/estado_equipo.dart';
+import '../models/censo_activo.dart';
 import 'base_repository.dart';
 import 'package:logger/logger.dart';
 
@@ -6,7 +6,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   final Logger _logger = Logger();
 
   @override
-  String get tableName => 'Estado_Equipo';
+  String get tableName => 'censo_activo';
 
   @override
   EstadoEquipo fromMap(Map<String, dynamic> map) => EstadoEquipo.fromMap(map);
@@ -299,7 +299,6 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   // ========== MÉTODOS PARA SINCRONIZACIÓN ==========
 
   /// Obtener registros no sincronizados
-  @override
   Future<List<EstadoEquipo>> obtenerNoSincronizados() async {
     try {
       final maps = await dbHelper.consultar(

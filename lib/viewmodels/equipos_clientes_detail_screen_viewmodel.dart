@@ -3,9 +3,9 @@ import 'dart:ui' show Color;
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
-import '../repositories/estado_equipo_repository.dart';
+import '../repositories/censo_activo_repository.dart';
 import '../repositories/equipo_repository.dart';
-import '../models/estado_equipo.dart';
+import '../models/censo_activo.dart';
 import '../services/location_service.dart';
 import 'package:geolocator/geolocator.dart';
 

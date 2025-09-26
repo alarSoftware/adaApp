@@ -32,7 +32,7 @@ class DatabaseTables {
     await db.execute(_sqlEquipos());
     await db.execute(_sqlEquiposPendientes());
     await db.execute(_sqlUsuarios());
-    await db.execute(_sqlEstadoEquipo());
+    await db.execute(_sqlCensoActivo());
   }
 
   String _sqlModelos() => '''
@@ -114,8 +114,8 @@ class DatabaseTables {
   ''';
 
   // ✅ ACTUALIZADO: Tabla con columnas para segunda imagen
-  String _sqlEstadoEquipo() => '''
-  CREATE TABLE Estado_Equipo (
+  String _sqlCensoActivo() => '''
+  CREATE TABLE censo_activo (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     equipo_id TEXT NOT NULL,
     cliente_id INTEGER NOT NULL,   
@@ -176,6 +176,7 @@ class DatabaseTables {
     }
   }
 
+
   Future<void> _crearIndicesEquiposPendientes(Database db) async {
     final indices = [
       'CREATE INDEX IF NOT EXISTS idx_equipos_pendientes_equipo_id ON equipos_pendientes (equipo_id)',
@@ -199,5 +200,6 @@ class DatabaseTables {
     for (final indice in indices) {
       await db.execute(indice);
     }
+
   }
 }

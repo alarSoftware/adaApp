@@ -5,7 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 import '../../models/cliente.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
-import 'package:ada_app/repositories/estado_equipo_repository.dart';
+import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'dart:async';
 
@@ -15,6 +15,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
   bool _isLoading = false;
   bool _isSaving = false;
   String? _statusMessage;
+
+  // ✅ SOLUCIÓN 1: Variable para prevenir múltiples ejecuciones
+  bool _isProcessing = false;
+  String? _currentProcessId; // Para identificar el proceso actual
 
   final EquipoRepository _equipoRepository = EquipoRepository();
   final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
@@ -27,12 +31,15 @@ class PreviewScreenViewModel extends ChangeNotifier {
   bool get isSaving => _isSaving;
   String? get statusMessage => _statusMessage;
 
+  // ✅ SOLUCIÓN 2: Getter para saber si se puede ejecutar una acción
+  bool get canConfirm => !_isProcessing && !_isSaving;
+
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
   }
 
-  void _setSaving(bool saving) {        // ← NUEVO método
+  void _setSaving(bool saving) {
     _isSaving = saving;
     notifyListeners();
   }
@@ -84,13 +91,50 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
+  // ✅ SOLUCIÓN 3: Método principal con protección contra múltiples ejecuciones
   Future<Map<String, dynamic>> confirmarRegistro(Map<String, dynamic> datos) async {
+    // Prevenir múltiples ejecuciones simultáneas
+    if (_isProcessing) {
+      _logger.w('⚠️ Proceso ya en ejecución, ignorando nueva solicitud');
+      return {
+        'success': false,
+        'error': 'Ya hay un proceso de confirmación en curso. Por favor espere.'
+      };
+    }
+
+    // Generar ID único para este proceso
+    final processId = DateTime.now().millisecondsSinceEpoch.toString();
+    _currentProcessId = processId;
+    _isProcessing = true;
+
+    try {
+      return await _ejecutarConfirmacion(datos, processId);
+    } finally {
+      // Solo limpiar si este es el proceso actual
+      if (_currentProcessId == processId) {
+        _isProcessing = false;
+        _currentProcessId = null;
+      }
+    }
+  }
+
+  // ✅ SOLUCIÓN 4: Método interno que ejecuta la lógica principal
+  Future<Map<String, dynamic>> _ejecutarConfirmacion(
+      Map<String, dynamic> datos,
+      String processId
+      ) async {
     _setSaving(true);
     _setStatusMessage(null);
     int? estadoIdActual;
 
     try {
-      _logger.i('📝 CONFIRMANDO REGISTRO - GUARDADO DEFINITIVO EN BD');
+      _logger.i('📝 CONFIRMANDO REGISTRO - GUARDADO DEFINITIVO EN BD [Process: $processId]');
+
+      // Verificar si el proceso sigue siendo válido
+      if (_currentProcessId != processId) {
+        _logger.w('⚠️ Proceso cancelado: ID no coincide');
+        return {'success': false, 'error': 'Proceso cancelado'};
+      }
 
       final cliente = datos['cliente'] as Cliente?;
       final equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
@@ -103,6 +147,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       _setStatusMessage('🔍 Verificando estado del equipo...');
 
+      // Verificar nuevamente si el proceso sigue activo
+      if (_currentProcessId != processId) {
+        return {'success': false, 'error': 'Proceso cancelado'};
+      }
+
       final equipoId = equipoCompleto['id'].toString();
       final clienteId = _convertirAInt(cliente.id, 'cliente_id');
 
@@ -112,6 +161,12 @@ class PreviewScreenViewModel extends ChangeNotifier {
       // PASO 2: CREAR REGISTRO PENDIENTE SOLO SI NO ESTÁ ASIGNADO
       if (esCenso && !yaAsignado) {
         _setStatusMessage('💾 Registrando censo pendiente...');
+
+        // Verificar proceso antes de operación crítica
+        if (_currentProcessId != processId) {
+          return {'success': false, 'error': 'Proceso cancelado'};
+        }
+
         try {
           _logger.i('📝 PASO 2: Crear registro pendiente (equipo NO asignado)');
           await _equipoPendienteRepository.procesarEscaneoCenso(
@@ -128,6 +183,12 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       // ✅ CAMBIO 1: CREAR ESTADO CON AMBAS IMÁGENES
       _setStatusMessage('📋 Registrando estado como CREADO...');
+
+      // Verificar proceso antes de crear estado
+      if (_currentProcessId != processId) {
+        return {'success': false, 'error': 'Proceso cancelado'};
+      }
+
       try {
         final estadoCreado = await _estadoEquipoRepository.crearNuevoEstado(
           equipoId: equipoId,
@@ -159,6 +220,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
       } catch (dbError) {
         _logger.e('❌ Error de base de datos al crear estado: $dbError');
         throw 'Error creando estado en base de datos: $dbError';
+      }
+
+      // Verificar proceso antes de continuar
+      if (_currentProcessId != processId) {
+        return {'success': false, 'error': 'Proceso cancelado'};
       }
 
       // ✅ CAMBIO 2: INCLUIR SEGUNDA IMAGEN EN DATOS COMPLETOS
@@ -218,6 +284,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
         datosCompletos = _prepararDatosParaEnvio(datos);
       }
 
+      // Verificar proceso antes de guardar
+      if (_currentProcessId != processId) {
+        return {'success': false, 'error': 'Proceso cancelado'};
+      }
+
       _setStatusMessage('💾 Guardando registro local maestro...');
       await _guardarRegistroLocal(datosCompletos);
 
@@ -226,6 +297,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
       bool migracionExitosa = false;
 
       if (estadoIdActual != null) {
+        // Verificar proceso antes de enviar al servidor
+        if (_currentProcessId != processId) {
+          return {'success': false, 'error': 'Proceso cancelado'};
+        }
+
         final respuestaServidor = await _intentarEnviarAlServidorConTimeout(datosCompletos, timeoutSegundos: 8);
         _logger.i('🔍 Respuesta del servidor: $respuestaServidor');
 
@@ -260,6 +336,24 @@ class PreviewScreenViewModel extends ChangeNotifier {
     } finally {
       _setSaving(false);
     }
+  }
+
+  // ✅ SOLUCIÓN 5: Método para cancelar el proceso actual (útil para navegación)
+  void cancelarProcesoActual() {
+    if (_isProcessing) {
+      _logger.i('🛑 Cancelando proceso actual: $_currentProcessId');
+      _currentProcessId = null;
+      _isProcessing = false;
+      _setSaving(false);
+      _setStatusMessage(null);
+    }
+  }
+
+  // ✅ SOLUCIÓN 6: Método para limpiar estado cuando se destruye el widget
+  @override
+  void dispose() {
+    cancelarProcesoActual();
+    super.dispose();
   }
 
   Future<Map<String, dynamic>> _intentarEnviarAlServidorConTimeout(Map<String, dynamic> datos, {int timeoutSegundos = 8}) async {

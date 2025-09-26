@@ -148,15 +148,39 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   @override
   void dispose() {
+    viewModel.cancelarProcesoActual();
     viewModel.dispose();
     super.dispose();
   }
 
   // ✅ CAMBIO 3: ACTUALIZAR MÉTODO DE CONFIRMACIÓN PARA INCLUIR SEGUNDA IMAGEN
   Future<void> _confirmarRegistro() async {
+    if (!viewModel.canConfirm) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Ya hay un proceso en curso. Por favor espere.'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+
+    final bool? confirmado = await _mostrarDialogoConfirmacion();
+    if (confirmado != true) return;
+
+    if (!viewModel.canConfirm) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Ya hay un proceso en curso. Por favor espere.'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+
+    // Resto del código actual (preparar datos, etc.)
     final datosCompletos = Map<String, dynamic>.from(widget.datos);
 
-    // Primera imagen
     if (_imagePath != null && _imageBase64 != null) {
       final bytes = base64Decode(_imageBase64!);
       datosCompletos['imagen_path'] = _imagePath;
@@ -170,7 +194,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
       datosCompletos['imagen_tamano'] = null;
     }
 
-    // Segunda imagen
     if (_imagePath2 != null && _imageBase64_2 != null) {
       final bytes2 = base64Decode(_imageBase64_2!);
       datosCompletos['imagen_path2'] = _imagePath2;
@@ -196,34 +219,84 @@ class _PreviewScreenState extends State<PreviewScreen> {
       }
     }
   }
+  Future<bool?> _mostrarDialogoConfirmacion() {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: const Text('Confirmar Censo'),
+          content: const Text('¿Está seguro que desea confirmar este censo?\n\nEsta acción guardará el registro definitivamente.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
+              child: const Text('Confirmar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
-  @override
+  void _mostrarDialogoProcesoEnCurso() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: const Text('Proceso en curso'),
+          content: const Text('Hay un proceso de guardado en curso.\n\nPor favor espere a que termine antes de continuar.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Entendido'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final Cliente cliente = widget.datos['cliente'];
 
     return ChangeNotifierProvider.value(
       value: viewModel,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: _buildAppBar(),
-        body: Stack(
-          children: [
-            _buildBody(cliente),
-            Consumer<PreviewScreenViewModel>(
-              builder: (context, vm, child) {
-                if (!vm.isSaving) return const SizedBox.shrink();
-                return _buildSavingOverlay();
-              },
+      child: Consumer<PreviewScreenViewModel>(  // Mover Consumer aquí
+        builder: (context, vm, child) {
+          return PopScope(  // Agregar PopScope
+            canPop: vm.canConfirm,
+            onPopInvoked: (didPop) {
+              if (!didPop && !vm.canConfirm) {
+                _mostrarDialogoProcesoEnCurso();
+              }
+            },
+            child: Scaffold(
+              backgroundColor: AppColors.background,
+              appBar: _buildAppBar(vm),  // Pasar vm como parámetro
+              body: Stack(
+                children: [
+                  _buildBody(cliente),
+                  if (vm.isSaving) _buildSavingOverlay(),  // Simplificar
+                ],
+              ),
+              bottomNavigationBar: _buildBottomButtons(),
             ),
-          ],
-        ),
-        bottomNavigationBar: _buildBottomButtons(),
+          );
+        },
       ),
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(PreviewScreenViewModel vm) {  // Cambiar firma
     final esHistorial = widget.datos['es_historial'] == true;
 
     return AppBar(
@@ -232,6 +305,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
       foregroundColor: AppColors.onPrimary,
       elevation: 2,
       shadowColor: AppColors.shadowLight,
+      automaticallyImplyLeading: vm.canConfirm,  // Agregar
+      leading: vm.canConfirm ? null : Container(   // Agregar
+        margin: const EdgeInsets.all(12),
+        child: CircularProgressIndicator(
+          color: AppColors.onPrimary,
+          strokeWidth: 2,
+        ),
+      ),
     );
   }
 
