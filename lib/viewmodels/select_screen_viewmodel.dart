@@ -1,4 +1,3 @@
-// viewmodels/select_screen_view_model.dart
 import 'package:flutter/foundation.dart';
 import 'package:ada_app/repositories/cliente_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
@@ -8,6 +7,7 @@ import 'package:logger/logger.dart';
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 
 // ========== EVENTOS PARA LA UI (CERO WIDGETS) ==========
 abstract class UIEvent {}
@@ -336,7 +336,7 @@ class SelectScreenViewModel extends ChangeNotifier {
 
   /// Ejecuta la sincronización (después de confirmación)
   Future<void> executeSync() async {
-    _setSyncLoading(true); // CAMBIO: Usar método específico para sync
+    _setSyncLoading(true);
 
     try {
       final resultado = await SyncService.sincronizarTodosLosDatos();
@@ -350,20 +350,21 @@ class SelectScreenViewModel extends ChangeNotifier {
 
       if (resultado.exito) {
         _eventController.add(SyncCompletedEvent(syncResult));
-        await _checkApiConnection(); // Actualizar estado de conexión
+
+        await _checkApiConnection();
       } else {
         _eventController.add(ShowErrorEvent('Error en sincronización: ${resultado.mensaje}'));
       }
     } catch (e) {
       _eventController.add(ShowErrorEvent('Error inesperado: $e'));
     } finally {
-      _setSyncLoading(false); // CAMBIO: Usar método específico para sync
+      _setSyncLoading(false);
     }
   }
 
   /// Prueba la conexión manualmente
   Future<void> testConnection() async {
-    _setConnectionTestLoading(true); // CAMBIO: Usar método específico para prueba
+    _setConnectionTestLoading(true);
 
     try {
       final response = await SyncService.probarConexion();
@@ -494,4 +495,5 @@ class SelectScreenViewModel extends ChangeNotifier {
       return 0;
     }
   }
+
 }

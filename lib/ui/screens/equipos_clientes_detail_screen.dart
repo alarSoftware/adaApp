@@ -892,6 +892,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
       print('DEBUG: Datos del historial extraídos - lat: $latitudSafe, lon: $longitudSafe, fecha: $fechaRevisionSafe, enLocal: $enLocalSafe');
 
       final datosFinales = {
+        'id': historialItem?.id,
         'cliente': cliente, // Cliente real desde la base de datos
         'equipo_completo': equipoCompleto,
         'latitud': latitudSafe,

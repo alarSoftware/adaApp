@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:http/http.dart' as http;
@@ -29,7 +30,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   // ✅ AGREGAR: Cache del usuario actual
   Usuario? _usuarioActual;
 
-  static const String _baseUrl = 'https://ada-api.loca.lt/adaControl/';
+  static const String _baseUrl = 'https://de3f164b7ff7.ngrok-free.app/adaControl/';
   static const String _estadosEndpoint = 'censoActivo/insertCensoActivo';
 
   bool get isLoading => _isLoading;
@@ -563,6 +564,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'longitud': datosLocales['longitud'] ?? 0.0,
       'enLocal': datosLocales['en_local'] ?? true,
       'fechaDeRevision': datosLocales['fecha_revision'] ?? DateTime.now().toIso8601String(),
+      'estadoCenso': datosLocales['ya_asignado'] == true ? 'asignado' : 'pendiente',
       'equipo_codigo_barras': datosLocales['codigo_barras'] ?? '',
       'equipo_numero_serie': datosLocales['numero_serie'] ?? '',
       'equipo_modelo': datosLocales['modelo'] ?? '',
@@ -592,6 +594,205 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'imagen_path2': datosLocales['imagen_path2'],
     };
   }
+
+  Future<bool> verificarSincronizacionPendiente(int? estadoId) async {
+    if (estadoId == null) return false;
+
+    try {
+      final maps = await _estadoEquipoRepository.dbHelper.consultar(
+        'censo_activo',
+        where: 'id = ?',
+        whereArgs: [estadoId],
+        limit: 1,
+      );
+
+      if (maps.isEmpty) return false;
+
+      final estado = maps.first;
+      final estadoCenso = estado['estado_censo'] as String?;
+      final sincronizado = estado['sincronizado'] as int?;
+
+      final estaPendiente = (estadoCenso == 'creado' || estadoCenso == 'error') &&
+          sincronizado == 0;
+
+      _logger.i('🔍 Estado $estadoId - Censo: $estadoCenso, Sincronizado: $sincronizado, Pendiente: $estaPendiente');
+
+      return estaPendiente;
+    } catch (e) {
+      _logger.e('❌ Error verificando sincronización: $e');
+      return false;
+    }
+  }
+
+  /// Obtiene información detallada del estado de sincronización
+  Future<Map<String, dynamic>> obtenerInfoSincronizacion(int? estadoId) async {
+    if (estadoId == null) {
+      return {
+        'pendiente': false,
+        'estado': 'desconocido',
+        'mensaje': 'No hay ID de estado',
+        'icono': Icons.help_outline,
+        'color': Colors.grey,
+      };
+    }
+
+    try {
+      final maps = await _estadoEquipoRepository.dbHelper.consultar(
+        'censo_activo',
+        where: 'id = ?',
+        whereArgs: [estadoId],
+        limit: 1,
+      );
+
+      if (maps.isEmpty) {
+        return {
+          'pendiente': false,
+          'estado': 'no_encontrado',
+          'mensaje': 'Estado no encontrado en base de datos',
+          'icono': Icons.error_outline,
+          'color': Colors.grey,
+        };
+      }
+
+      final estado = maps.first;
+      final estadoCenso = estado['estado_censo'] as String?;
+      final sincronizado = estado['sincronizado'] as int?;
+
+      final estaPendiente = (estadoCenso == 'creado' || estadoCenso == 'error') &&
+          sincronizado == 0;
+
+      String mensaje;
+      IconData icono;
+      Color color;
+
+      if (sincronizado == 1) {
+        mensaje = 'Registro sincronizado correctamente';
+        icono = Icons.cloud_done;
+        color = Colors.green;
+      } else if (estadoCenso == 'error') {
+        mensaje = 'Error en sincronización - Puede reintentar';
+        icono = Icons.cloud_off;
+        color = Colors.red;
+      } else {
+        mensaje = 'Pendiente de sincronización automática';
+        icono = Icons.cloud_upload;
+        color = Colors.orange;
+      }
+
+      return {
+        'pendiente': estaPendiente,
+        'estado': estadoCenso,
+        'sincronizado': sincronizado,
+        'mensaje': mensaje,
+        'icono': icono,
+        'color': color,
+        'fecha_creacion': estado['fecha_creacion'],
+        'observaciones': estado['observaciones'],
+      };
+    } catch (e) {
+      _logger.e('❌ Error obteniendo info de sincronización: $e');
+      return {
+        'pendiente': false,
+        'estado': 'error',
+        'mensaje': 'Error consultando estado: $e',
+        'icono': Icons.error,
+        'color': Colors.red,
+      };
+    }
+  }
+
+  /// Reintenta el envío de un registro del historial
+  Future<Map<String, dynamic>> reintentarEnvio(int estadoId) async {
+    try {
+      _logger.i('🔄 Reintentando envío del estado ID: $estadoId');
+
+      final maps = await _estadoEquipoRepository.dbHelper.consultar(
+        'censo_activo',
+        where: 'id = ?',
+        whereArgs: [estadoId],
+        limit: 1,
+      );
+
+      if (maps.isEmpty) {
+        return {
+          'success': false,
+          'error': 'No se encontró el registro en la base de datos'
+        };
+      }
+
+      final estadoMap = maps.first;
+
+      final usuarioId = await _getUsuarioId;
+      final edfVendedorId = await _getEdfVendedorId;
+
+      final datosParaApi = {
+        'id': estadoMap['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        'edfVendedorSucursalId': edfVendedorId ?? '',
+        'edfEquipoId': estadoMap['equipo_id']?.toString() ?? '',
+        'usuarioId': usuarioId,
+        'edfClienteId': estadoMap['cliente_id'] ?? 0,
+        'fecha_revision': estadoMap['fecha_revision'] ?? DateTime.now().toIso8601String(),
+        'latitud': estadoMap['latitud'] ?? 0.0,
+        'longitud': estadoMap['longitud'] ?? 0.0,
+        'enLocal': true,
+        'fechaDeRevision': estadoMap['fecha_revision'] ?? DateTime.now().toIso8601String(),
+        'estadoCenso': 'pendiente',
+        'observaciones': estadoMap['observaciones'] ?? '',
+        'imageBase64_1': estadoMap['imagen_base64'],
+        'imageBase64_2': estadoMap['imagen_base64_2'],
+        'tiene_imagen': estadoMap['tiene_imagen'] ?? 0,
+        'tiene_imagen2': estadoMap['tiene_imagen2'] ?? 0,
+        'equipo_codigo_barras': '',
+        'equipo_numero_serie': '',
+        'equipo_modelo': '',
+        'equipo_marca': '',
+        'equipo_logo': '',
+        'cliente_nombre': '',
+        'usuario_id': usuarioId,
+        'cliente_id': estadoMap['cliente_id'] ?? 0,
+      };
+
+      final respuesta = await _enviarAApiEstadosConTimeout(datosParaApi, 8);
+
+      if (respuesta['exito'] == true) {
+        await _estadoEquipoRepository.marcarComoMigrado(
+          estadoId,
+          servidorId: respuesta['id'],
+        );
+
+        _logger.i('✅ Reenvío exitoso del estado $estadoId');
+
+        return {
+          'success': true,
+          'message': 'Registro sincronizado correctamente'
+        };
+      } else {
+        await _estadoEquipoRepository.marcarComoError(
+            estadoId,
+            'Error del servidor: ${respuesta['mensaje']}'
+        );
+
+        _logger.w('⚠️ Fallo en reenvío: ${respuesta['mensaje']}');
+
+        return {
+          'success': false,
+          'error': 'Error del servidor: ${respuesta['mensaje']}'
+        };
+      }
+    } catch (e) {
+      _logger.e('❌ Error en reintento de envío: $e');
+
+      try {
+        await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción: $e');
+      } catch (_) {}
+
+      return {
+        'success': false,
+        'error': 'Error al reintentar: $e'
+      };
+    }
+  }
+
 
   Future<void> _marcarComoSincronizado(int idLocal) async {
     try {
