@@ -79,7 +79,6 @@ class EquipoListScreenViewModel extends ChangeNotifier {
   Future<void> initialize() async {
     await cargarEquipos();
   }
-// Reemplaza estos métodos en tu EquipoListScreenViewModel:
 
   Future<void> cargarEquipos() async {
     _setLoading(true);

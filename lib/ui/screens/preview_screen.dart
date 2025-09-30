@@ -289,7 +289,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (esHistorial) ...[
-            _buildHistorialIndicator(),
             _buildSyncStatusIndicator(estadoId),
           ],
           _buildClienteCard(cliente),
@@ -606,17 +605,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
-  Widget _buildHistorialIndicator() {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-      ),
-    );
-  }
 
   Widget _buildSyncStatusIndicator(int? estadoId) {
     // Si no es historial o no hay estadoId, no mostrar nada

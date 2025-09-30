@@ -131,12 +131,19 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   /// Guardar censos desde el servidor en la base de datos local
+  /// Guardar censos desde el servidor en la base de datos local
+  /// Guardar censos desde el servidor en la base de datos local
   Future<int> guardarCensosDesdeServidor(List<Map<String, dynamic>> censosServidor) async {
     int guardados = 0;
 
     try {
       for (final censo in censosServidor) {
         try {
+          // 🔍 LOG PARA DEBUG - Ver qué trae la API
+          _logger.i('📦 Procesando censo: ${censo['id']}');
+          _logger.i('   - tiene_imagen (API): ${censo['tiene_imagen'] ?? censo['tieneImagen']}');
+          _logger.i('   - imagen_base64 length: ${(censo['imagen_base64'] ?? censo['imagenBase64'])?.toString().length ?? 0}');
+
           // Mapear campos del servidor a estructura local
           final datosLocal = {
             'equipo_id': censo['equipoId']?.toString() ?? censo['edfEquipoId']?.toString() ?? '',
@@ -150,7 +157,23 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
             'sincronizado': 1, // Viene del servidor, ya está sincronizado
             'estado_censo': 'migrado', // Censos del servidor están migrados
             'observaciones': censo['observaciones'],
+
+            // 🖼️ PRIMERA IMAGEN - Múltiples formatos posibles desde la API
+            'imagen_path': censo['imagenPath'] ?? censo['imagen_path'] ?? censo['imagePath'],
+            'imagen_base64': censo['imageBase64_1'] ?? censo['imagenBase64'] ?? censo['imagen_base64'],
+            'tiene_imagen': _parsearBoolean(censo['tieneImagen'] ?? censo['tiene_imagen']),
+            'imagen_tamano': censo['imagenTamano'] ?? censo['imagen_tamano'],
+
+            // 🖼️ SEGUNDA IMAGEN
+            'imagen_path2': censo['imagenPath2'] ?? censo['imagen_path2'] ?? censo['imagePath2'],
+            'imagen_base64_2': censo['imageBase64_2'] ?? censo['imagenBase64_2'] ?? censo['imagen_base64_2'],
+            'tiene_imagen2': _parsearBoolean(censo['tieneImagen2'] ?? censo['tiene_imagen2']),
+            'imagen_tamano2': censo['imagenTamano2'] ?? censo['imagen_tamano2'],
           };
+
+          // 🔍 LOG DESPUÉS DEL MAPEO
+          _logger.i('   - tiene_imagen (mapeado): ${datosLocal['tiene_imagen']}');
+          _logger.i('   - imagen_base64 (mapeado): ${datosLocal['imagen_base64'] != null ? 'SÍ' : 'NO'}');
 
           await dbHelper.insertar(tableName, datosLocal);
           guardados++;
@@ -168,6 +191,18 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       _logger.e('❌ Error guardando censos desde servidor: $e');
       return guardados;
     }
+  }
+
+// 🔧 MÉTODO AUXILIAR para parsear booleanos
+  int _parsearBoolean(dynamic valor) {
+    if (valor == null) return 0;
+    if (valor is bool) return valor ? 1 : 0;
+    if (valor is int) return valor == 1 ? 1 : 0;
+    if (valor is String) {
+      final lower = valor.toLowerCase();
+      return (lower == 'true' || lower == '1') ? 1 : 0;
+    }
+    return 0;
   }
 
   /// Obtener historial completo por equipo_id y cliente_id

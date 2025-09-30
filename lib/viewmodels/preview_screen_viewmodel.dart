@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -14,7 +13,7 @@ import 'dart:async';
 final _logger = Logger();
 
 class PreviewScreenViewModel extends ChangeNotifier {
-  bool _isLoading = false;
+  final bool _isLoading = false;
   bool _isSaving = false;
   String? _statusMessage;
   bool _isProcessing = false;
@@ -30,7 +29,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   // ✅ AGREGAR: Cache del usuario actual
   Usuario? _usuarioActual;
 
-  static const String _baseUrl = 'https://de3f164b7ff7.ngrok-free.app/adaControl/';
+  static const String _baseUrl = 'https://ada-api.loca.lt/adaControl/';
   static const String _estadosEndpoint = 'censoActivo/insertCensoActivo';
 
   bool get isLoading => _isLoading;
@@ -68,11 +67,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     // TODO: Implementar cuando tengas la lógica de sucursales
     // Por ahora devuelve 1 como fallback
     return 1;
-  }
-
-  void _setLoading(bool loading) {
-    _isLoading = loading;
-    notifyListeners();
   }
 
   void _setSaving(bool saving) {
@@ -455,7 +449,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
             'cliente_nombre': '',
             'usuario_id': usuarioId, // ✅ USUARIO REAL
             'funcionando': true,
-            'cliente_id': registro.clienteId ?? 0,
+            'cliente_id': registro.clienteId,
             'observaciones': registro.observaciones ?? 'Sincronización automática',
           };
 
@@ -549,12 +543,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
     // ✅ OBTENER DATOS REALES DEL USUARIO
     final usuarioId = await _getUsuarioId;
     final edfVendedorId = await _getEdfVendedorId;
-    final sucursalId = await _getSucursalId;
 
     return {
       'id': datosLocales['id_local']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
 
-      'edfVendedorSucursalId': '${edfVendedorId}',
+      'edfVendedorSucursalId': '$edfVendedorId',
 
       'edfEquipoId': (datosLocales['equipo_id'] ?? '').toString(),
       'usuarioId': usuarioId,

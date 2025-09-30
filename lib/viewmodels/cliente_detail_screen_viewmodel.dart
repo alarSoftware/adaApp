@@ -75,7 +75,7 @@ class ClienteDetailState {
 class ClienteDetailScreenViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
   final EquipoRepository _equipoRepository = EquipoRepository();
-  final EquipoPendienteRepository _equipoPendienteRepository = EquipoPendienteRepository(); // AGREGAR
+  final EquipoPendienteRepository _equipoPendienteRepository = EquipoPendienteRepository();
   final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
 
   // ========== ESTADO INTERNO ==========
@@ -135,11 +135,9 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
 
       _logger.i('Cargando equipos para cliente: ${_cliente!.id}');
 
-      // CORREGIDO: Usar los repositories correctos
       final equiposAsignadosList = await _equipoRepository.obtenerEquiposAsignados(_cliente!.id!);
       final equiposPendientesList = await _equipoPendienteRepository.obtenerEquiposPendientesPorCliente(_cliente!.id!);
 
-      // DEBUG LOGS
       _logger.i('=== DEBUG SEPARACIÓN ===');
       _logger.i('Equipos ASIGNADOS obtenidos: ${equiposAsignadosList.length}');
       equiposAsignadosList.forEach((eq) => _logger.i('  - Asignado: ${eq['cod_barras']} | Estado: ${eq['estado']}'));

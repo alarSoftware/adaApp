@@ -1,4 +1,3 @@
-// ui/screens/select_screen.dart
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/screens/equipos_screen.dart';
 import 'package:ada_app/ui/screens/modelos_screen.dart';
@@ -64,7 +63,6 @@ class _SelectScreenState extends State<SelectScreen> {
     }
   }
 
-  // DIÁLOGOS - Actualizados con sistema de colores
   Future<bool?> _mostrarDialogoSincronizacion() async {
     return showDialog<bool>(
       context: context,
@@ -75,10 +73,7 @@ class _SelectScreenState extends State<SelectScreen> {
             children: [
               Icon(Icons.sync, color: AppColors.neutral700),
               SizedBox(width: 8),
-              Text(
-                'Sincronizar Datos',
-                style: TextStyle(color: AppColors.textPrimary),
-              ),
+              Text('Sincronizar Datos', style: TextStyle(color: AppColors.textPrimary)),
             ],
           ),
           content: Column(
@@ -100,38 +95,23 @@ class _SelectScreenState extends State<SelectScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '• Clientes del servidor',
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
-                    Text(
-                      '• Equipos y refrigeradores',
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
-                    Text(
-                      '• Estados y asignaciones',
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
+                    Text('• Clientes del servidor', style: TextStyle(color: AppColors.textSecondary)),
+                    Text('• Equipos y refrigeradores', style: TextStyle(color: AppColors.textSecondary)),
+                    Text('• Estados y asignaciones', style: TextStyle(color: AppColors.textSecondary)),
                   ],
                 ),
               ),
               SizedBox(height: 12),
               Text(
                 'Los datos locales serán actualizados.',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text(
-                'Cancelar',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
+              child: Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
@@ -157,54 +137,29 @@ class _SelectScreenState extends State<SelectScreen> {
             children: [
               Icon(Icons.delete_forever, color: AppColors.error),
               SizedBox(width: 8),
-              Text(
-                'Borrar Base de Datos',
-                style: TextStyle(
-                  fontSize: 20,
-                  color: AppColors.textPrimary,
-                ),
-              ),
+              Text('Borrar Base de Datos', style: TextStyle(fontSize: 20, color: AppColors.textPrimary)),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '¡ATENCIÓN!',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.error,
-                  fontSize: 16,
-                ),
-              ),
+              Text('¡ATENCIÓN!', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.error, fontSize: 16)),
               SizedBox(height: 12),
-              Text(
-                'Esta acción borrará TODOS los datos locales:',
-                style: TextStyle(color: AppColors.textPrimary),
-              ),
+              Text('Esta acción borrará TODOS los datos locales:', style: TextStyle(color: AppColors.textPrimary)),
               SizedBox(height: 8),
               Text('• Todos los clientes', style: TextStyle(color: AppColors.textSecondary)),
               Text('• Todos los equipos', style: TextStyle(color: AppColors.textSecondary)),
               Text('• Configuraciones locales', style: TextStyle(color: AppColors.textSecondary)),
               Text('• Datos de sincronización', style: TextStyle(color: AppColors.textSecondary)),
               SizedBox(height: 16),
-              Text(
-                '¿Estás seguro?',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
+              Text('¿Estás seguro?', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text(
-                'Cancelar',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
+              child: Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
@@ -220,7 +175,6 @@ class _SelectScreenState extends State<SelectScreen> {
     );
   }
 
-  // MENSAJES - Actualizados con sistema de colores
   void _mostrarError(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -245,60 +199,80 @@ class _SelectScreenState extends State<SelectScreen> {
     );
   }
 
-  Widget _buildMenuButton(
-      BuildContext context, {
-        required String label,
-        required IconData icon,
-        required Color? color,
-        String? routeName,
-        Widget? page,
-        VoidCallback? onTap,
-      }) {
-    return GestureDetector(
-      onTap: onTap ?? () {
-        if (routeName != null) {
-          Navigator.pushNamed(context, routeName);
-        } else if (page != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => page),
-          );
-        }
-      },
-      child: Container(
-        width: 120,
-        height: 120,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadowLight,
-              spreadRadius: 2,
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-          border: Border.all(
-            color: AppColors.border,
-            width: 0.5,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: color ?? AppColors.primary),
-            SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: color ?? AppColors.primary,
+  Widget _buildMenuCard({
+    required String label,
+    required String description,
+    required IconData icon,
+    required Color color,
+    String? routeName,
+    Widget? page,
+    VoidCallback? onTap,
+  }) {
+    return Card(
+      elevation: 2,
+      color: AppColors.surface,
+      shadowColor: AppColors.shadowLight,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppColors.border, width: 0.5),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap ?? () {
+          if (routeName != null) {
+            Navigator.pushNamed(context, routeName);
+          } else if (page != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => page),
+            );
+          }
+        },
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: color.withOpacity(0.2)),
+                ),
+                child: Icon(icon, color: color, size: 28),
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -310,9 +284,7 @@ class _SelectScreenState extends State<SelectScreen> {
       child: Center(
         child: Card(
           color: AppColors.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Padding(
             padding: const EdgeInsets.all(32.0),
             child: Column(
@@ -338,10 +310,7 @@ class _SelectScreenState extends State<SelectScreen> {
                 SizedBox(height: 12),
                 Text(
                   'Descargando clientes y equipos...',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
+                  style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                   textAlign: TextAlign.center,
                 ),
                 SizedBox(height: 16),
@@ -390,13 +359,7 @@ class _SelectScreenState extends State<SelectScreen> {
             children: [
               Icon(icon, color: color, size: 20),
               SizedBox(width: 4),
-              Text(
-                text,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.appBarForeground,
-                ),
-              ),
+              Text(text, style: TextStyle(fontSize: 12, color: AppColors.appBarForeground)),
             ],
           ),
         );
@@ -408,14 +371,10 @@ class _SelectScreenState extends State<SelectScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Panel Principal',
-          style: TextStyle(color: AppColors.onPrimary),
-        ),
+        title: Text('Panel Principal', style: TextStyle(color: AppColors.onPrimary)),
         backgroundColor: AppColors.appBarBackground,
         foregroundColor: AppColors.appBarForeground,
         actions: [
-          // Botón de sync - usa ViewModel
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {
@@ -435,11 +394,7 @@ class _SelectScreenState extends State<SelectScreen> {
               );
             },
           ),
-
-          // Estado de conexión
           _buildConnectionStatus(),
-
-          // Menu de opciones
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {
@@ -457,11 +412,9 @@ class _SelectScreenState extends State<SelectScreen> {
                 itemBuilder: (BuildContext context) => [
                   PopupMenuItem<String>(
                     value: 'probar_conexion',
-                    // CAMBIO: Ahora deshabilita solo si está probando conexión O sincronizando
                     enabled: !_viewModel.isTestingConnection && !_viewModel.isSyncing,
                     child: Row(
                       children: [
-                        // CAMBIO: Mostrar spinner si está probando conexión
                         _viewModel.isTestingConnection
                             ? SizedBox(
                           width: 16,
@@ -487,10 +440,7 @@ class _SelectScreenState extends State<SelectScreen> {
                       children: [
                         Icon(Icons.delete_forever, color: AppColors.error),
                         SizedBox(width: 8),
-                        Text(
-                          'Borrar Base de Datos',
-                          style: TextStyle(color: AppColors.textPrimary),
-                        ),
+                        Text('Borrar Base de Datos', style: TextStyle(color: AppColors.textPrimary)),
                       ],
                     ),
                   ),
@@ -500,36 +450,30 @@ class _SelectScreenState extends State<SelectScreen> {
           ),
         ],
       ),
-
-      body: Stack(  // CAMBIO: Envolver en Stack
+      body: Stack(
         children: [
-          // Contenido principal
           SafeArea(
             child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24.0),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    AppColors.containerBackground,
-                    AppColors.background,
-                  ],
+                  colors: [AppColors.containerBackground, AppColors.background],
                 ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Header con nombre de usuario
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 24.0),
+                    padding: const EdgeInsets.all(16.0),
                     child: Card(
                       color: AppColors.surface,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                         side: BorderSide(color: AppColors.border),
                       ),
-                      elevation: 4,
+                      elevation: 2,
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: ListenableBuilder(
@@ -571,62 +515,67 @@ class _SelectScreenState extends State<SelectScreen> {
                       ),
                     ),
                   ),
+
+                  // Lista de opciones
                   Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: ListView(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            _buildMenuButton(
-                              context,
-                              label: 'Clientes',
-                              icon: Icons.people,
-                              color: AppColors.primary,
-                              routeName: '/clienteLista',
-                            ),
-                            _buildMenuButton(
-                              context,
-                              label: 'Equipos',
-                              icon: Icons.kitchen,
-                              color: AppColors.primary,
-                              page: const EquipoListScreen(),
-                            ),
-                          ],
+                        _buildMenuCard(
+                          label: 'Clientes',
+                          description: 'Lista de clientes',
+                          icon: Icons.people,
+                          color: AppColors.primary,
+                          routeName: '/clienteLista',
                         ),
-                        SizedBox(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            _buildMenuButton(
-                              context,
-                              label: 'Modelos',
-                              icon: Icons.branding_watermark,
-                              color: AppColors.primary,
-                              page: const ModelosScreen(),
-                            ),
-                            _buildMenuButton(
-                              context,
-                              label: 'Logos',
-                              icon: Icons.newspaper,
-                              color: AppColors.primary,
-                              page: const LogosScreen(),
-                            ),
-                          ],
+                        SizedBox(height: 12),
+                        _buildMenuCard(
+                          label: 'Equipos',
+                          description: 'Lista de equipos de frío',
+                          icon: Icons.kitchen,
+                          color: AppColors.primary,
+                          page: const EquipoListScreen(),
                         ),
+                        SizedBox(height: 12),
+                        _buildMenuCard(
+                          label: 'Modelos',
+                          description: 'Catálogo de modelos de equipos',
+                          icon: Icons.branding_watermark,
+                          color: AppColors.primary,
+                          page: const ModelosScreen(),
+                        ),
+                        SizedBox(height: 12),
+                        _buildMenuCard(
+                          label: 'Logos',
+                          description: 'lista de los logos de la empresa',
+                          icon: Icons.newspaper,
+                          color: AppColors.primary,
+                          page: const LogosScreen(),
+                        ),
+                        SizedBox(height: 12),
+                        // Espacio para futura sección de formularios
+                        // _buildMenuCard(
+                        //   label: 'Formularios',
+                        //   description: 'Formularios dinámicos',
+                        //   icon: Icons.edit_note,
+                        //   color: AppColors.primary,
+                        //   page: const FormulariosScreen(),
+                        // ),
                       ],
                     ),
                   ),
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.pushReplacementNamed(context, '/login');
-                    },
-                    icon: Icon(Icons.logout, color: AppColors.textSecondary),
-                    label: Text(
-                      'Cerrar Sesión',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 16,
+
+                  // Botón de cerrar sesión
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: TextButton.icon(
+                      onPressed: () {
+                        Navigator.pushReplacementNamed(context, '/login');
+                      },
+                      icon: Icon(Icons.logout, color: AppColors.textSecondary),
+                      label: Text(
+                        'Cerrar Sesión',
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
                       ),
                     ),
                   ),
@@ -635,13 +584,11 @@ class _SelectScreenState extends State<SelectScreen> {
             ),
           ),
 
-          // CAMBIO IMPORTANTE: Overlay de sincronización SOLO aparece para sincronización
+          // Overlay de sincronización
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {
-              // SOLO mostrar overlay si está sincronizando, NO si está probando conexión
               if (!_viewModel.isSyncing) return const SizedBox.shrink();
-
               return _buildSyncOverlay();
             },
           ),

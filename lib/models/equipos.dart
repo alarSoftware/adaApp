@@ -130,15 +130,15 @@ class Equipo {
       'id': id,
       'clienteId': clienteId,
       'cod_barras': codBarras,
-      'codBarras': codBarras, // Para compatibilidad con API
+      'codBarras': codBarras,
       'marca_id': marcaId,
-      'marcaId': marcaId, // Para compatibilidad con API
+      'marcaId': marcaId,
       'modelo_id': modeloId,
-      'modeloId': modeloId,   // Para compatibilidad con API
+      'modeloId': modeloId,
       'numero_serie': numeroSerie,
-      'numeroSerie': numeroSerie, // Para compatibilidad
+      'numeroSerie': numeroSerie,
       'logo_id': logoId,
-      'logoId': logoId, // Para compatibilidad con API
+      'logoId': logoId,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fechaCreacion': fechaCreacion.toIso8601String(), // Para compatibilidad
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
