@@ -450,10 +450,30 @@ class SelectScreenViewModel extends ChangeNotifier {
 
   String _buildSyncMessage(dynamic resultado) {
     String mensaje = 'Sincronización completada';
-    if (resultado.clientesSincronizados > 0 || resultado.equiposSincronizados > 0) {
-      mensaje += '\n• Clientes: ${resultado.clientesSincronizados}';
-      mensaje += '\n• Equipos: ${resultado.equiposSincronizados}';
+
+    List<String> detalles = [];
+
+    if (resultado.clientesSincronizados > 0) {
+      detalles.add('Clientes: ${resultado.clientesSincronizados}');
     }
+
+    if (resultado.equiposSincronizados > 0) {
+      detalles.add('Equipos: ${resultado.equiposSincronizados}');
+    }
+
+    // NUEVO: Incluir censos en el mensaje
+    if (resultado.censosSincronizados > 0) {
+      detalles.add('Censos: ${resultado.censosSincronizados}');
+    }
+
+    if (resultado.asignacionesSincronizadas > 0) {
+      detalles.add('Asignaciones: ${resultado.asignacionesSincronizadas}');
+    }
+
+    if (detalles.isNotEmpty) {
+      mensaje += '\n• ${detalles.join('\n• ')}';
+    }
+
     return mensaje;
   }
 

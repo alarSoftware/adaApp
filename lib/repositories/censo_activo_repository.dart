@@ -130,6 +130,46 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
+  /// Guardar censos desde el servidor en la base de datos local
+  Future<int> guardarCensosDesdeServidor(List<Map<String, dynamic>> censosServidor) async {
+    int guardados = 0;
+
+    try {
+      for (final censo in censosServidor) {
+        try {
+          // Mapear campos del servidor a estructura local
+          final datosLocal = {
+            'equipo_id': censo['equipoId']?.toString() ?? censo['edfEquipoId']?.toString() ?? '',
+            'cliente_id': censo['clienteId'] ?? censo['edfClienteId'] ?? 0,
+            'en_local': (censo['enLocal'] == true || censo['enLocal'] == 1) ? 1 : 0,
+            'latitud': censo['latitud'],
+            'longitud': censo['longitud'],
+            'fecha_revision': censo['fechaRevision'] ?? censo['fechaDeRevision'] ?? DateTime.now().toIso8601String(),
+            'fecha_creacion': DateTime.now().toIso8601String(),
+            'fecha_actualizacion': DateTime.now().toIso8601String(),
+            'sincronizado': 1, // Viene del servidor, ya está sincronizado
+            'estado_censo': 'migrado', // Censos del servidor están migrados
+            'observaciones': censo['observaciones'],
+          };
+
+          await dbHelper.insertar(tableName, datosLocal);
+          guardados++;
+
+        } catch (e) {
+          _logger.w('Error guardando censo individual: $e');
+          // Continuar con el siguiente
+        }
+      }
+
+      _logger.i('✅ Censos guardados en local: $guardados de ${censosServidor.length}');
+      return guardados;
+
+    } catch (e) {
+      _logger.e('❌ Error guardando censos desde servidor: $e');
+      return guardados;
+    }
+  }
+
   /// Obtener historial completo por equipo_id y cliente_id
   Future<List<EstadoEquipo>> obtenerHistorialCompleto(String equipoId, int clienteId) async {
     try {

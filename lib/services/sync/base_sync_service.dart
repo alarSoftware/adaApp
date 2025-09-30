@@ -176,3 +176,25 @@ class ApiResponse {
     return 'ApiResponse(exito: $exito, mensaje: $mensaje, codigo: $codigoEstado)';
   }
 }
+
+// Agregar esta clase a base_sync_service.dart
+class SyncResultWithData {
+  final bool exito;
+  final String mensaje;
+  final int itemsSincronizados;
+  final int totalEnAPI;
+  final dynamic data; // Los datos obtenidos
+
+  SyncResultWithData({
+    required this.exito,
+    required this.mensaje,
+    required this.itemsSincronizados,
+    this.totalEnAPI = 0,
+    this.data,
+  });
+
+  @override
+  String toString() {
+    return 'SyncResultWithData(exito: $exito, mensaje: $mensaje, sincronizados: $itemsSincronizados, total: $totalEnAPI)';
+  }
+}

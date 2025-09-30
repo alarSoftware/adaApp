@@ -4,25 +4,30 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
 import '../../models/cliente.dart';
+import '../../models/usuario.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
+import 'package:ada_app/services/auth_service.dart';
 import 'dart:async';
-
 final _logger = Logger();
 
 class PreviewScreenViewModel extends ChangeNotifier {
   bool _isLoading = false;
   bool _isSaving = false;
   String? _statusMessage;
-
-  // ✅ SOLUCIÓN 1: Variable para prevenir múltiples ejecuciones
   bool _isProcessing = false;
-  String? _currentProcessId; // Para identificar el proceso actual
+  String? _currentProcessId;
 
   final EquipoRepository _equipoRepository = EquipoRepository();
   final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
   final EquipoPendienteRepository _equipoPendienteRepository = EquipoPendienteRepository();
+
+  // ✅ AGREGAR: Servicio de autenticación
+  final AuthService _authService = AuthService();
+
+  // ✅ AGREGAR: Cache del usuario actual
+  Usuario? _usuarioActual;
 
   static const String _baseUrl = 'https://ada-api.loca.lt/adaControl/';
   static const String _estadosEndpoint = 'censoActivo/insertCensoActivo';
@@ -30,9 +35,39 @@ class PreviewScreenViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
   String? get statusMessage => _statusMessage;
-
-  // ✅ SOLUCIÓN 2: Getter para saber si se puede ejecutar una acción
   bool get canConfirm => !_isProcessing && !_isSaving;
+
+  // ✅ AGREGAR: Métodos para obtener información del usuario
+  Future<int> get _getUsuarioId async {
+    if (_usuarioActual != null && _usuarioActual!.id != null) {
+      return _usuarioActual!.id!;
+    }
+
+    _usuarioActual = await _authService.getCurrentUser();
+
+    if (_usuarioActual?.id != null) {
+      _logger.i('✅ Usuario actual: ${_usuarioActual!.username} (ID: ${_usuarioActual!.id})');
+      return _usuarioActual!.id!;
+    }
+
+    _logger.w('⚠️ No se pudo obtener usuario, usando ID 1 como fallback');
+    return 1;
+  }
+
+  Future<String?> get _getEdfVendedorId async {
+    if (_usuarioActual != null) {
+      return _usuarioActual!.edfVendedorId;
+    }
+
+    _usuarioActual = await _authService.getCurrentUser();
+    return _usuarioActual?.edfVendedorId;
+  }
+
+  Future<int> get _getSucursalId async {
+    // TODO: Implementar cuando tengas la lógica de sucursales
+    // Por ahora devuelve 1 como fallback
+    return 1;
+  }
 
   void _setLoading(bool loading) {
     _isLoading = loading;
@@ -91,9 +126,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ✅ SOLUCIÓN 3: Método principal con protección contra múltiples ejecuciones
   Future<Map<String, dynamic>> confirmarRegistro(Map<String, dynamic> datos) async {
-    // Prevenir múltiples ejecuciones simultáneas
     if (_isProcessing) {
       _logger.w('⚠️ Proceso ya en ejecución, ignorando nueva solicitud');
       return {
@@ -102,7 +135,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       };
     }
 
-    // Generar ID único para este proceso
     final processId = DateTime.now().millisecondsSinceEpoch.toString();
     _currentProcessId = processId;
     _isProcessing = true;
@@ -110,7 +142,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     try {
       return await _ejecutarConfirmacion(datos, processId);
     } finally {
-      // Solo limpiar si este es el proceso actual
       if (_currentProcessId == processId) {
         _isProcessing = false;
         _currentProcessId = null;
@@ -118,7 +149,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ✅ SOLUCIÓN 4: Método interno que ejecuta la lógica principal
   Future<Map<String, dynamic>> _ejecutarConfirmacion(
       Map<String, dynamic> datos,
       String processId
@@ -130,7 +160,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     try {
       _logger.i('📝 CONFIRMANDO REGISTRO - GUARDADO DEFINITIVO EN BD [Process: $processId]');
 
-      // Verificar si el proceso sigue siendo válido
       if (_currentProcessId != processId) {
         _logger.w('⚠️ Proceso cancelado: ID no coincide');
         return {'success': false, 'error': 'Proceso cancelado'};
@@ -145,9 +174,12 @@ class PreviewScreenViewModel extends ChangeNotifier {
       if (cliente.id == null) throw 'El cliente no tiene ID asignado';
       if (equipoCompleto['id'] == null) throw 'El equipo no tiene ID asignado';
 
+      // ✅ OBTENER USUARIO REAL
+      final usuarioId = await _getUsuarioId;
+      _logger.i('👤 Usuario ID obtenido: $usuarioId');
+
       _setStatusMessage('🔍 Verificando estado del equipo...');
 
-      // Verificar nuevamente si el proceso sigue activo
       if (_currentProcessId != processId) {
         return {'success': false, 'error': 'Proceso cancelado'};
       }
@@ -158,11 +190,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final yaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(equipoId, clienteId);
       _logger.i('🔍 Equipo $equipoId ya asignado: $yaAsignado');
 
-      // PASO 2: CREAR REGISTRO PENDIENTE SOLO SI NO ESTÁ ASIGNADO
       if (esCenso && !yaAsignado) {
         _setStatusMessage('💾 Registrando censo pendiente...');
 
-        // Verificar proceso antes de operación crítica
         if (_currentProcessId != processId) {
           return {'success': false, 'error': 'Proceso cancelado'};
         }
@@ -181,10 +211,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
         _logger.i('ℹ️ Equipo ya asignado - no se crea registro pendiente');
       }
 
-      // ✅ CAMBIO 1: CREAR ESTADO CON AMBAS IMÁGENES
       _setStatusMessage('📋 Registrando estado como CREADO...');
 
-      // Verificar proceso antes de crear estado
       if (_currentProcessId != processId) {
         return {'success': false, 'error': 'Proceso cancelado'};
       }
@@ -198,12 +226,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
           fechaRevision: DateTime.now(),
           enLocal: true,
           observaciones: datos['observaciones']?.toString(),
-          // Primera imagen
           imagenPath: datos['imagen_path'],
           imagenBase64: datos['imagen_base64'],
           tieneImagen: datos['tiene_imagen'] ?? false,
           imagenTamano: datos['imagen_tamano'],
-          // Segunda imagen
           imagenPath2: datos['imagen_path2'],
           imagenBase64_2: datos['imagen_base64_2'],
           tieneImagen2: datos['tiene_imagen2'] ?? false,
@@ -222,12 +248,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
         throw 'Error creando estado en base de datos: $dbError';
       }
 
-      // Verificar proceso antes de continuar
       if (_currentProcessId != processId) {
         return {'success': false, 'error': 'Proceso cancelado'};
       }
 
-      // ✅ CAMBIO 2: INCLUIR SEGUNDA IMAGEN EN DATOS COMPLETOS
       _setStatusMessage('📤 Preparando datos para migración...');
       Map<String, dynamic> datosCompletos;
 
@@ -241,26 +265,21 @@ class PreviewScreenViewModel extends ChangeNotifier {
           'fecha_creacion_local': now.toIso8601String(),
           'equipo_id': equipoCompleto['id'],
           'cliente_id': cliente.id,
-          'usuario_id': 1,
+          'usuario_id': usuarioId,
           'funcionando': true,
           'estado_general': 'Equipo registrado desde APP móvil - ${datos['observaciones'] ?? 'Censo registrado'}',
           'temperatura_actual': null,
           'temperatura_freezer': null,
           'latitud': datos['latitud'],
           'longitud': datos['longitud'],
-
-          // Primera imagen
           'imagen_path': datos['imagen_path'],
           'imagen_base64': datos['imagen_base64'],
           'tiene_imagen': datos['tiene_imagen'] ?? false,
           'imagen_tamano': datos['imagen_tamano'],
-
-          // Segunda imagen
           'imagen_path2': datos['imagen_path2'],
           'imagen_base64_2': datos['imagen_base64_2'],
           'tiene_imagen2': datos['tiene_imagen2'] ?? false,
           'imagen_tamano2': datos['imagen_tamano2'],
-
           'codigo_barras': equipoCompleto['cod_barras'] ?? datos['codigo_barras'],
           'numero_serie': equipoCompleto['numero_serie'] ?? datos['numero_serie'],
           'modelo': equipoCompleto['modelo_nombre'] ?? datos['modelo'],
@@ -281,10 +300,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
         _logger.i('✅ Datos preparados directamente desde equipoCompleto');
       } else {
         _logger.i('📋 Usando datos originales (no hay estadoId)');
-        datosCompletos = _prepararDatosParaEnvio(datos);
+        datosCompletos = await _prepararDatosParaEnvio(datos); //
       }
 
-      // Verificar proceso antes de guardar
       if (_currentProcessId != processId) {
         return {'success': false, 'error': 'Proceso cancelado'};
       }
@@ -297,7 +315,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       bool migracionExitosa = false;
 
       if (estadoIdActual != null) {
-        // Verificar proceso antes de enviar al servidor
         if (_currentProcessId != processId) {
           return {'success': false, 'error': 'Proceso cancelado'};
         }
@@ -338,7 +355,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ✅ SOLUCIÓN 5: Método para cancelar el proceso actual (útil para navegación)
   void cancelarProcesoActual() {
     if (_isProcessing) {
       _logger.i('🛑 Cancelando proceso actual: $_currentProcessId');
@@ -349,7 +365,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ✅ SOLUCIÓN 6: Método para limpiar estado cuando se destruye el widget
   @override
   void dispose() {
     cancelarProcesoActual();
@@ -359,7 +374,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   Future<Map<String, dynamic>> _intentarEnviarAlServidorConTimeout(Map<String, dynamic> datos, {int timeoutSegundos = 8}) async {
     try {
       _logger.i('🚀 ENVÍO DIRECTO AL SERVIDOR');
-      final datosApi = _prepararDatosParaApiEstados(datos);
+      final datosApi = await _prepararDatosParaApiEstados(datos); // ✅ AHORA ES ASYNC
       final response = await _enviarAApiEstadosConTimeout(datosApi, timeoutSegundos);
 
       if (response['exito'] == true) {
@@ -418,21 +433,29 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       _logger.i('📋 Encontrados ${registrosPendientes.length} registros pendientes');
 
+      // ✅ OBTENER USUARIO REAL PARA SINCRONIZACIÓN
+      final usuarioId = await _getUsuarioId;
+
       int exitosos = 0;
       int fallidos = 0;
 
       for (final registro in registrosPendientes) {
         try {
           final datosParaApi = {
-            'equipo_id': registro.equipoId,
-            'cliente_id': registro.clienteId,
-            'usuario_id': 1,
-            'funcionando': true,
-            'latitud': registro.latitud,
-            'longitud': registro.longitud,
-            'estado_general': 'Sincronización automática desde APP móvil',
             'fecha_revision': registro.fechaRevision.toIso8601String(),
-            'en_local': registro.enLocal,
+            'equipo_id': (registro.equipoId ?? '').toString(),
+            'latitud': registro.latitud ?? 0.0,
+            'longitud': registro.longitud ?? 0.0,
+            'equipo_codigo_barras': '',
+            'equipo_numero_serie': '',
+            'equipo_modelo': '',
+            'equipo_marca': '',
+            'equipo_logo': '',
+            'cliente_nombre': '',
+            'usuario_id': usuarioId, // ✅ USUARIO REAL
+            'funcionando': true,
+            'cliente_id': registro.clienteId ?? 0,
+            'observaciones': registro.observaciones ?? 'Sincronización automática',
           };
 
           final respuesta = await _enviarAApiEstadosConTimeout(datosParaApi, 5);
@@ -473,11 +496,14 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ✅ CAMBIO 3: ACTUALIZAR PREPARACIÓN DE DATOS PARA INCLUIR SEGUNDA IMAGEN
-  Map<String, dynamic> _prepararDatosParaEnvio(Map<String, dynamic> datos) {
+  // ✅ AHORA ES ASYNC
+  Future<Map<String, dynamic>> _prepararDatosParaEnvio(Map<String, dynamic> datos) async {
     final cliente = datos['cliente'] as Cliente;
     final equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
     final idLocal = DateTime.now().millisecondsSinceEpoch;
+
+    // ✅ OBTENER USUARIO REAL
+    final usuarioId = await _getUsuarioId;
 
     return {
       'id_local': idLocal,
@@ -485,29 +511,24 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'fecha_creacion_local': DateTime.now().toIso8601String(),
       'equipo_id': equipoCompleto?['id'],
       'cliente_id': cliente.id,
-      'usuario_id': 1,
+      'usuario_id': usuarioId, // ✅ USUARIO REAL
       'funcionando': true,
       'estado_general': 'Equipo registrado desde APP móvil - ${datos['observaciones'] ?? 'Sin observaciones'}',
-      'observaciones': datos['observaciones'], // AGREGAR ESTA LÍNEA
+      'observaciones': datos['observaciones'],
       'latitud': datos['latitud'],
       'longitud': datos['longitud'],
       'codigo_barras': datos['codigo_barras'],
       'modelo': datos['modelo'],
       'logo': datos['logo'],
       'numero_serie': datos['numero_serie'],
-
-      // Primera imagen
       'imagen_path': datos['imagen_path'],
       'imagen_base64': datos['imagen_base64'],
       'tiene_imagen': datos['tiene_imagen'] ?? false,
       'imagen_tamano': datos['imagen_tamano'],
-
-      // Segunda imagen
       'imagen_path2': datos['imagen_path2'],
       'imagen_base64_2': datos['imagen_base64_2'],
       'tiene_imagen2': datos['tiene_imagen2'] ?? false,
       'imagen_tamano2': datos['imagen_tamano2'],
-
       'version_app': '1.0.0',
       'dispositivo': Platform.operatingSystem,
     };
@@ -522,40 +543,53 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ✅ CAMBIO 4: ACTUALIZAR API PARA INCLUIR SEGUNDA IMAGEN
-  Map<String, dynamic> _prepararDatosParaApiEstados(Map<String, dynamic> datosLocales) {
+  // ✅ AHORA ES ASYNC
+  Future<Map<String, dynamic>> _prepararDatosParaApiEstados(Map<String, dynamic> datosLocales) async {
+    // ✅ OBTENER DATOS REALES DEL USUARIO
+    final usuarioId = await _getUsuarioId;
+    final edfVendedorId = await _getEdfVendedorId;
+    final sucursalId = await _getSucursalId;
+
     return {
-      'equipo_id': datosLocales['equipo_id'],
-      'cliente_id': datosLocales['cliente_id'],
-      'usuario_id': datosLocales['usuario_id'],
-      'funcionando': datosLocales['funcionando'],
-      'latitud': datosLocales['latitud'],
-      'longitud': datosLocales['longitud'],
-      'estado_general': datosLocales['estado_general'],
-      'observaciones': datosLocales['observaciones'], // AGREGAR ESTA LÍNEA
-      'equipo_codigo_barras': datosLocales['codigo_barras'],
-      'equipo_numero_serie': datosLocales['numero_serie'],
-      'equipo_modelo': datosLocales['modelo'],
-      'equipo_logo': datosLocales['logo'],
-      'equipo_marca': datosLocales['marca_nombre'],
-      'cliente_nombre': datosLocales['cliente_nombre'],
-      'es_censo': datosLocales['es_censo'],
-      'version_app': datosLocales['version_app'],
-      'dispositivo': datosLocales['dispositivo'],
-      'fecha_revision': datosLocales['fecha_revision'],
-      'en_local': datosLocales['en_local'],
+      'id': datosLocales['id_local']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
 
-      // Primera imagen
-      'imagen_path': datosLocales['imagen_path'],
-      'imagen_base64': datosLocales['imagen_base64'],
-      'tiene_imagen': datosLocales['tiene_imagen'],
+      'edfVendedorSucursalId': '${edfVendedorId}',
+
+      'edfEquipoId': (datosLocales['equipo_id'] ?? '').toString(),
+      'usuarioId': usuarioId,
+      'edfClienteId': datosLocales['cliente_id'] ?? 0,
+      'fecha_revision': datosLocales['fecha_revision'] ?? DateTime.now().toIso8601String(),
+      'latitud': datosLocales['latitud'] ?? 0.0,
+      'longitud': datosLocales['longitud'] ?? 0.0,
+      'enLocal': datosLocales['en_local'] ?? true,
+      'fechaDeRevision': datosLocales['fecha_revision'] ?? DateTime.now().toIso8601String(),
+      'equipo_codigo_barras': datosLocales['codigo_barras'] ?? '',
+      'equipo_numero_serie': datosLocales['numero_serie'] ?? '',
+      'equipo_modelo': datosLocales['modelo'] ?? '',
+      'equipo_marca': datosLocales['marca_nombre'] ?? '',
+      'equipo_logo': datosLocales['logo'] ?? '',
+      'equipo_id': (datosLocales['equipo_id'] ?? '').toString(),
+      'cliente_nombre': datosLocales['cliente_nombre'] ?? '',
+      'observaciones': datosLocales['observaciones'] ?? '',
+      'cliente_id': datosLocales['cliente_id'] ?? 0,
+      'usuario_id': usuarioId,
+      'imagenPath': datosLocales['imagen_path'],
+      'imageBase64_1': datosLocales['imagen_base64'],
+      'imageBase64_2': datosLocales['imagen_base64_2'],
+      'imageSize': datosLocales['imagen_tamano']?.toString(),
+      'en_local': datosLocales['en_local'] ?? true,
+      'dispositivo': datosLocales['dispositivo'] ?? 'android',
+      'es_censo': datosLocales['es_censo'] ?? true,
+      'version_app': datosLocales['version_app'] ?? '1.0.0',
+      'estado_general': datosLocales['estado_general'] ?? '',
       'imagen_tamano': datosLocales['imagen_tamano'],
-
-      // Segunda imagen
-      'imagen_path2': datosLocales['imagen_path2'],
+      'imagen_base64': datosLocales['imagen_base64'],
       'imagen_base64_2': datosLocales['imagen_base64_2'],
-      'tiene_imagen2': datosLocales['tiene_imagen2'],
       'imagen_tamano2': datosLocales['imagen_tamano2'],
+      'tiene_imagen': datosLocales['tiene_imagen'] ?? false,
+      'tiene_imagen2': datosLocales['tiene_imagen2'] ?? false,
+      'imagen_path': datosLocales['imagen_path'],
+      'imagen_path2': datosLocales['imagen_path2'],
     };
   }
 
