@@ -213,9 +213,10 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
   String formatearFecha(DateTime fecha) {
     return '${fecha.day.toString().padLeft(2, '0')}/'
         '${fecha.month.toString().padLeft(2, '0')}/'
-        '${fecha.year}';
+        '${fecha.year} '
+        '${fecha.hour.toString().padLeft(2, '0')}:'
+        '${fecha.minute.toString().padLeft(2, '0')}';
   }
-
   String getEquipoTitle(Map<String, dynamic> equipoData) {
     final marca = equipoData['marca_nombre'] ?? 'Sin marca';
     final modelo = equipoData['modelo_nombre'] ?? 'Sin modelo';
@@ -271,8 +272,6 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
         return '#FF9800'; // Naranja
       case 'disponible':
         return '#2196F3'; // Azul
-      case 'mantenimiento':
-        return '#F44336'; // Rojo
       default:
         return '#9E9E9E'; // Gris
     }
@@ -287,8 +286,6 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
         return 'schedule';
       case 'disponible':
         return 'radio_button_unchecked';
-      case 'mantenimiento':
-        return 'build';
       default:
         return 'help';
     }
