@@ -1,6 +1,7 @@
 import '../models/censo_activo.dart';
 import 'base_repository.dart';
 import 'package:logger/logger.dart';
+import 'dart:convert';
 
 class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   final Logger _logger = Logger();
@@ -131,65 +132,107 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   /// Guardar censos desde el servidor en la base de datos local
-  /// Guardar censos desde el servidor en la base de datos local
-  /// Guardar censos desde el servidor en la base de datos local
   Future<int> guardarCensosDesdeServidor(List<Map<String, dynamic>> censosServidor) async {
     int guardados = 0;
 
     try {
       for (final censo in censosServidor) {
         try {
-          // 🔍 LOG PARA DEBUG - Ver qué trae la API
           _logger.i('📦 Procesando censo: ${censo['id']}');
-          _logger.i('   - tiene_imagen (API): ${censo['tiene_imagen'] ?? censo['tieneImagen']}');
-          _logger.i('   - imagen_base64 length: ${(censo['imagen_base64'] ?? censo['imagenBase64'])?.toString().length ?? 0}');
+
+          // Extraer identificadores
+          final equipoId = censo['equipoId']?.toString() ?? censo['edfEquipoId']?.toString() ?? '';
+          final clienteId = censo['clienteId'] ?? censo['edfClienteId'] ?? 0;
+          final fechaRevision = censo['fechaRevision'] ?? censo['fechaDeRevision'];
+
+          // Verificar si ya existe
+          final existente = await dbHelper.consultar(
+            tableName,
+            where: 'equipo_id = ? AND cliente_id = ? AND fecha_revision = ?',
+            whereArgs: [equipoId, clienteId, fechaRevision],
+            limit: 1,
+          );
+
+          if (existente.isNotEmpty) {
+            _logger.i('⏭️ Censo ya existe - Omitiendo');
+            continue;
+          }
+
+          // ✅ EXTRAER OBSERVACIONES DEL datosJson
+          String? observacionesExtraidas = _extraerObservacionesDeJson(censo);
+
+          _logger.i('📝 Observaciones extraídas: $observacionesExtraidas');
 
           // Mapear campos del servidor a estructura local
           final datosLocal = {
-            'equipo_id': censo['equipoId']?.toString() ?? censo['edfEquipoId']?.toString() ?? '',
-            'cliente_id': censo['clienteId'] ?? censo['edfClienteId'] ?? 0,
+            'equipo_id': equipoId,
+            'cliente_id': clienteId,
             'en_local': (censo['enLocal'] == true || censo['enLocal'] == 1) ? 1 : 0,
             'latitud': censo['latitud'],
             'longitud': censo['longitud'],
-            'fecha_revision': censo['fechaRevision'] ?? censo['fechaDeRevision'] ?? DateTime.now().toIso8601String(),
+            'fecha_revision': fechaRevision ?? DateTime.now().toIso8601String(),
             'fecha_creacion': DateTime.now().toIso8601String(),
             'fecha_actualizacion': DateTime.now().toIso8601String(),
-            'sincronizado': 1, // Viene del servidor, ya está sincronizado
-            'estado_censo': 'migrado', // Censos del servidor están migrados
-            'observaciones': censo['observaciones'],
+            'sincronizado': 1,
+            'estado_censo': 'migrado',
+            'observaciones': observacionesExtraidas, // ✅ USAR OBSERVACIONES EXTRAÍDAS
 
-            // 🖼️ PRIMERA IMAGEN - Múltiples formatos posibles desde la API
-            'imagen_path': censo['imagenPath'] ?? censo['imagen_path'] ?? censo['imagePath'],
-            'imagen_base64': censo['imageBase64_1'] ?? censo['imagenBase64'] ?? censo['imagen_base64'],
+            // Imágenes
+            'imagen_path': censo['imagenPath'] ?? censo['imagen_path'],
+            'imagen_base64': censo['imageBase64_1'] ?? censo['imagenBase64'],
             'tiene_imagen': _parsearBoolean(censo['tieneImagen'] ?? censo['tiene_imagen']),
             'imagen_tamano': censo['imagenTamano'] ?? censo['imagen_tamano'],
 
-            // 🖼️ SEGUNDA IMAGEN
-            'imagen_path2': censo['imagenPath2'] ?? censo['imagen_path2'] ?? censo['imagePath2'],
-            'imagen_base64_2': censo['imageBase64_2'] ?? censo['imagenBase64_2'] ?? censo['imagen_base64_2'],
+            'imagen_path2': censo['imagenPath2'] ?? censo['imagen_path2'],
+            'imagen_base64_2': censo['imageBase64_2'] ?? censo['imagenBase64_2'],
             'tiene_imagen2': _parsearBoolean(censo['tieneImagen2'] ?? censo['tiene_imagen2']),
             'imagen_tamano2': censo['imagenTamano2'] ?? censo['imagen_tamano2'],
           };
 
-          // 🔍 LOG DESPUÉS DEL MAPEO
-          _logger.i('   - tiene_imagen (mapeado): ${datosLocal['tiene_imagen']}');
-          _logger.i('   - imagen_base64 (mapeado): ${datosLocal['imagen_base64'] != null ? 'SÍ' : 'NO'}');
-
           await dbHelper.insertar(tableName, datosLocal);
           guardados++;
+          _logger.i('✅ Censo insertado con observaciones');
 
         } catch (e) {
           _logger.w('Error guardando censo individual: $e');
-          // Continuar con el siguiente
         }
       }
 
-      _logger.i('✅ Censos guardados en local: $guardados de ${censosServidor.length}');
+      _logger.i('✅ Censos guardados: $guardados de ${censosServidor.length}');
       return guardados;
 
     } catch (e) {
-      _logger.e('❌ Error guardando censos desde servidor: $e');
+      _logger.e('❌ Error guardando censos: $e');
       return guardados;
+    }
+  }
+
+// ✅ NUEVO MÉTODO HELPER
+  String? _extraerObservacionesDeJson(Map<String, dynamic> censo) {
+    try {
+      // Intentar campo directo primero
+      if (censo['observaciones'] != null && censo['observaciones'].toString().isNotEmpty) {
+        return censo['observaciones'].toString();
+      }
+
+      // Extraer de datosJson
+      final datosJson = censo['datosJson'] ?? censo['datos_json'];
+      if (datosJson != null && datosJson is String && datosJson.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(datosJson);
+          final obs = decoded['observaciones'];
+          if (obs != null && obs.toString().isNotEmpty) {
+            return obs.toString();
+          }
+        } catch (e) {
+          _logger.w('Error parseando datosJson: $e');
+        }
+      }
+
+      return null;
+    } catch (e) {
+      _logger.w('Error extrayendo observaciones: $e');
+      return null;
     }
   }
 

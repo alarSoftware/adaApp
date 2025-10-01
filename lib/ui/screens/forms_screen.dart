@@ -51,7 +51,7 @@ class _FormsScreenState extends State<FormsScreen> {
       } else if (event is NavigateToPreviewEvent) {
         _navigateToPreview(event.datos);
       } else if (event is NavigateBackEvent) {
-        Navigator.of(context).pop(event.result); // Simplificado - un solo pop
+        Navigator.of(context).pop(event.result);
       }
     });
   }
@@ -147,7 +147,6 @@ class _FormsScreenState extends State<FormsScreen> {
                     ),
                   ),
 
-                  // Información adicional según el contexto
                   if (_shouldShowAdditionalInfo(title)) ...[
                     const SizedBox(height: 12),
                     Container(
@@ -232,7 +231,6 @@ class _FormsScreenState extends State<FormsScreen> {
     );
   }
 
-// Métodos auxiliares para personalización
   IconData _getIconForTitle(String title) {
     switch (title.toLowerCase()) {
       case 'equipo no encontrado':
@@ -305,7 +303,7 @@ class _FormsScreenState extends State<FormsScreen> {
       case 'crear':
       case 'agregar':
       case 'registrar nuevo':
-      case 'registrar nuevo equipo': // Agregar esta línea
+      case 'registrar nuevo equipo':
         return Icons.add_circle_outline;
       case 'reintentar':
         return Icons.refresh;
@@ -335,12 +333,62 @@ class _FormsScreenState extends State<FormsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: _buildAppBar(),
-      body: SafeArea(
-        child: _buildBody(),
-      ),
-      bottomNavigationBar: _buildBottomButtons(),
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            // Contenido principal
+            Scaffold(
+              appBar: _buildAppBar(),
+              body: SafeArea(
+                child: _buildBody(),
+              ),
+              bottomNavigationBar: _buildBottomButtons(),
+            ),
+
+            // Overlay de bloqueo cuando está procesando
+            if (_viewModel.isLoading)
+              Container(
+                color: Colors.black.withOpacity(0.5),
+                child: Center(
+                  child: Card(
+                    elevation: 8,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Procesando...',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Por favor espere',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 
@@ -653,7 +701,6 @@ class _FormsScreenState extends State<FormsScreen> {
             SizedBox(
               width: double.infinity,
               child: DropdownButtonFormField<int>(
-                // CORREGIR LA VALIDACIÓN DEL VALUE
                 value: _viewModel.logos.isNotEmpty &&
                     _viewModel.logoSeleccionado != null &&
                     _viewModel.logos.any((logo) => logo['id'] == _viewModel.logoSeleccionado)
@@ -679,7 +726,6 @@ class _FormsScreenState extends State<FormsScreen> {
                   _viewModel.logoHint,
                   overflow: TextOverflow.ellipsis,
                 ),
-                // MEJORAR LA CONSTRUCCIÓN DE ITEMS
                 items: _viewModel.logos.map((logo) {
                   final logoId = logo['id'] is int ? logo['id'] : int.tryParse(logo['id'].toString());
                   return DropdownMenuItem<int>(
@@ -687,7 +733,7 @@ class _FormsScreenState extends State<FormsScreen> {
                     child: SizedBox(
                       width: double.infinity,
                       child: Text(
-                        '${logo['nombre']} (ID: $logoId)', // TEMPORAL - mostrar ID para debug
+                        '${logo['nombre']} (ID: $logoId)',
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
                       ),
@@ -696,13 +742,13 @@ class _FormsScreenState extends State<FormsScreen> {
                 }).toList(),
                 onChanged: _viewModel.areFieldsEnabled
                     ? (value) {
-                  print('Dropdown onChanged: $value'); // DEBUG TEMPORAL
+                  print('Dropdown onChanged: $value');
                   _viewModel.setLogoSeleccionado(value);
                 }
                     : null,
                 validator: (value) {
                   final result = _viewModel.validarLogo(value);
-                  print('Dropdown validation: $value -> $result'); // DEBUG TEMPORAL
+                  print('Dropdown validation: $value -> $result');
                   return result;
                 },
               ),
@@ -712,6 +758,7 @@ class _FormsScreenState extends State<FormsScreen> {
       },
     );
   }
+
   Widget _buildImagenField() {
     return ListenableBuilder(
       listenable: _viewModel,
@@ -729,7 +776,6 @@ class _FormsScreenState extends State<FormsScreen> {
             ),
             const SizedBox(height: 8),
 
-            // Foto 1
             _buildSingleImageField(
               imagen: _viewModel.imagenSeleccionada,
               titulo: 'Foto',
@@ -739,7 +785,6 @@ class _FormsScreenState extends State<FormsScreen> {
 
             const SizedBox(height: 16),
 
-            // Foto 2
             _buildSingleImageField(
               imagen: _viewModel.imagenSeleccionada2,
               titulo: 'Foto',
@@ -751,6 +796,7 @@ class _FormsScreenState extends State<FormsScreen> {
       },
     );
   }
+
   Widget _buildSingleImageField({
     required File? imagen,
     required String titulo,
@@ -770,7 +816,6 @@ class _FormsScreenState extends State<FormsScreen> {
         ),
         const SizedBox(height: 8),
 
-        // Vista previa de la imagen
         if (imagen != null) ...[
           Container(
             height: 180,
@@ -790,7 +835,6 @@ class _FormsScreenState extends State<FormsScreen> {
           const SizedBox(height: 8),
         ],
 
-        // Botón de cámara
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
@@ -821,6 +865,7 @@ class _FormsScreenState extends State<FormsScreen> {
       ],
     );
   }
+
   Widget _buildObservacionesField() {
     return ListenableBuilder(
       listenable: _viewModel,
@@ -830,14 +875,12 @@ class _FormsScreenState extends State<FormsScreen> {
           label: _viewModel.observacionesLabel,
           hint: _viewModel.observacionesHint,
           icon: Icons.comment_outlined,
-          maxLines: 3, // Permitir múltiples líneas
-          enabled: _viewModel.observacionesEnabled, // Siempre habilitado
-          // No usar backgroundColor para que se vea diferente a los campos deshabilitados
+          maxLines: 3,
+          enabled: _viewModel.observacionesEnabled,
         );
       },
     );
   }
-
 
   Widget _buildBottomButtons() {
     return SafeArea(
@@ -852,7 +895,7 @@ class _FormsScreenState extends State<FormsScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-            color: AppColors.shadowLight,
+              color: AppColors.shadowLight,
               spreadRadius: 1,
               blurRadius: 5,
               offset: const Offset(0, -2),

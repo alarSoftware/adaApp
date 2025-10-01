@@ -6,8 +6,10 @@ import 'package:ada_app/viewmodels/preview_screen_viewmodel.dart';
 import 'package:ada_app/ui/widgets/preview/preview_dialogs.dart';
 import 'package:ada_app/ui/widgets/preview/preview_image_section.dart';
 import 'package:ada_app/ui/widgets/preview/preview_bottom_bar.dart';
+import 'package:ada_app/ui/widgets/preview/preview_cards.dart';
 import 'dart:io';
 import 'dart:convert';
+
 
 class PreviewScreen extends StatefulWidget {
   final Map<String, dynamic> datos;
@@ -25,6 +27,7 @@ class PreviewScreen extends StatefulWidget {
 
 class _PreviewScreenState extends State<PreviewScreen> {
   late PreviewScreenViewModel viewModel;
+  bool _yaConfirmado = false; // Bandera para bloquear después del primer tap
 
   String? _imagePath;
   String? _imageBase64;
@@ -141,6 +144,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
   }
 
   Future<void> _confirmarRegistro() async {
+    // Verificar si ya se confirmó antes
+    if (_yaConfirmado) {
+      return; // Ignorar silenciosamente
+    }
+
     if (!viewModel.canConfirm) {
       _mostrarSnackBar('Ya hay un proceso en curso. Por favor espere.', AppColors.warning);
       return;
@@ -148,6 +156,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
     final bool? confirmado = await PreviewDialogs.mostrarConfirmacion(context);
     if (confirmado != true) return;
+
+    // Marcar como confirmado inmediatamente después de aceptar el diálogo
+    setState(() {
+      _yaConfirmado = true;
+    });
 
     if (!viewModel.canConfirm) {
       _mostrarSnackBar('Ya hay un proceso en curso. Por favor espere.', AppColors.warning);
@@ -192,16 +205,20 @@ class _PreviewScreenState extends State<PreviewScreen> {
         await Future.delayed(const Duration(seconds: 2));
         Navigator.of(context).pop(true);
       } else {
+        // Si hay error, desbloquear para permitir reintentar
+        setState(() {
+          _yaConfirmado = false;
+        });
+
         await PreviewDialogs.mostrarErrorConReintentar(
           context,
           resultado['error'],
-          _confirmarRegistro, // Reintentar automáticamente
+          _confirmarRegistro,
         );
       }
     }
   }
 
-  // Agregar después del método _confirmarRegistro
   Future<void> _reintentarEnvioHistorial(int? estadoId) async {
     if (estadoId == null) {
       _mostrarSnackBar('Error: ID de estado no disponible', AppColors.error);
@@ -213,7 +230,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
     if (mounted) {
       if (resultado['success']) {
         _mostrarSnackBar(resultado['message'], AppColors.success);
-        // Recargar la vista para actualizar el estado
         setState(() {});
       } else {
         await PreviewDialogs.mostrarErrorConReintentar(
@@ -240,16 +256,16 @@ class _PreviewScreenState extends State<PreviewScreen> {
                 PreviewDialogs.mostrarProcesoEnCurso(context);
               }
             },
-            child: Scaffold(
-              backgroundColor: AppColors.background,
-              appBar: _buildAppBar(vm),
-              body: Stack(
-                children: [
-                  _buildBody(cliente),
-                  if (vm.isSaving) _buildSavingOverlay(vm),
-                ],
-              ),
-              bottomNavigationBar: _buildBottomBar(vm),
+            child: Stack(
+              children: [
+                Scaffold(
+                  backgroundColor: AppColors.background,
+                  appBar: _buildAppBar(vm),
+                  body: _buildBody(cliente),
+                  bottomNavigationBar: _buildBottomBar(vm),
+                ),
+                if (vm.isSaving) _buildSavingOverlay(vm),
+              ],
             ),
           );
         },
@@ -288,14 +304,15 @@ class _PreviewScreenState extends State<PreviewScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (esHistorial) ...[
-            _buildSyncStatusIndicator(estadoId),
-          ],
-          _buildClienteCard(cliente),
+          if (esHistorial) _buildSyncStatusIndicator(estadoId),
+          PreviewClienteCard(cliente: cliente),
           const SizedBox(height: 16),
-          _buildEquipoCard(),
+          PreviewEquipoCard(datos: widget.datos),
           const SizedBox(height: 16),
-          _buildUbicacionCard(),
+          PreviewUbicacionCard(
+            datos: widget.datos,
+            formatearFecha: viewModel.formatearFecha,
+          ),
           const SizedBox(height: 16),
           PreviewImageSection(
             imagePath: _imagePath,
@@ -325,7 +342,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
     if (_imagePath != null || _imageBase64 != null) cantidadImagenes++;
     if (_imagePath2 != null || _imageBase64_2 != null) cantidadImagenes++;
 
-    // Si es historial, verificar estado de sincronización
     if (esHistorial) {
       final estadoId = widget.datos['id'] as int?;
 
@@ -347,7 +363,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
       );
     }
 
-    // Modo normal
     return PreviewBottomBar(
       esHistorial: esHistorial,
       isSaving: vm.isSaving,
@@ -407,207 +422,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
-  Widget _buildClienteCard(Cliente cliente) {
-    return Card(
-      elevation: 2,
-      color: AppColors.surface,
-      shadowColor: AppColors.shadowLight,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.border, width: 0.5),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.person, color: AppColors.secondary, size: 24),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Informacion del Cliente',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            Divider(height: 20, color: AppColors.border),
-            _buildInfoRow('Nombre', cliente.nombre, Icons.account_circle),
-            _buildInfoRow('Direccion', cliente.direccion, Icons.location_on),
-            _buildInfoRow('Telefono', cliente.telefono ?? 'No especificado', Icons.phone),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEquipoCard() {
-    return Card(
-      elevation: 2,
-      color: AppColors.surface,
-      shadowColor: AppColors.shadowLight,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.border, width: 0.5),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.devices, color: AppColors.primary, size: 24),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Datos del Visicooler',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            Divider(height: 20, color: AppColors.border),
-            _buildInfoRow(
-              'Codigo de Barras',
-              widget.datos['codigo_barras'] ?? 'No especificado',
-              Icons.qr_code,
-            ),
-            _buildInfoRow(
-              'Modelo del Equipo',
-              widget.datos['modelo'] ?? 'No especificado',
-              Icons.devices,
-            ),
-            _buildInfoRow(
-              'Logo',
-              widget.datos['logo'] ?? 'No especificado',
-              Icons.business,
-            ),
-            if (widget.datos['observaciones'] != null &&
-                widget.datos['observaciones'].toString().isNotEmpty)
-              _buildInfoRow(
-                'Observaciones',
-                widget.datos['observaciones'].toString(),
-                Icons.note_add,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUbicacionCard() {
-    final latitud = widget.datos['latitud'];
-    final longitud = widget.datos['longitud'];
-    final fechaRegistro = widget.datos['fecha_registro'];
-
-    return Card(
-      elevation: 2,
-      color: AppColors.surface,
-      shadowColor: AppColors.shadowLight,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.border, width: 0.5),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.location_on, color: AppColors.warning, size: 24),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Informacion de Registro',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            Divider(height: 20, color: AppColors.border),
-            _buildInfoRow(
-              'Latitud',
-              latitud != null ? latitud.toStringAsFixed(6) : 'No disponible',
-              Icons.explore,
-            ),
-            _buildInfoRow(
-              'Longitud',
-              longitud != null ? longitud.toStringAsFixed(6) : 'No disponible',
-              Icons.explore_off,
-            ),
-            _buildInfoRow(
-              'Fecha y Hora',
-              viewModel.formatearFecha(fechaRegistro?.toString()),
-              Icons.access_time,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String? value, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: AppColors.textTertiary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value ?? 'No especificado',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w400,
-                    color: AppColors.textPrimary,
-                  ),
-                  overflow: TextOverflow.visible,
-                  softWrap: true,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-
   Widget _buildSyncStatusIndicator(int? estadoId) {
-    // Si no es historial o no hay estadoId, no mostrar nada
     if (widget.datos['es_historial'] != true || estadoId == null) {
       return const SizedBox.shrink();
     }
@@ -624,35 +439,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
         final icono = info['icono'] as IconData;
         final color = info['color'] as Color;
 
-        return Container(
-          margin: const EdgeInsets.only(top: 16, bottom: 16),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color),
-          ),
-          child: Row(
-            children: [
-              Icon(icono, color: color, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  mensaje,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        return SyncStatusIndicator(
+          mensaje: mensaje,
+          icono: icono,
+          color: color,
         );
       },
     );
   }
-
 
   void _mostrarSnackBar(String mensaje, Color color) {
     if (!mounted) return;

@@ -96,7 +96,7 @@ abstract class BaseSyncService {
   static Future<ApiResponse> testConnection() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/getUsers'),
+        Uri.parse('$baseUrl/getPing'),
         headers: headers,
       ).timeout(const Duration(seconds: 10));
 
@@ -108,7 +108,7 @@ abstract class BaseSyncService {
             final responseData = jsonDecode(response.body);
             serverInfo = {
               'status': responseData['status'] ?? 'OK',
-              'endpoint': 'getUsers',
+              'endpoint': 'getPing',
               'hasData': responseData['data'] != null,
             };
           }

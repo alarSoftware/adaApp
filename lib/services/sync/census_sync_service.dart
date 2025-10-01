@@ -91,11 +91,20 @@ class CensusSyncService extends BaseSyncService {
             BaseSyncService.logger.e('❌ Error guardando en BD local: $e');
           }
 
-          BaseSyncService.logger.i('PRIMER CENSO DE LA API:');
-          final primer = censosData.first;
-          BaseSyncService.logger.i('- id: ${primer['id']}');
-          BaseSyncService.logger.i('- cliente_id: ${primer['cliente_id'] ?? primer['clienteId']}');
-          BaseSyncService.logger.i('- equipo_id: ${primer['equipo_id'] ?? primer['equipoId']}');
+          // Buscar un censo que tenga observaciones para verificar el campo
+          BaseSyncService.logger.i('🔍 Buscando censo con observaciones...');
+
+          for (var censo in censosData) {
+            final obs = censo['observaciones'];
+            if (obs != null && obs.toString().isNotEmpty) {
+              BaseSyncService.logger.i('✅ CENSO CON OBSERVACIONES ENCONTRADO:');
+              BaseSyncService.logger.i('   ID: ${censo['id']}');
+              BaseSyncService.logger.i('   observaciones: $obs');
+              BaseSyncService.logger.i('   Keys del censo: ${censo.keys.toList()}');
+              break; // Solo mostrar el primero que tenga observaciones
+            }
+          }
+
         } else {
           BaseSyncService.logger.w('⚠️ No se encontraron censos en la respuesta');
         }

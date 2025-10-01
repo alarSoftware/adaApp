@@ -238,8 +238,10 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   String getEquipoFechaCensado(Map<String, dynamic> equipoData) {
-    // Para equipos pendientes: usar fecha_censo
-    final fechaStr = equipoData['fecha_censo'] ?? equipoData['fecha_creacion'] ?? equipoData['fecha_actualizacion'];
+    final fechaStr = equipoData['fecha_revision'] ??
+        equipoData['censo_fecha_creacion'] ??
+        equipoData['censo_fecha_actualizacion'];
+
     if (fechaStr != null) {
       try {
         final fecha = DateTime.parse(fechaStr);

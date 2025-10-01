@@ -88,7 +88,7 @@ class SelectScreenViewModel extends ChangeNotifier {
 
   // ========== ESTADO INTERNO ==========
   bool _isSyncing = false;
-  bool _isTestingConnection = false; // NUEVO: Estado separado para prueba de conexión
+  bool _isTestingConnection = false;
   ConnectionStatus _connectionStatus = ConnectionStatus(
     hasInternet: false,
     hasApiConnection: false,

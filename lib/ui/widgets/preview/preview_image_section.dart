@@ -86,7 +86,7 @@ class PreviewImageSection extends StatelessWidget {
                 const Icon(Icons.check_circle, color: Colors.green, size: 16),
                 const SizedBox(width: 4),
                 Text(
-                  imagePath != null ? 'Archivo' : 'Base64',
+                  imagePath != null ? 'Archivo' : 'Historial',
                   style: const TextStyle(
                     color: Colors.green,
                     fontSize: 12,

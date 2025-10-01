@@ -10,10 +10,10 @@ import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/services/auth_service.dart';
 import 'dart:async';
+
 final _logger = Logger();
 
 class PreviewScreenViewModel extends ChangeNotifier {
-  final bool _isLoading = false;
   bool _isSaving = false;
   String? _statusMessage;
   bool _isProcessing = false;
@@ -22,22 +22,23 @@ class PreviewScreenViewModel extends ChangeNotifier {
   final EquipoRepository _equipoRepository = EquipoRepository();
   final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
   final EquipoPendienteRepository _equipoPendienteRepository = EquipoPendienteRepository();
-
-  // ✅ AGREGAR: Servicio de autenticación
   final AuthService _authService = AuthService();
 
-  // ✅ AGREGAR: Cache del usuario actual
   Usuario? _usuarioActual;
 
   static const String _baseUrl = 'https://ada-api.loca.lt/adaControl/';
   static const String _estadosEndpoint = 'censoActivo/insertCensoActivo';
 
-  bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
   String? get statusMessage => _statusMessage;
   bool get canConfirm => !_isProcessing && !_isSaving;
 
-  // ✅ AGREGAR: Métodos para obtener información del usuario
+  // HELPER para formatear fechas en zona horaria local (sin UTC)
+  String _formatearFechaLocal(DateTime fecha) {
+    final local = fecha.toLocal();
+    return local.toIso8601String().replaceAll('Z', '');
+  }
+
   Future<int> get _getUsuarioId async {
     if (_usuarioActual != null && _usuarioActual!.id != null) {
       return _usuarioActual!.id!;
@@ -46,11 +47,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
     _usuarioActual = await _authService.getCurrentUser();
 
     if (_usuarioActual?.id != null) {
-      _logger.i('✅ Usuario actual: ${_usuarioActual!.username} (ID: ${_usuarioActual!.id})');
+      _logger.i('Usuario actual: ${_usuarioActual!.username} (ID: ${_usuarioActual!.id})');
       return _usuarioActual!.id!;
     }
 
-    _logger.w('⚠️ No se pudo obtener usuario, usando ID 1 como fallback');
+    _logger.w('No se pudo obtener usuario, usando ID 1 como fallback');
     return 1;
   }
 
@@ -61,12 +62,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
     _usuarioActual = await _authService.getCurrentUser();
     return _usuarioActual?.edfVendedorId;
-  }
-
-  Future<int> get _getSucursalId async {
-    // TODO: Implementar cuando tengas la lógica de sucursales
-    // Por ahora devuelve 1 como fallback
-    return 1;
   }
 
   void _setSaving(bool saving) {
@@ -82,7 +77,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   String formatearFecha(String? fechaIso) {
     if (fechaIso == null) return 'No disponible';
     try {
-      final fecha = DateTime.parse(fechaIso);
+      final fecha = DateTime.parse(fechaIso).toLocal();
       final dia = fecha.day.toString().padLeft(2, '0');
       final mes = fecha.month.toString().padLeft(2, '0');
       final ano = fecha.year;
@@ -123,7 +118,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Future<Map<String, dynamic>> confirmarRegistro(Map<String, dynamic> datos) async {
     if (_isProcessing) {
-      _logger.w('⚠️ Proceso ya en ejecución, ignorando nueva solicitud');
+      _logger.w('Proceso ya en ejecución, ignorando nueva solicitud');
       return {
         'success': false,
         'error': 'Ya hay un proceso de confirmación en curso. Por favor espere.'
@@ -153,10 +148,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
     int? estadoIdActual;
 
     try {
-      _logger.i('📝 CONFIRMANDO REGISTRO - GUARDADO DEFINITIVO EN BD [Process: $processId]');
+      _logger.i('CONFIRMANDO REGISTRO - GUARDADO DEFINITIVO EN BD [Process: $processId]');
 
       if (_currentProcessId != processId) {
-        _logger.w('⚠️ Proceso cancelado: ID no coincide');
+        _logger.w('Proceso cancelado: ID no coincide');
         return {'success': false, 'error': 'Proceso cancelado'};
       }
 
@@ -169,11 +164,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
       if (cliente.id == null) throw 'El cliente no tiene ID asignado';
       if (equipoCompleto['id'] == null) throw 'El equipo no tiene ID asignado';
 
-      // ✅ OBTENER USUARIO REAL
       final usuarioId = await _getUsuarioId;
-      _logger.i('👤 Usuario ID obtenido: $usuarioId');
+      _logger.i('Usuario ID obtenido: $usuarioId');
 
-      _setStatusMessage('🔍 Verificando estado del equipo...');
+      _setStatusMessage('Verificando estado del equipo...');
 
       if (_currentProcessId != processId) {
         return {'success': false, 'error': 'Proceso cancelado'};
@@ -183,42 +177,44 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final clienteId = _convertirAInt(cliente.id, 'cliente_id');
 
       final yaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(equipoId, clienteId);
-      _logger.i('🔍 Equipo $equipoId ya asignado: $yaAsignado');
+      _logger.i('Equipo $equipoId ya asignado: $yaAsignado');
 
       if (esCenso && !yaAsignado) {
-        _setStatusMessage('💾 Registrando censo pendiente...');
+        _setStatusMessage('Registrando censo pendiente...');
 
         if (_currentProcessId != processId) {
           return {'success': false, 'error': 'Proceso cancelado'};
         }
 
         try {
-          _logger.i('📝 PASO 2: Crear registro pendiente (equipo NO asignado)');
+          _logger.i('Crear registro pendiente (equipo NO asignado)');
           await _equipoPendienteRepository.procesarEscaneoCenso(
               equipoId: equipoId,
               clienteId: clienteId
           );
-          _logger.i('✅ Registro pendiente creado exitosamente');
+          _logger.i('Registro pendiente creado exitosamente');
         } catch (e) {
-          _logger.w('⚠️ Error registrando censo pendiente: $e');
+          _logger.w('Error registrando censo pendiente: $e');
         }
       } else if (yaAsignado) {
-        _logger.i('ℹ️ Equipo ya asignado - no se crea registro pendiente');
+        _logger.i('Equipo ya asignado - no se crea registro pendiente');
       }
 
-      _setStatusMessage('📋 Registrando estado como CREADO...');
+      _setStatusMessage('Registrando estado como CREADO...');
 
       if (_currentProcessId != processId) {
         return {'success': false, 'error': 'Proceso cancelado'};
       }
 
       try {
+        final now = DateTime.now().toLocal();
+
         final estadoCreado = await _estadoEquipoRepository.crearNuevoEstado(
           equipoId: equipoId,
           clienteId: clienteId,
           latitud: datos['latitud'],
           longitud: datos['longitud'],
-          fechaRevision: DateTime.now(),
+          fechaRevision: now,
           enLocal: true,
           observaciones: datos['observaciones']?.toString(),
           imagenPath: datos['imagen_path'],
@@ -233,13 +229,13 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
         if (estadoCreado.id != null) {
           estadoIdActual = estadoCreado.id!;
-          _logger.i('✅ Estado CREADO registrado con ID: $estadoIdActual');
+          _logger.i('Estado CREADO registrado con ID: $estadoIdActual');
         } else {
-          _logger.w('⚠️ Estado creado pero sin ID asignado');
+          _logger.w('Estado creado pero sin ID asignado');
           estadoIdActual = null;
         }
       } catch (dbError) {
-        _logger.e('❌ Error de base de datos al crear estado: $dbError');
+        _logger.e('Error de base de datos al crear estado: $dbError');
         throw 'Error creando estado en base de datos: $dbError';
       }
 
@@ -247,17 +243,17 @@ class PreviewScreenViewModel extends ChangeNotifier {
         return {'success': false, 'error': 'Proceso cancelado'};
       }
 
-      _setStatusMessage('📤 Preparando datos para migración...');
+      _setStatusMessage('Preparando datos para migración...');
       Map<String, dynamic> datosCompletos;
 
       if (estadoIdActual != null) {
-        _logger.i('📋 Preparando datos con estadoId: $estadoIdActual');
-        final now = DateTime.now();
+        _logger.i('Preparando datos con estadoId: $estadoIdActual');
+        final now = DateTime.now().toLocal();
 
         datosCompletos = {
           'id_local': estadoIdActual,
           'estado_sincronizacion': 'pendiente',
-          'fecha_creacion_local': now.toIso8601String(),
+          'fecha_creacion_local': _formatearFechaLocal(now),
           'equipo_id': equipoCompleto['id'],
           'cliente_id': cliente.id,
           'usuario_id': usuarioId,
@@ -288,24 +284,24 @@ class PreviewScreenViewModel extends ChangeNotifier {
           'ya_asignado': yaAsignado,
           'version_app': '1.0.0',
           'dispositivo': Platform.operatingSystem,
-          'fecha_revision': now.toIso8601String(),
+          'fecha_revision': _formatearFechaLocal(now),
           'en_local': true,
         };
 
-        _logger.i('✅ Datos preparados directamente desde equipoCompleto');
+        _logger.i('Datos preparados directamente desde equipoCompleto');
       } else {
-        _logger.i('📋 Usando datos originales (no hay estadoId)');
-        datosCompletos = await _prepararDatosParaEnvio(datos); //
+        _logger.i('Usando datos originales (no hay estadoId)');
+        datosCompletos = await _prepararDatosParaEnvio(datos);
       }
 
       if (_currentProcessId != processId) {
         return {'success': false, 'error': 'Proceso cancelado'};
       }
 
-      _setStatusMessage('💾 Guardando registro local maestro...');
+      _setStatusMessage('Guardando registro local maestro...');
       await _guardarRegistroLocal(datosCompletos);
 
-      _setStatusMessage('🔄 Sincronizando registro actual...');
+      _setStatusMessage('Sincronizando registro actual...');
       String mensajeFinal;
       bool migracionExitosa = false;
 
@@ -315,20 +311,20 @@ class PreviewScreenViewModel extends ChangeNotifier {
         }
 
         final respuestaServidor = await _intentarEnviarAlServidorConTimeout(datosCompletos, timeoutSegundos: 8);
-        _logger.i('🔍 Respuesta del servidor: $respuestaServidor');
+        _logger.i('Respuesta del servidor: $respuestaServidor');
 
         if (respuestaServidor['exito'] == true) {
-          _logger.i('✅ Marcando estado como migrado con ID: $estadoIdActual');
+          _logger.i('Marcando estado como migrado con ID: $estadoIdActual');
           await _estadoEquipoRepository.marcarComoMigrado(estadoIdActual, servidorId: respuestaServidor['servidor_id']);
           final idLocal = _safeCastToInt(datosCompletos['id_local'], 'id_local');
           if (idLocal != null) await _marcarComoSincronizado(idLocal);
           mensajeFinal = 'Censo completado y sincronizado al servidor';
           migracionExitosa = true;
-          _setStatusMessage('✅ Registro sincronizado exitosamente');
+          _setStatusMessage('Registro sincronizado exitosamente');
         } else {
-          _logger.w('⚠️ Migración no exitosa: ${respuestaServidor['motivo']}');
+          _logger.w('Migración no exitosa: ${respuestaServidor['motivo']}');
           mensajeFinal = 'Censo guardado localmente. Se sincronizará automáticamente';
-          _setStatusMessage('📱 Censo guardado. Sincronización automática pendiente');
+          _setStatusMessage('Censo guardado. Sincronización automática pendiente');
         }
       } else {
         mensajeFinal = 'Censo guardado localmente';
@@ -343,7 +339,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       };
 
     } catch (e) {
-      _logger.e('❌ Error crítico en confirmación de registro: $e');
+      _logger.e('Error crítico en confirmación de registro: $e');
       return {'success': false, 'error': 'Error guardando registro: $e'};
     } finally {
       _setSaving(false);
@@ -352,7 +348,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   void cancelarProcesoActual() {
     if (_isProcessing) {
-      _logger.i('🛑 Cancelando proceso actual: $_currentProcessId');
+      _logger.i('Cancelando proceso actual: $_currentProcessId');
       _currentProcessId = null;
       _isProcessing = false;
       _setSaving(false);
@@ -368,8 +364,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Future<Map<String, dynamic>> _intentarEnviarAlServidorConTimeout(Map<String, dynamic> datos, {int timeoutSegundos = 8}) async {
     try {
-      _logger.i('🚀 ENVÍO DIRECTO AL SERVIDOR');
-      final datosApi = await _prepararDatosParaApiEstados(datos); // ✅ AHORA ES ASYNC
+      _logger.i('ENVÍO DIRECTO AL SERVIDOR');
+      final datosApi = await _prepararDatosParaApiEstados(datos);
       final response = await _enviarAApiEstadosConTimeout(datosApi, timeoutSegundos);
 
       if (response['exito'] == true) {
@@ -417,18 +413,17 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Future<void> _sincronizarRegistrosPendientesEnBackground() async {
     try {
-      _logger.i('🔄 Iniciando sincronización automática de registros pendientes...');
+      _logger.i('Iniciando sincronización automática de registros pendientes...');
 
       final registrosPendientes = await _estadoEquipoRepository.obtenerCreados();
 
       if (registrosPendientes.isEmpty) {
-        _logger.i('✅ No hay registros pendientes de sincronización');
+        _logger.i('No hay registros pendientes de sincronización');
         return;
       }
 
-      _logger.i('📋 Encontrados ${registrosPendientes.length} registros pendientes');
+      _logger.i('Encontrados ${registrosPendientes.length} registros pendientes');
 
-      // ✅ OBTENER USUARIO REAL PARA SINCRONIZACIÓN
       final usuarioId = await _getUsuarioId;
 
       int exitosos = 0;
@@ -437,7 +432,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       for (final registro in registrosPendientes) {
         try {
           final datosParaApi = {
-            'fecha_revision': registro.fechaRevision.toIso8601String(),
+            'fecha_revision': _formatearFechaLocal(registro.fechaRevision),
             'equipo_id': (registro.equipoId ?? '').toString(),
             'latitud': registro.latitud ?? 0.0,
             'longitud': registro.longitud ?? 0.0,
@@ -447,7 +442,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
             'equipo_marca': '',
             'equipo_logo': '',
             'cliente_nombre': '',
-            'usuario_id': usuarioId, // ✅ USUARIO REAL
+            'usuario_id': usuarioId,
             'funcionando': true,
             'cliente_id': registro.clienteId,
             'observaciones': registro.observaciones ?? 'Sincronización automática',
@@ -461,19 +456,19 @@ class PreviewScreenViewModel extends ChangeNotifier {
                 servidorId: respuesta['id']
             );
             exitosos++;
-            _logger.i('✅ Registro ${registro.id} sincronizado exitosamente');
+            _logger.i('Registro ${registro.id} sincronizado exitosamente');
           } else {
             await _estadoEquipoRepository.marcarComoError(
                 registro.id!,
                 'Error del servidor: ${respuesta['mensaje']}'
             );
             fallidos++;
-            _logger.w('⚠️ Error sincronizando registro ${registro.id}: ${respuesta['mensaje']}');
+            _logger.w('Error sincronizando registro ${registro.id}: ${respuesta['mensaje']}');
           }
 
         } catch (e) {
           fallidos++;
-          _logger.e('❌ Error procesando registro ${registro.id}: $e');
+          _logger.e('Error procesando registro ${registro.id}: $e');
 
           if (registro.id != null) {
             await _estadoEquipoRepository.marcarComoError(
@@ -484,29 +479,27 @@ class PreviewScreenViewModel extends ChangeNotifier {
         }
       }
 
-      _logger.i('📊 Sincronización finalizada - Exitosos: $exitosos, Fallidos: $fallidos');
+      _logger.i('Sincronización finalizada - Exitosos: $exitosos, Fallidos: $fallidos');
 
     } catch (e) {
-      _logger.e('❌ Error en sincronización automática: $e');
+      _logger.e('Error en sincronización automática: $e');
     }
   }
 
-  // ✅ AHORA ES ASYNC
   Future<Map<String, dynamic>> _prepararDatosParaEnvio(Map<String, dynamic> datos) async {
     final cliente = datos['cliente'] as Cliente;
     final equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
     final idLocal = DateTime.now().millisecondsSinceEpoch;
-
-    // ✅ OBTENER USUARIO REAL
     final usuarioId = await _getUsuarioId;
+    final now = DateTime.now().toLocal();
 
     return {
       'id_local': idLocal,
       'estado_sincronizacion': 'pendiente',
-      'fecha_creacion_local': DateTime.now().toIso8601String(),
+      'fecha_creacion_local': _formatearFechaLocal(now),
       'equipo_id': equipoCompleto?['id'],
       'cliente_id': cliente.id,
-      'usuario_id': usuarioId, // ✅ USUARIO REAL
+      'usuario_id': usuarioId,
       'funcionando': true,
       'estado_general': 'Equipo registrado desde APP móvil - ${datos['observaciones'] ?? 'Sin observaciones'}',
       'observaciones': datos['observaciones'],
@@ -531,32 +524,29 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Future<void> _guardarRegistroLocal(Map<String, dynamic> datos) async {
     try {
-      _logger.i('💾 Guardando registro maestro localmente con ID: ${datos['id_local']}');
+      _logger.i('Guardando registro maestro localmente con ID: ${datos['id_local']}');
       await Future.delayed(const Duration(milliseconds: 500));
     } catch (e) {
       throw 'Error guardando datos localmente';
     }
   }
 
-  // ✅ AHORA ES ASYNC
   Future<Map<String, dynamic>> _prepararDatosParaApiEstados(Map<String, dynamic> datosLocales) async {
-    // ✅ OBTENER DATOS REALES DEL USUARIO
     final usuarioId = await _getUsuarioId;
     final edfVendedorId = await _getEdfVendedorId;
+    final now = DateTime.now().toLocal();
 
     return {
-      'id': datosLocales['id_local']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
-
+      'id': datosLocales['id_local']?.toString() ?? now.millisecondsSinceEpoch.toString(),
       'edfVendedorSucursalId': '$edfVendedorId',
-
       'edfEquipoId': (datosLocales['equipo_id'] ?? '').toString(),
       'usuarioId': usuarioId,
       'edfClienteId': datosLocales['cliente_id'] ?? 0,
-      'fecha_revision': datosLocales['fecha_revision'] ?? DateTime.now().toIso8601String(),
+      'fecha_revision': datosLocales['fecha_revision'] ?? _formatearFechaLocal(now),
       'latitud': datosLocales['latitud'] ?? 0.0,
       'longitud': datosLocales['longitud'] ?? 0.0,
       'enLocal': datosLocales['en_local'] ?? true,
-      'fechaDeRevision': datosLocales['fecha_revision'] ?? DateTime.now().toIso8601String(),
+      'fechaDeRevision': datosLocales['fecha_revision'] ?? _formatearFechaLocal(now),
       'estadoCenso': datosLocales['ya_asignado'] == true ? 'asignado' : 'pendiente',
       'equipo_codigo_barras': datosLocales['codigo_barras'] ?? '',
       'equipo_numero_serie': datosLocales['numero_serie'] ?? '',
@@ -608,16 +598,15 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final estaPendiente = (estadoCenso == 'creado' || estadoCenso == 'error') &&
           sincronizado == 0;
 
-      _logger.i('🔍 Estado $estadoId - Censo: $estadoCenso, Sincronizado: $sincronizado, Pendiente: $estaPendiente');
+      _logger.i('Estado $estadoId - Censo: $estadoCenso, Sincronizado: $sincronizado, Pendiente: $estaPendiente');
 
       return estaPendiente;
     } catch (e) {
-      _logger.e('❌ Error verificando sincronización: $e');
+      _logger.e('Error verificando sincronización: $e');
       return false;
     }
   }
 
-  /// Obtiene información detallada del estado de sincronización
   Future<Map<String, dynamic>> obtenerInfoSincronizacion(int? estadoId) async {
     if (estadoId == null) {
       return {
@@ -683,7 +672,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         'observaciones': estado['observaciones'],
       };
     } catch (e) {
-      _logger.e('❌ Error obteniendo info de sincronización: $e');
+      _logger.e('Error obteniendo info de sincronización: $e');
       return {
         'pendiente': false,
         'estado': 'error',
@@ -694,10 +683,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// Reintenta el envío de un registro del historial
   Future<Map<String, dynamic>> reintentarEnvio(int estadoId) async {
     try {
-      _logger.i('🔄 Reintentando envío del estado ID: $estadoId');
+      _logger.i('Reintentando envío del estado ID: $estadoId');
 
       final maps = await _estadoEquipoRepository.dbHelper.consultar(
         'censo_activo',
@@ -714,21 +702,21 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
 
       final estadoMap = maps.first;
-
       final usuarioId = await _getUsuarioId;
       final edfVendedorId = await _getEdfVendedorId;
+      final now = DateTime.now().toLocal();
 
       final datosParaApi = {
-        'id': estadoMap['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        'id': estadoMap['id']?.toString() ?? now.millisecondsSinceEpoch.toString(),
         'edfVendedorSucursalId': edfVendedorId ?? '',
         'edfEquipoId': estadoMap['equipo_id']?.toString() ?? '',
         'usuarioId': usuarioId,
         'edfClienteId': estadoMap['cliente_id'] ?? 0,
-        'fecha_revision': estadoMap['fecha_revision'] ?? DateTime.now().toIso8601String(),
+        'fecha_revision': estadoMap['fecha_revision'] ?? _formatearFechaLocal(now),
         'latitud': estadoMap['latitud'] ?? 0.0,
         'longitud': estadoMap['longitud'] ?? 0.0,
         'enLocal': true,
-        'fechaDeRevision': estadoMap['fecha_revision'] ?? DateTime.now().toIso8601String(),
+        'fechaDeRevision': estadoMap['fecha_revision'] ?? _formatearFechaLocal(now),
         'estadoCenso': 'pendiente',
         'observaciones': estadoMap['observaciones'] ?? '',
         'imageBase64_1': estadoMap['imagen_base64'],
@@ -753,7 +741,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
           servidorId: respuesta['id'],
         );
 
-        _logger.i('✅ Reenvío exitoso del estado $estadoId');
+        _logger.i('Reenvío exitoso del estado $estadoId');
 
         return {
           'success': true,
@@ -765,7 +753,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
             'Error del servidor: ${respuesta['mensaje']}'
         );
 
-        _logger.w('⚠️ Fallo en reenvío: ${respuesta['mensaje']}');
+        _logger.w('Fallo en reenvío: ${respuesta['mensaje']}');
 
         return {
           'success': false,
@@ -773,7 +761,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         };
       }
     } catch (e) {
-      _logger.e('❌ Error en reintento de envío: $e');
+      _logger.e('Error en reintento de envío: $e');
 
       try {
         await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción: $e');
@@ -786,10 +774,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-
   Future<void> _marcarComoSincronizado(int idLocal) async {
     try {
-      _logger.i('✅ Registro marcado como sincronizado: $idLocal');
+      _logger.i('Registro marcado como sincronizado: $idLocal');
     } catch (e) {}
   }
 }

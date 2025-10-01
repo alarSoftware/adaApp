@@ -33,6 +33,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
   String getEntityName() => 'EquipoPendiente';
 
   /// Obtener equipos PENDIENTES de un cliente
+// En EquipoPendienteRepository
   Future<List<Map<String, dynamic>>> obtenerEquiposPendientesPorCliente(int clienteId) async {
     try {
       final sql = '''
@@ -44,18 +45,27 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
         mo.nombre as modelo_nombre,
         l.nombre as logo_nombre,
         c.nombre as cliente_nombre,
-        'pendiente' as estado
+        ca.fecha_revision,
+        ca.fecha_creacion as censo_fecha_creacion,
+        ca.fecha_actualizacion as censo_fecha_actualizacion,
+        ca.estado_censo,
+        ca.sincronizado,
+        'pendiente' as estado,
+        'pendiente' as estado_tipo
       FROM equipos_pendientes ep
       INNER JOIN equipos e ON ep.equipo_id = e.id
       INNER JOIN marcas m ON e.marca_id = m.id
       INNER JOIN modelos mo ON e.modelo_id = mo.id
       INNER JOIN logo l ON e.logo_id = l.id
       INNER JOIN clientes c ON ep.cliente_id = c.id
+      LEFT JOIN censo_activo ca ON e.id = ca.equipo_id AND ca.cliente_id = ?
       WHERE ep.cliente_id = ?
+      -- NUEVO: Solo mostrar pendientes con estado_censo = 'pendiente' o sin sincronizar
+      AND (ca.estado_censo = 'pendiente' OR ca.sincronizado = 0 OR ca.sincronizado IS NULL)
       ORDER BY ep.fecha_creacion DESC
     ''';
 
-      final result = await dbHelper.consultarPersonalizada(sql, [clienteId]);
+      final result = await dbHelper.consultarPersonalizada(sql, [clienteId, clienteId]);
       _logger.i('Equipos PENDIENTES para cliente $clienteId: ${result.length}');
       return result;
     } catch (e) {

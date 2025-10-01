@@ -34,18 +34,49 @@ class EquipoRepository extends BaseRepository<Equipo> {
   // MÉTODOS CORREGIDOS PARA EQUIPOS ASIGNADOS
   // ================================
 
-  /// Obtener equipos ASIGNADOS de un cliente (solo tabla equipos)
+// En EquipoRepository
   Future<List<Map<String, dynamic>>> obtenerEquiposAsignados(int clienteId) async {
     try {
       final sql = '''
-      SELECT 
-        e.*,
+      SELECT DISTINCT
+        e.id,
+        e.cod_barras,
+        e.numero_serie,
+        e.marca_id,
+        e.modelo_id,
+        e.logo_id,
+        e.cliente_id,
         m.nombre as marca_nombre,
         mo.nombre as modelo_nombre,
         l.nombre as logo_nombre,
         c.nombre as cliente_nombre,
         'asignado' as estado,
-        'asignado' as estado_tipo
+        'asignado' as estado_tipo,
+        (SELECT ca2.fecha_revision 
+         FROM censo_activo ca2 
+         WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
+         ORDER BY ca2.fecha_creacion DESC 
+         LIMIT 1) as fecha_revision,
+        (SELECT ca2.fecha_creacion 
+         FROM censo_activo ca2 
+         WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
+         ORDER BY ca2.fecha_creacion DESC 
+         LIMIT 1) as censo_fecha_creacion,
+        (SELECT ca2.fecha_actualizacion 
+         FROM censo_activo ca2 
+         WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
+         ORDER BY ca2.fecha_creacion DESC 
+         LIMIT 1) as censo_fecha_actualizacion,
+        (SELECT ca2.estado_censo 
+         FROM censo_activo ca2 
+         WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
+         ORDER BY ca2.fecha_creacion DESC 
+         LIMIT 1) as estado_censo,
+        (SELECT ca2.sincronizado 
+         FROM censo_activo ca2 
+         WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
+         ORDER BY ca2.fecha_creacion DESC 
+         LIMIT 1) as sincronizado
       FROM equipos e
       INNER JOIN marcas m ON e.marca_id = m.id
       INNER JOIN modelos mo ON e.modelo_id = mo.id
@@ -55,8 +86,12 @@ class EquipoRepository extends BaseRepository<Equipo> {
       ORDER BY e.id DESC
     ''';
 
-      final result = await dbHelper.consultarPersonalizada(sql, [clienteId]);
-      _logger.i('Equipos ASIGNADOS del cliente $clienteId: ${result.length}');
+      final result = await dbHelper.consultarPersonalizada(
+          sql,
+          [clienteId, clienteId, clienteId, clienteId, clienteId, clienteId]
+      );
+
+      _logger.i('Equipos ASIGNADOS para cliente $clienteId: ${result.length}');
       return result;
     } catch (e) {
       _logger.e('Error obteniendo equipos asignados del cliente $clienteId: $e');

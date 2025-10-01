@@ -376,7 +376,18 @@ class FormsScreenViewModel extends ChangeNotifier {
   // LÓGICA DE NEGOCIO - IMÁGENES
   // ===============================
 
+  bool _isTakingPhoto = false;
+
   Future<void> tomarFoto({bool esPrimeraFoto = true}) async {
+    // Prevenir múltiples aperturas de cámara
+    if (_isTakingPhoto) {
+      _showWarning('Ya hay una captura en proceso');
+      return;
+    }
+
+    _isTakingPhoto = true;
+    notifyListeners();
+
     try {
       _logger.i('Iniciando captura de foto ${esPrimeraFoto ? "1" : "2"}...');
 
@@ -390,8 +401,12 @@ class FormsScreenViewModel extends ChangeNotifier {
     } catch (e) {
       _logger.e('Error tomando foto: $e');
       _showError('Error al tomar la foto: $e');
+    } finally {
+      _isTakingPhoto = false;
+      notifyListeners();
     }
   }
+
 
   Future<void> _procesarImagenSeleccionada(File imagen, {bool esPrimeraFoto = true}) async {
     try {
@@ -750,4 +765,6 @@ class FormsScreenViewModel extends ChangeNotifier {
   bool get areFieldsEnabled => !_isCensoMode;
 
   Color? get fieldBackgroundColor => _isCensoMode ? Colors.grey[50] : null;
+
+  bool get isTakingPhoto => _isTakingPhoto;
 }

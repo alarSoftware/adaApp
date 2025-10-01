@@ -414,14 +414,11 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
       listenable: _viewModel,
       builder: (context, child) {
         final estadoUbicacion = _viewModel.estadoUbicacionEquipo;
-        final hasChanges = _viewModel.hasUnsavedChanges;
 
-        Color statusColor = AppColors.neutral500;
-        if (estadoUbicacion == true) {
-          statusColor = AppColors.success;
-        } else if (estadoUbicacion == false) {
-          statusColor = AppColors.warning;
-        }
+        // CAMBIO: Color basado en si hay selección o no
+        Color statusColor = estadoUbicacion == null
+            ? AppColors.neutral400
+            : (estadoUbicacion ? AppColors.success : AppColors.warning);
 
         return Card(
           elevation: 3,
@@ -435,17 +432,16 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
             ),
           ),
           child: Container(
-            width: double.infinity, // Asegurar ancho completo
+            width: double.infinity,
             padding: EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Título con overflow protection
                 Row(
                   children: [
                     Icon(Icons.store, color: statusColor, size: 20),
                     SizedBox(width: 12),
-                    Expanded( // Prevenir overflow del título
+                    Expanded(
                       child: Text(
                         'Ubicación del Equipo',
                         style: TextStyle(
@@ -456,20 +452,21 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (hasChanges) ...[
+                    // CAMBIO: Mostrar badge solo si hay selección
+                    if (estadoUbicacion != null) ...[
                       SizedBox(width: 8),
                       Container(
                         padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: AppColors.warning.withValues(alpha: 0.1),
+                          color: AppColors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          'CAMBIOS PENDIENTES',
+                          'LISTO PARA GUARDAR',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.warning,
+                            color: AppColors.primary,
                           ),
                         ),
                       ),
@@ -479,14 +476,11 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
 
                 SizedBox(height: 16),
 
-                // Dropdown con constraints apropiados
                 ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: double.infinity,
-                  ),
+                  constraints: BoxConstraints(maxWidth: double.infinity),
                   child: DropdownButtonFormField<bool?>(
-                    initialValue: estadoUbicacion,
-                    isExpanded: true, // IMPORTANTE: Previene overflow
+                    value: estadoUbicacion,  // Será null inicialmente
+                    isExpanded: true,
                     decoration: InputDecoration(
                       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -494,14 +488,15 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                       fillColor: AppColors.surface,
                     ),
                     hint: Row(
-                      mainAxisSize: MainAxisSize.min, // Evitar expansion innecesaria
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.help_outline, size: 20, color: AppColors.textSecondary),
                         SizedBox(width: 8),
-                        Flexible( // Permitir que el texto se ajuste
+                        Flexible(
                           child: Text(
-                            'Seleccione la ubicación del equipo',
+                            '-- Seleccionar ubicación --',  // ← Placeholder personalizado
                             overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: AppColors.textSecondary),
                           ),
                         ),
                       ],
@@ -514,7 +509,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                           children: [
                             Icon(Icons.store, color: AppColors.success, size: 20),
                             SizedBox(width: 12),
-                            Flexible( // Prevenir overflow del texto
+                            Flexible(
                               child: Text(
                                 'En el local',
                                 overflow: TextOverflow.ellipsis,
@@ -530,7 +525,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                           children: [
                             Icon(Icons.location_off, color: AppColors.warning, size: 20),
                             SizedBox(width: 12),
-                            Flexible( // Prevenir overflow del texto
+                            Flexible(
                               child: Text(
                                 'Fuera del local',
                                 overflow: TextOverflow.ellipsis,
@@ -541,7 +536,6 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                       ),
                     ],
                     onChanged: (value) => _viewModel.cambiarUbicacionEquipo(value),
-                    validator: (value) => value == null ? 'Seleccione una opción' : null,
                   ),
                 ),
               ],
@@ -822,12 +816,9 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
     try {
       print('DEBUG: Iniciando _prepararDatosHistorialParaPreview con consulta a BD');
 
-      // Obtener cliente_id del equipo
       final clienteIdRaw = widget.equipoCliente['cliente_id'];
-
       print('DEBUG: clienteIdRaw = $clienteIdRaw (tipo: ${clienteIdRaw.runtimeType})');
 
-      // Convertir clienteId a int para la consulta
       int? clienteIdInt;
       try {
         if (clienteIdRaw == null) {
@@ -847,7 +838,6 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
 
       print('DEBUG: Consultando cliente con ID: $clienteIdInt');
 
-      // Consultar cliente desde la base de datos
       final clienteRepository = ClienteRepository();
       final cliente = await clienteRepository.obtenerPorId(clienteIdInt);
 
@@ -857,7 +847,6 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
 
       print('DEBUG: Cliente encontrado: ${cliente.toString()}');
 
-      // Preparar datos del equipo completo
       final equipoIdRaw = widget.equipoCliente['equipo_id'] ?? widget.equipoCliente['id'];
       String equipoIdStr = equipoIdRaw?.toString() ?? '';
 
@@ -874,7 +863,6 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
 
       print('DEBUG: equipoCompleto creado');
 
-      // Preparar datos del historial de forma segura
       dynamic latitudSafe, longitudSafe, fechaRevisionSafe, enLocalSafe;
       try {
         latitudSafe = historialItem?.latitud;
@@ -893,35 +881,31 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
 
       final datosFinales = {
         'id': historialItem?.id,
-        'cliente': cliente, // Cliente real desde la base de datos
+        'cliente': cliente,
         'equipo_completo': equipoCompleto,
         'latitud': latitudSafe,
         'longitud': longitudSafe,
         'fecha_registro': fechaRevisionSafe?.toString(),
         'timestamp_gps': fechaRevisionSafe?.toString(),
 
-        // Datos del equipo con conversión segura
         'codigo_barras': widget.equipoCliente['cod_barras']?.toString() ?? 'No especificado',
         'modelo': widget.equipoCliente['modelo_nombre']?.toString() ?? 'No especificado',
         'logo': widget.equipoCliente['logo_nombre']?.toString() ?? 'No especificado',
         'numero_serie': widget.equipoCliente['numero_serie']?.toString() ?? 'No especificado',
 
-        // Observaciones del historial
-        'observaciones': 'Revisión histórica - ${enLocalSafe ? "En local" : "Fuera del local"}',
+        // ✅ CORRECCIÓN: Usar las observaciones reales del historial
+        'observaciones': historialItem?.observaciones ?? 'Sin observaciones',
 
-        // Imágenes del historial (si existen)
         'imagen_path': historialItem?.imagenPath?.toString(),
         'imagen_base64': historialItem?.imagenBase64?.toString(),
         'tiene_imagen': historialItem?.tieneImagen ?? false,
         'imagen_tamano': historialItem?.imagenTamano,
 
-        // Segunda imagen (si existe)
         'imagen_path2': historialItem?.imagenPath2?.toString(),
         'imagen_base64_2': historialItem?.imagenBase64_2?.toString(),
         'tiene_imagen2': historialItem?.tieneImagen2 ?? false,
         'imagen_tamano2': historialItem?.imagenTamano2,
 
-        // Identificar que es desde historial
         'es_censo': false,
         'es_historial': true,
         'historial_item': historialItem,
@@ -931,12 +915,11 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
       return datosFinales;
 
     } catch (e, stackTrace) {
-      // Log detallado del error para debugging
       print('ERROR CRÍTICO en _prepararDatosHistorialParaPreview: $e');
       print('StackTrace: $stackTrace');
       print('historialItem: $historialItem');
       print('equipoCliente: ${widget.equipoCliente}');
-      rethrow; // Re-lanzar el error para que sea capturado por el SnackBar
+      rethrow;
     }
   }
 
