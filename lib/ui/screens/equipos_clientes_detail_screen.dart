@@ -503,22 +503,6 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                     ),
                     items: [
                       DropdownMenuItem<bool?>(
-                        value: true,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.store, color: AppColors.success, size: 20),
-                            SizedBox(width: 12),
-                            Flexible(
-                              child: Text(
-                                'En el local',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      DropdownMenuItem<bool?>(
                         value: false,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,

@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 
 abstract class BaseSyncService {
-  static const String baseUrl = 'https://ada-api.loca.lt/adaControl/api';
+  static const String baseUrl = 'http://200.85.60.250:28080/adaControl/api';
   static const Duration timeout = Duration(minutes: 5);
 
   static final Logger logger = Logger();

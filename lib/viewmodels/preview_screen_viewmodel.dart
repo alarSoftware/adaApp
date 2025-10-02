@@ -26,7 +26,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Usuario? _usuarioActual;
 
-  static const String _baseUrl = 'https://ada-api.loca.lt/adaControl/';
+  static const String _baseUrl = 'http://200.85.60.250:28080/adaControl/';
   static const String _estadosEndpoint = 'censoActivo/insertCensoActivo';
 
   bool get isSaving => _isSaving;
@@ -322,7 +322,12 @@ class PreviewScreenViewModel extends ChangeNotifier {
           migracionExitosa = true;
           _setStatusMessage('Registro sincronizado exitosamente');
         } else {
+          // ✅ AGREGAR ESTO: Marcar como error para permitir reintentos
           _logger.w('Migración no exitosa: ${respuestaServidor['motivo']}');
+          await _estadoEquipoRepository.marcarComoError(
+              estadoIdActual,
+              'Error inicial: ${respuestaServidor['detalle'] ?? respuestaServidor['motivo']}'
+          );
           mensajeFinal = 'Censo guardado localmente. Se sincronizará automáticamente';
           _setStatusMessage('Censo guardado. Sincronización automática pendiente');
         }
@@ -331,6 +336,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
 
       _programarSincronizacionBackground();
+
+      await Future.delayed(const Duration(milliseconds: 300));
 
       return {
         'success': true,

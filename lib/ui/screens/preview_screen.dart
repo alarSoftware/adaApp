@@ -7,6 +7,8 @@ import 'package:ada_app/ui/widgets/preview/preview_dialogs.dart';
 import 'package:ada_app/ui/widgets/preview/preview_image_section.dart';
 import 'package:ada_app/ui/widgets/preview/preview_bottom_bar.dart';
 import 'package:ada_app/ui/widgets/preview/preview_cards.dart';
+import 'package:ada_app/ui/screens/equipos_clientes_detail_screen.dart';
+import 'package:ada_app/repositories/equipo_repository.dart';
 import 'dart:io';
 import 'dart:convert';
 
@@ -197,14 +199,31 @@ class _PreviewScreenState extends State<PreviewScreen> {
       datosCompletos['imagen_tamano2'] = null;
     }
 
+    print('🔍 DEBUG: Iniciando confirmación de registro...');
     final resultado = await viewModel.confirmarRegistro(datosCompletos);
+    print('🔍 DEBUG: Resultado recibido: $resultado');
 
     if (mounted) {
+      print('🔍 DEBUG: Widget mounted = true');
+
       if (resultado['success']) {
+        print('✅ DEBUG: Resultado success = true');
+
         _mostrarSnackBar(resultado['message'], AppColors.success);
         await Future.delayed(const Duration(seconds: 2));
-        Navigator.of(context).pop(true);
+
+        print('✅ DEBUG: Delay completado, verificando mounted...');
+
+        if (mounted) {
+          print('✅ DEBUG: Aún mounted, navegando ahora...');
+          await _navegarAEquipoClienteDetail();
+          print('✅ DEBUG: Navegación completada');
+        } else {
+          print('❌ DEBUG: Widget ya no está mounted después del delay');
+        }
       } else {
+        print('❌ DEBUG: Resultado success = false, error: ${resultado['error']}');
+
         // Si hay error, desbloquear para permitir reintentar
         setState(() {
           _yaConfirmado = false;
@@ -216,6 +235,62 @@ class _PreviewScreenState extends State<PreviewScreen> {
           _confirmarRegistro,
         );
       }
+    } else {
+      print('❌ DEBUG: Widget NO mounted inmediatamente después del resultado');
+    }
+  }
+
+  Future<void> _navegarAEquipoClienteDetail() async {
+    try {
+      print('=== NAVEGANDO A EQUIPO DETAIL DESPUÉS DE CENSO ===');
+
+      final cliente = widget.datos['cliente'] as Cliente;
+      final equipoCompleto = widget.datos['equipo_completo'];
+
+      if (cliente.id == null || equipoCompleto == null) {
+        Navigator.of(context).pop(true);
+        return;
+      }
+
+      final equipoCliente = {
+        'id': equipoCompleto['id'],
+        'cod_barras': equipoCompleto['cod_barras'],
+        'numero_serie': equipoCompleto['numero_serie'],
+        'marca_id': equipoCompleto['marca_id'],
+        'modelo_id': equipoCompleto['modelo_id'],
+        'logo_id': equipoCompleto['logo_id'],
+        'cliente_id': cliente.id,
+        'marca_nombre': equipoCompleto['marca_nombre'],
+        'modelo_nombre': equipoCompleto['modelo_nombre'],
+        'logo_nombre': equipoCompleto['logo_nombre'],
+        'cliente_nombre': cliente.nombre,
+        'cliente_telefono': cliente.telefono,
+        'cliente_direccion': cliente.direccion,
+        'tipo_estado': widget.datos['ya_asignado'] == true ? 'asignado' : 'pendiente',
+      };
+
+      print('Navegando con datos del censo:');
+      print('  cliente_id: ${cliente.id}');
+      print('  tipo_estado: ${equipoCliente['tipo_estado']}');
+
+      // ✅ CAMBIO: Solo hacer pop 2 veces para cerrar PreviewScreen y FormsScreen
+      // Esto te deja en ClienteDetailScreen
+      Navigator.of(context).pop(); // Cierra PreviewScreen
+      Navigator.of(context).pop(); // Cierra FormsScreen
+
+      // Ahora navega a EquiposClientesDetailScreen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => EquiposClientesDetailScreen(
+            equipoCliente: equipoCliente,
+          ),
+        ),
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Error navegando: $e');
+      debugPrint('StackTrace: $stackTrace');
+      Navigator.of(context).pop(true);
     }
   }
 
@@ -345,10 +420,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
     if (esHistorial) {
       final estadoId = widget.datos['id'] as int?;
 
-      return FutureBuilder<bool>(
-        future: vm.verificarSincronizacionPendiente(estadoId),
+      return FutureBuilder<Map<String, dynamic>>(
+        future: vm.obtenerInfoSincronizacion(estadoId),
         builder: (context, snapshot) {
-          final envioFallido = snapshot.data ?? false;
+          final info = snapshot.data;
+          final envioFallido = info?['pendiente'] == true;
 
           return PreviewBottomBar(
             esHistorial: esHistorial,
@@ -356,8 +432,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
             statusMessage: vm.statusMessage,
             cantidadImagenes: cantidadImagenes,
             onVolver: () => Navigator.of(context).pop(),
-            onConfirmar: null,
-            onReintentarEnvio: envioFallido ? () => _reintentarEnvioHistorial(estadoId) : null,
+            onConfirmar: null, // No mostrar confirmar en historial
+            onReintentarEnvio: envioFallido && estadoId != null
+                ? () => _reintentarEnvioHistorial(estadoId)
+                : null,
           );
         },
       );
@@ -369,7 +447,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
       statusMessage: vm.statusMessage,
       cantidadImagenes: cantidadImagenes,
       onVolver: () => Navigator.of(context).pop(),
-      onConfirmar: _confirmarRegistro,
+      onConfirmar: _yaConfirmado ? null : _confirmarRegistro,
       onReintentarEnvio: null,
     );
   }

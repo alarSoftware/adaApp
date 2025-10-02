@@ -505,6 +505,49 @@ class EquipoRepository extends BaseRepository<Equipo> {
       orderBy: 'nombre ASC',
     );
   }
+  /// Obtener equipo con datos completos por ID incluyendo información del cliente
+  /// Obtener equipo con datos completos por ID incluyendo información del cliente
+  Future<Map<String, dynamic>?> obtenerEquipoClientePorId(dynamic equipoId) async {
+    try {
+      final sql = '''
+      SELECT 
+        e.id,
+        e.cod_barras,           -- ← IMPORTANTE: Debe estar aquí
+        e.numero_serie,
+        e.marca_id,
+        e.modelo_id,
+        e.logo_id,
+        e.cliente_id,
+        m.nombre as marca_nombre,
+        mo.nombre as modelo_nombre,
+        l.nombre as logo_nombre,
+        c.nombre as cliente_nombre,
+        c.telefono as cliente_telefono,
+        c.direccion as cliente_direccion,
+        'asignado' as tipo_estado
+      FROM equipos e
+      LEFT JOIN marcas m ON e.marca_id = m.id
+      LEFT JOIN modelos mo ON e.modelo_id = mo.id
+      LEFT JOIN logo l ON e.logo_id = l.id
+      LEFT JOIN clientes c ON e.cliente_id = c.id
+      WHERE e.id = ?
+      LIMIT 1
+    ''';
+
+      final result = await dbHelper.consultarPersonalizada(sql, [equipoId.toString()]);
+
+      if (result.isEmpty) {
+        _logger.w('No se encontró equipo con ID: $equipoId');
+        return null;
+      }
+
+      _logger.i('Equipo encontrado: ${result.first['cod_barras']}');
+      return result.first;
+    } catch (e, stackTrace) {
+      _logger.e('Error obteniendo equipo por ID $equipoId: $e', stackTrace: stackTrace);
+      return null;
+    }
+  }
 
   /// Obtener logos activos
   Future<List<Map<String, dynamic>>> obtenerLogos() async {

@@ -111,16 +111,17 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   // CARGAR ESTADO INICIAL Y HISTORIAL
   Future<void> _loadInitialState() async {
     try {
-      final equipoId = equipoCliente['cod_barras'];
+      // ✅ USAR CÓDIGO DE BARRAS para buscar historial
+      final codigoBarras = equipoCliente['cod_barras'];
       final clienteId = equipoCliente['cliente_id'];
 
       print('🔍 BUSCANDO HISTORIAL PARA:');
-      print('   equipoId: $equipoId (tipo: ${equipoId.runtimeType})');
+      print('   cod_barras: $codigoBarras (tipo: ${codigoBarras.runtimeType})');
       print('   clienteId: $clienteId (tipo: ${clienteId.runtimeType})');
       print('   tipo_estado: ${equipoCliente['tipo_estado']}');
 
-      if (equipoId == null || clienteId == null) {
-        _logger.w('No se encontró ID del equipo o cliente');
+      if (codigoBarras == null || clienteId == null) {
+        _logger.w('No se encontró código de barras o cliente');
         return;
       }
 
@@ -129,12 +130,12 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       List<EstadoEquipo> historialCompleto = [];
 
       _logger.i(
-          '📋 Cargando historial para equipo: $equipoId, cliente: $clienteId, tipo: $tipoEstado');
+          '📋 Cargando historial para equipo: $codigoBarras, cliente: $clienteId, tipo: $tipoEstado');
 
       try {
         historialCompleto =
         await _estadoEquipoRepository.obtenerHistorialDirectoPorEquipoCliente(
-            equipoId,
+            codigoBarras.toString(),  // ← Usar código de barras
             int.parse(clienteId.toString())
         );
 
@@ -145,7 +146,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         try {
           historialCompleto =
           await _estadoEquipoRepository.obtenerHistorialCompleto(
-              equipoId.toString(),
+              codigoBarras.toString(),  // ← Usar código de barras
               int.parse(clienteId.toString())
           );
           _logger.i('📈 Historial alternativo obtenido: ${historialCompleto.length} registros');
@@ -160,7 +161,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       if (estadoActual == null && tipoEstado == 'asignado') {
         try {
           estadoActual = await _estadoEquipoRepository.obtenerUltimoEstado(
-              equipoId,
+              codigoBarras.toString(),  // ← Usar código de barras
               int.parse(clienteId.toString())
           );
           _logger.i('📍 Estado individual obtenido para equipo asignado');
@@ -172,6 +173,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
           _logger.w('⚠️ No se pudo obtener estado individual: $e');
         }
       }
+
 
       if (estadoActual != null) {
         _estadoLocalActual = estadoActual.enLocal ? 1 : 0;
@@ -331,16 +333,16 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       }
 
       final clienteId = equipoCliente['cliente_id'];
-      final equipoId = equipoCliente['id']?.toString();
+      final codigoBarras = equipoCliente['cod_barras'];  // ← CAMBIO: usar cod_barras
 
-      if (clienteId == null || equipoId == null || equipoId.isEmpty) {
-        throw Exception('ID del equipo o cliente no disponible');
+      if (clienteId == null || codigoBarras == null || codigoBarras.isEmpty) {
+        throw Exception('Código de barras o cliente no disponible');
       }
 
-      _logger.i('Usando equipoId: $equipoId, clienteId: $clienteId');
+      _logger.i('Usando codigoBarras: $codigoBarras, clienteId: $clienteId');
 
       final nuevoEstado = await _estadoEquipoRepository.crearNuevoEstado(
-        equipoId: equipoId,
+        equipoId: codigoBarras.toString(),  // ← CAMBIO: pasar código de barras
         clienteId: int.parse(clienteId.toString()),
         enLocal: _estadoUbicacionEquipo!,
         fechaRevision: DateTime.now(),
