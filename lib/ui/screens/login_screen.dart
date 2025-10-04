@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ada_app/viewmodels/login_screen_viewmodel.dart';
 import 'package:ada_app/ui/theme/colors.dart';
-
+import 'package:ada_app/services/database_helper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -36,6 +36,108 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     } catch (e) {
       if (mounted) {
         _showErrorSnackBar('Error al sincronizar usuarios: $e');
+      }
+    }
+  }
+
+  Future<void> _showDeleteUsersConfirmation() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          backgroundColor: AppColors.cardBackground,
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 28),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  '¿Eliminar usuarios?',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Esta acción eliminará TODOS los usuarios de la base de datos local.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.errorContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: AppColors.error, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Deberás sincronizar usuarios nuevamente para poder iniciar sesión',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                'Cancelar',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      await _deleteUsersTable();
+    }
+  }
+
+  Future<void> _deleteUsersTable() async {
+    try {
+      final dbHelper = DatabaseHelper();
+      await dbHelper.eliminar('Users');
+
+      if (mounted) {
+        _showSuccessSnackBar(
+          'Tabla de usuarios eliminada correctamente',
+          Icons.delete_sweep,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('Error al eliminar usuarios: $e');
       }
     }
   }
@@ -150,10 +252,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           child: Center(
             child: SingleChildScrollView(
               padding: EdgeInsets.symmetric(
-                horizontal: MediaQuery
-                    .of(context)
-                    .size
-                    .width < 600 ? 24.0 : 32.0,
+                horizontal: MediaQuery.of(context).size.width < 600 ? 24.0 : 32.0,
                 vertical: 24.0,
               ),
               child: FadeTransition(
@@ -267,16 +366,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         labelText: 'Usuario',
         prefixIcon: Icon(
           Icons.person_outline_rounded,
-          color: AppColors.getValidationIconColor(
-              viewModel.usernameValid, hasContent),
+          color: AppColors.getValidationIconColor(viewModel.usernameValid, hasContent),
         ),
         suffixIcon: hasContent
             ? Icon(
-          viewModel.usernameValid
-              ? Icons.check_circle_outline
-              : Icons.error_outline,
-          color: AppColors.getValidationIconColor(
-              viewModel.usernameValid, hasContent),
+          viewModel.usernameValid ? Icons.check_circle_outline : Icons.error_outline,
+          color: AppColors.getValidationIconColor(viewModel.usernameValid, hasContent),
           size: 20,
         )
             : null,
@@ -287,8 +382,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(
-            color: AppColors.getValidationBorderColor(
-                viewModel.usernameValid, hasContent),
+            color: AppColors.getValidationBorderColor(viewModel.usernameValid, hasContent),
           ),
         ),
         focusedBorder: OutlineInputBorder(
@@ -301,15 +395,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         ),
         filled: true,
         fillColor: AppColors.inputBackground,
-        contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
-      style: TextStyle(
-        fontSize: 16,
-        color: AppColors.textPrimary,
-      ),
+      style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
       validator: viewModel.validateUsername,
       textInputAction: TextInputAction.next,
       keyboardType: TextInputType.emailAddress,
@@ -329,33 +417,25 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         hintText: 'Ingresa tu contraseña',
         prefixIcon: Icon(
           Icons.lock_outline_rounded,
-          color: AppColors.getValidationIconColor(
-              viewModel.passwordValid, hasContent),
+          color: AppColors.getValidationIconColor(viewModel.passwordValid, hasContent),
         ),
         suffixIcon: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (hasContent)
               Icon(
-                viewModel.passwordValid
-                    ? Icons.check_circle_outline
-                    : Icons.error_outline,
-                color: AppColors.getValidationIconColor(
-                    viewModel.passwordValid, hasContent),
+                viewModel.passwordValid ? Icons.check_circle_outline : Icons.error_outline,
+                color: AppColors.getValidationIconColor(viewModel.passwordValid, hasContent),
                 size: 20,
               ),
             const SizedBox(width: 8),
             IconButton(
               icon: Icon(
-                viewModel.obscurePassword
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
+                viewModel.obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                 color: AppColors.neutral500,
               ),
               onPressed: viewModel.togglePasswordVisibility,
-              tooltip: viewModel.obscurePassword
-                  ? 'Mostrar contraseña'
-                  : 'Ocultar contraseña',
+              tooltip: viewModel.obscurePassword ? 'Mostrar contraseña' : 'Ocultar contraseña',
             ),
           ],
         ),
@@ -366,8 +446,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(
-            color: AppColors.getValidationBorderColor(
-                viewModel.passwordValid, hasContent),
+            color: AppColors.getValidationBorderColor(viewModel.passwordValid, hasContent),
           ),
         ),
         focusedBorder: OutlineInputBorder(
@@ -380,15 +459,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         ),
         filled: true,
         fillColor: AppColors.inputBackground,
-        contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
-      style: TextStyle(
-        fontSize: 16,
-        color: AppColors.textPrimary,
-      ),
+      style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
       validator: viewModel.validatePassword,
       textInputAction: TextInputAction.done,
       onFieldSubmitted: (_) => _handleLogin(viewModel),
@@ -406,20 +479,13 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         decoration: BoxDecoration(
           color: AppColors.errorContainer,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: AppColors.borderError,
-            width: 1,
-          ),
+          border: Border.all(color: AppColors.borderError, width: 1),
         ),
         child: Semantics(
           liveRegion: true,
           child: Row(
             children: [
-              Icon(
-                Icons.error_outline_rounded,
-                color: AppColors.error,
-                size: 20,
-              ),
+              Icon(Icons.error_outline_rounded, color: AppColors.error, size: 20),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -439,7 +505,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     );
   }
 
-
   Widget _buildLoginButton(LoginScreenViewModel viewModel) {
     return SizedBox(
       height: 54,
@@ -452,9 +517,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             backgroundColor: AppColors.buttonPrimary,
             foregroundColor: AppColors.buttonTextPrimary,
             disabledBackgroundColor: AppColors.buttonDisabled,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             elevation: 2,
             shadowColor: AppColors.shadowLight,
           ),
@@ -464,17 +527,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             height: 20,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                  AppColors.buttonTextPrimary),
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.buttonTextPrimary),
             ),
           )
               : const Text(
             'Iniciar Sesión',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-            ),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5),
           ),
         ),
       ),
@@ -484,29 +542,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Widget _buildDivider() {
     return Row(
       children: [
-        Expanded(
-          child: Divider(
-            color: AppColors.divider,
-            height: 1,
-          ),
-        ),
+        Expanded(child: Divider(color: AppColors.divider, height: 1)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'o',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          child: Text('o', style: TextStyle(color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w500)),
         ),
-        Expanded(
-          child: Divider(
-            color: AppColors.divider,
-            height: 1,
-          ),
-        ),
+        Expanded(child: Divider(color: AppColors.divider, height: 1)),
       ],
     );
   }
@@ -517,52 +558,32 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       hint: 'Usar autenticación biométrica para iniciar sesión',
       child: OutlinedButton.icon(
         onPressed: () => _handleBiometricLogin(viewModel),
-        icon: Icon(
-          Icons.fingerprint,
-          color: AppColors.secondary,
-          size: 24,
-        ),
+        icon: Icon(Icons.fingerprint, color: AppColors.secondary, size: 24),
         label: Text(
           'Acceder con Biometría',
-          style: TextStyle(
-            color: AppColors.secondary,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: AppColors.secondary, fontSize: 16, fontWeight: FontWeight.w600),
         ),
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: AppColors.secondary, width: 1.5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           padding: const EdgeInsets.symmetric(vertical: 16),
         ),
       ),
     );
   }
 
-
   Widget _buildFooter() {
-    return Consumer<LoginScreenViewModel>(
-      builder: (context, viewModel, child) {
-        return Column(
-          children: [
-            // Botón de sincronización discreto
-            // Copyright existente
-            Text(
-              '© 2025 Alarsoftware. Todos los derechos reservados.',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 12,
-                fontWeight: FontWeight.w400,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        );
-      },
+    return Column(
+      children: [
+        Text(
+          '© 2025 Alarsoftware. Todos los derechos reservados.',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w400),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
+
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: Colors.transparent,
@@ -571,16 +592,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         Consumer<LoginScreenViewModel>(
           builder: (context, viewModel, child) {
             return PopupMenuButton<String>(
-              icon: Icon(
-                Icons.more_vert,
-                color: AppColors.textSecondary,
-                size: 24,
-              ),
+              icon: Icon(Icons.more_vert, color: AppColors.textSecondary, size: 24),
               tooltip: 'Más opciones',
               offset: const Offset(0, 40),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               color: AppColors.cardBackground,
               elevation: 8,
               shadowColor: AppColors.shadowLight,
@@ -590,6 +605,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                     if (!viewModel.isSyncingUsers) {
                       _syncUsers(viewModel);
                     }
+                    break;
+                  case 'delete_users':
+                    _showDeleteUsersConfirmation();
                     break;
                 }
               },
@@ -605,18 +623,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.textSecondary,
-                          ),
+                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.textSecondary),
                         ),
                       )
-                          : Icon(
-                        Icons.sync,
-                        color: viewModel.isSyncingUsers
-                            ? AppColors.textSecondary.withOpacity(0.5)
-                            : AppColors.textSecondary,
-                        size: 20,
-                      ),
+                          : Icon(Icons.sync, color: AppColors.textSecondary, size: 20),
                       const SizedBox(width: 12),
                       Text(
                         'Sincronizar usuarios',
@@ -624,6 +634,24 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                           color: viewModel.isSyncingUsers
                               ? AppColors.textSecondary.withOpacity(0.5)
                               : AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(),
+                PopupMenuItem<String>(
+                  value: 'delete_users',
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_remove, color: AppColors.error, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Eliminar usuarios',
+                        style: TextStyle(
+                          color: AppColors.error,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),

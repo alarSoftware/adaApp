@@ -5,6 +5,7 @@ import 'package:ada_app/services/sync/equipment_sync_service.dart';
 import 'package:ada_app/repositories/cliente_repository.dart';
 import 'package:ada_app/services/sync/census_sync_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ada_app/services/sync/equipos_pendientes_sync_service.dart';
 import '../database_helper.dart';
 import 'package:logger/logger.dart';
 
@@ -92,6 +93,23 @@ class SyncService {
         resultado.censosSincronizados = 0;
       }
 
+      BaseSyncService.logger.i('📋 Iniciando sincronización de equipos pendientes...');
+
+      try {
+        final resultadoPendientes = await EquiposPendientesSyncService.obtenerEquiposPendientes(
+          edfVendedorId: edfVendedorId,
+        );
+        resultado.equiposPendientesSincronizados = resultadoPendientes.itemsSincronizados;
+        resultado.equiposPendientesExito = resultadoPendientes.exito;
+        if (!resultadoPendientes.exito) resultado.erroresEquiposPendientes = resultadoPendientes.mensaje;
+        BaseSyncService.logger.i('✅ Equipos pendientes sincronizados: ${resultadoPendientes.itemsSincronizados} (Éxito: ${resultadoPendientes.exito})');
+      } catch (e) {
+        BaseSyncService.logger.e('❌ ERROR EN EQUIPOS PENDIENTES: $e');
+        resultado.equiposPendientesExito = false;
+        resultado.erroresEquiposPendientes = 'Error al sincronizar equipos pendientes: $e';
+        resultado.equiposPendientesSincronizados = 0;
+      }
+
       BaseSyncService.logger.i('🏁 EVALUANDO RESULTADO GENERAL...');
 
       // Evaluar resultado general
@@ -102,13 +120,14 @@ class SyncService {
 
       if (totalExitosos >= 3) {
         resultado.exito = true;
-        resultado.mensaje = 'Sincronización completa: ${resultado.clientesSincronizados} clientes, ${resultado.equiposSincronizados} equipos, ${resultado.censosSincronizados} censos y ${resultado.asignacionesSincronizadas} asignaciones';
+        resultado.mensaje = 'Sincronización completa: ${resultado.clientesSincronizados} clientes, ${resultado.equiposSincronizados} equipos, ${resultado.censosSincronizados} censos, ${resultado.equiposPendientesSincronizados} equipos pendientes y ${resultado.asignacionesSincronizadas} asignaciones';
       } else if (totalExitosos > 0) {
         resultado.exito = true;
         final partes = <String>[];
         if (resultado.clientesExito) partes.add('${resultado.clientesSincronizados} clientes');
         if (resultado.equiposExito) partes.add('${resultado.equiposSincronizados} equipos');
         if (resultado.censosExito) partes.add('${resultado.censosSincronizados} censos');
+        if (resultado.equiposPendientesExito) partes.add('${resultado.equiposPendientesSincronizados} equipos pendientes');
         if (resultado.asignacionesExito) partes.add('${resultado.asignacionesSincronizadas} asignaciones');
         resultado.mensaje = 'Sincronización parcial: ${partes.join(', ')}';
       } else {
@@ -138,6 +157,9 @@ class SyncService {
   }
 
   static Future<SyncResult> sincronizarEquipos() => EquipmentSyncService.sincronizarEquipos();
+
+  static Future<SyncResult> sincronizarEquiposPendientes({String? edfVendedorId}) =>
+      EquiposPendientesSyncService.obtenerEquiposPendientes(edfVendedorId: edfVendedorId);
 
   // Métodos de envío
   static Future<SyncResult> enviarClientesPendientes() => ClientSyncService.enviarClientesPendientes();
@@ -205,6 +227,8 @@ class SyncService {
     limit: limit,
     offset: offset,
   );
+
+
 
   static Future<SyncResult> obtenerCensoPorId(int censoId) =>
       CensusSyncService.obtenerCensoPorId(censoId);
@@ -300,10 +324,14 @@ class SyncResultUnificado {
   int equiposSincronizados = 0;
   String? erroresEquipos;
 
-  // NUEVO: Soporte para censos
   bool censosExito = false;
   int censosSincronizados = 0;
   String? erroresCensos;
+
+  // AGREGAR ESTOS CAMPOS
+  bool equiposPendientesExito = false;
+  int equiposPendientesSincronizados = 0;
+  String? erroresEquiposPendientes;
 
   bool asignacionesExito = false;
   int asignacionesSincronizadas = 0;
@@ -311,6 +339,6 @@ class SyncResultUnificado {
 
   @override
   String toString() {
-    return 'SyncResultUnificado(exito: $exito, clientes: $clientesSincronizados, equipos: $equiposSincronizados, censos: $censosSincronizados, asignaciones: $asignacionesSincronizadas, mensaje: $mensaje)';
+    return 'SyncResultUnificado(exito: $exito, clientes: $clientesSincronizados, equipos: $equiposSincronizados, censos: $censosSincronizados, equiposPendientes: $equiposPendientesSincronizados, asignaciones: $asignacionesSincronizadas, mensaje: $mensaje)';
   }
 }

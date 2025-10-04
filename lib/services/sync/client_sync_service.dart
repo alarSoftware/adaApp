@@ -43,7 +43,7 @@ class ClientSyncService {
     try {
       BaseSyncService.logger.i('Sincronizando clientes para vendedor: $edfVendedorId');
 
-      final url = '${BaseSyncService.baseUrl}/getEdfClientes?edfvendedorId=$edfVendedorId';
+      final url = '${BaseSyncService.baseUrl}/api/getEdfClientes?edfvendedorId=$edfVendedorId';
       BaseSyncService.logger.i('URL completa: $url');
 
       final response = await http.get(
@@ -231,7 +231,7 @@ class ClientSyncService {
       };
 
       final response = await http.post(
-        Uri.parse('${BaseSyncService.baseUrl}/getEdfClientes'),
+        Uri.parse('${BaseSyncService.baseUrl}/api/getEdfClientes'),
         headers: BaseSyncService.headers,
         body: jsonEncode(clienteData),
       ).timeout(BaseSyncService.timeout);

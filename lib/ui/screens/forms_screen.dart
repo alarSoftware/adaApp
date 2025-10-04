@@ -338,13 +338,22 @@ class _FormsScreenState extends State<FormsScreen> {
       builder: (context, child) {
         return Stack(
           children: [
-            // Contenido principal
             Scaffold(
+              resizeToAvoidBottomInset: true,
               appBar: _buildAppBar(),
               body: SafeArea(
-                child: _buildBody(),
+                child: Column(
+                  children: [
+                    // Contenido scrolleable
+                    Expanded(
+                      child: _buildBody(),
+                    ),
+                    // Botones AQUÍ - esto es lo que faltaba agregar
+                    _buildBottomButtons(),
+                  ],
+                ),
               ),
-              bottomNavigationBar: _buildBottomButtons(),
+              // NO pongas bottomNavigationBar aquí
             ),
 
             // Overlay de bloqueo cuando está procesando
@@ -409,12 +418,7 @@ class _FormsScreenState extends State<FormsScreen> {
 
   Widget _buildBody() {
     return SingleChildScrollView(
-      padding: EdgeInsets.only(
-        left: 16.0,
-        right: 16.0,
-        top: 16.0,
-        bottom: 16.0 + MediaQuery.of(context).padding.bottom,
-      ),
+      padding: const EdgeInsets.all(16.0),
       child: Form(
         key: _formKey,
         child: Column(
@@ -883,98 +887,96 @@ class _FormsScreenState extends State<FormsScreen> {
   }
 
   Widget _buildBottomButtons() {
-    return SafeArea(
-      child: Container(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 16,
-          bottom: 16 + MediaQuery.of(context).padding.bottom,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadowLight,
-              spreadRadius: 1,
-              blurRadius: 5,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: ListenableBuilder(
-          listenable: _viewModel,
-          builder: (context, child) {
-            return Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _viewModel.isLoading ? null : _viewModel.cancelar,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: BorderSide(color: AppColors.border),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+    return Container(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: 16,  // ← Simplificado, el SafeArea ya maneja el padding inferior
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowLight,
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: ListenableBuilder(
+        listenable: _viewModel,
+        builder: (context, child) {
+          return Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _viewModel.isLoading ? null : _viewModel.cancelar,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text(
-                      'Cancelar',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  ),
+                  child: const Text(
+                    'Cancelar',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    onPressed: _viewModel.isLoading
-                        ? null
-                        : () => _viewModel.continuarAPreview(_formKey),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.buttonPrimary,
-                      foregroundColor: AppColors.buttonTextPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: _viewModel.isLoading
+                      ? null
+                      : () => _viewModel.continuarAPreview(_formKey),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.buttonPrimary,
+                    foregroundColor: AppColors.buttonTextPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 2,
+                  ),
+                  child: _viewModel.isLoading
+                      ? const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
                       ),
-                      elevation: 2,
-                    ),
-                    child: _viewModel.isLoading
-                        ? const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Text('Procesando...'),
-                      ],
-                    )
-                        : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _viewModel.buttonIcon,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(_viewModel.buttonText),
-                      ],
-                    ),
+                      SizedBox(width: 12),
+                      Text('Procesando...'),
+                    ],
+                  )
+                      : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _viewModel.buttonIcon,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(_viewModel.buttonText),
+                    ],
                   ),
                 ),
-              ],
-            );
-          },
-        ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

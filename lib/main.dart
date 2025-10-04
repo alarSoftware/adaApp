@@ -5,7 +5,7 @@ import 'ui/screens/clients_screen.dart';
 import 'ui/screens/select_screen.dart';
 import 'ui/screens/equipos_screen.dart';
 import 'ui/screens/cliente_detail_screen.dart';
-import 'models/cliente.dart';  // ✅ AGREGA ESTA IMPORTACIÓN
+import 'models/cliente.dart';
 
 var logger = Logger();
 
@@ -15,6 +15,9 @@ void main() {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
+  // Crear el RouteObserver como variable estática
+  static final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +29,8 @@ class MyApp extends StatelessWidget {
       ),
       debugShowCheckedModeBanner: false,
       initialRoute: '/login',
+      // Agregar el navigatorObservers aquí
+      navigatorObservers: [routeObserver],
       routes: {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const SelectScreen(),

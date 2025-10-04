@@ -10,7 +10,7 @@ class UserSyncService {
   static Future<SyncResult> sincronizarUsuarios() async {
     try {
       final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/getUsers'),
+        Uri.parse('${BaseSyncService.baseUrl}/api/getUsers'),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 

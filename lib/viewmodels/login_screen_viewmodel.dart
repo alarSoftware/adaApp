@@ -4,6 +4,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:ada_app/services/auth_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/sync/equipment_sync_service.dart';
+import 'package:ada_app/services/database_helper.dart'; // ← AGREGAR ESTE IMPORT
 
 class LoginScreenViewModel extends ChangeNotifier {
   final _authService = AuthService();
@@ -71,7 +72,6 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // Método actualizado para usar AuthService en lugar de SyncService
   Future<SyncResult> syncUsers() async {
     _isSyncingUsers = true;
     notifyListeners();
@@ -106,6 +106,34 @@ class LoginScreenViewModel extends ChangeNotifier {
       );
     } finally {
       _isSyncingClients = false;
+      notifyListeners();
+    }
+  }
+
+  // ← MÉTODO PARA ELIMINAR SOLO LA TABLA USERS
+  Future<SyncResult> deleteUsersTable() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final dbHelper = DatabaseHelper();
+
+      // Eliminar SOLO la tabla Users
+      await dbHelper.eliminar('Users');
+
+      return SyncResult(
+        exito: true,
+        mensaje: 'Tabla de usuarios eliminada correctamente',
+        itemsSincronizados: 0,
+      );
+    } catch (e) {
+      return SyncResult(
+        exito: false,
+        mensaje: 'Error al eliminar tabla de usuarios: $e',
+        itemsSincronizados: 0,
+      );
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
   }
@@ -159,7 +187,6 @@ class LoginScreenViewModel extends ChangeNotifier {
     try {
       HapticFeedback.lightImpact();
 
-      // 1. Primero verificar biometría del dispositivo
       final bool didAuthenticate = await _localAuth.authenticate(
         localizedReason: 'Autentica tu identidad para acceder a la aplicación',
         options: const AuthenticationOptions(
@@ -172,11 +199,9 @@ class LoginScreenViewModel extends ChangeNotifier {
       if (didAuthenticate) {
         HapticFeedback.lightImpact();
 
-        // 2. Verificar si hay usuario válido en la app
         final result = await _authService.authenticateWithBiometric();
 
         if (result.exitoso) {
-          // NUEVA VALIDACIÓN: Verificar asignación de clientes después de autenticación biométrica
           final validationResult = await _validateUserAssignment();
           if (!validationResult.success) {
             return validationResult;
@@ -206,7 +231,6 @@ class LoginScreenViewModel extends ChangeNotifier {
   }
 
   Future<AuthResult> handleLogin() async {
-    // Limpiar focus
     usernameFocusNode.unfocus();
     passwordFocusNode.unfocus();
 
@@ -225,7 +249,6 @@ class LoginScreenViewModel extends ChangeNotifier {
       if (result.exitoso) {
         HapticFeedback.lightImpact();
 
-        // NUEVA VALIDACIÓN: Verificar si el usuario tiene clientes asignados
         final validationResult = await _validateUserAssignment();
         if (!validationResult.success) {
           _errorMessage = validationResult.message;
@@ -233,7 +256,6 @@ class LoginScreenViewModel extends ChangeNotifier {
           return validationResult;
         }
 
-        // Después del primer login exitoso, verificar biometría nuevamente
         await _checkBiometricAvailability();
 
         return AuthResult(
@@ -263,13 +285,10 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// NUEVA FUNCIÓN: Validar que el usuario tenga clientes asignados
   Future<AuthResult> _validateUserAssignment() async {
     try {
-      // Obtener el usuario completo desde la base de datos
       final usuario = await _authService.getCurrentUser();
 
-      // Verificar si edf_vendedor_id es null o vacío
       if (usuario?.edfVendedorId == null || usuario!.edfVendedorId!.trim().isEmpty) {
         return AuthResult(
             success: false,
@@ -280,7 +299,6 @@ class LoginScreenViewModel extends ChangeNotifier {
         );
       }
 
-      // Si llegamos aquí, el usuario tiene edf_vendedor_id válido
       debugPrint('Usuario validado - edf_vendedor_id: ${usuario.edfVendedorId}');
       return AuthResult(
           success: true,
@@ -312,7 +330,6 @@ class LoginScreenViewModel extends ChangeNotifier {
   }
 }
 
-// Clase auxiliar para resultados de autenticación
 class AuthResult {
   final bool success;
   final String message;

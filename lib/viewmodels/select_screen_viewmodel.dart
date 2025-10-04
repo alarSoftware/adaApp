@@ -396,33 +396,35 @@ class SelectScreenViewModel extends ChangeNotifier {
     _eventController.add(RequestDeleteConfirmationEvent());
   }
 
-  /// Ejecuta el borrado de la base de datos
+  /// Ejecuta el borrado de la base de datos (excepto usuarios)
   Future<void> executeDeleteDatabase() async {
-    _setSyncLoading(true); // CAMBIO: Usar método específico para sync (porque es una operación importante)
+    _setSyncLoading(true);
 
     try {
-      final clienteRepo = ClienteRepository();
-      final equipoRepo = EquipoRepository();
+      // Borrar tablas principales
+      await _dbHelper.eliminar('clientes');
+      await _dbHelper.eliminar('equipos');
+      await _dbHelper.eliminar('equipos_pendientes');
+      await _dbHelper.eliminar('censo_activo');
 
-      // Usar métodos que realmente existen en BaseRepository
-      await clienteRepo.vaciar();
-      await equipoRepo.vaciar();
+      // Borrar tablas maestras
+      await _dbHelper.eliminar('marcas');
+      await _dbHelper.eliminar('modelos');
+      await _dbHelper.eliminar('logo');
 
-      // Para otras tablas, usar limpiarYSincronizar con lista vacía
-      await clienteRepo.limpiarYSincronizar([]);
-      await equipoRepo.limpiarYSincronizar([]);
+      // NOTA: NO se borra la tabla Users
 
-      // Limpiar también las tablas maestras usando consultas directas
-      await _dbHelper.consultarPersonalizada('DELETE FROM marcas');
-      await _dbHelper.consultarPersonalizada('DELETE FROM modelos');
-      await _dbHelper.consultarPersonalizada('DELETE FROM logo');
-      await _dbHelper.consultarPersonalizada('DELETE FROM Users');
+      _logger.i('Base de datos limpiada (usuarios preservados)');
 
-      _eventController.add(ShowSuccessEvent('Base de datos completa borrada correctamente'));
+      _eventController.add(ShowSuccessEvent('Base de datos borrada correctamente'));
+
+      // Recargar el estado de conexión
+      await _checkInitialConnection();
     } catch (e) {
+      _logger.e('Error al borrar la base de datos: $e');
       _eventController.add(ShowErrorEvent('Error al borrar la base de datos: $e'));
     } finally {
-      _setSyncLoading(false); // CAMBIO: Usar método específico para sync
+      _setSyncLoading(false);
     }
   }
 

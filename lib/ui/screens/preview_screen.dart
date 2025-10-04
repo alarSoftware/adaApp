@@ -200,6 +200,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
 
     print('🔍 DEBUG: Iniciando confirmación de registro...');
+    //final resultado = await viewModel.confirmarRegistro(datosCompletos);
     final resultado = await viewModel.confirmarRegistro(datosCompletos);
     print('🔍 DEBUG: Resultado recibido: $resultado');
 

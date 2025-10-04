@@ -1,9 +1,11 @@
 import 'package:ada_app/models/equipos_pendientes.dart';
+import 'package:ada_app/services/post/equipos_pendientes_api_service.dart';
 import 'base_repository.dart';
 import 'package:logger/logger.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:ada_app/services/auth_service.dart';
+import 'package:sqflite/sqflite.dart';
 
 class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
   final Logger _logger = Logger();
@@ -12,16 +14,19 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
   String get tableName => 'equipos_pendientes';
 
   @override
-  EquiposPendientes fromMap(Map<String, dynamic> map) => EquiposPendientes.fromMap(map);
+  EquiposPendientes fromMap(Map<String, dynamic> map) =>
+      EquiposPendientes.fromMap(map);
 
   @override
-  Map<String, dynamic> toMap(EquiposPendientes equipoPendiente) => equipoPendiente.toMap();
+  Map<String, dynamic> toMap(EquiposPendientes equipoPendiente) =>
+      equipoPendiente.toMap();
 
   @override
   String getDefaultOrderBy() => 'fecha_creacion DESC';
 
   @override
-  String getBuscarWhere() => 'CAST(equipo_id AS TEXT) LIKE ? OR CAST(cliente_id AS TEXT) LIKE ?';
+  String getBuscarWhere() =>
+      'CAST(equipo_id AS TEXT) LIKE ? OR CAST(cliente_id AS TEXT) LIKE ?';
 
   @override
   List<dynamic> getBuscarArgs(String query) {
@@ -33,7 +38,8 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
   String getEntityName() => 'EquipoPendiente';
 
   /// Obtener equipos PENDIENTES de un cliente
-  Future<List<Map<String, dynamic>>> obtenerEquiposPendientesPorCliente(int clienteId) async {
+  Future<List<Map<String, dynamic>>> obtenerEquiposPendientesPorCliente(
+      int clienteId) async {
     try {
       final sql = '''
     SELECT DISTINCT
@@ -59,12 +65,12 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
     ORDER BY ep.fecha_creacion DESC
   ''';
 
-
       final result = await dbHelper.consultarPersonalizada(sql, [clienteId]);
       _logger.i('Equipos PENDIENTES para cliente $clienteId: ${result.length}');
       return result;
     } catch (e) {
-      _logger.e('Error obteniendo equipos pendientes del cliente $clienteId: $e');
+      _logger.e(
+          'Error obteniendo equipos pendientes del cliente $clienteId: $e');
       rethrow;
     }
   }
@@ -88,37 +94,36 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
 
   /// Procesar escaneo de censo - crear registro pendiente
   Future<int> procesarEscaneoCenso({
-    required dynamic equipoId, // Acepta String o int
+    required dynamic equipoId,
     required int clienteId,
   }) async {
     try {
       final now = DateTime.now();
-
-      // Convertir a String para almacenar (ya que la columna es TEXT)
       final equipoIdString = equipoId.toString();
-
       _logger.i('Procesando censo - equipoId: $equipoIdString, clienteId: $clienteId');
 
       // Verificar si ya existe
       final existe = await buscarEquipoPendienteId(equipoIdString, clienteId);
       if (existe != null) {
         _logger.i('Ya existe registro pendiente para equipoId: $equipoIdString, clienteId: $clienteId');
+        _enviarAlServidorAsync(equipoIdString, clienteId);
         return existe;
       }
 
-      // Crear nuevo registro
+      // Crear nuevo registro - SOLO con campos que existen
       final datos = {
-        'equipo_id': equipoIdString, // Guardar como String
+        'equipo_id': equipoIdString,
         'cliente_id': clienteId,
         'fecha_censo': now.toIso8601String(),
         'usuario_censo_id': 1,
-        'latitud': 0.0,
-        'longitud': 0.0,
-        'observaciones': 'Registro creado desde censo móvil',
       };
 
       final id = await crear(datos);
       _logger.i('Registro pendiente creado: Equipo $equipoIdString → Cliente $clienteId (ID: $id)');
+
+      // Enviar al servidor
+      _enviarAlServidorAsync(equipoIdString, clienteId);
+
       return id;
     } catch (e) {
       _logger.e('Error procesando escaneo de censo: $e');
@@ -134,9 +139,6 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
         'cliente_id': datos['cliente_id'],
         'fecha_censo': datos['fecha_censo'],
         'usuario_censo_id': datos['usuario_censo_id'],
-        'latitud': datos['latitud'],
-        'longitud': datos['longitud'],
-        'observaciones': datos['observaciones'],
         'fecha_creacion': DateTime.now().toIso8601String(),
         'fecha_actualizacion': DateTime.now().toIso8601String(),
       };
@@ -149,7 +151,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
       rethrow;
     }
   }
-  /// Sincronizar pendientes locales al servidor
+
   /// Sincronizar pendientes locales al servidor
   Future<Map<String, dynamic>> sincronizarPendientesAlServidor() async {
     try {
@@ -187,12 +189,9 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
             'edfClienteId': pendiente['cliente_id'],
             'usuarioId': usuarioId,
             'fecha_revision': pendiente['fecha_censo'] ?? DateTime.now().toIso8601String(),
-            'latitud': pendiente['latitud'] ?? 0.0,
-            'longitud': pendiente['longitud'] ?? 0.0,
             'equipo_id': pendiente['equipo_id'].toString(),
             'cliente_id': pendiente['cliente_id'],
             'usuario_id': usuarioId,
-            'observaciones': 'Pendiente desde APP móvil',
             'es_censo': true,
             'estadoCenso': 'pendiente'
           };
@@ -230,12 +229,12 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
         'exito': exitosos > 0,
         'mensaje': 'Sincronizados: $exitosos, Fallidos: $fallidos'
       };
-
     } catch (e) {
       _logger.e('Error sincronizando: $e');
       return {'exito': false, 'mensaje': 'Error: $e'};
     }
   }
+
   /// Procesar equipos pendientes después de descargar censo del servidor
   Future<int> procesarPendientesDelCensoDescargado() async {
     try {
@@ -275,9 +274,6 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
             'cliente_id': equipo['cliente_id'],
             'fecha_censo': now.toIso8601String(),
             'usuario_censo_id': 1,
-            'latitud': 0.0,
-            'longitud': 0.0,
-            'observaciones': 'Pendiente sincronizado desde servidor',
             'fecha_creacion': now.toIso8601String(),
             'fecha_actualizacion': now.toIso8601String(),
             'sincronizado': 1, // Ya viene del servidor
@@ -286,18 +282,121 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
           await dbHelper.insertar(tableName, datos);
           creados++;
           _logger.i('✅ Pendiente recreado: Equipo ${equipo['equipo_id']} → Cliente ${equipo['cliente_id']}');
-
         } catch (e) {
           _logger.w('⚠️ Error creando pendiente: $e');
         }
       }
 
-      _logger.i('📊 Procesamiento compcletado: $creados pendientes recreados');
+      _logger.i('📊 Procesamiento completado: $creados pendientes recreados');
       return creados;
-
     } catch (e) {
       _logger.e('❌ Error procesando pendientes del censo: $e');
       return 0;
     }
+  }
+
+  /// Guardar equipos pendientes desde el servidor con mapeo de campos
+  Future<int> guardarEquiposPendientesDesdeServidor(List<Map<String, dynamic>> equiposAPI) async {
+    final db = await dbHelper.database;
+    int guardados = 0;
+
+    _logger.i('Guardando ${equiposAPI.length} equipos pendientes desde servidor...');
+
+    await db.transaction((txn) async {
+      for (var equipoAPI in equiposAPI) {
+        try {
+          // MAPEO SIMPLIFICADO: Solo los campos que existen en la tabla
+          final equipoLocal = {
+            'equipo_id': equipoAPI['edfEquipoId'],
+            'cliente_id': equipoAPI['edfClienteId'],
+            'fecha_creacion': equipoAPI['creationDate'],
+            'fecha_actualizacion': DateTime.now().toIso8601String(),
+            'fecha_censo': equipoAPI['creationDate'],
+            'usuario_censo_id': 1,
+          };
+
+          _logger.i('Insertando: equipo_id=${equipoLocal['equipo_id']}, cliente_id=${equipoLocal['cliente_id']}');
+
+          await txn.insert(
+            'equipos_pendientes',
+            equipoLocal,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+
+          guardados++;
+          _logger.i('✅ Guardado exitosamente');
+
+        } catch (e) {
+          _logger.e('❌ Error guardando: $e');
+          _logger.e('Dato API: $equipoAPI');
+        }
+      }
+    });
+
+    _logger.i('✅ $guardados equipos pendientes guardados correctamente');
+
+    // DEBUG: Verificar lo que se guardó
+    await debugVerificarDatos();
+
+    return guardados;
+  }
+
+  /// DEBUG: Verificar datos guardados
+  Future<void> debugVerificarDatos() async {
+    final db = await dbHelper.database;
+
+    _logger.i('=== DEBUG: Verificando datos en equipos_pendientes ===');
+
+    // Ver todas las columnas de la tabla
+    final schema = await db.rawQuery("PRAGMA table_info(equipos_pendientes)");
+    _logger.i('Columnas de la tabla: ${schema.map((e) => e['name']).toList()}');
+
+    // Ver todos los registros
+    final todos = await db.query('equipos_pendientes');
+    _logger.i('Total de registros en tabla: ${todos.length}');
+
+    if (todos.isNotEmpty) {
+      _logger.i('=== TODOS LOS REGISTROS ===');
+      for (var i = 0; i < todos.length; i++) {
+        _logger.i('--- Registro ${i + 1} ---');
+        todos[i].forEach((key, value) {
+          _logger.i('  $key: $value');
+        });
+      }
+    } else {
+      _logger.w('⚠️ LA TABLA ESTÁ VACÍA');
+    }
+
+    _logger.i('========================================================');
+  }
+
+  void _enviarAlServidorAsync(String equipoId, int clienteId) {
+    Future(() async {
+      try {
+        _logger.i('🚀 INICIO envío async: equipo=$equipoId, cliente=$clienteId');
+
+        final authService = AuthService();
+        final usuario = await authService.getCurrentUser();
+        final edfVendedorId = usuario?.edfVendedorId ?? '1_1';
+
+        _logger.i('👤 VendedorId obtenido: $edfVendedorId');
+
+        final resultado = await EquiposPendientesApiService.enviarEquipoPendiente(
+          equipoId: equipoId,
+          clienteId: clienteId,
+          edfVendedorId: edfVendedorId,
+        );
+
+        _logger.i('📨 RESULTADO FINAL: $resultado');
+
+        if (resultado['exito']) {
+          _logger.i('✅ Enviado al servidor correctamente');
+        } else {
+          _logger.w('⚠️ Fallo: ${resultado['mensaje']}');
+        }
+      } catch (e) {
+        _logger.e('❌ Error completo: $e');
+      }
+    });
   }
 }

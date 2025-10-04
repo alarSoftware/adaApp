@@ -6,6 +6,7 @@ import 'forms_screen.dart';
 import 'dart:async';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:logger/logger.dart';
+import 'package:ada_app/main.dart'; // ✅ IMPORTANTE: Importar para acceder a MyApp.routeObserver
 
 var logger = Logger();
 
@@ -22,7 +23,7 @@ class ClienteDetailScreen extends StatefulWidget {
 }
 
 class _ClienteDetailScreenState extends State<ClienteDetailScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, RouteAware {
   late ClienteDetailScreenViewModel _viewModel;
   late StreamSubscription<ClienteDetailUIEvent> _eventSubscription;
   late TabController _tabController;
@@ -37,7 +38,25 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // ✅ ACTUALIZADO: Usar MyApp.routeObserver
+    MyApp.routeObserver.subscribe(this, ModalRoute.of(context) as PageRoute);
+  }
+
+  @override
+  void didPopNext() {
+    // Se llama cuando vuelves a esta pantalla desde otra
+    logger.i('🔄 Pantalla visible nuevamente - Refrescando datos');
+    if (mounted) {
+      _viewModel.refresh();
+    }
+  }
+
+  @override
   void dispose() {
+    // ✅ ACTUALIZADO: Usar MyApp.routeObserver
+    MyApp.routeObserver.unsubscribe(this);
     _eventSubscription.cancel();
     _tabController.dispose();
     _viewModel.dispose();
@@ -96,7 +115,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     logger.i('- Tipo estado: ${equipoData['tipo_estado']}');
     logger.i('- Es asignado: $isAsignado');
 
-    // CAMBIO: Ambos tipos van a la misma pantalla
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -104,11 +122,8 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
           equipoCliente: equipoData,
         ),
       ),
-    ).then((_) => _viewModel.refresh());
+    );
   }
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -499,7 +514,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                             ),
                           ),
                           const SizedBox(width: 8),
-                          // Solo icono de sincronización
                           _buildSyncIcon(equipoData),
                         ],
                       ),
@@ -557,12 +571,10 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     );
   }
 
-  // Método helper para formatear el título del equipo sin espacios excesivos
   String _getFormattedEquipoTitle(Map<String, dynamic> equipoData) {
     final marca = equipoData['marca_nombre']?.toString()?.trim() ?? '';
     final modelo = equipoData['modelo_nombre']?.toString()?.trim() ?? '';
 
-    // Si tenemos marca y modelo, los unimos con un solo espacio
     if (marca.isNotEmpty && modelo.isNotEmpty) {
       return '$marca $modelo';
     } else if (marca.isNotEmpty) {
@@ -570,17 +582,14 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     } else if (modelo.isNotEmpty) {
       return modelo;
     } else {
-      // Fallback al método original si no hay marca ni modelo
       return _viewModel.getEquipoTitle(equipoData);
     }
   }
 
-  // ICONO DE SINCRONIZACIÓN - USANDO DATOS REALES DE ESTADO_EQUIPO
   Widget _buildSyncIcon(Map<String, dynamic> equipoData) {
     final tipoEstado = equipoData['tipo_estado']?.toString();
 
     if (tipoEstado == 'asignado') {
-      // Para equipos asignados (de API), mostrar icono fijo de "sincronizado"
       return Tooltip(
         message: 'Equipo sincronizado desde servidor',
         child: Container(
@@ -601,11 +610,9 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
         ),
       );
     } else {
-      // Para equipos pendientes, usar FutureBuilder para verificar estado real
       return FutureBuilder<Map<String, dynamic>?>(
         future: _viewModel.getEstadoCensoInfo(equipoData),
         builder: (context, snapshot) {
-          // Debug: Agregar logs para ver qué datos llegan
           if (snapshot.hasData && snapshot.data != null) {
             logger.i('Estado info para ${equipoData['cod_barras']}: ${snapshot.data}');
           }
@@ -619,35 +626,28 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
           IconData icon;
           String tooltip;
 
-          // CORRECCIÓN: Buscar en el campo correcto 'estado_censo' de la tabla Estado_Equipo
           final estadoCenso = estadoInfo['estado_censo']?.toString().toLowerCase();
 
-          // También verificar el campo 'sincronizado' si existe (equivalente a migrado)
           final sincronizado = estadoInfo['sincronizado']?.toString() == '1' ||
               estadoInfo['sincronizado'] == 1 ||
               estadoInfo['sincronizado'] == true ||
-              estadoInfo['esta_sincronizado'] == true; // Por si usa el nombre del modelo
+              estadoInfo['esta_sincronizado'] == true;
 
           logger.i('Estado censo: $estadoCenso, Sincronizado: $sincronizado');
 
-          // Lógica correcta usando estado_censo:
           if (estadoCenso == 'migrado' || sincronizado) {
-            // Datos ya enviados al servidor
             iconColor = AppColors.success;
             icon = Icons.cloud_done;
             tooltip = 'Sincronizado con servidor';
           } else if (estadoCenso == 'creado') {
-            // Creado localmente pero no enviado al servidor
             iconColor = AppColors.warning;
             icon = Icons.cloud_upload;
             tooltip = 'Pendiente de sincronizar';
           } else if (estadoCenso == 'error') {
-            // Error en la sincronización
             iconColor = AppColors.error;
             icon = Icons.cloud_off;
             tooltip = 'Error en sincronización';
           } else {
-            // Si no hay estado_censo válido, no mostrar icono
             logger.w('No se encontró estado_censo válido: $estadoCenso');
             return SizedBox.shrink();
           }

@@ -14,7 +14,7 @@ class EquipmentSyncService extends BaseSyncService {
   static Future<SyncResult> sincronizarMarcas() async {
     try {
       final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/getEdfMarcas'),
+        Uri.parse('${BaseSyncService.baseUrl}/api/getEdfMarcas'),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
@@ -81,7 +81,7 @@ class EquipmentSyncService extends BaseSyncService {
   static Future<SyncResult> sincronizarModelos() async {
     try {
       final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/getEdfModelos'),
+        Uri.parse('${BaseSyncService.baseUrl}/api/getEdfModelos'),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
@@ -152,7 +152,7 @@ class EquipmentSyncService extends BaseSyncService {
   static Future<SyncResult> sincronizarLogos() async {
     try {
       final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/getEdfLogos'),
+        Uri.parse('${BaseSyncService.baseUrl}/api/getEdfLogos'),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
@@ -212,7 +212,7 @@ class EquipmentSyncService extends BaseSyncService {
     try {
       BaseSyncService.logger.i('🔄 Iniciando sincronización de equipos...');
       final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/getEdfEquipos'),
+        Uri.parse('${BaseSyncService.baseUrl}/api/getEdfEquipos'),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 

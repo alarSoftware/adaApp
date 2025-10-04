@@ -26,8 +26,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Usuario? _usuarioActual;
 
-  static const String _baseUrl = 'http://200.85.60.250:28080/adaControl/';
-  static const String _estadosEndpoint = 'censoActivo/insertCensoActivo';
+  static const String _baseUrl = 'https://ada-api.loca.lt/adaControl';
+  static const String _estadosEndpoint = '/censoActivo/insertCensoActivo';
 
   bool get isSaving => _isSaving;
   String? get statusMessage => _statusMessage;

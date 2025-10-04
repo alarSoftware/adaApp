@@ -35,7 +35,7 @@ class CensusSyncService extends BaseSyncService {
       if (limit != null) queryParams['limit'] = limit.toString();
       if (offset != null) queryParams['offset'] = offset.toString();
 
-      final uri = Uri.parse('${BaseSyncService.baseUrl}/getCensoActivo')
+      final uri = Uri.parse('${BaseSyncService.baseUrl}/api/getCensoActivo')
           .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       BaseSyncService.logger.i('📡 Llamando a: ${uri.toString()}');
@@ -140,7 +140,7 @@ class CensusSyncService extends BaseSyncService {
       BaseSyncService.logger.i('Obteniendo censo ID: $censoId');
 
       final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/getCensoActivo/$censoId'),
+        Uri.parse('${BaseSyncService.baseUrl}/api/getCensoActivo/$censoId'),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
@@ -189,7 +189,7 @@ class CensusSyncService extends BaseSyncService {
       BaseSyncService.logger.i('Buscando censos por código: $codigoBarras');
 
       final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/getCensoActivo')
+        Uri.parse('${BaseSyncService.baseUrl}/api/getCensoActivo')
             .replace(queryParameters: {'codigoBarras': codigoBarras}),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);

@@ -87,13 +87,10 @@ class DatabaseTables {
   String _sqlEquiposPendientes() => '''
   CREATE TABLE equipos_pendientes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    equipo_id INTEGER,
-    cliente_id INTEGER,
+    equipo_id TEXT,
+    cliente_id TEXT,
     fecha_censo DATETIME,
     usuario_censo_id INTEGER,
-    latitud REAL,
-    longitud REAL,
-    observaciones TEXT,
     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion DATETIME,
     FOREIGN KEY (equipo_id) REFERENCES equipos (id),
@@ -113,7 +110,6 @@ class DatabaseTables {
     )
   ''';
 
-  // ✅ ACTUALIZADO: Tabla con columnas para segunda imagen
   String _sqlCensoActivo() => '''
   CREATE TABLE censo_activo (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
