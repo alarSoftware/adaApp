@@ -287,25 +287,26 @@ class SyncService {
       final estadisticasDB = await _clienteRepo.obtenerEstadisticas();
       final conexion = await BaseSyncService.testConnection();
 
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
       return {
         ...estadisticasDB,
         'conexionServidor': conexion.exito,
         'mensajeConexion': conexion.mensaje,
         'ultimaVerificacion': DateTime.now().toIso8601String(),
-        'servidorURL': BaseSyncService.baseUrl,
+        'servidorURL': baseUrl,
       };
     } catch (e) {
+      // CAMBIO AQUÍ: Obtener la URL dinámica incluso en el catch
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
       return {
         'error': e.toString(),
         'conexionServidor': false,
-        'servidorURL': BaseSyncService.baseUrl,
+        'servidorURL': baseUrl,
       };
     }
   }
-
-  // Getters para compatibilidad
-  static String get baseUrl => BaseSyncService.baseUrl;
-  static Duration get timeout => BaseSyncService.timeout;
 }
 
 // Clase de resultado unificado - CON SOPORTE PARA CENSOS

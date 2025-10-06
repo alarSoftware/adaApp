@@ -28,8 +28,10 @@ class AuthService {
     try {
       logger.i('Sincronizando solo usuarios...');
 
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
       final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/api/getUsers'),
+        Uri.parse('$baseUrl/api/getUsers'),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
@@ -123,8 +125,10 @@ class AuthService {
     try {
       logger.i('Sincronizando clientes del vendedor: $edfVendedorId');
 
+
+      final baseUrl = await BaseSyncService.getBaseUrl();
       // Debug de la URL
-      final url = '${BaseSyncService.baseUrl}/api/getEdfClientes?edfvendedorId=$edfVendedorId';
+      final url = '$baseUrl/api/getEdfClientes?edfvendedorId=$edfVendedorId';
       logger.i('URL completa: $url');
 
       final response = await http.get(
@@ -279,8 +283,10 @@ class AuthService {
     try {
       logger.i('Intentando login online...');
 
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
       final response = await http.post(
-        Uri.parse('${BaseSyncService.baseUrl}/login'),
+        Uri.parse('$baseUrl/login'),
         headers: BaseSyncService.headers,
         body: jsonEncode({'username': username, 'password': password}),
       ).timeout(Duration(seconds: 5));

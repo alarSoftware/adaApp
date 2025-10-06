@@ -9,8 +9,11 @@ class UserSyncService {
 
   static Future<SyncResult> sincronizarUsuarios() async {
     try {
+      // CAMBIO AQUÍ: Obtener la URL dinámica
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
       final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/api/getUsers'),
+        Uri.parse('$baseUrl/api/getUsers'),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
@@ -103,7 +106,6 @@ class UserSyncService {
 
       BaseSyncService.logger.i('Buscando edf_vendedor_id para usuario: $username');
 
-      // Consulta directa a la base de datos por el campo edf_vendedor_id
       final db = await _dbHelper.database;
       final result = await db.query(
         'Users',
@@ -131,7 +133,6 @@ class UserSyncService {
     }
   }
 
-  // Método alternativo más eficiente usando raw query
   static Future<String?> obtenerEdfVendedorIdDirecto(String username) async {
     try {
       final db = await _dbHelper.database;

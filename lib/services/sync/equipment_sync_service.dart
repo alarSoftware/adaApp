@@ -13,8 +13,11 @@ class EquipmentSyncService extends BaseSyncService {
 
   static Future<SyncResult> sincronizarMarcas() async {
     try {
+      // CAMBIO AQUÍ: Obtener la URL dinámica
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
       final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/api/getEdfMarcas'),
+        Uri.parse('$baseUrl/api/getEdfMarcas'),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
@@ -35,10 +38,9 @@ class EquipmentSyncService extends BaseSyncService {
           marcasAPI = responseData;
         }
 
-        // CORRECCIÓN: El filtro ahora busca 'marca' que es como viene de la API
         final marcasValidas = marcasAPI.where((marca) {
           return marca != null &&
-              marca['marca'] != null &&  // Cambiado de 'nombre' a 'marca'
+              marca['marca'] != null &&
               marca['marca'].toString().trim().isNotEmpty;
         }).toList();
 
@@ -80,8 +82,11 @@ class EquipmentSyncService extends BaseSyncService {
 
   static Future<SyncResult> sincronizarModelos() async {
     try {
+      // CAMBIO AQUÍ: Obtener la URL dinámica
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
       final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/api/getEdfModelos'),
+        Uri.parse('$baseUrl/api/getEdfModelos'),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
@@ -151,8 +156,11 @@ class EquipmentSyncService extends BaseSyncService {
 
   static Future<SyncResult> sincronizarLogos() async {
     try {
+      // CAMBIO AQUÍ: Obtener la URL dinámica
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
       final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/api/getEdfLogos'),
+        Uri.parse('$baseUrl/api/getEdfLogos'),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
@@ -211,15 +219,18 @@ class EquipmentSyncService extends BaseSyncService {
   static Future<SyncResult> sincronizarEquipos() async {
     try {
       BaseSyncService.logger.i('🔄 Iniciando sincronización de equipos...');
+
+      // CAMBIO AQUÍ: Obtener la URL dinámica
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
       final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/api/getEdfEquipos'),
+        Uri.parse('$baseUrl/api/getEdfEquipos'),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
       BaseSyncService.logger.i('📡 Respuesta equipos: ${response.statusCode}');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        // Usar el parseResponse corregido
         final List<dynamic> equiposData = BaseSyncService.parseResponse(response.body);
         BaseSyncService.logger.i('📊 Equipos parseados: ${equiposData.length}');
 
@@ -231,7 +242,6 @@ class EquipmentSyncService extends BaseSyncService {
           );
         }
 
-        // Debug: Mostrar el primer equipo procesado
         if (equiposData.isNotEmpty) {
           BaseSyncService.logger.i('PRIMER EQUIPO DE LA API:');
           final primer = equiposData.first;
@@ -256,7 +266,6 @@ class EquipmentSyncService extends BaseSyncService {
 
             if (equipo.codBarras.isNotEmpty) {
               conCodigo++;
-              // Log de los primeros 3 códigos para verificar
               if (conCodigo <= 3) {
                 BaseSyncService.logger.i('✅ Código procesado: "${equipo.codBarras}"');
               }
@@ -313,6 +322,9 @@ class EquipmentSyncService extends BaseSyncService {
 
       int exitosos = 0;
 
+      // CAMBIO AQUÍ: Obtener la URL dinámica UNA VEZ fuera del loop
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
       for (final registro in registrosPendientes) {
         try {
           final estadoData = {
@@ -328,7 +340,7 @@ class EquipmentSyncService extends BaseSyncService {
           };
 
           final response = await http.post(
-            Uri.parse('${BaseSyncService.baseUrl}/estados'),
+            Uri.parse('$baseUrl/estados'),
             headers: BaseSyncService.headers,
             body: jsonEncode(estadoData),
           ).timeout(const Duration(seconds: 15));

@@ -17,7 +17,10 @@ class EquiposPendientesSyncService extends BaseSyncService {
         queryParams['edfvendedorId'] = edfVendedorId;
       }
 
-      final uri = Uri.parse('${BaseSyncService.baseUrl}/api/getEquipoPendiente')
+      // CAMBIO AQUÍ: Obtener la URL dinámica
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
+      final uri = Uri.parse('$baseUrl/api/getEquipoPendiente')
           .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       BaseSyncService.logger.i('📡 Llamando a: ${uri.toString()}');
@@ -35,11 +38,9 @@ class EquiposPendientesSyncService extends BaseSyncService {
         try {
           final responseBody = jsonDecode(response.body);
 
-          // CORRECCIÓN: Manejar el formato específico de este endpoint
           if (responseBody is Map<String, dynamic> && responseBody.containsKey('data')) {
             final dataValue = responseBody['data'];
 
-            // El 'data' viene como STRING, no como array directo
             if (dataValue is String) {
               equiposData = jsonDecode(dataValue) as List;
             } else if (dataValue is List) {
@@ -61,7 +62,6 @@ class EquiposPendientesSyncService extends BaseSyncService {
 
         BaseSyncService.logger.i('✅ Equipos pendientes parseados: ${equiposData.length}');
 
-        // Guardar en base de datos local
         if (equiposData.isNotEmpty) {
           try {
             final repo = EquipoPendienteRepository();

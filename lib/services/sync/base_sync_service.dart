@@ -3,12 +3,16 @@ import 'dart:io';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
+import 'package:ada_app/services/api_config_service.dart';
 
 abstract class BaseSyncService {
-  static const String baseUrl = 'https://ada-api.loca.lt/adaControl';
   static const Duration timeout = Duration(minutes: 5);
 
   static final Logger logger = Logger();
+
+  static Future<String> getBaseUrl() async {
+    return await ApiConfigService.getBaseUrl();
+  }
 
 
   static Map<String, String> get headers => {
@@ -95,6 +99,8 @@ abstract class BaseSyncService {
 
   static Future<ApiResponse> testConnection() async {
     try {
+      final baseUrl = await getBaseUrl();
+
       final response = await http.get(
         Uri.parse('$baseUrl/api/getPing'),
         headers: headers,

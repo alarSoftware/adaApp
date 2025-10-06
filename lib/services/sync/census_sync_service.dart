@@ -35,7 +35,10 @@ class CensusSyncService extends BaseSyncService {
       if (limit != null) queryParams['limit'] = limit.toString();
       if (offset != null) queryParams['offset'] = offset.toString();
 
-      final uri = Uri.parse('${BaseSyncService.baseUrl}/api/getCensoActivo')
+      // CAMBIO AQUÍ: Obtener la URL dinámica
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
+      final uri = Uri.parse('$baseUrl/api/getCensoActivo')
           .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       BaseSyncService.logger.i('📡 Llamando a: ${uri.toString()}');
@@ -101,7 +104,7 @@ class CensusSyncService extends BaseSyncService {
               BaseSyncService.logger.i('   ID: ${censo['id']}');
               BaseSyncService.logger.i('   observaciones: $obs');
               BaseSyncService.logger.i('   Keys del censo: ${censo.keys.toList()}');
-              break; // Solo mostrar el primero que tenga observaciones
+              break;
             }
           }
 
@@ -139,8 +142,11 @@ class CensusSyncService extends BaseSyncService {
     try {
       BaseSyncService.logger.i('Obteniendo censo ID: $censoId');
 
+      // CAMBIO AQUÍ: Obtener la URL dinámica
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
       final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/api/getCensoActivo/$censoId'),
+        Uri.parse('$baseUrl/api/getCensoActivo/$censoId'),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
@@ -188,8 +194,11 @@ class CensusSyncService extends BaseSyncService {
     try {
       BaseSyncService.logger.i('Buscando censos por código: $codigoBarras');
 
+      // CAMBIO AQUÍ: Obtener la URL dinámica
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
       final response = await http.get(
-        Uri.parse('${BaseSyncService.baseUrl}/api/getCensoActivo')
+        Uri.parse('$baseUrl/api/getCensoActivo')
             .replace(queryParameters: {'codigoBarras': codigoBarras}),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);

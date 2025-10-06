@@ -9,6 +9,7 @@ import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'dart:async';
 
 final _logger = Logger();
@@ -388,8 +389,12 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Future<Map<String, dynamic>> _enviarAApiEstadosConTimeout(Map<String, dynamic> datos, int timeoutSegundos) async {
     try {
+
+      final baseUrl = await BaseSyncService.getBaseUrl();
+      final estadosEndpoint = '/censoActivo/insertCensoActivo';
+
       final response = await http.post(
-        Uri.parse('$_baseUrl$_estadosEndpoint'),
+        Uri.parse('$baseUrl$estadosEndpoint'),
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
         body: json.encode(datos),
       ).timeout(Duration(seconds: timeoutSegundos));

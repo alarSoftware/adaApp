@@ -1,3 +1,4 @@
+import 'package:ada_app/ui/screens/sync_panel_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/screens/equipos_screen.dart';
 import 'package:ada_app/ui/screens/modelos_screen.dart';
@@ -409,6 +410,7 @@ class _SelectScreenState extends State<SelectScreen> {
                       break;
                   }
                 },
+
                 itemBuilder: (BuildContext context) => [
                   PopupMenuItem<String>(
                     value: 'probar_conexion',
@@ -441,6 +443,17 @@ class _SelectScreenState extends State<SelectScreen> {
                         Icon(Icons.delete_forever, color: AppColors.error),
                         SizedBox(width: 8),
                         Text('Borrar Base de Datos', style: TextStyle(color: AppColors.textPrimary)),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem<String>(
+                    value: 'pendientes_envio',
+                    enabled: !_viewModel.isSyncing && !_viewModel.isTestingConnection,
+                    child: Row(
+                      children: [
+                        Icon(Icons.upload_outlined, color: AppColors.warning),
+                        SizedBox(width: 8),
+                        Text('Pendientes de Envío', style: TextStyle(color: AppColors.textPrimary)),
                       ],
                     ),
                   ),
@@ -561,6 +574,14 @@ class _SelectScreenState extends State<SelectScreen> {
                         //   color: AppColors.primary,
                         //   page: const FormulariosScreen(),
                         // ),
+                        //SizedBox(height: 12),
+                        // _buildMenuCard(
+                          //label: 'Pendientes de Envio',
+                           //description: 'Censos pendientes de envio',
+                           //icon: Icons.edit_note,
+                           //color: AppColors.primary,
+                           //page: const SyncPanelScreen(),
+                         //)
                       ],
                     ),
                   ),

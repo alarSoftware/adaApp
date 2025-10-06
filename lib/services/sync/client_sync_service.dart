@@ -43,7 +43,9 @@ class ClientSyncService {
     try {
       BaseSyncService.logger.i('Sincronizando clientes para vendedor: $edfVendedorId');
 
-      final url = '${BaseSyncService.baseUrl}/api/getEdfClientes?edfvendedorId=$edfVendedorId';
+      // CAMBIO AQUÍ: Obtener la URL dinámica
+      final baseUrl = await BaseSyncService.getBaseUrl();
+      final url = '$baseUrl/api/getEdfClientes?edfvendedorId=$edfVendedorId';
       BaseSyncService.logger.i('URL completa: $url');
 
       final response = await http.get(
@@ -96,7 +98,6 @@ class ClientSyncService {
 
         BaseSyncService.logger.i('Guardando ${clientes.length} clientes en base de datos...');
 
-        // CORREGIDO: Usar limpiarYSincronizar con los mapas directos de los clientes
         final clientesMapas = clientes.map((cliente) => cliente.toMap()).toList();
         await _clienteRepo.limpiarYSincronizar(clientesMapas);
 
@@ -139,7 +140,6 @@ class ClientSyncService {
         return null;
       }
 
-      // Obtener RUC/CI (prioritario RUC, luego cedula)
       String rucCi = '';
       if (data['ruc'] != null && data['ruc'].toString().trim().isNotEmpty) {
         rucCi = data['ruc'].toString().trim();
@@ -147,7 +147,6 @@ class ClientSyncService {
         rucCi = data['cedula'].toString().trim();
       }
 
-      // Convertir clienteIdGc a int para el campo codigo
       int codigo = 0;
       if (data['clienteIdGc'] != null) {
         final clienteIdGcStr = data['clienteIdGc'].toString().trim();
@@ -157,7 +156,7 @@ class ClientSyncService {
       return Cliente(
         id: data['id'] is int ? data['id'] : null,
         nombre: data['cliente'].toString().trim(),
-        codigo: codigo, // ← Usar clienteIdGc convertido a int
+        codigo: codigo,
         telefono: data['telefono']?.toString().trim() ?? '',
         direccion: data['direccion']?.toString().trim() ?? '',
         rucCi: rucCi,
@@ -169,14 +168,9 @@ class ClientSyncService {
     }
   }
 
-  // MÉTODO SIMPLIFICADO - Ya no usa sincronización de auditoría
   static Future<SyncResult> enviarClientesPendientes() async {
     try {
       BaseSyncService.logger.i('Verificando clientes pendientes por enviar...');
-
-      // Como la tabla clientes no tiene columna sincronizado,
-      // este método podría simplemente retornar que no hay pendientes
-      // O implementar otra lógica según tus necesidades de negocio
 
       return SyncResult(
         exito: true,
@@ -193,7 +187,6 @@ class ClientSyncService {
     }
   }
 
-  // MÉTODO ALTERNATIVO: Si necesitas enviar clientes específicos
   static Future<SyncResult> enviarClienteEspecifico(Cliente cliente) async {
     try {
       final resultado = await _enviarClienteAAPI(cliente);
@@ -230,8 +223,11 @@ class ClientSyncService {
         'propietario': cliente.propietario,
       };
 
+      // CAMBIO AQUÍ: Obtener la URL dinámica
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
       final response = await http.post(
-        Uri.parse('${BaseSyncService.baseUrl}/api/getEdfClientes'),
+        Uri.parse('$baseUrl/api/getEdfClientes'),
         headers: BaseSyncService.headers,
         body: jsonEncode(clienteData),
       ).timeout(BaseSyncService.timeout);

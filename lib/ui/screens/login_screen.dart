@@ -609,6 +609,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                   case 'delete_users':
                     _showDeleteUsersConfirmation();
                     break;
+                  case 'api_settings': // AGREGAR ESTE CASO
+                    Navigator.of(context).pushNamed('/api-settings');
+                    break;
                 }
               },
               itemBuilder: (BuildContext context) => [
@@ -652,6 +655,25 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                         'Eliminar usuarios',
                         style: TextStyle(
                           color: AppColors.error,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(),
+                // MOVER LA CONFIGURACIÓN AL FINAL:
+                PopupMenuItem<String>(
+                  value: 'api_settings',
+                  child: Row(
+                    children: [
+                      Icon(Icons.dns, color: AppColors.textSecondary, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Configurar servidor',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
