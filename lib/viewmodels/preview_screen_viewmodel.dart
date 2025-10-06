@@ -26,7 +26,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Usuario? _usuarioActual;
 
-  static const String _baseUrl = 'https://ada-api.loca.lt/adaControl';
+  static const String _baseUrl = 'http://200.85.60.250:28080/adaControl';
   static const String _estadosEndpoint = '/censoActivo/insertCensoActivo';
 
   bool get isSaving => _isSaving;
@@ -249,9 +249,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
       if (estadoIdActual != null) {
         _logger.i('Preparando datos con estadoId: $estadoIdActual');
         final now = DateTime.now().toLocal();
+        final timestampId = now.millisecondsSinceEpoch;
 
         datosCompletos = {
           'id_local': estadoIdActual,
+          'timestamp_id': timestampId,
           'estado_sincronizacion': 'pendiente',
           'fecha_creacion_local': _formatearFechaLocal(now),
           'equipo_id': equipoCompleto['id'],
@@ -322,7 +324,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
           migracionExitosa = true;
           _setStatusMessage('Registro sincronizado exitosamente');
         } else {
-          // ✅ AGREGAR ESTO: Marcar como error para permitir reintentos
           _logger.w('Migración no exitosa: ${respuestaServidor['motivo']}');
           await _estadoEquipoRepository.marcarComoError(
               estadoIdActual,
@@ -502,6 +503,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
     return {
       'id_local': idLocal,
+      'timestamp_id': idLocal,
       'estado_sincronizacion': 'pendiente',
       'fecha_creacion_local': _formatearFechaLocal(now),
       'equipo_id': equipoCompleto?['id'],
@@ -544,7 +546,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     final now = DateTime.now().toLocal();
 
     return {
-      'id': datosLocales['id_local']?.toString() ?? now.millisecondsSinceEpoch.toString(),
+      'id': datosLocales['timestamp_id']?.toString() ?? now.millisecondsSinceEpoch.toString(),
       'edfVendedorSucursalId': '$edfVendedorId',
       'edfEquipoId': (datosLocales['equipo_id'] ?? '').toString(),
       'usuarioId': usuarioId,
@@ -689,7 +691,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       };
     }
   }
-
   Future<Map<String, dynamic>> reintentarEnvio(int estadoId) async {
     try {
       _logger.i('Reintentando envío del estado ID: $estadoId');
@@ -712,9 +713,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final usuarioId = await _getUsuarioId;
       final edfVendedorId = await _getEdfVendedorId;
       final now = DateTime.now().toLocal();
+      final timestampId = now.millisecondsSinceEpoch;
 
       final datosParaApi = {
-        'id': estadoMap['id']?.toString() ?? now.millisecondsSinceEpoch.toString(),
+        'id': timestampId.toString(),
         'edfVendedorSucursalId': edfVendedorId ?? '',
         'edfEquipoId': estadoMap['equipo_id']?.toString() ?? '',
         'usuarioId': usuarioId,

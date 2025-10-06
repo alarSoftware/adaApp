@@ -17,8 +17,12 @@ class EquiposPendientesApiService {
       BaseSyncService.logger.i('📦 Payload completo: $payload');
 
       print(jsonEncode(payload));
+
+      // CAMBIO AQUÍ: Obtener la URL dinámica
+      final baseUrl = await BaseSyncService.getBaseUrl();
+
       final response = await http.post(
-        Uri.parse('${BaseSyncService.baseUrl}/edfEquipoPendiente/insertEquipoPendiente'),
+        Uri.parse('$baseUrl/edfEquipoPendiente/insertEquipoPendiente'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(payload),
       ).timeout(BaseSyncService.timeout);

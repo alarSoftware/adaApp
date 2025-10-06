@@ -303,6 +303,9 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
     _logger.i('Guardando ${equiposAPI.length} equipos pendientes desde servidor...');
 
     await db.transaction((txn) async {
+      await txn.delete('equipos_pendientes');
+      _logger.i('Tabla equipos_pendientes limpiada');
+
       for (var equipoAPI in equiposAPI) {
         try {
           // MAPEO SIMPLIFICADO: Solo los campos que existen en la tabla
