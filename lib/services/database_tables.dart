@@ -1,4 +1,3 @@
-// database_tables.dart
 import 'package:sqflite/sqflite.dart';
 import 'package:logger/logger.dart';
 
@@ -33,6 +32,12 @@ class DatabaseTables {
     await db.execute(_sqlEquiposPendientes());
     await db.execute(_sqlUsuarios());
     await db.execute(_sqlCensoActivo());
+
+    // Tablas de formularios dinámicos
+    await db.execute(_sqlDynamicForm());
+    await db.execute(_sqlDynamicFormDetail());
+    await db.execute(_sqlDynamicFormResponse());
+    await db.execute(_sqlDynamicFormResponseDetail());
   }
 
   String _sqlModelos() => '''
@@ -135,11 +140,76 @@ class DatabaseTables {
   )
 ''';
 
+  // ==================== TABLAS DE FORMULARIOS DINÁMICOS ====================
+
+  String _sqlDynamicForm() => '''
+    CREATE TABLE dynamic_form (
+      id TEXT PRIMARY KEY,
+      last_update_user_id INTEGER,
+      estado TEXT,
+      name TEXT,
+      total_puntos INTEGER,
+      creation_date TEXT,
+      creator_user_id INTEGER,
+      last_update_date TEXT
+    )
+  ''';
+
+  String _sqlDynamicFormDetail() => '''
+    CREATE TABLE dynamic_form_detail (
+      id TEXT PRIMARY KEY,
+      version INTEGER,
+      respuesta_correcta TEXT,
+      dynamic_form_id TEXT,
+      sequence INTEGER,
+      points INTEGER,
+      type TEXT,
+      respuesta_correcta_opt TEXT,
+      label TEXT,
+      parent_id TEXT,
+      percentage REAL,
+      FOREIGN KEY (dynamic_form_id) REFERENCES dynamic_form (id)
+    )
+  ''';
+
+  String _sqlDynamicFormResponse() => '''
+    CREATE TABLE dynamic_form_response (
+      id TEXT PRIMARY KEY,
+      version INTEGER,
+      contacto_id TEXT,
+      cliente_id TEXT,
+      edf_vendedor_id TEXT,
+      last_update_user_id INTEGER,
+      dynamic_form_id TEXT,
+      usuario_id INTEGER,
+      estado TEXT,
+      creation_date TEXT,
+      creation_user_id INTEGER,
+      last_update_date TEXT,
+      FOREIGN KEY (dynamic_form_id) REFERENCES dynamic_form (id)
+    )
+  ''';
+
+  String _sqlDynamicFormResponseDetail() => '''
+    CREATE TABLE dynamic_form_response_detail (
+      id TEXT PRIMARY KEY,
+      version INTEGER,
+      response TEXT,
+      dynamic_form_response_id TEXT,
+      dynamic_form_detail_id TEXT,
+      FOREIGN KEY (dynamic_form_response_id) REFERENCES dynamic_form_response (id),
+      FOREIGN KEY (dynamic_form_detail_id) REFERENCES dynamic_form_detail (id)
+    )
+  ''';
+
+  // ==================== ÍNDICES ====================
+
   Future<void> _crearIndices(Database db) async {
     await _crearIndicesClientes(db);
     await _crearIndicesEquipos(db);
     await _crearIndicesEquiposPendientes(db);
     await _crearIndicesMaestras(db);
+    await _crearIndicesDynamicForms(db);
   }
 
   Future<void> _crearIndicesClientes(Database db) async {
@@ -172,7 +242,6 @@ class DatabaseTables {
     }
   }
 
-
   Future<void> _crearIndicesEquiposPendientes(Database db) async {
     final indices = [
       'CREATE INDEX IF NOT EXISTS idx_equipos_pendientes_equipo_id ON equipos_pendientes (equipo_id)',
@@ -196,6 +265,32 @@ class DatabaseTables {
     for (final indice in indices) {
       await db.execute(indice);
     }
+  }
 
+  Future<void> _crearIndicesDynamicForms(Database db) async {
+    final indices = [
+      // Índices para dynamic_form
+      'CREATE INDEX IF NOT EXISTS idx_dynamic_form_name ON dynamic_form (name)',
+      'CREATE INDEX IF NOT EXISTS idx_dynamic_form_estado ON dynamic_form (estado)',
+
+      // Índices para dynamic_form_detail
+      'CREATE INDEX IF NOT EXISTS idx_dynamic_form_detail_form_id ON dynamic_form_detail (dynamic_form_id)',
+      'CREATE INDEX IF NOT EXISTS idx_dynamic_form_detail_sequence ON dynamic_form_detail (sequence)',
+      'CREATE INDEX IF NOT EXISTS idx_dynamic_form_detail_type ON dynamic_form_detail (type)',
+
+      // Índices para dynamic_form_response
+      'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_form_id ON dynamic_form_response (dynamic_form_id)',
+      'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_estado ON dynamic_form_response (estado)',
+      'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_usuario_id ON dynamic_form_response (usuario_id)',
+      'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_contacto_id ON dynamic_form_response (contacto_id)',
+
+      // Índices para dynamic_form_response_detail
+      'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_detail_response_id ON dynamic_form_response_detail (dynamic_form_response_id)',
+      'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_detail_detail_id ON dynamic_form_response_detail (dynamic_form_detail_id)',
+    ];
+
+    for (final indice in indices) {
+      await db.execute(indice);
+    }
   }
 }

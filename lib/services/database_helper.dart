@@ -381,9 +381,15 @@ class DatabaseHelper {
       values['fecha_creacion'] = now;
     }
   }
-
   bool _requiresTimestamps(String tableName) {
-    const tablesWithoutTimestamps = {'clientes', 'modelos'};
+    const tablesWithoutTimestamps = {
+      'clientes',
+      'modelos',
+      'dynamic_form',
+      'dynamic_form_detail',
+      'dynamic_form_response',
+      'dynamic_form_response_detail',
+    };
     return !tablesWithoutTimestamps.contains(tableName);
   }
 }

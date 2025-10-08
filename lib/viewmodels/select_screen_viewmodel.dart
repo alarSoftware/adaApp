@@ -469,6 +469,11 @@ class SelectScreenViewModel extends ChangeNotifier {
       detalles.add('Censos: ${resultado.censosSincronizados}');
     }
 
+    if (resultado.formulariosSincronizados > 0) {
+      detalles.add('Formularios: ${resultado.formulariosSincronizados}');
+    }
+
+
     if (resultado.asignacionesSincronizadas > 0) {
       detalles.add('Asignaciones: ${resultado.asignacionesSincronizadas}');
     }

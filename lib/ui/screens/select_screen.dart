@@ -5,6 +5,7 @@ import 'package:ada_app/ui/screens/modelos_screen.dart';
 import 'package:ada_app/ui/screens/logo_screen.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/select_screen_viewmodel.dart';
+import 'package:ada_app/ui/screens/dynamic_form_responses_screen.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -566,22 +567,6 @@ class _SelectScreenState extends State<SelectScreen> {
                           page: const LogosScreen(),
                         ),
                         SizedBox(height: 12),
-                        // Espacio para futura sección de formularios
-                        // _buildMenuCard(
-                        //   label: 'Formularios',
-                        //   description: 'Formularios dinámicos',
-                        //   icon: Icons.edit_note,
-                        //   color: AppColors.primary,
-                        //   page: const FormulariosScreen(),
-                        // ),
-                        //SizedBox(height: 12),
-                        // _buildMenuCard(
-                          //label: 'Pendientes de Envio',
-                           //description: 'Censos pendientes de envio',
-                           //icon: Icons.edit_note,
-                           //color: AppColors.primary,
-                           //page: const SyncPanelScreen(),
-                         //)
                       ],
                     ),
                   ),

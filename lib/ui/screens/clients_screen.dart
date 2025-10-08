@@ -1,4 +1,3 @@
-// ui/screens/clients_screen.dart
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/screens/cliente_detail_screen.dart';
 import 'package:ada_app/ui/theme/colors.dart';
@@ -8,6 +7,7 @@ import 'package:ada_app/ui/widgets/app_loading.dart';
 import 'package:ada_app/ui/widgets/app_loading_more.dart';
 import 'package:ada_app/ui/widgets/app_empty_state.dart';
 import 'package:ada_app/ui/widgets/app_search_bar.dart';
+import 'package:ada_app/ui/screens/client_options_screen.dart';
 import 'dart:async';
 
 class ClienteListScreen extends StatefulWidget {
@@ -49,7 +49,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ClienteDetailScreen(cliente: event.cliente),
+            builder: (context) => ClientOptionsScreen(cliente: event.cliente),
           ),
         ).then((_) {
           // Opcional: refrescar lista de clientes si es necesario

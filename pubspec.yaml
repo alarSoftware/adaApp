@@ -27,6 +27,7 @@ dependencies:
   image_picker: ^1.0.4
   path_provider: ^2.1.1
   flutter_svg: ^2.0.0
+  uuid: ^4.0.0
 
   # Para peticiones HTTP
   http: ^1.2.0

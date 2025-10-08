@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/viewmodels/cliente_detail_screen_viewmodel.dart';
 import 'package:ada_app/ui/screens/equipos_clientes_detail_screen.dart';
+import 'package:ada_app/ui/widgets/client_info_card.dart';
 import 'forms_screen.dart';
 import 'dart:async';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:logger/logger.dart';
-import 'package:ada_app/main.dart'; // ✅ IMPORTANTE: Importar para acceder a MyApp.routeObserver
+import 'package:ada_app/main.dart';
 
 var logger = Logger();
 
@@ -163,39 +164,29 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   }
 
   Widget _buildClienteInfoCard() {
-    return Card(
-      elevation: 3,
-      color: AppColors.cardBackground,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.cliente.nombre,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            _buildInfoRow(Icons.person_outline, 'Propietario', widget.cliente.propietario),
-            if (_viewModel.shouldShowPhone())
-              _buildInfoRow(Icons.phone_outlined, 'Teléfono', _viewModel.getClientePhone()),
-            if (_viewModel.shouldShowAddress())
-              _buildInfoRow(Icons.location_on_outlined, 'Dirección', _viewModel.getClienteAddress()),
-          ],
+    return ClientInfoCard(
+      cliente: widget.cliente,
+      padding: const EdgeInsets.all(20),
+      additionalInfo: [
+        ClientInfoRow(
+          icon: Icons.person_outline,
+          label: 'Propietario',
+          value: widget.cliente.propietario,
         ),
-      ),
+        if (_viewModel.shouldShowPhone())
+          ClientInfoRow(
+            icon: Icons.phone_outlined,
+            label: 'Teléfono',
+            value: _viewModel.getClientePhone(),
+          ),
+        if (_viewModel.shouldShowAddress())
+          ClientInfoRow(
+            icon: Icons.location_on_outlined,
+            label: 'Dirección',
+            value: _viewModel.getClienteAddress(),
+          ),
+      ],
+      showDefaultInfo: false,
     );
   }
 
