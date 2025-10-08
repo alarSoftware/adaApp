@@ -168,27 +168,50 @@ class DynamicFormRepository {
     }
   }
 
-  /// ✅ MÉTODO CORREGIDO: Mapear datos de BD a DynamicFormTemplate incluyendo los detalles
+  /// ✅ MÉTODO MEJORADO: Mapear datos de BD a DynamicFormTemplate con ordenamiento correcto
   Future<DynamicFormTemplate?> _mapearBDaTemplateConDetalles(Map<String, dynamic> map) async {
     try {
-      final formId = map['id']?.toString() ?? '';
+      _logger.d('🔍 === INICIO MAPEO TEMPLATE ===');
+      _logger.d('📋 Map recibido: $map');
 
+      // Validar formId
+      final formId = map['id']?.toString() ?? '';
       if (formId.isEmpty) {
         _logger.e('❌ Formulario sin ID');
         return null;
       }
 
-      // Obtener los detalles (campos) del formulario
-      final detalles = await _dbHelper.consultar(
+      _logger.d('✅ FormID: $formId');
+
+      // Obtener detalles
+      _logger.d('🔍 Consultando detalles para form_id: $formId');
+      var detalles = await _dbHelper.consultar(
         detailTableName,
         where: 'dynamic_form_id = ?',
         whereArgs: [formId],
-        orderBy: 'sequence ASC',
       );
 
-      _logger.d('📋 Formulario ${map['name'] ?? 'Sin nombre'}: ${detalles.length} detalles encontrados');
+      _logger.i('📋 Formulario "${map['name']}": ${detalles.length} detalles encontrados');
 
-      // Preparar el JSON del formulario - CON MANEJO DE NULLS
+      // Si no hay detalles, retornar null o template vacío según tu lógica
+      if (detalles.isEmpty) {
+        _logger.w('⚠️ Formulario sin detalles, retornando null');
+        return null;
+      }
+
+      // Ordenar por ID
+      try {
+        detalles.sort((a, b) {
+          final idA = int.tryParse(a['id']?.toString() ?? '0') ?? 0;
+          final idB = int.tryParse(b['id']?.toString() ?? '0') ?? 0;
+          return idA.compareTo(idB);
+        });
+        _logger.d('✅ ${detalles.length} detalles ordenados por ID');
+      } catch (e) {
+        _logger.w('⚠️ Error ordenando detalles: $e (continuando sin ordenar)');
+      }
+
+      // Preparar formJson
       final formJson = {
         'id': int.tryParse(formId) ?? formId,
         'name': map['name']?.toString() ?? 'Sin título',
@@ -202,50 +225,69 @@ class DynamicFormRepository {
         'lastUpdateUser': map['last_update_user_id'],
       };
 
-      // Preparar el JSON de los detalles - CON MANEJO DE NULLS
-      final detailsJson = detalles.map((detalle) {
-        // Validar que el detalle tenga ID
-        if (detalle['id'] == null) {
-          _logger.w('⚠️ Detalle sin ID encontrado, omitiendo');
-          return null;
+      _logger.d('✅ formJson: ${formJson['name']} (ID: ${formJson['id']})');
+
+      // Preparar detailsJson
+      final detailsJson = <Map<String, dynamic>>[];
+
+      for (var detalle in detalles) {
+        try {
+          // Validar ID del detalle
+          if (detalle['id'] == null || detalle['id'].toString().isEmpty) {
+            _logger.w('⚠️ Detalle sin ID, omitiendo');
+            continue;
+          }
+
+          final detalleMap = {
+            'id': detalle['id'],
+            'type': detalle['type']?.toString() ?? 'text',
+            'label': detalle['label']?.toString() ?? 'Sin etiqueta',
+            'parent': detalle['parent_id'] != null
+                ? {'id': detalle['parent_id']}
+                : null,
+            'sequence': detalle['sequence'],
+            'points': detalle['points'] ?? 0,
+            'respuestaCorrectaOpt': _parseBooleanFromDb(detalle['respuesta_correcta_opt']),
+            'respuestaCorrectaText': detalle['respuesta_correcta']?.toString(),
+            'percentage': detalle['percentage'],
+            'dynamicForm': {'id': formId},
+          };
+
+          detailsJson.add(detalleMap);
+
+        } catch (e) {
+          _logger.w('⚠️ Error procesando detalle ${detalle['id']}: $e');
+          continue;
         }
+      }
 
-        return {
-          'id': detalle['id'],
-          'type': detalle['type']?.toString() ?? 'text',
-          'label': detalle['label']?.toString() ?? 'Sin etiqueta',
-          'parent': detalle['parent_id'] != null
-              ? {'id': detalle['parent_id']}
-              : null,
-          'sequence': detalle['sequence'] ?? 0,
-          'points': detalle['points'] ?? 0,
-          'respuestaCorrectaOpt': _parseBooleanFromDb(detalle['respuesta_correcta_opt']),
-          'respuestaCorrectaText': detalle['respuesta_correcta']?.toString(),
-          'percentage': detalle['percentage'],
-          'dynamicForm': {'id': formId},
-        };
-      }).where((d) => d != null).toList(); // Filtrar nulls
+      _logger.i('✅ ${detailsJson.length} detalles procesados correctamente');
 
-      // Usar fromApiJson para crear el template
-      final template = DynamicFormTemplate.fromApiJson(
-          formJson,
-          detailsJson.cast<Map<String, dynamic>>()
-      );
+      if (detailsJson.isEmpty) {
+        _logger.e('❌ No se pudo procesar ningún detalle');
+        return null;
+      }
 
-      _logger.d('✅ Template creado: ${template.title} con ${template.fields.length} campos organizados');
+      // Crear template
+      _logger.d('🔨 Creando DynamicFormTemplate...');
+
+      final template = DynamicFormTemplate.fromApiJson(formJson, detailsJson);
+
+      _logger.i('✅ Template creado: "${template.title}" con ${template.fields.length} campos');
+      _logger.d('🔍 === FIN MAPEO TEMPLATE ===\n');
 
       return template;
+
     } catch (e, stackTrace) {
-      _logger.e('❌ Error mapeando template: $e');
+      _logger.e('❌ ERROR CRÍTICO en _mapearBDaTemplateConDetalles: $e');
       _logger.e('Stack trace: $stackTrace');
       return null;
     }
   }
 
-// Método auxiliar para parsear booleanos desde la BD
+  /// Parsear valores booleanos desde la BD
   bool? _parseBooleanFromDb(dynamic value) {
     if (value == null) return null;
-
     if (value is bool) return value;
     if (value is int) return value == 1;
 

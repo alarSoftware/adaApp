@@ -255,7 +255,7 @@ class DynamicFormFieldWidget extends StatelessWidget {
     return allOptions.where((opt) => opt.type == 'opt').toList();
   }
 
-  /// Renderiza un grupo de checkboxes (sin cambios)
+  /// Renderiza un grupo de checkboxes
   Widget _buildCheckboxGroup() {
     List<String> selectedIds = [];
 

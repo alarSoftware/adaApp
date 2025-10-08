@@ -1,4 +1,5 @@
 import 'dynamic_form_field.dart';
+
 class DynamicFormTemplate {
   final String id;
   final String title;
@@ -29,12 +30,20 @@ class DynamicFormTemplate {
       Map<String, dynamic> formJson,
       List<Map<String, dynamic>> detailsJson,
       ) {
-    // Primero, crear todos los campos
-    final allFields = detailsJson
+    // ⭐ PASO 1: ORDENAR detailsJson por ID ANTES de procesar
+    final sortedDetailsJson = List<Map<String, dynamic>>.from(detailsJson);
+    sortedDetailsJson.sort((a, b) {
+      final idA = _extractNumericId(a['id']);
+      final idB = _extractNumericId(b['id']);
+      return idA.compareTo(idB);
+    });
+
+    // PASO 2: Crear todos los campos
+    final allFields = sortedDetailsJson
         .map((detail) => DynamicFormField.fromApiJson(detail))
         .toList();
 
-    // Organizar los campos en jerarquía (padres con sus hijos)
+    // PASO 3: Organizar los campos en jerarquía (padres con sus hijos)
     final organizedFields = _organizeFieldsHierarchy(allFields);
 
     return DynamicFormTemplate(
@@ -59,7 +68,32 @@ class DynamicFormTemplate {
     );
   }
 
-  /// Organiza los campos en jerarquía (padres con sus hijos)
+  /// Extrae el ID numérico de manera segura
+  static int _extractNumericId(dynamic id) {
+    if (id == null) return 999999;
+    if (id is int) return id;
+    if (id is String) return int.tryParse(id) ?? 999999;
+    return 999999;
+  }
+
+  /// Compara dos campos para ordenamiento (sequence prioritario, luego ID)
+  static int _compareFields(DynamicFormField a, DynamicFormField b) {
+    // Primero intentar ordenar por sequence si ambos lo tienen
+    if (a.sequence != null && b.sequence != null) {
+      return a.sequence!.compareTo(b.sequence!);
+    }
+
+    // Si uno tiene sequence y otro no, el que tiene va primero
+    if (a.sequence != null) return -1;
+    if (b.sequence != null) return 1;
+
+    // Si ninguno tiene sequence, ordenar por ID numérico
+    final idA = _extractNumericId(a.id);
+    final idB = _extractNumericId(b.id);
+    return idA.compareTo(idB);
+  }
+
+  /// Organiza los campos manteniendo la jerarquía completa (NO aplana)
   static List<DynamicFormField> _organizeFieldsHierarchy(List<DynamicFormField> allFields) {
     // Crear un mapa para búsqueda rápida por ID
     final Map<String, DynamicFormField> fieldsById = {};
@@ -80,6 +114,11 @@ class DynamicFormTemplate {
       }
     }
 
+    // ⭐ ORDENAR los hijos de cada padre usando _compareFields
+    childrenMap.forEach((parentId, children) {
+      children.sort(_compareFields);
+    });
+
     // Función recursiva para construir el árbol COMPLETO
     DynamicFormField buildTree(DynamicFormField field) {
       final children = childrenMap[field.id] ?? [];
@@ -89,6 +128,9 @@ class DynamicFormTemplate {
 
     // Obtener solo los nodos raíz (sin parent)
     final rootFields = allFields.where((f) => f.parentId == null).toList();
+
+    // ⭐ ORDENAR los campos raíz usando _compareFields
+    rootFields.sort(_compareFields);
 
     // Construir el árbol completo para cada raíz
     final organizedFields = rootFields.map((root) => buildTree(root)).toList();
@@ -122,49 +164,26 @@ class DynamicFormTemplate {
     return finalFields;
   }
 
-  static List<DynamicFormField> _extractOptions(DynamicFormField field) {
-    List<DynamicFormField> options = [];
-
-    for (final child in field.children) {
-      if (child.type == 'opt') {
-        // Es una opción directa
-        options.add(child);
-
-        // Buscar opciones anidadas (como Si_2, Si_3, etc.)
-        options.addAll(_extractOptionsRecursive(child));
-      } else if (child.type == 'radio_button' || child.type == 'checkbox') {
-        // Caso especial: hay otro radio/checkbox anidado
-        // Esto no debería pasar según tu estructura, pero por si acaso
-        options.addAll(_extractOptions(child));
-      }
-    }
-
-    return options;
-  }
-
-  /// Extrae opciones de forma recursiva (para manejar Si -> Si_2 -> Si_3 -> Si_4)
-  static List<DynamicFormField> _extractOptionsRecursive(DynamicFormField option) {
-    List<DynamicFormField> nestedOptions = [];
-
-    for (final child in option.children) {
-      if (child.type == 'opt') {
-        nestedOptions.add(child);
-        nestedOptions.addAll(_extractOptionsRecursive(child));
-      }
-    }
-
-    return nestedOptions;
-  }
-
-  /// Obtiene un campo por su ID
+  /// Obtiene un campo por su ID (búsqueda recursiva completa)
   DynamicFormField? getFieldById(String id) {
     for (final field in fields) {
       if (field.id == id) return field;
 
-      // Buscar en los hijos
-      for (final child in field.children) {
-        if (child.id == id) return child;
-      }
+      // Buscar en los hijos recursivamente
+      final found = _findFieldInChildren(field, id);
+      if (found != null) return found;
+    }
+    return null;
+  }
+
+  /// Busca un campo en los hijos recursivamente
+  DynamicFormField? _findFieldInChildren(DynamicFormField parent, String id) {
+    for (final child in parent.children) {
+      if (child.id == id) return child;
+
+      // Buscar en los nietos
+      final found = _findFieldInChildren(child, id);
+      if (found != null) return found;
     }
     return null;
   }

@@ -144,8 +144,6 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
             _buildFilterChip('Completados', 'completed'),
             SizedBox(width: 8),
             _buildFilterChip('Borradores', 'draft'),
-            SizedBox(width: 8),
-            _buildFilterChip('Pendientes Sync', 'pending'),
           ],
         ),
       ),
