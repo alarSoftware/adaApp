@@ -11,13 +11,13 @@ class ClientInfoCard extends StatelessWidget {
   final bool showDefaultInfo;
 
   const ClientInfoCard({
-    Key? key,
+    super.key,
     required this.cliente,
     this.title,
     this.additionalInfo,
     this.padding,
     this.showDefaultInfo = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +29,7 @@ class ClientInfoCard extends StatelessWidget {
       ),
       elevation: 2,
       child: Padding(
-        padding: padding ?? const EdgeInsets.all(16.0),
+        padding: padding ?? const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0), // <- Cambia aquí
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -46,6 +46,9 @@ class ClientInfoCard extends StatelessWidget {
               ),
               SizedBox(height: 8),
             ],
+
+            // Espacio superior (igual que en el código original)
+            SizedBox(height: 8),
 
             // Nombre del cliente
             Text(

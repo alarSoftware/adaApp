@@ -3,6 +3,7 @@ import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/ui/screens/cliente_detail_screen.dart';
 import 'package:ada_app/ui/screens/dynamic_form_responses_screen.dart';
+import 'package:ada_app/ui/widgets/client_info_card.dart';
 
 /// Pantalla de selección de opciones para un cliente
 class ClientOptionsScreen extends StatelessWidget {
@@ -36,39 +37,7 @@ class ClientOptionsScreen extends StatelessWidget {
               // Header con información del cliente
               Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Card(
-                  color: AppColors.surface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: AppColors.border),
-                  ),
-                  elevation: 2,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(height: 8),
-                        Text(
-                          cliente.nombre,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          cliente.propietario,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                child: ClientInfoCard(cliente: cliente),
               ),
 
               // Título de opciones

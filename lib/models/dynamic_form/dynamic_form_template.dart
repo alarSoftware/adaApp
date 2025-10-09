@@ -1,4 +1,4 @@
-import 'dynamic_form_field.dart';
+import 'package:ada_app/models/dynamic_form/dynamic_form_field.dart';
 
 class DynamicFormTemplate {
   final String id;
@@ -25,12 +25,10 @@ class DynamicFormTemplate {
     this.metadata,
   });
 
-  /// Crea un template desde el JSON del API
   factory DynamicFormTemplate.fromApiJson(
       Map<String, dynamic> formJson,
       List<Map<String, dynamic>> detailsJson,
       ) {
-    // ⭐ PASO 1: ORDENAR detailsJson por ID ANTES de procesar
     final sortedDetailsJson = List<Map<String, dynamic>>.from(detailsJson);
     sortedDetailsJson.sort((a, b) {
       final idA = _extractNumericId(a['id']);
@@ -38,13 +36,12 @@ class DynamicFormTemplate {
       return idA.compareTo(idB);
     });
 
-    // PASO 2: Crear todos los campos
     final allFields = sortedDetailsJson
         .map((detail) => DynamicFormField.fromApiJson(detail))
         .toList();
 
-    // PASO 3: Organizar los campos en jerarquía (padres con sus hijos)
-    final organizedFields = _organizeFieldsHierarchy(allFields);
+    // ⭐ NUEVA ESTRATEGIA: NO aplanar, mantener jerarquía completa
+    final organizedFields = _organizeFieldsKeepingHierarchy(allFields);
 
     return DynamicFormTemplate(
       id: formJson['id'].toString(),
@@ -68,7 +65,6 @@ class DynamicFormTemplate {
     );
   }
 
-  /// Extrae el ID numérico de manera segura
   static int _extractNumericId(dynamic id) {
     if (id == null) return 999999;
     if (id is int) return id;
@@ -76,100 +72,83 @@ class DynamicFormTemplate {
     return 999999;
   }
 
-  /// Compara dos campos para ordenamiento (sequence prioritario, luego ID)
   static int _compareFields(DynamicFormField a, DynamicFormField b) {
-    // Primero intentar ordenar por sequence si ambos lo tienen
     if (a.sequence != null && b.sequence != null) {
       return a.sequence!.compareTo(b.sequence!);
     }
-
-    // Si uno tiene sequence y otro no, el que tiene va primero
     if (a.sequence != null) return -1;
     if (b.sequence != null) return 1;
 
-    // Si ninguno tiene sequence, ordenar por ID numérico
     final idA = _extractNumericId(a.id);
     final idB = _extractNumericId(b.id);
     return idA.compareTo(idB);
   }
 
-  /// Organiza los campos manteniendo la jerarquía completa (NO aplana)
-  static List<DynamicFormField> _organizeFieldsHierarchy(List<DynamicFormField> allFields) {
-    // Crear un mapa para búsqueda rápida por ID
+  /// ⭐ NUEVA ESTRATEGIA: Mantener la jerarquía completa sin aplanar
+  static List<DynamicFormField> _organizeFieldsKeepingHierarchy(List<DynamicFormField> allFields) {
+    // 1. Crear mapa de búsqueda rápida
     final Map<String, DynamicFormField> fieldsById = {};
     for (final field in allFields) {
       fieldsById[field.id] = field;
     }
 
-    // Construir el árbol completo recursivamente
+    // 2. Agrupar hijos por parent_id
     Map<String, List<DynamicFormField>> childrenMap = {};
-
-    // Agrupar hijos por su parent_id
     for (final field in allFields) {
       if (field.parentId != null) {
-        if (!childrenMap.containsKey(field.parentId)) {
-          childrenMap[field.parentId!] = [];
-        }
-        childrenMap[field.parentId]!.add(field);
+        childrenMap.putIfAbsent(field.parentId!, () => []).add(field);
       }
     }
 
-    // ⭐ ORDENAR los hijos de cada padre usando _compareFields
+    // 3. Ordenar los hijos de cada padre
     childrenMap.forEach((parentId, children) {
       children.sort(_compareFields);
     });
 
-    // Función recursiva para construir el árbol COMPLETO
+    // 4. Construir árbol completo recursivamente
     DynamicFormField buildTree(DynamicFormField field) {
       final children = childrenMap[field.id] ?? [];
       final childrenWithTheirChildren = children.map((child) => buildTree(child)).toList();
       return field.withChildren(childrenWithTheirChildren);
     }
 
-    // Obtener solo los nodos raíz (sin parent)
+    // 5. Obtener campos raíz y construir árbol
     final rootFields = allFields.where((f) => f.parentId == null).toList();
-
-    // ⭐ ORDENAR los campos raíz usando _compareFields
     rootFields.sort(_compareFields);
+    final fieldsWithChildren = rootFields.map((root) => buildTree(root)).toList();
 
-    // Construir el árbol completo para cada raíz
-    final organizedFields = rootFields.map((root) => buildTree(root)).toList();
+    // 6. ⭐ NUEVA LÓGICA: Solo retornar campos de primer nivel
+    // Los campos anidados se quedan en children y el widget los renderiza
+    final List<DynamicFormField> topLevelFields = [];
 
-    // Filtrar y procesar según tipo, pero MANTENER la jerarquía
-    final List<DynamicFormField> finalFields = [];
-
-    for (final root in organizedFields) {
+    for (final root in fieldsWithChildren) {
       if (root.type == 'titulo') {
-        // Agregar el título
-        finalFields.add(root);
-
-        // Procesar sus hijos directos (radio_button, checkbox, resp_abierta, etc.)
+        topLevelFields.add(root);
+        // Agregar solo los hijos directos que sean renderizables (no opts)
         for (final child in root.children) {
-          if (child.type == 'radio_button' || child.type == 'checkbox') {
-            // Mantener la estructura jerárquica completa
-            finalFields.add(child);
-          } else if (child.type == 'resp_abierta' || child.type == 'resp_abierta_larga') {
-            finalFields.add(child);
+          if (child.type == 'radio_button' ||
+              child.type == 'checkbox' ||
+              child.type == 'resp_abierta' ||
+              child.type == 'resp_abierta_larga') {
+            topLevelFields.add(child);
           }
         }
       } else if (root.type == 'radio_button' || root.type == 'checkbox') {
-        // Radio o checkbox sin título padre - mantener jerarquía
-        finalFields.add(root);
+        // Radio/Checkbox con su jerarquía completa de children
+        topLevelFields.add(root);
       } else if (root.type == 'resp_abierta' || root.type == 'resp_abierta_larga') {
-        // Campo de texto sin padre
-        finalFields.add(root);
+        // Campos de texto standalone
+        topLevelFields.add(root);
       }
     }
 
-    return finalFields;
+    return topLevelFields;
   }
 
   /// Obtiene un campo por su ID (búsqueda recursiva completa)
   DynamicFormField? getFieldById(String id) {
     for (final field in fields) {
       if (field.id == id) return field;
-
-      // Buscar en los hijos recursivamente
       final found = _findFieldInChildren(field, id);
       if (found != null) return found;
     }
@@ -180,20 +159,40 @@ class DynamicFormTemplate {
   DynamicFormField? _findFieldInChildren(DynamicFormField parent, String id) {
     for (final child in parent.children) {
       if (child.id == id) return child;
-
-      // Buscar en los nietos
       final found = _findFieldInChildren(child, id);
       if (found != null) return found;
     }
     return null;
   }
 
-  /// Obtiene todos los campos que necesitan respuesta (excluyendo títulos y opts solos)
-  List<DynamicFormField> get answerableFields {
-    return fields.where((f) => f.type != 'titulo').toList();
+  /// ⭐ SIMPLIFICADO: Ya no necesitamos getVisibleFields porque el widget maneja la visibilidad
+  List<DynamicFormField> getVisibleFields(Map<String, dynamic> answers) {
+    // Simplemente retornar todos los campos de primer nivel
+    // El widget DynamicFormFieldWidget se encarga de mostrar/ocultar los children
+    return fields;
   }
 
-  /// Obtiene todos los campos obligatorios
+  /// Obtiene todos los campos que necesitan respuesta (recursivo)
+  List<DynamicFormField> get answerableFields {
+    List<DynamicFormField> answerable = [];
+
+    void collectAnswerable(DynamicFormField field) {
+      if (field.type != 'titulo' && field.type != 'opt') {
+        answerable.add(field);
+      }
+      for (final child in field.children) {
+        collectAnswerable(child);
+      }
+    }
+
+    for (final field in fields) {
+      collectAnswerable(field);
+    }
+
+    return answerable;
+  }
+
+  /// Obtiene todos los campos obligatorios (recursivo)
   List<DynamicFormField> get requiredFields {
     return answerableFields.where((f) => f.required).toList();
   }
@@ -204,7 +203,6 @@ class DynamicFormTemplate {
   /// Cuenta de campos obligatorios
   int get requiredFieldCount => requiredFields.length;
 
-  /// Convierte a JSON
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -220,7 +218,6 @@ class DynamicFormTemplate {
     };
   }
 
-  /// Crea una copia con modificaciones
   DynamicFormTemplate copyWith({
     String? id,
     String? title,

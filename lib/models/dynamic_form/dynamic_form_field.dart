@@ -1,18 +1,17 @@
 /// Representa un campo/pregunta individual del formulario dinámico
 class DynamicFormField {
-  final String id;                    // ID único del campo (viene del API)
-  final String type;                  // titulo, radio_button, checkbox, resp_abierta, opt
-  final String label;                 // Texto de la pregunta/opción
-  final String? parentId;             // ID del parent (para opciones anidadas)
-  final int? sequence;                // Orden de la pregunta
-  final double? points;               // Puntos asignados
-  final bool? respuestaCorrectaOpt;   // Si es la respuesta correcta (para opts)
-  final String? respuestaCorrectaText; // Respuesta correcta en texto
-  final double? percentage;           // Porcentaje asignado
-
-  // Campos derivados para facilitar el uso
-  final bool isParent;                // Si es un campo padre (titulo, checkbox, radio_button)
-  final List<DynamicFormField> children; // Opciones hijas (si las tiene)
+  final String id;
+  final String type;
+  final String label;
+  final String? parentId;
+  final int? sequence;
+  final double? points;
+  final bool? respuestaCorrectaOpt;
+  final String? respuestaCorrectaText;
+  final double? percentage;
+  final bool isParent;
+  final List<DynamicFormField> children;
+  final Map<String, dynamic>? metadata; // ← NUEVO: para metadata de condiciones
 
   DynamicFormField({
     required this.id,
@@ -26,9 +25,9 @@ class DynamicFormField {
     this.percentage,
     this.isParent = false,
     this.children = const [],
+    this.metadata, // ← NUEVO
   });
 
-  /// Crea un campo desde el JSON del API
   factory DynamicFormField.fromApiJson(Map<String, dynamic> json) {
     return DynamicFormField(
       id: json['id'].toString(),
@@ -44,19 +43,14 @@ class DynamicFormField {
     );
   }
 
-  /// Determina si un tipo de campo puede tener hijos
   static bool _isParentType(String type) {
     return ['titulo', 'radio_button', 'checkbox'].contains(type);
   }
 
-  /// Verifica si este campo es obligatorio
   bool get required {
-    // Los títulos y opciones individuales no son obligatorios
-    // Los campos de respuesta sí lo son
     return type != 'titulo' && type != 'opt';
   }
 
-  /// Obtiene el tipo de widget que debe renderizarse
   String get widgetType {
     switch (type) {
       case 'titulo':
@@ -67,6 +61,8 @@ class DynamicFormField {
         return 'checkbox_group';
       case 'resp_abierta':
         return 'text_field';
+      case 'image':
+        return 'image_picker';
       case 'opt':
         return 'option';
       default:
@@ -74,7 +70,6 @@ class DynamicFormField {
     }
   }
 
-  /// Placeholder para el campo
   String? get placeholder {
     if (type == 'resp_abierta') {
       return 'Escribe tu respuesta aquí...';
@@ -82,22 +77,18 @@ class DynamicFormField {
     return null;
   }
 
-  /// Hint/ayuda para el campo
   String? get hint => null;
 
-  /// Longitud máxima (solo para texto)
   int? get maxLength => type == 'resp_abierta' ? 500 : null;
 
-  /// Opciones del campo (para dropdowns, etc.)
   List<String>? get options {
     if (children.isEmpty) return null;
     return children.map((c) => c.label).toList();
   }
 
-  /// Validación simple
   String? validate(dynamic value) {
     if (type == 'titulo' || type == 'opt') {
-      return null; // Los títulos y opciones no se validan directamente
+      return null;
     }
 
     if (required && (value == null || value.toString().trim().isEmpty)) {
@@ -107,7 +98,6 @@ class DynamicFormField {
     return null;
   }
 
-  /// Crea una copia con hijos asignados
   DynamicFormField withChildren(List<DynamicFormField> children) {
     return DynamicFormField(
       id: id,
@@ -121,10 +111,41 @@ class DynamicFormField {
       percentage: percentage,
       isParent: isParent,
       children: children,
+      metadata: metadata,
     );
   }
 
-  /// Convierte a JSON
+  /// ⭐ NUEVO: copyWith para agregar metadata
+  DynamicFormField copyWith({
+    String? id,
+    String? type,
+    String? label,
+    String? parentId,
+    int? sequence,
+    double? points,
+    bool? respuestaCorrectaOpt,
+    String? respuestaCorrectaText,
+    double? percentage,
+    bool? isParent,
+    List<DynamicFormField>? children,
+    Map<String, dynamic>? metadata,
+  }) {
+    return DynamicFormField(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      label: label ?? this.label,
+      parentId: parentId ?? this.parentId,
+      sequence: sequence ?? this.sequence,
+      points: points ?? this.points,
+      respuestaCorrectaOpt: respuestaCorrectaOpt ?? this.respuestaCorrectaOpt,
+      respuestaCorrectaText: respuestaCorrectaText ?? this.respuestaCorrectaText,
+      percentage: percentage ?? this.percentage,
+      isParent: isParent ?? this.isParent,
+      children: children ?? this.children,
+      metadata: metadata ?? this.metadata,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -138,6 +159,7 @@ class DynamicFormField {
       if (percentage != null) 'percentage': percentage,
       'isParent': isParent,
       if (children.isNotEmpty) 'children': children.map((c) => c.toJson()).toList(),
+      if (metadata != null) 'metadata': metadata,
     };
   }
 
@@ -146,7 +168,7 @@ class DynamicFormField {
     return 'DynamicFormField(id: $id, type: $type, label: $label, children: ${children.length})';
   }
 
-  // Propiedades adicionales para compatibilidad con código antiguo
+  // Compatibilidad con código antiguo
   String get key => id;
   String? get defaultValue => null;
   num? get minValue => null;

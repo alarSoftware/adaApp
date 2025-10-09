@@ -34,7 +34,6 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
 
   Future<void> _loadData() async {
     await _viewModel.loadTemplates();
-    // ✅ AGREGAR clienteId aquí:
     await _viewModel.loadSavedResponses(clienteId: widget.cliente.id.toString());
   }
 
@@ -80,17 +79,15 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
             colors: [AppColors.containerBackground, AppColors.background],
           ),
         ),
-        child: Column(
+        child: SafeArea(child: Column(
           children: [
             // Card de información del cliente
             Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0), // <- Reduce el padding horizontal
               child: ClientInfoCard(
                 cliente: widget.cliente,
-                title: 'Cliente Seleccionado',
               ),
             ),
-
             // Filtros
             _buildFilterChips(),
 
@@ -122,6 +119,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
               ),
             ),
           ],
+        )
         ),
       ),
       // ✂️ Botón flotante eliminado

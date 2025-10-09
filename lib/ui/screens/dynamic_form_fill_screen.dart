@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/dynamic_form_viewmodel.dart';
 import 'package:ada_app/ui/widgets/dynamic_form/dynamic_form_field_widget.dart';
-import 'package:intl/intl.dart'; // ← AGREGAR ESTA LÍNEA
+import 'package:intl/intl.dart';
 
 /// Pantalla para llenar un formulario dinámico
 class DynamicFormFillScreen extends StatefulWidget {
@@ -62,6 +62,10 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
               );
             }
 
+            // ⭐ CAMBIO CRÍTICO: Obtener solo campos visibles según respuestas actuales
+            final currentAnswers = widget.viewModel.currentResponse?.answers ?? {};
+            final visibleFields = template.getVisibleFields(currentAnswers);
+
             return Column(
               children: [
                 // Barra de progreso
@@ -88,16 +92,21 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
 
                           SizedBox(height: 24),
 
-                          // Campos del formulario
-                          ...template.fields.map((field) {
+                          // ⭐ CAMBIO CRÍTICO: Usar visibleFields en lugar de template.fields
+                          ...visibleFields.map((field) {
                             return DynamicFormFieldWidget(
+                              key: ValueKey('${field.id}_${currentAnswers[field.id]}'), // ⭐ Key para forzar rebuild
                               field: field,
-                              value: widget.viewModel.getFieldValue(field.id),  // ← Cambiar .key por .id
+                              value: widget.viewModel.getFieldValue(field.id),
                               onChanged: (value) {
-                                widget.viewModel.updateFieldValue(field.id, value);  // ← Cambiar .key por .id
+                                widget.viewModel.updateFieldValue(field.id, value);
                               },
-                              errorText: widget.viewModel.getFieldError(field.id),  // ← Cambiar .key por .id
-                              allValues: widget.viewModel.currentResponse?.answers ?? {}, // ← AGREGAR ESTA LÍNEA
+                              errorText: widget.viewModel.getFieldError(field.id),
+                              allValues: currentAnswers,
+                              onNestedFieldChanged: (fieldId, value) {
+                                // ⭐ NUEVO: Callback para campos anidados
+                                widget.viewModel.updateFieldValue(fieldId, value);
+                              },
                             );
                           }).toList(),
 
@@ -110,55 +119,6 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
               ],
             );
           },
-        ),
-        floatingActionButton: ListenableBuilder(
-          listenable: widget.viewModel,
-          builder: (context, child) {
-            final isComplete = widget.viewModel.isFormComplete();
-
-            return FloatingActionButton.extended(
-              onPressed: isComplete ? _saveAndComplete : null,
-              backgroundColor: isComplete ? AppColors.success : AppColors.neutral400,
-              foregroundColor: AppColors.onPrimary,
-              icon: Icon(Icons.check_circle_outline),
-              label: Text('Completar Formulario'),
-            );
-          },
-        ),
-      ),
-    );
-  }
-  Widget _buildDebugInfo() {
-    final response = widget.viewModel.currentResponse;
-
-    if (response == null) {
-      return Card(
-        color: Colors.red.withOpacity(0.1),
-        child: Padding(
-          padding: EdgeInsets.all(12),
-          child: Text('❌ No hay response cargado'),
-        ),
-      );
-    }
-
-    return Card(
-      color: Colors.blue.withOpacity(0.1),
-      child: Padding(
-        padding: EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('🔍 DEBUG - Datos en BD',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-            Divider(),
-            Text('ID: ${response.id}', style: TextStyle(fontSize: 11)),
-            Text('Template ID: ${response.formTemplateId}', style: TextStyle(fontSize: 11)),
-            Text('Cliente ID: ${response.clienteId}', style: TextStyle(fontSize: 11)),
-            Text('Estado: ${response.status}', style: TextStyle(fontSize: 11)),
-            Text('Creado: ${DateFormat('dd/MM/yyyy HH:mm').format(response.createdAt)}',
-                style: TextStyle(fontSize: 11)),
-            Text('Answers: ${response.answers.length}', style: TextStyle(fontSize: 11)),
-          ],
         ),
       ),
     );
