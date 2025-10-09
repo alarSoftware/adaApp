@@ -8,7 +8,7 @@ import 'package:ada_app/ui/screens/dynamic_form_template_list_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:ada_app/ui/screens/dynamic_form_fill_screen.dart';
 
-/// Pantalla principal que muestra las respuestas guardadas (completadas y borradores)
+/// Pantalla principal que muestra las respuestas guardadas
 class DynamicFormResponsesScreen extends StatefulWidget {
   final Cliente cliente;
 
@@ -23,7 +23,7 @@ class DynamicFormResponsesScreen extends StatefulWidget {
 
 class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen> {
   late DynamicFormViewModel _viewModel;
-  String _filterStatus = 'all'; // all, completed, draft, pending
+  String _filterStatus = 'all'; // all, completed, pending, synced
 
   @override
   void initState() {
@@ -79,50 +79,50 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
             colors: [AppColors.containerBackground, AppColors.background],
           ),
         ),
-        child: SafeArea(child: Column(
-          children: [
-            // Card de información del cliente
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0), // <- Reduce el padding horizontal
-              child: ClientInfoCard(
-                cliente: widget.cliente,
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Card de información del cliente
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0),
+                child: ClientInfoCard(
+                  cliente: widget.cliente,
+                ),
               ),
-            ),
-            // Filtros
-            _buildFilterChips(),
+              // Filtros
+              _buildFilterChips(),
 
-            // Lista de respuestas
-            Expanded(
-              child: ListenableBuilder(
-                listenable: _viewModel,
-                builder: (context, child) {
-                  if (_viewModel.isLoading) {
-                    return Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                      ),
-                    );
-                  }
+              // Lista de respuestas
+              Expanded(
+                child: ListenableBuilder(
+                  listenable: _viewModel,
+                  builder: (context, child) {
+                    if (_viewModel.isLoading) {
+                      return Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                        ),
+                      );
+                    }
 
-                  if (_viewModel.errorMessage != null) {
-                    return _buildErrorView();
-                  }
+                    if (_viewModel.errorMessage != null) {
+                      return _buildErrorView();
+                    }
 
-                  final responses = _getFilteredResponses();
+                    final responses = _getFilteredResponses();
 
-                  if (responses.isEmpty) {
-                    return _buildEmptyView();
-                  }
+                    if (responses.isEmpty) {
+                      return _buildEmptyView();
+                    }
 
-                  return _buildResponsesList(responses);
-                },
+                    return _buildResponsesList(responses);
+                  },
+                ),
               ),
-            ),
-          ],
-        )
+            ],
+          ),
         ),
       ),
-      // ✂️ Botón flotante eliminado
     );
   }
 
@@ -141,7 +141,9 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
             SizedBox(width: 8),
             _buildFilterChip('Completados', 'completed'),
             SizedBox(width: 8),
-            _buildFilterChip('Borradores', 'draft'),
+            _buildFilterChip('Pendientes', 'pending'), // ✅ CORREGIDO: de 'draft' a 'pending'
+            SizedBox(width: 8),
+            _buildFilterChip('Sincronizados', 'synced'), // ✅ AGREGADO
           ],
         ),
       ),
@@ -177,10 +179,10 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     switch (_filterStatus) {
       case 'completed':
         return allResponses.where((r) => r.status == 'completed').toList();
-      case 'draft':
-        return allResponses.where((r) => r.status == 'draft').toList();
       case 'pending':
-        return allResponses.where((r) => r.status != 'synced').toList();
+        return allResponses.where((r) => r.status == 'pending').toList();
+      case 'synced':
+        return allResponses.where((r) => r.status == 'synced').toList();
       default:
         return allResponses;
     }
@@ -343,17 +345,17 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
         label = 'COMPLETADO';
         color = AppColors.success;
         break;
-      case 'draft':
-        label = 'BORRADOR';
+      case 'pending':
+        label = 'PENDIENTE';
         color = AppColors.warning;
         break;
       case 'synced':
         label = 'SINCRONIZADO';
         color = AppColors.info;
         break;
-      case 'pending':
-        label = 'PENDIENTE';
-        color = AppColors.neutral400;
+      case 'error':
+        label = 'ERROR';
+        color = AppColors.error;
         break;
       default:
         label = status.toUpperCase();
@@ -475,10 +477,10 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     switch (_filterStatus) {
       case 'completed':
         return 'No hay formularios completados';
-      case 'draft':
-        return 'No hay borradores guardados';
       case 'pending':
-        return 'No hay respuestas pendientes de sincronizar';
+        return 'No hay formularios pendientes';
+      case 'synced':
+        return 'No hay formularios sincronizados';
       default:
         return 'Presiona el botón "+" para crear un nuevo formulario';
     }
@@ -488,10 +490,12 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     switch (status) {
       case 'completed':
         return AppColors.success;
-      case 'draft':
+      case 'pending':
         return AppColors.warning;
       case 'synced':
         return AppColors.info;
+      case 'error':
+        return AppColors.error;
       default:
         return AppColors.neutral400;
     }
@@ -501,12 +505,14 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     switch (status) {
       case 'completed':
         return Icons.check_circle;
-      case 'draft':
-        return Icons.edit_note;
+      case 'pending':
+        return Icons.pending;
       case 'synced':
         return Icons.cloud_done;
+      case 'error':
+        return Icons.error;
       default:
-        return Icons.pending;
+        return Icons.help_outline;
     }
   }
 
@@ -520,23 +526,19 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
         ),
       ),
     ).then((_) {
-      // Recargar respuestas al volver
       _loadData();
     });
   }
 
   void _viewResponse(DynamicFormResponse response) {
-    // Cargar la respuesta en el ViewModel
     _viewModel.loadResponseForEditing(response);
 
-    // Navegar directamente a la pantalla de llenado
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => DynamicFormFillScreen(viewModel: _viewModel),
       ),
     ).then((_) {
-      // Recargar respuestas al volver
       _loadData();
     });
   }
@@ -567,7 +569,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
           children: [
             Icon(Icons.warning_amber_rounded, color: AppColors.warning),
             SizedBox(width: 8),
-            Expanded( // <-- aquí
+            Expanded(
               child: Text(
                 'Confirmar eliminación',
                 style: TextStyle(color: AppColors.textPrimary),
@@ -575,7 +577,6 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
             ),
           ],
         ),
-
         content: Text(
           '¿Estás seguro de eliminar esta respuesta? Esta acción no se puede deshacer.',
           style: TextStyle(color: AppColors.textSecondary),

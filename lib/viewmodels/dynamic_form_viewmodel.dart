@@ -116,7 +116,7 @@ class DynamicFormViewModel extends ChangeNotifier {
           formTemplateId: templateId,
           answers: {},
           createdAt: DateTime.now(),
-          status: 'draft',
+          status: 'pending', // ✅ CORREGIDO: ahora es 'pending' en lugar de 'draft'
           clienteId: clienteId,
           equipoId: equipoId,
           userId: userId,
@@ -269,38 +269,38 @@ class DynamicFormViewModel extends ChangeNotifier {
     return filledRequired / requiredFields.length;
   }
 
-  /// Guardar borrador
-  Future<bool> saveDraft() async {
+  /// Guardar progreso (mantiene como 'pending')
+  Future<bool> saveProgress() async {
     try {
       if (_currentResponse == null) {
         _errorMessage = 'No hay formulario activo';
         return false;
       }
 
-      _logger.i('💾 Guardando borrador...');
+      _logger.i('💾 Guardando progreso...');
       _logger.d('📊 Valores a guardar: $_fieldValues');
 
-      // Actualizar respuestas
+      // Actualizar respuestas manteniendo el estado 'pending'
       final updatedResponse = _currentResponse!.copyWith(
         answers: Map<String, dynamic>.from(_fieldValues),
-        status: 'draft',
+        // No cambiamos el status, se mantiene 'pending'
       );
 
       final success = await _repository.saveResponse(updatedResponse);
 
       if (success) {
         _currentResponse = updatedResponse;
-        _logger.i('✅ Borrador guardado exitosamente');
+        _logger.i('✅ Progreso guardado exitosamente');
         notifyListeners();
         return true;
       } else {
-        _errorMessage = 'Error guardando borrador';
-        _logger.e('❌ Error guardando borrador en repositorio');
+        _errorMessage = 'Error guardando progreso';
+        _logger.e('❌ Error guardando progreso en repositorio');
         return false;
       }
     } catch (e) {
-      _errorMessage = 'Error guardando borrador: $e';
-      _logger.e('❌ Error guardando borrador: $e');
+      _errorMessage = 'Error guardando progreso: $e';
+      _logger.e('❌ Error guardando progreso: $e');
       return false;
     }
   }
@@ -327,7 +327,7 @@ class DynamicFormViewModel extends ChangeNotifier {
       final completedResponse = _currentResponse!.copyWith(
         answers: Map<String, dynamic>.from(_fieldValues),
         completedAt: DateTime.now(),
-        status: 'completed',
+        status: 'completed', // ✅ Ahora cambia a 'completed'
       );
 
       final success = await _repository.saveResponse(completedResponse);

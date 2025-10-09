@@ -40,7 +40,7 @@ class DynamicFormTemplate {
         .map((detail) => DynamicFormField.fromApiJson(detail))
         .toList();
 
-    // ⭐ NUEVA ESTRATEGIA: NO aplanar, mantener jerarquía completa
+    // NUEVA ESTRATEGIA: NO aplanar, mantener jerarquía completa
     final organizedFields = _organizeFieldsKeepingHierarchy(allFields);
 
     return DynamicFormTemplate(
@@ -84,7 +84,7 @@ class DynamicFormTemplate {
     return idA.compareTo(idB);
   }
 
-  /// ⭐ NUEVA ESTRATEGIA: Mantener la jerarquía completa sin aplanar
+  /// NUEVA ESTRATEGIA: Mantener la jerarquía completa sin aplanar
   static List<DynamicFormField> _organizeFieldsKeepingHierarchy(List<DynamicFormField> allFields) {
     // 1. Crear mapa de búsqueda rápida
     final Map<String, DynamicFormField> fieldsById = {};
@@ -117,7 +117,7 @@ class DynamicFormTemplate {
     rootFields.sort(_compareFields);
     final fieldsWithChildren = rootFields.map((root) => buildTree(root)).toList();
 
-    // 6. ⭐ NUEVA LÓGICA: Solo retornar campos de primer nivel
+    // 6. NUEVA LÓGICA: Solo retornar campos de primer nivel
     // Los campos anidados se quedan en children y el widget los renderiza
     final List<DynamicFormField> topLevelFields = [];
 
@@ -165,7 +165,7 @@ class DynamicFormTemplate {
     return null;
   }
 
-  /// ⭐ SIMPLIFICADO: Ya no necesitamos getVisibleFields porque el widget maneja la visibilidad
+  ///SIMPLIFICADO: Ya no necesitamos getVisibleFields porque el widget maneja la visibilidad
   List<DynamicFormField> getVisibleFields(Map<String, dynamic> answers) {
     // Simplemente retornar todos los campos de primer nivel
     // El widget DynamicFormFieldWidget se encarga de mostrar/ocultar los children

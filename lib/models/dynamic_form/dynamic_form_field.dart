@@ -115,7 +115,7 @@ class DynamicFormField {
     );
   }
 
-  /// ⭐ NUEVO: copyWith para agregar metadata
+  ///  NUEVO: copyWith para agregar metadata
   DynamicFormField copyWith({
     String? id,
     String? type,
