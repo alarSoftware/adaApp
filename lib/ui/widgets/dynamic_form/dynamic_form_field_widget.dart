@@ -4,7 +4,6 @@ import 'package:ada_app/models/dynamic_form/dynamic_form_field.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
-/// Widget que renderiza un campo dinámico según su tipo CON LÓGICA CONDICIONAL Y JERARQUÍA VISUAL
 class DynamicFormFieldWidget extends StatelessWidget {
   final DynamicFormField field;
   final dynamic value;
@@ -26,84 +25,24 @@ class DynamicFormFieldWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isConditional = field.metadata?['conditionalParentId'] != null;
+    final content = _buildFieldByType(context);
 
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: 16,
-        left: isConditional ? 24 : 0,
-      ),
-      child: isConditional
-          ? _buildConditionalFieldWithLine(context)
-          : _buildFieldByType(context),
-    );
-  }
-
-  Widget _buildConditionalFieldWithLine(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 3,
-          height: 60,
-          margin: EdgeInsets.only(right: 12, top: 8),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.3),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                margin: EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.info.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.info.withOpacity(0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.arrow_forward, size: 12, color: AppColors.info),
-                    SizedBox(width: 4),
-                    Text(
-                      'Campo condicional',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: AppColors.info,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              _buildFieldByType(context),
-            ],
-          ),
-        ),
-      ],
+      padding: EdgeInsets.only(bottom: 16, left: isConditional ? 24 : 0),
+      child: isConditional ? _buildWithConditionalBadge(content) : content,
     );
   }
 
   Widget _buildFieldByType(BuildContext context) {
-    switch (field.type) {
-      case 'titulo':
-        return _buildHeader();
-      case 'radio_button':
-        return _buildRadioGroupWithNested(context);
-      case 'checkbox':
-        return _buildCheckboxGroupWithNested(context);
-      case 'resp_abierta':
-        return _buildTextField(maxLines: 3);
-      case 'resp_abierta_larga':
-        return _buildTextField(maxLines: 6);
-      case 'image':
-        return _buildImagePicker(context);
-      default:
-        return _buildTextField();
-    }
+    return switch (field.type) {
+      'titulo' => _buildHeader(),
+      'radio_button' => _buildSelectionGroup(context, isMultiple: false),
+      'checkbox' => _buildSelectionGroup(context, isMultiple: true),
+      'resp_abierta' => _buildTextField(maxLines: 3),
+      'resp_abierta_larga' => _buildTextField(maxLines: 6),
+      'image' => _buildImagePicker(context),
+      _ => _buildTextField(),
+    };
   }
 
   Widget _buildHeader() {
@@ -123,11 +62,7 @@ class DynamicFormFieldWidget extends StatelessWidget {
             Expanded(
               child: Text(
                 field.label,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary),
               ),
             ),
           ],
@@ -136,197 +71,115 @@ class DynamicFormFieldWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildRadioGroupWithNested(BuildContext context) {
-    return Card(
-      elevation: 1,
-      color: AppColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: errorText != null ? AppColors.error : AppColors.border,
-          width: errorText != null ? 2 : 0.5,
-        ),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    field.label,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                if (field.required)
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '*',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.error,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            if (errorText != null) ...[
-              SizedBox(height: 4),
-              Text(
-                errorText!,
-                style: TextStyle(fontSize: 11, color: AppColors.error),
-              ),
-            ],
-            SizedBox(height: 12),
-            Divider(color: AppColors.border, height: 1),
-            SizedBox(height: 8),
-            if (field.children.isEmpty)
-              Padding(
-                padding: EdgeInsets.all(8),
-                child: Text(
-                  'No hay opciones disponibles',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              )
-            else
-              ...field.children.where((c) => c.type == 'opt').map((option) {
-                final isSelected = value == option.id;
-                final hasNestedFields = option.children.isNotEmpty;
+  Widget _buildSelectionGroup(BuildContext context, {required bool isMultiple}) {
+    final selectedIds = _parseSelectedIds(value);
+    final options = field.children.where((c) => c.type == 'opt').toList();
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    InkWell(
-                      onTap: () => onChanged(option.id),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        margin: EdgeInsets.only(bottom: 8),
-                        padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.primary.withOpacity(0.1)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isSelected ? AppColors.primary : AppColors.border,
-                            width: isSelected ? 2 : 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isSelected
-                                  ? Icons.radio_button_checked
-                                  : Icons.radio_button_unchecked,
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                              size: 22,
-                            ),
-                            SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                option.label,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: isSelected
-                                      ? AppColors.primary
-                                      : AppColors.textPrimary,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (isSelected && hasNestedFields)
-                      _buildNestedFields(context, option.children),
-                  ],
-                );
-              }),
-          ],
-        ),
+    return _buildCardContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildFieldHeader(),
+          if (errorText != null) _buildErrorText(),
+          SizedBox(height: 12),
+          Divider(color: AppColors.border, height: 1),
+          SizedBox(height: 8),
+          if (options.isEmpty)
+            _buildEmptyMessage()
+          else
+            ...options.map((opt) => _buildOptionWithNested(context, opt, selectedIds, isMultiple)),
+        ],
       ),
     );
   }
 
-  ///DISEÑO COMPACTO CON LÍNEAS EN "L"
-  Widget _buildNestedFields(BuildContext context, List<DynamicFormField> nestedFields, {int depth = 0}) {
-    // Límite de profundidad visual con líneas (niveles 0-1 con líneas)
-    final showLines = depth < 2;
-    final leftPadding = depth == 0 ? 8.0 : 6.0; // Padding muy compacto
+  Widget _buildOptionWithNested(BuildContext context, DynamicFormField option, List<String> selectedIds, bool isMultiple) {
+    final isSelected = selectedIds.contains(option.id);
+    final hasNested = option.children.any((c) => c.type != 'opt');
 
     return Column(
-      children: nestedFields
-          .where((f) => f.type != 'opt')
-          .map((nestedField) {
-        final hasSubChildren = nestedField.children.where((c) => c.type != 'opt').isNotEmpty;
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildOptionItem(
+          option: option,
+          isSelected: isSelected,
+          isRadio: !isMultiple,
+          onTap: () => _handleSelection(option.id, isMultiple, selectedIds),
+        ),
+        if (isSelected && hasNested)
+          _buildNestedFields(context, option.children),
+      ],
+    );
+  }
 
+  Widget _buildOptionItem({
+    required DynamicFormField option,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required bool isRadio,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        margin: EdgeInsets.only(bottom: 8),
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.border,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isRadio
+                  ? (isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked)
+                  : (isSelected ? Icons.check_box : Icons.check_box_outline_blank),
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              size: 22,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                option.label,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNestedFields(BuildContext context, List<DynamicFormField> nestedFields, {int depth = 0}) {
+    final fields = nestedFields.where((f) => f.type != 'opt').toList();
+    if (fields.isEmpty) return SizedBox.shrink();
+
+    return Column(
+      children: fields.map((f) {
+        final hasSubChildren = f.children.any((c) => c.type != 'opt');
         return Padding(
-          padding: EdgeInsets.only(bottom: 6, top: 4),
+          padding: EdgeInsets.only(bottom: depth >= 2 ? 12.0 : 8.0, top: 6),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Línea en "L" compacta
-              if (showLines)
-                SizedBox(
-                  width: 14,
-                  child: Column(
-                    children: [
-                      // Línea vertical corta
-                      SizedBox(
-                        width: 2,
-                        height: 10,
-                      ),
-                      // Línea horizontal
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 2,
-                            height: 2,
-                          ),
-                          Expanded(
-                            child: Container(
-                              height: 2,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-              // Campo anidado
+              _buildNestedLineIndicator(),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildNestedFieldCard(context, nestedField, depth),
-
-                    // Recursión con más profundidad
+                    _buildNestedFieldCard(context, f, depth),
                     if (hasSubChildren)
                       Padding(
-                        padding: EdgeInsets.only(left: leftPadding, top: 4),
-                        child: _buildNestedFields(context, nestedField.children, depth: depth + 1),
+                        padding: EdgeInsets.only(left: 10, top: 8),
+                        child: _buildNestedFields(context, f.children, depth: depth + 1),
                       ),
                   ],
                 ),
@@ -338,7 +191,23 @@ class DynamicFormFieldWidget extends StatelessWidget {
     );
   }
 
-  ///Card compacta para campos anidados
+  Widget _buildNestedLineIndicator() {
+    return SizedBox(
+      width: 16,
+      child: Column(
+        children: [
+          Container(width: 2, height: 14, color: AppColors.primary.withOpacity(0.3)),
+          Row(
+            children: [
+              Container(width: 2, height: 2, color: AppColors.primary.withOpacity(0.3)),
+              Expanded(child: Container(height: 2, color: AppColors.primary.withOpacity(0.3))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildNestedFieldCard(BuildContext context, DynamicFormField nestedField, int depth) {
     return Card(
       elevation: 0.5,
@@ -349,44 +218,109 @@ class DynamicFormFieldWidget extends StatelessWidget {
         side: BorderSide(color: AppColors.border.withOpacity(0.5), width: 1),
       ),
       child: Padding(
-        padding: EdgeInsets.all(10),
+        padding: EdgeInsets.all(depth >= 2 ? 14.0 : 12.0),
         child: _buildNestedFieldContent(context, nestedField),
       ),
     );
   }
 
-  Widget _buildNestedFieldContent(BuildContext context, DynamicFormField nestedField) {
-    switch (nestedField.type) {
-      case 'image':
-        return _buildImagePickerContent(context, nestedField);
-      case 'checkbox':
-        return _buildCheckboxContent(context, nestedField);
-      case 'resp_abierta':
-        return _buildTextFieldContent(nestedField, maxLines: 2);
-      case 'resp_abierta_larga':
-        return _buildTextFieldContent(nestedField, maxLines: 4);
-      default:
-        return _buildTextFieldContent(nestedField);
-    }
+  Widget _buildNestedFieldContent(BuildContext context, DynamicFormField field) {
+    return switch (field.type) {
+      'image' => _buildNestedImagePicker(context, field),
+      'checkbox' => _buildNestedSelectionField(context, field, isRadio: false),
+      'radio_button' => _buildNestedSelectionField(context, field, isRadio: true),
+      'resp_abierta' => _buildNestedTextField(field, maxLines: 2),
+      'resp_abierta_larga' => _buildNestedTextField(field, maxLines: 4),
+      _ => _buildNestedTextField(field),
+    };
   }
 
-  Widget _buildTextFieldContent(DynamicFormField nestedField, {int maxLines = 2}) {
-    final nestedValue = allValues[nestedField.id];
+  Widget _buildNestedSelectionField(BuildContext context, DynamicFormField field, {required bool isRadio}) {
+    final nestedValue = allValues[field.id];
+    final selectedIds = isRadio ? (nestedValue != null ? [nestedValue.toString()] : <String>[]) : _parseSelectedIds(nestedValue);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          nestedField.label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
+          field.label,
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
         ),
         SizedBox(height: 6),
+        ...field.children.where((c) => c.type == 'opt').map((opt) {
+          final isSelected = isRadio ? selectedIds.firstOrNull == opt.id : selectedIds.contains(opt.id);
+          final hasNested = opt.children.any((c) => c.type != 'opt');
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildNestedOption(opt, isSelected, isRadio, () {
+                if (onNestedFieldChanged == null) return;
+                if (isRadio) {
+                  onNestedFieldChanged!(field.id, opt.id);
+                } else {
+                  final newIds = List<String>.from(selectedIds);
+                  isSelected ? newIds.remove(opt.id) : newIds.add(opt.id);
+                  onNestedFieldChanged!(field.id, newIds);
+                }
+              }),
+              if (isSelected && hasNested)
+                _buildNestedFields(context, opt.children, depth: 1),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildNestedOption(DynamicFormField opt, bool isSelected, bool isRadio, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        margin: EdgeInsets.only(bottom: 6),
+        padding: EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.background,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.border,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isRadio
+                  ? (isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked)
+                  : (isSelected ? Icons.check_box : Icons.check_box_outline_blank),
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              size: 18,
+            ),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                opt.label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNestedTextField(DynamicFormField field, {int maxLines = 2}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(field.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+        SizedBox(height: 6),
         TextFormField(
-          initialValue: nestedValue?.toString(),
+          initialValue: allValues[field.id]?.toString(),
           decoration: InputDecoration(
             hintText: 'Escribe...',
             hintStyle: TextStyle(fontSize: 11),
@@ -398,101 +332,15 @@ class DynamicFormFieldWidget extends StatelessWidget {
           ),
           style: TextStyle(fontSize: 12),
           maxLines: maxLines,
-          onChanged: (newValue) {
-            if (onNestedFieldChanged != null) {
-              onNestedFieldChanged!(nestedField.id, newValue);
-            }
-          },
+          onChanged: (v) => onNestedFieldChanged?.call(field.id, v),
         ),
       ],
     );
   }
 
-  Widget _buildCheckboxContent(BuildContext context, DynamicFormField nestedField) {
-    final nestedValue = allValues[nestedField.id];
-    List<String> selectedIds = [];
-
-    if (nestedValue is List) {
-      selectedIds = List<String>.from(nestedValue);
-    } else if (nestedValue is String && nestedValue.isNotEmpty) {
-      selectedIds = [nestedValue];
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          nestedField.label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        SizedBox(height: 6),
-        ...nestedField.children.where((c) => c.type == 'opt').map((option) {
-          final isSelected = selectedIds.contains(option.id);
-          final hasNestedFields = option.children.where((c) => c.type != 'opt').isNotEmpty;
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              InkWell(
-                onTap: () {
-                  List<String> newSelected = List<String>.from(selectedIds);
-                  if (isSelected) {
-                    newSelected.remove(option.id);
-                  } else {
-                    newSelected.add(option.id);
-                  }
-                  if (onNestedFieldChanged != null) {
-                    onNestedFieldChanged!(nestedField.id, newSelected);
-                  }
-                },
-                child: Container(
-                  margin: EdgeInsets.only(bottom: 6),
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.background,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: isSelected ? AppColors.primary : AppColors.border,
-                      width: isSelected ? 1.5 : 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isSelected ? Icons.check_box : Icons.check_box_outline_blank,
-                        color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                        size: 18,
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          option.label,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (isSelected && hasNestedFields)
-                _buildNestedFields(context, option.children, depth: 1),
-            ],
-          );
-        }),
-      ],
-    );
-  }
-
-  Widget _buildImagePickerContent(BuildContext context, DynamicFormField nestedField) {
-    final nestedValue = allValues[nestedField.id];
+  Widget _buildNestedImagePicker(BuildContext context, DynamicFormField field) {
+    final imagePath = allValues[field.id]?.toString();
+    final hasImage = imagePath != null && imagePath.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -502,487 +350,264 @@ class DynamicFormFieldWidget extends StatelessWidget {
             Icon(Icons.photo_camera, color: AppColors.primary, size: 16),
             SizedBox(width: 6),
             Expanded(
-              child: Text(
-                nestedField.label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
+              child: Text(field.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
             ),
           ],
         ),
         SizedBox(height: 8),
-        if (nestedValue != null && nestedValue.toString().isNotEmpty) ...[
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: Image.file(
-              File(nestedValue.toString()),
-              height: 100,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  height: 100,
-                  color: AppColors.neutral200,
-                  child: Center(
-                    child: Icon(Icons.broken_image, size: 28, color: AppColors.textSecondary),
-                  ),
-                );
-              },
-            ),
-          ),
+        if (hasImage) ...[
+          _buildImagePreview(imagePath, height: 100),
           SizedBox(height: 6),
         ],
-        Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  await _pickImageForNested(context, nestedField, ImageSource.camera);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.onPrimary,
-                  padding: EdgeInsets.symmetric(vertical: 6),
-                ),
-                icon: Icon(Icons.camera_alt, size: 14),
-                label: Text('Cámara', style: TextStyle(fontSize: 10)),
-              ),
-            ),
-            SizedBox(width: 6),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  await _pickImageForNested(context, nestedField, ImageSource.gallery);
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  padding: EdgeInsets.symmetric(vertical: 6),
-                  side: BorderSide(color: AppColors.primary),
-                ),
-                icon: Icon(Icons.photo_library, size: 14),
-                label: Text('Galería', style: TextStyle(fontSize: 10)),
-              ),
-            ),
-          ],
-        ),
-        if (nestedValue != null && nestedValue.toString().isNotEmpty) ...[
-          SizedBox(height: 4),
-          TextButton.icon(
-            onPressed: () {
-              if (onNestedFieldChanged != null) {
-                onNestedFieldChanged!(nestedField.id, null);
-              }
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.error,
-              padding: EdgeInsets.symmetric(vertical: 4),
-            ),
-            icon: Icon(Icons.delete_outline, size: 14),
-            label: Text('Eliminar', style: TextStyle(fontSize: 10)),
-          ),
-        ],
+        _buildImageButtons(context, isNested: true, fieldId: field.id),
+        if (hasImage)
+          _buildDeleteButton(() => onNestedFieldChanged?.call(field.id, null), isCompact: true),
       ],
     );
   }
 
-  Future<void> _pickImageForNested(BuildContext context, DynamicFormField nestedField, ImageSource source) async {
-    try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: source,
-        maxWidth: 1920,
-        maxHeight: 1920,
-        imageQuality: 85,
-      );
-
-      if (image != null && onNestedFieldChanged != null) {
-        onNestedFieldChanged!(nestedField.id, image.path);
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    }
-  }
-
-  Widget _buildCheckboxGroupWithNested(BuildContext context) {
-    List<String> selectedIds = [];
-
-    if (value is List) {
-      selectedIds = List<String>.from(value);
-    } else if (value is String && value.isNotEmpty) {
-      selectedIds = [value];
-    }
-
-    return Card(
-      elevation: 1,
-      color: AppColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: errorText != null ? AppColors.error : AppColors.border,
-          width: errorText != null ? 2 : 0.5,
-        ),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    field.label,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                if (field.required)
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '*',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.error,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            if (errorText != null) ...[
-              SizedBox(height: 4),
-              Text(errorText!, style: TextStyle(fontSize: 11, color: AppColors.error)),
-            ],
-            SizedBox(height: 12),
-            Divider(color: AppColors.border, height: 1),
-            SizedBox(height: 8),
-            if (field.children.isEmpty)
-              Padding(
-                padding: EdgeInsets.all(8),
-                child: Text(
-                  'No hay opciones disponibles',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              )
-            else
-              ...field.children.where((c) => c.type == 'opt').map((option) {
-                final isSelected = selectedIds.contains(option.id);
-                final hasNestedFields = option.children.where((c) => c.type != 'opt').isNotEmpty;
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    InkWell(
-                      onTap: () {
-                        List<String> newSelected = List<String>.from(selectedIds);
-                        if (isSelected) {
-                          newSelected.remove(option.id);
-                        } else {
-                          newSelected.add(option.id);
-                        }
-                        onChanged(newSelected);
-                      },
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        margin: EdgeInsets.only(bottom: 8),
-                        padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.primary.withOpacity(0.1)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isSelected ? AppColors.primary : AppColors.border,
-                            width: isSelected ? 2 : 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isSelected
-                                  ? Icons.check_box
-                                  : Icons.check_box_outline_blank,
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                              size: 22,
-                            ),
-                            SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                option.label,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: isSelected
-                                      ? AppColors.primary
-                                      : AppColors.textPrimary,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (isSelected && hasNestedFields)
-                      _buildNestedFields(context, option.children),
-                  ],
-                );
-              }),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildTextField({int maxLines = 3}) {
-    return Card(
-      elevation: 1,
-      color: AppColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: AppColors.border, width: 0.5),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    field.label,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                if (field.required)
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '*',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.error,
-                      ),
-                    ),
-                  ),
-              ],
+    return _buildCardContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildFieldHeader(),
+          SizedBox(height: 8),
+          TextFormField(
+            initialValue: value?.toString(),
+            decoration: InputDecoration(
+              hintText: field.placeholder ?? 'Escribe tu respuesta aquí...',
+              errorText: errorText,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+              errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.error, width: 2)),
+              filled: true,
+              fillColor: AppColors.background,
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             ),
-            SizedBox(height: 8),
-            TextFormField(
-              initialValue: value?.toString(),
-              decoration: InputDecoration(
-                hintText: field.placeholder ?? 'Escribe tu respuesta aquí...',
-                errorText: errorText,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.primary, width: 2),
-                ),
-                errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.error, width: 2),
-                ),
-                filled: true,
-                fillColor: AppColors.background,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              ),
-              maxLines: maxLines,
-              maxLength: field.maxLength,
-              onChanged: (newValue) => onChanged(newValue),
-            ),
-          ],
-        ),
+            maxLines: maxLines,
+            maxLength: field.maxLength,
+            onChanged: onChanged,
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildImagePicker(BuildContext context) {
-    return Card(
-      elevation: 1,
-      color: AppColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: errorText != null ? AppColors.error : AppColors.border,
-          width: errorText != null ? 2 : 0.5,
-        ),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.photo_camera, color: AppColors.primary, size: 20),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    field.label,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                if (field.required)
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '*',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.error,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            if (errorText != null) ...[
-              SizedBox(height: 4),
-              Text(errorText!, style: TextStyle(fontSize: 11, color: AppColors.error)),
+    final hasImage = value != null && value.toString().isNotEmpty;
+
+    return _buildCardContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.photo_camera, color: AppColors.primary, size: 20),
+              SizedBox(width: 8),
+              Expanded(child: Text(field.label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+              if (field.required) _buildRequiredBadge(),
             ],
+          ),
+          if (errorText != null) _buildErrorText(),
+          SizedBox(height: 12),
+          if (hasImage) ...[
+            _buildImagePreview(value.toString(), height: 200),
             SizedBox(height: 12),
-            if (value != null && value.toString().isNotEmpty) ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.file(
-                  File(value.toString()),
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      height: 200,
-                      color: AppColors.neutral200,
-                      child: Center(
-                        child: Icon(
-                          Icons.broken_image,
-                          size: 48,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              SizedBox(height: 12),
-            ],
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _pickImage(context, ImageSource.camera),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.onPrimary,
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    icon: Icon(Icons.camera_alt, size: 20),
-                    label: Text('Cámara'),
-                  ),
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _pickImage(context, ImageSource.gallery),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary.withOpacity(0.1),
-                      foregroundColor: AppColors.primary,
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    icon: Icon(Icons.photo_library, size: 20),
-                    label: Text('Galería'),
-                  ),
-                ),
-              ],
-            ),
-            if (value != null && value.toString().isNotEmpty) ...[
-              SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton.icon(
-                  onPressed: () => onChanged(null),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.error,
-                  ),
-                  icon: Icon(Icons.delete_outline, size: 20),
-                  label: Text('Eliminar imagen'),
-                ),
-              ),
-            ],
           ],
+          _buildImageButtons(context),
+          if (hasImage) _buildDeleteButton(() => onChanged(null)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImagePreview(String path, {double height = 200}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.file(
+        File(path),
+        height: height,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          height: height,
+          color: AppColors.neutral200,
+          child: Center(child: Icon(Icons.broken_image, size: height > 100 ? 48 : 28, color: AppColors.textSecondary)),
         ),
       ),
     );
   }
 
-  Future<void> _pickImage(BuildContext context, ImageSource source) async {
-    try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: source,
-        maxWidth: 1920,
-        maxHeight: 1920,
-        imageQuality: 85,
-      );
+  Widget _buildImageButtons(BuildContext context, {bool isNested = false, String? fieldId}) {
+    final buttonPadding = isNested ? EdgeInsets.symmetric(vertical: 6) : EdgeInsets.symmetric(vertical: 12);
+    final iconSize = isNested ? 14.0 : 20.0;
+    final fontSize = isNested ? 10.0 : 14.0;
 
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: () => _pickImage(context, ImageSource.camera, isNested: isNested, fieldId: fieldId),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.onPrimary,
+              padding: buttonPadding,
+            ),
+            icon: Icon(Icons.camera_alt, size: iconSize),
+            label: Text('Cámara', style: TextStyle(fontSize: fontSize)),
+          ),
+        ),
+        SizedBox(width: isNested ? 6 : 8),
+        Expanded(
+          child: isNested
+              ? OutlinedButton.icon(
+            onPressed: () => _pickImage(context, ImageSource.gallery, isNested: true, fieldId: fieldId),
+            style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary, padding: buttonPadding, side: BorderSide(color: AppColors.primary)),
+            icon: Icon(Icons.photo_library, size: iconSize),
+            label: Text('Galería', style: TextStyle(fontSize: fontSize)),
+          )
+              : ElevatedButton.icon(
+            onPressed: () => _pickImage(context, ImageSource.gallery),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary.withOpacity(0.1),
+              foregroundColor: AppColors.primary,
+              padding: buttonPadding,
+            ),
+            icon: Icon(Icons.photo_library, size: iconSize),
+            label: Text('Galería', style: TextStyle(fontSize: fontSize)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDeleteButton(VoidCallback onDelete, {bool isCompact = false}) {
+    return SizedBox(
+      width: double.infinity,
+      child: TextButton.icon(
+        onPressed: onDelete,
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.error,
+          padding: EdgeInsets.symmetric(vertical: isCompact ? 4 : 8),
+        ),
+        icon: Icon(Icons.delete_outline, size: isCompact ? 14 : 20),
+        label: Text('Eliminar', style: TextStyle(fontSize: isCompact ? 10 : 14)),
+      ),
+    );
+  }
+
+  Future<void> _pickImage(BuildContext context, ImageSource source, {bool isNested = false, String? fieldId}) async {
+    try {
+      final image = await ImagePicker().pickImage(source: source, maxWidth: 1920, maxHeight: 1920, imageQuality: 85);
       if (image != null) {
-        onChanged(image.path);
+        isNested && fieldId != null ? onNestedFieldChanged?.call(fieldId, image.path) : onChanged(image.path);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al seleccionar imagen: $e'),
-          backgroundColor: AppColors.error,
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al seleccionar imagen: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  Widget _buildCardContainer({required Widget child}) {
+    return Card(
+      elevation: 1,
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: errorText != null ? AppColors.error : AppColors.border, width: errorText != null ? 2 : 0.5),
+      ),
+      child: Padding(padding: EdgeInsets.all(12), child: child),
+    );
+  }
+
+  Widget _buildFieldHeader() {
+    return Row(
+      children: [
+        Expanded(child: Text(field.label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+        if (field.required) _buildRequiredBadge(),
+      ],
+    );
+  }
+
+  Widget _buildRequiredBadge() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(color: AppColors.error.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+      child: Text('*', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.error)),
+    );
+  }
+
+  Widget _buildErrorText() {
+    return Padding(
+      padding: EdgeInsets.only(top: 4),
+      child: Text(errorText!, style: TextStyle(fontSize: 11, color: AppColors.error)),
+    );
+  }
+
+  Widget _buildEmptyMessage() {
+    return Padding(
+      padding: EdgeInsets.all(8),
+      child: Text('No hay opciones disponibles', style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontStyle: FontStyle.italic)),
+    );
+  }
+
+  Widget _buildWithConditionalBadge(Widget child) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 3,
+          height: 60,
+          margin: EdgeInsets.only(right: 12, top: 8),
+          decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.3), borderRadius: BorderRadius.circular(2)),
         ),
-      );
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                margin: EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.info.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.arrow_forward, size: 12, color: AppColors.info),
+                    SizedBox(width: 4),
+                    Text('Campo condicional', style: TextStyle(fontSize: 10, color: AppColors.info, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              child,
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<String> _parseSelectedIds(dynamic value) {
+    if (value is List) return List<String>.from(value);
+    if (value is String && value.isNotEmpty) return [value];
+    return [];
+  }
+
+  void _handleSelection(String optionId, bool isMultiple, List<String> current) {
+    if (isMultiple) {
+      final newSelected = List<String>.from(current);
+      newSelected.contains(optionId) ? newSelected.remove(optionId) : newSelected.add(optionId);
+      onChanged(newSelected);
+    } else {
+      onChanged(optionId);
     }
   }
 }

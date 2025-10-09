@@ -342,8 +342,8 @@ class _DynamicFormTemplateListScreenState extends State<DynamicFormTemplateListS
       clienteId: widget.cliente.id.toString(),
     );
 
-    // ✅ CORREGIDO: Guardar inmediatamente en la BD con saveProgress()
-    final saved = await widget.viewModel.saveProgress();
+    // ✅ Guardar inmediatamente en la BD como borrador
+    final saved = await widget.viewModel.saveDraft();
 
     // Cerrar loading
     if (mounted) {

@@ -43,7 +43,7 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
             IconButton(
               icon: Icon(Icons.save_outlined, color: AppColors.onPrimary),
               onPressed: _saveProgress,
-              tooltip: 'Guardar progreso',
+              tooltip: 'Guardar borrador',
             ),
           ],
         ),

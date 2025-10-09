@@ -411,6 +411,11 @@ class SelectScreenViewModel extends ChangeNotifier {
       await _dbHelper.eliminar('marcas');
       await _dbHelper.eliminar('modelos');
       await _dbHelper.eliminar('logo');
+      await _dbHelper.eliminar('dynamic_form');
+      await _dbHelper.eliminar('dynamic_form_detail');
+      await _dbHelper.eliminar('dynamic_form_response');
+      await _dbHelper.eliminar('dynamic_form_detail');
+
 
       // NOTA: NO se borra la tabla Users
 

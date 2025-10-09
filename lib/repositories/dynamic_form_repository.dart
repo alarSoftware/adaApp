@@ -3,6 +3,7 @@ import 'package:logger/logger.dart';
 import '../models/dynamic_form/dynamic_form_template.dart';
 import '../models/dynamic_form/dynamic_form_response.dart';
 import '../adapter/dynamic_form_api_adapter.dart';
+import '../services/sync/dynamic_form_sync_service.dart';
 import '../services/database_helper.dart';
 
 class DynamicFormRepository {
@@ -22,13 +23,31 @@ class DynamicFormRepository {
     return await obtenerTodos();
   }
 
-  /// Descargar plantillas desde el servidor
+
+  /// Descargar templates desde el servidor
+  /// Descargar plantillas desde el servidor (limpia antes de descargar)
   Future<bool> downloadTemplatesFromServer() async {
     try {
-      _logger.i('📋 Solicitud de descarga de formularios desde servidor');
+      _logger.i('📋 Descargando formularios desde servidor...');
+
+      // 1. Limpiar formularios locales primero
+      _logger.i('🗑️ Limpiando formularios locales...');
+      await _dbHelper.eliminar(detailTableName); // Eliminar detalles
+      await _dbHelper.eliminar(tableName); // Eliminar formularios
+      _logger.i('✅ Formularios locales eliminados');
+
+      // 2. Descargar del servidor
+      final resultado = await DynamicFormSyncService.obtenerFormulariosDinamicos();
+
+      if (!resultado.exito) {
+        _logger.e('❌ Error: ${resultado.mensaje}');
+        return false;
+      }
+
+      _logger.i('✅ Formularios descargados: ${resultado.itemsSincronizados}');
       return true;
     } catch (e) {
-      _logger.e('❌ Error descargando plantillas: $e');
+      _logger.e('❌ Error: $e');
       return false;
     }
   }

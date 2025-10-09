@@ -6,7 +6,7 @@ class DynamicFormResponse {
   final DateTime createdAt;           // Cuándo se creó
   final DateTime? completedAt;        // Cuándo se completó
   final DateTime? syncedAt;           // Cuándo se sincronizó al servidor
-  final String status;                // pending, completed, synced, error
+  final String status;                // draft, completed, synced, error
   final String? userId;               // Usuario que llenó el formulario
   final String? clienteId;            // Cliente asociado (si aplica)
   final String? equipoId;             // Equipo asociado (si aplica)
@@ -20,7 +20,7 @@ class DynamicFormResponse {
     required this.createdAt,
     this.completedAt,
     this.syncedAt,
-    this.status = 'pending',
+    this.status = 'draft',
     this.userId,
     this.clienteId,
     this.equipoId,
@@ -41,7 +41,7 @@ class DynamicFormResponse {
       syncedAt: json['syncedAt'] != null
           ? DateTime.parse(json['syncedAt'] as String)
           : null,
-      status: json['status'] as String? ?? 'pending',
+      status: json['status'] as String? ?? 'draft',
       userId: json['userId'] as String?,
       clienteId: json['clienteId'] as String?,
       equipoId: json['equipoId'] as String?,
@@ -77,8 +77,8 @@ class DynamicFormResponse {
   /// Verifica si tiene errores
   bool get hasError => status == 'error';
 
-  /// Verifica si está pendiente
-  bool get isPending => status == 'pending';
+  /// Verifica si es un borrador
+  bool get isDraft => status == 'draft';
 
   /// Obtiene el valor de una respuesta específica
   dynamic getAnswer(String key) {

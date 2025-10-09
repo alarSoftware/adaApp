@@ -56,18 +56,21 @@ class DynamicFormViewModel extends ChangeNotifier {
   }
 
   /// Descargar templates desde el servidor
+  /// Descargar templates desde el servidor
   Future<bool> downloadTemplatesFromServer() async {
     try {
       _isLoading = true;
       _errorMessage = null;
       notifyListeners();
 
+      _logger.i('📥 Descargando formularios desde servidor...');
+
       final success = await _repository.downloadTemplatesFromServer();
 
       if (success) {
         // Recargar templates desde la BD local
         await loadTemplates();
-        _logger.i('✅ Templates descargados exitosamente');
+        _logger.i('✅ Templates descargados: ${_templates.length} disponibles');
         return true;
       } else {
         _errorMessage = 'Error descargando formularios del servidor';
@@ -116,7 +119,7 @@ class DynamicFormViewModel extends ChangeNotifier {
           formTemplateId: templateId,
           answers: {},
           createdAt: DateTime.now(),
-          status: 'pending', // ✅ CORREGIDO: ahora es 'pending' en lugar de 'draft'
+          status: 'draft',
           clienteId: clienteId,
           equipoId: equipoId,
           userId: userId,
@@ -143,7 +146,14 @@ class DynamicFormViewModel extends ChangeNotifier {
   }
 
   /// Actualizar valor de un campo (usa ID en lugar de key)
+  /// Actualizar valor de un campo (usa ID en lugar de key)
   void updateFieldValue(String fieldId, dynamic value) {
+    // Si es un campo de tipo radio_button o checkbox, limpiar sus hijos
+    final field = _findFieldById(fieldId);
+    if (field != null && (field.type == 'radio_button' || field.type == 'checkbox')) {
+      _clearChildrenValues(field, value);
+    }
+
     _fieldValues[fieldId] = value;
 
     // Limpiar error si existe
@@ -154,7 +164,7 @@ class DynamicFormViewModel extends ChangeNotifier {
     // Actualizar en la respuesta actual
     if (_currentResponse != null) {
       _currentResponse = _currentResponse!.copyWith(
-        answers: {..._currentResponse!.answers, fieldId: value},
+        answers: {..._fieldValues},
       );
     }
 
@@ -162,27 +172,84 @@ class DynamicFormViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Buscar un campo por ID en el template actual
+  DynamicFormField? _findFieldById(String fieldId) {
+    if (_currentTemplate == null) return null;
+
+    for (var field in _currentTemplate!.fields) {
+      if (field.id == fieldId) return field;
+
+      // Buscar recursivamente en los hijos
+      final found = _findFieldInChildren(field, fieldId);
+      if (found != null) return found;
+    }
+
+    return null;
+  }
+
+  /// Buscar recursivamente en los hijos
+  DynamicFormField? _findFieldInChildren(DynamicFormField parent, String fieldId) {
+    for (var child in parent.children) {
+      if (child.id == fieldId) return child;
+
+      final found = _findFieldInChildren(child, fieldId);
+      if (found != null) return found;
+    }
+
+    return null;
+  }
+
+  /// Limpiar valores de campos hijos cuando cambia la selección
+  void _clearChildrenValues(DynamicFormField field, dynamic newValue) {
+    if (field.type == 'radio_button') {
+      // Para radio button: limpiar hijos de TODAS las opciones
+      for (var option in field.children.where((c) => c.type == 'opt')) {
+        _clearFieldAndDescendants(option);
+      }
+    } else if (field.type == 'checkbox') {
+      // Para checkbox: limpiar hijos de opciones NO seleccionadas
+      final selectedIds = newValue is List ? List<String>.from(newValue) : <String>[];
+
+      for (var option in field.children.where((c) => c.type == 'opt')) {
+        if (!selectedIds.contains(option.id)) {
+          _clearFieldAndDescendants(option);
+        }
+      }
+    }
+  }
+
+  /// Limpiar un campo y todos sus descendientes recursivamente
+  void _clearFieldAndDescendants(DynamicFormField field) {
+    // Limpiar el valor del campo actual (si no es opción)
+    if (field.type != 'opt') {
+      _fieldValues.remove(field.id);
+      _fieldErrors.remove(field.id);
+      _logger.d('🧹 Limpiando campo: ${field.id} (${field.label})');
+    }
+
+    // Limpiar recursivamente todos los hijos
+    for (var child in field.children) {
+      _clearFieldAndDescendants(child);
+    }
+  }
+
   /// Obtener error de un campo (usa ID en lugar de key)
   String? getFieldError(String fieldId) {
     return _fieldErrors[fieldId];
   }
 
-  /// Obtener todos los campos que necesitan respuesta (incluyendo campos hijos para grupos)
+  /// Obtener todos los campos que necesitan respuesta
   List<DynamicFormField> _getAllAnswerableFields() {
     if (_currentTemplate == null) return [];
 
     final List<DynamicFormField> answerableFields = [];
 
     for (final field in _currentTemplate!.fields) {
-      // Los títulos no se responden
       if (field.type == 'titulo') continue;
 
-      // Para radio_button y checkbox, agregar el campo con sus opciones
       if (field.type == 'radio_button' || field.type == 'checkbox') {
         answerableFields.add(field);
-      }
-      // Campos de texto (ambos tipos)
-      else if (field.type == 'resp_abierta' || field.type == 'resp_abierta_larga') {
+      } else if (field.type == 'resp_abierta' || field.type == 'resp_abierta_larga') {
         answerableFields.add(field);
       }
     }
@@ -226,7 +293,6 @@ class DynamicFormViewModel extends ChangeNotifier {
 
     final answerableFields = _getAllAnswerableFields();
 
-    // Verificar que todos los campos requeridos estén llenos
     for (final field in answerableFields) {
       if (field.required) {
         final value = _fieldValues[field.id];
@@ -250,7 +316,7 @@ class DynamicFormViewModel extends ChangeNotifier {
     final requiredFields = answerableFields.where((f) => f.required).toList();
 
     if (requiredFields.isEmpty) {
-      return 1.0; // Si no hay campos requeridos, está completo
+      return 1.0;
     }
 
     int filledRequired = 0;
@@ -269,7 +335,7 @@ class DynamicFormViewModel extends ChangeNotifier {
     return filledRequired / requiredFields.length;
   }
 
-  /// Guardar progreso (mantiene como 'pending')
+  /// Guardar progreso
   Future<bool> saveProgress() async {
     try {
       if (_currentResponse == null) {
@@ -280,10 +346,8 @@ class DynamicFormViewModel extends ChangeNotifier {
       _logger.i('💾 Guardando progreso...');
       _logger.d('📊 Valores a guardar: $_fieldValues');
 
-      // Actualizar respuestas manteniendo el estado 'pending'
       final updatedResponse = _currentResponse!.copyWith(
         answers: Map<String, dynamic>.from(_fieldValues),
-        // No cambiamos el status, se mantiene 'pending'
       );
 
       final success = await _repository.saveResponse(updatedResponse);
@@ -315,7 +379,6 @@ class DynamicFormViewModel extends ChangeNotifier {
 
       _logger.i('✔️ Intentando completar formulario...');
 
-      // Validar campos
       if (!_validateAllFields()) {
         _errorMessage = 'Por favor completa todos los campos obligatorios';
         _logger.w('⚠️ Validación fallida al completar');
@@ -323,11 +386,10 @@ class DynamicFormViewModel extends ChangeNotifier {
         return false;
       }
 
-      // Marcar como completado
       final completedResponse = _currentResponse!.copyWith(
         answers: Map<String, dynamic>.from(_fieldValues),
         completedAt: DateTime.now(),
-        status: 'completed', // ✅ Ahora cambia a 'completed'
+        status: 'completed',
       );
 
       final success = await _repository.saveResponse(completedResponse);
@@ -336,7 +398,6 @@ class DynamicFormViewModel extends ChangeNotifier {
         _currentResponse = completedResponse;
         _logger.i('✅ Formulario completado exitosamente');
 
-        // Limpiar formulario actual
         _currentTemplate = null;
         _currentResponse = null;
         _fieldValues.clear();
@@ -381,16 +442,12 @@ class DynamicFormViewModel extends ChangeNotifier {
   /// Cargar una respuesta existente para editarla
   void loadResponseForEditing(DynamicFormResponse response) {
     try {
-      // Buscar el template correspondiente
       _currentTemplate = _templates.firstWhere(
             (t) => t.id == response.formTemplateId,
         orElse: () => throw Exception('Template no encontrado'),
       );
 
-      // Cargar la respuesta
       _currentResponse = response;
-
-      // Cargar los valores de los campos
       _fieldValues = Map<String, dynamic>.from(response.answers);
       _fieldErrors.clear();
 
@@ -413,12 +470,10 @@ class DynamicFormViewModel extends ChangeNotifier {
       _errorMessage = null;
       notifyListeners();
 
-      _currentClienteId = clienteId; // Guardar cliente actual
+      _currentClienteId = clienteId;
 
-      // Obtener todas las respuestas locales
       final allResponses = await _repository.getLocalResponses();
 
-      // Filtrar por cliente si es necesario
       if (clienteId != null && clienteId.isNotEmpty) {
         _savedResponses = allResponses
             .where((response) => response.clienteId == clienteId)
@@ -466,11 +521,45 @@ class DynamicFormViewModel extends ChangeNotifier {
     }
   }
 
+  /// Guardar como borrador
+  Future<bool> saveDraft() async {
+    try {
+      if (_currentResponse == null) {
+        _errorMessage = 'No hay formulario activo';
+        return false;
+      }
+
+      _logger.i('💾 Guardando borrador...');
+
+      final draftResponse = _currentResponse!.copyWith(
+        answers: Map<String, dynamic>.from(_fieldValues),
+        status: 'draft',
+      );
+
+      final success = await _repository.saveResponse(draftResponse);
+
+      if (success) {
+        _currentResponse = draftResponse;
+        _logger.i('✅ Borrador guardado exitosamente');
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = 'Error guardando borrador';
+        _logger.e('❌ Error guardando borrador en repositorio');
+        return false;
+      }
+    } catch (e) {
+      _errorMessage = 'Error guardando borrador: $e';
+      _logger.e('❌ Error guardando borrador: $e');
+      return false;
+    }
+  }
+
   // ==================== CLEANUP ====================
 
   @override
   void dispose() {
-    _logger.d('🧹 Limpiando DynamicFormViewModel');
+    _logger.d('Limpiando DynamicFormViewModel');
     super.dispose();
   }
 }

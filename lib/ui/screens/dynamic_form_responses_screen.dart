@@ -23,7 +23,7 @@ class DynamicFormResponsesScreen extends StatefulWidget {
 
 class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen> {
   late DynamicFormViewModel _viewModel;
-  String _filterStatus = 'all'; // all, completed, pending, synced
+  String _filterStatus = 'all'; // all, completed, draft, synced
 
   @override
   void initState() {
@@ -54,20 +54,16 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
         backgroundColor: AppColors.appBarBackground,
         foregroundColor: AppColors.appBarForeground,
         actions: [
+          // Botón para descargar formularios
+          IconButton(
+            icon: Icon(Icons.cloud_download, color: AppColors.onPrimary),
+            onPressed: _downloadTemplates,
+            tooltip: 'Descargar formularios del servidor',
+          ),
           IconButton(
             icon: Icon(Icons.add_circle_outline, color: AppColors.onPrimary),
             onPressed: _navigateToFormList,
             tooltip: 'Nuevo Formulario',
-          ),
-          IconButton(
-            icon: Icon(Icons.sync, color: AppColors.onPrimary),
-            onPressed: _syncResponses,
-            tooltip: 'Sincronizar con servidor',
-          ),
-          IconButton(
-            icon: Icon(Icons.refresh, color: AppColors.onPrimary),
-            onPressed: _loadData,
-            tooltip: 'Actualizar',
           ),
         ],
       ),
@@ -613,6 +609,74 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
       if (success) {
         await _loadData();
       }
+    }
+  }
+  Future<void> _downloadTemplates() async {
+    // Mostrar diálogo de carga
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false,
+        child: Center(
+          child: Container(
+            padding: EdgeInsets.all(24),
+            margin: EdgeInsets.symmetric(horizontal: 40),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: AppColors.primary),
+                SizedBox(height: 16),
+                Text(
+                  'Descargando formularios...',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Ejecutar descarga
+    final success = await _viewModel.downloadTemplatesFromServer();
+
+    if (!mounted) return;
+    Navigator.pop(context); // Cerrar diálogo de carga
+
+    // Mostrar resultado
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              success ? Icons.check_circle : Icons.error,
+              color: Colors.white,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                success
+                    ? '✅ Formularios descargados: ${_viewModel.templates.length} disponibles'
+                    : '❌ ${_viewModel.errorMessage ?? "Error al descargar"}',
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: success ? AppColors.success : AppColors.error,
+        duration: Duration(seconds: 3),
+      ),
+    );
+
+    if (success) {
+      await _loadData(); // Recargar la pantalla
     }
   }
 }
