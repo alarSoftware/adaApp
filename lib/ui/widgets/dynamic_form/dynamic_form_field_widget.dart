@@ -11,6 +11,8 @@ class DynamicFormFieldWidget extends StatelessWidget {
   final String? errorText;
   final Map<String, dynamic> allValues;
   final Function(String fieldId, dynamic value)? onNestedFieldChanged;
+  final int depth;
+  final bool isReadOnly;
 
   const DynamicFormFieldWidget({
     super.key,
@@ -20,6 +22,8 @@ class DynamicFormFieldWidget extends StatelessWidget {
     this.errorText,
     this.allValues = const {},
     this.onNestedFieldChanged,
+    this.depth = 0,
+    this.isReadOnly = false,
   });
 
   @override
@@ -104,7 +108,7 @@ class DynamicFormFieldWidget extends StatelessWidget {
           option: option,
           isSelected: isSelected,
           isRadio: !isMultiple,
-          onTap: () => _handleSelection(option.id, isMultiple, selectedIds),
+          onTap: isReadOnly ? null : () => _handleSelection(option.id, isMultiple, selectedIds),
         ),
         if (isSelected && hasNested)
           _buildNestedFields(context, option.children),
@@ -115,44 +119,49 @@ class DynamicFormFieldWidget extends StatelessWidget {
   Widget _buildOptionItem({
     required DynamicFormField option,
     required bool isSelected,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
     required bool isRadio,
   }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
-      child: Container(
-        margin: EdgeInsets.only(bottom: 8),
-        padding: EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.border,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isRadio
-                  ? (isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked)
-                  : (isSelected ? Icons.check_box : Icons.check_box_outline_blank),
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-              size: 22,
+      child: Opacity(
+        opacity: isReadOnly ? 0.6 : 1.0,
+        child: Container(
+          margin: EdgeInsets.only(bottom: 8),
+          padding: EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.border,
+              width: isSelected ? 2 : 1,
             ),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                option.label,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                isRadio
+                    ? (isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked)
+                    : (isSelected ? Icons.check_box : Icons.check_box_outline_blank),
+                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                size: 22,
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  option.label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
                 ),
               ),
-            ),
-          ],
+              if (isReadOnly)
+                Icon(Icons.lock_outline, size: 16, color: AppColors.textSecondary),
+            ],
+          ),
         ),
       ),
     );
@@ -254,7 +263,7 @@ class DynamicFormFieldWidget extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildNestedOption(opt, isSelected, isRadio, () {
+              _buildNestedOption(opt, isSelected, isRadio, isReadOnly ? null : () {
                 if (onNestedFieldChanged == null) return;
                 if (isRadio) {
                   onNestedFieldChanged!(field.id, opt.id);
@@ -273,41 +282,46 @@ class DynamicFormFieldWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildNestedOption(DynamicFormField opt, bool isSelected, bool isRadio, VoidCallback onTap) {
+  Widget _buildNestedOption(DynamicFormField opt, bool isSelected, bool isRadio, VoidCallback? onTap) {
     return InkWell(
       onTap: onTap,
-      child: Container(
-        margin: EdgeInsets.only(bottom: 6),
-        padding: EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.background,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.border,
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isRadio
-                  ? (isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked)
-                  : (isSelected ? Icons.check_box : Icons.check_box_outline_blank),
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-              size: 18,
+      child: Opacity(
+        opacity: isReadOnly ? 0.6 : 1.0,
+        child: Container(
+          margin: EdgeInsets.only(bottom: 6),
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.background,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.border,
+              width: isSelected ? 1.5 : 1,
             ),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                opt.label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                isRadio
+                    ? (isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked)
+                    : (isSelected ? Icons.check_box : Icons.check_box_outline_blank),
+                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                size: 18,
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  opt.label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
                 ),
               ),
-            ),
-          ],
+              if (isReadOnly)
+                Icon(Icons.lock_outline, size: 14, color: AppColors.textSecondary),
+            ],
+          ),
         ),
       ),
     );
@@ -321,18 +335,20 @@ class DynamicFormFieldWidget extends StatelessWidget {
         SizedBox(height: 6),
         TextFormField(
           initialValue: allValues[field.id]?.toString(),
+          enabled: !isReadOnly,
           decoration: InputDecoration(
-            hintText: 'Escribe...',
+            hintText: isReadOnly ? '' : 'Escribe...',
             hintStyle: TextStyle(fontSize: 11),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
             contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             isDense: true,
             filled: true,
-            fillColor: AppColors.background,
+            fillColor: isReadOnly ? AppColors.neutral200 : AppColors.background,
+            suffixIcon: isReadOnly ? Icon(Icons.lock_outline, size: 16) : null,
           ),
           style: TextStyle(fontSize: 12),
           maxLines: maxLines,
-          onChanged: (v) => onNestedFieldChanged?.call(field.id, v),
+          onChanged: isReadOnly ? null : (v) => onNestedFieldChanged?.call(field.id, v),
         ),
       ],
     );
@@ -352,16 +368,40 @@ class DynamicFormFieldWidget extends StatelessWidget {
             Expanded(
               child: Text(field.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
             ),
+            if (isReadOnly)
+              Icon(Icons.lock_outline, size: 14, color: AppColors.textSecondary),
           ],
         ),
         SizedBox(height: 8),
         if (hasImage) ...[
           _buildImagePreview(imagePath, height: 100),
           SizedBox(height: 6),
+        ] else if (isReadOnly) ...[
+          Container(
+            height: 100,
+            decoration: BoxDecoration(
+              color: AppColors.neutral200,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.image_not_supported, color: AppColors.textSecondary, size: 32),
+                  SizedBox(height: 4),
+                  Text('Sin imagen', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: 6),
         ],
-        _buildImageButtons(context, isNested: true, fieldId: field.id),
-        if (hasImage)
-          _buildDeleteButton(() => onNestedFieldChanged?.call(field.id, null), isCompact: true),
+        if (!isReadOnly) ...[
+          _buildImageButtons(context, isNested: true, fieldId: field.id),
+          if (hasImage)
+            _buildDeleteButton(() => onNestedFieldChanged?.call(field.id, null), isCompact: true),
+        ],
       ],
     );
   }
@@ -375,20 +415,23 @@ class DynamicFormFieldWidget extends StatelessWidget {
           SizedBox(height: 8),
           TextFormField(
             initialValue: value?.toString(),
+            enabled: !isReadOnly,
             decoration: InputDecoration(
-              hintText: field.placeholder ?? 'Escribe tu respuesta aquí...',
+              hintText: isReadOnly ? '' : (field.placeholder ?? 'Escribe tu respuesta aquí...'),
               errorText: errorText,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
               focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.primary, width: 2)),
               errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.error, width: 2)),
+              disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
               filled: true,
-              fillColor: AppColors.background,
+              fillColor: isReadOnly ? AppColors.neutral200 : AppColors.background,
               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              suffixIcon: isReadOnly ? Icon(Icons.lock_outline, size: 20) : null,
             ),
             maxLines: maxLines,
-            maxLength: field.maxLength,
-            onChanged: onChanged,
+            maxLength: isReadOnly ? null : field.maxLength,
+            onChanged: isReadOnly ? null : onChanged,
           ),
         ],
       ),
@@ -407,7 +450,9 @@ class DynamicFormFieldWidget extends StatelessWidget {
               Icon(Icons.photo_camera, color: AppColors.primary, size: 20),
               SizedBox(width: 8),
               Expanded(child: Text(field.label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
-              if (field.required) _buildRequiredBadge(),
+              if (field.required && !isReadOnly) _buildRequiredBadge(),
+              if (isReadOnly)
+                Icon(Icons.lock_outline, size: 18, color: AppColors.textSecondary),
             ],
           ),
           if (errorText != null) _buildErrorText(),
@@ -415,9 +460,31 @@ class DynamicFormFieldWidget extends StatelessWidget {
           if (hasImage) ...[
             _buildImagePreview(value.toString(), height: 200),
             SizedBox(height: 12),
+          ] else if (isReadOnly) ...[
+            Container(
+              height: 200,
+              decoration: BoxDecoration(
+                color: AppColors.neutral200,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.image_not_supported, color: AppColors.textSecondary, size: 48),
+                    SizedBox(height: 8),
+                    Text('Sin imagen', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 12),
           ],
-          _buildImageButtons(context),
-          if (hasImage) _buildDeleteButton(() => onChanged(null)),
+          if (!isReadOnly) ...[
+            _buildImageButtons(context),
+            if (hasImage) _buildDeleteButton(() => onChanged(null)),
+          ],
         ],
       ),
     );
@@ -529,7 +596,12 @@ class DynamicFormFieldWidget extends StatelessWidget {
     return Row(
       children: [
         Expanded(child: Text(field.label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
-        if (field.required) _buildRequiredBadge(),
+        if (field.required && !isReadOnly) _buildRequiredBadge(),
+        if (isReadOnly)
+          Padding(
+            padding: EdgeInsets.only(left: 8),
+            child: Icon(Icons.lock_outline, size: 18, color: AppColors.textSecondary),
+          ),
       ],
     );
   }

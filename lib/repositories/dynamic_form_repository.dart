@@ -544,6 +544,7 @@ class DynamicFormRepository {
   }
 
   /// Sincronizar todas las respuestas pendientes
+  @override
   Future<Map<String, int>> syncAllPendingResponses() async {
     int success = 0;
     int failed = 0;
@@ -553,7 +554,7 @@ class DynamicFormRepository {
       _logger.i('📤 Sincronizando ${pending.length} respuestas pendientes');
 
       for (final response in pending) {
-        final result = await syncResponse(response);
+        final result = await simulateSyncToServer(response.id);
         if (result) {
           success++;
         } else {
@@ -568,6 +569,7 @@ class DynamicFormRepository {
 
     return {'success': success, 'failed': failed};
   }
+
 
   /// Eliminar una respuesta
   Future<bool> deleteResponse(String responseId) async {
@@ -773,6 +775,202 @@ class DynamicFormRepository {
     } catch (e) {
       _logger.e('❌ Error eliminando formulario: $e');
       return false;
+    }
+  }
+  Future<bool> markResponseAsSynced(String responseId) async {
+    try {
+      final now = DateTime.now();
+
+      final updated = await _dbHelper.actualizar(
+        responseTableName,
+        {
+          'sync_status': 'synced',
+          'fecha_sincronizado': now.toIso8601String(),
+          'mensaje_error_sync': null,
+        },
+        where: 'id = ?',
+        whereArgs: [responseId],
+      );
+
+      if (updated > 0) {
+        _logger.i('✅ Response marcada como sincronizada: $responseId');
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _logger.e('❌ Error marcando response como sincronizada: $e');
+      return false;
+    }
+  }
+
+  Future<bool> markResponseDetailsAsSynced(String responseId) async {
+    try {
+      final updated = await _dbHelper.actualizar(
+        responseDetailTableName,
+        {
+          'sync_status': 'synced',
+        },
+        where: 'dynamic_form_response_id = ?',
+        whereArgs: [responseId],
+      );
+
+      if (updated > 0) {
+        _logger.i('✅ Response details marcados como sincronizados: $responseId');
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _logger.e('❌ Error marcando details como sincronizados: $e');
+      return false;
+    }
+  }
+
+  Future<bool> markSyncAttemptFailed(String responseId, String errorMessage) async {
+    try {
+      final now = DateTime.now();
+
+      final current = await _dbHelper.consultar(
+        responseTableName,
+        where: 'id = ?',
+        whereArgs: [responseId],
+      );
+
+      if (current.isEmpty) return false;
+
+      final intentosActuales = current.first['intentos_sync'] as int? ?? 0;
+
+      final updated = await _dbHelper.actualizar(
+        responseTableName,
+        {
+          'intentos_sync': intentosActuales + 1,
+          'ultimo_intento_sync': now.toIso8601String(),
+          'mensaje_error_sync': errorMessage,
+        },
+        where: 'id = ?',
+        whereArgs: [responseId],
+      );
+
+      if (updated > 0) {
+        _logger.w('⚠️ Intento fallido registrado: $responseId (intento ${intentosActuales + 1})');
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _logger.e('❌ Error registrando intento fallido: $e');
+      return false;
+    }
+  }
+
+  Future<List<DynamicFormResponse>> getPendingSync() async {
+    try {
+      final maps = await _dbHelper.consultar(
+        responseTableName,
+        where: 'estado = ? AND sync_status = ?',
+        whereArgs: ['completed', 'pending'],
+        orderBy: 'creation_date ASC',
+      );
+
+      List<DynamicFormResponse> responses = [];
+
+      for (var map in maps) {
+        final response = await _mapearBDaResponseConDetalles(map);
+        if (response != null) {
+          responses.add(response);
+        }
+      }
+
+      _logger.i('✅ Respuestas pendientes de sync: ${responses.length}');
+      return responses;
+    } catch (e) {
+      _logger.e('❌ Error obteniendo pendientes de sync: $e');
+      return [];
+    }
+  }
+  Future<int> countPendingSync() async {
+    try {
+      return await _dbHelper.contarRegistros(
+        responseTableName,
+        where: 'estado = ? AND sync_status = ?',
+        whereArgs: ['completed', 'pending'],
+      );
+    } catch (e) {
+      _logger.e('❌ Error contando pendientes de sync: $e');
+      return 0;
+    }
+  }
+  Future<int> countSynced() async {
+    try {
+      return await _dbHelper.contarRegistros(
+        responseTableName,
+        where: 'sync_status = ?',
+        whereArgs: ['synced'],
+      );
+    } catch (e) {
+      _logger.e('❌ Error contando sincronizadas: $e');
+      return 0;
+    }
+  }
+  Future<bool> simulateSyncToServer(String responseId) async {
+    try {
+      _logger.i('📤 Simulando envío al servidor: $responseId');
+
+      // Simular delay de red (2-3 segundos)
+      await Future.delayed(Duration(seconds: 2));
+
+      // Simular éxito/falla (90% éxito, 10% falla para testing)
+      final random = DateTime.now().millisecondsSinceEpoch % 10;
+      final success = random < 9;
+
+      if (success) {
+        await markResponseAsSynced(responseId);
+        await markResponseDetailsAsSynced(responseId);
+        _logger.i('✅ Formulario sincronizado exitosamente');
+        return true;
+      } else {
+        await markSyncAttemptFailed(responseId, 'Error simulado de conexión');
+        _logger.w('❌ Fallo simulado en envío');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('❌ Error en simulación: $e');
+      await markSyncAttemptFailed(responseId, e.toString());
+      return false;
+    }
+  }
+  /// Obtener sync_status y metadata de una respuesta
+  Future<Map<String, dynamic>> getSyncMetadata(String responseId) async {
+    try {
+      final db = await _dbHelper.database;
+      final result = await db.query(
+        responseTableName,
+        where: 'id = ?',
+        whereArgs: [responseId],
+      );
+
+      if (result.isEmpty) {
+        return {
+          'sync_status': 'pending',
+          'intentos_sync': 0,
+          'mensaje_error_sync': null,
+          'fecha_sincronizado': null,
+        };
+      }
+
+      final map = result.first;
+      return {
+        'sync_status': map['sync_status'] ?? 'pending',
+        'intentos_sync': map['intentos_sync'] ?? 0,
+        'mensaje_error_sync': map['mensaje_error_sync'],
+        'fecha_sincronizado': map['fecha_sincronizado'],
+      };
+    } catch (e) {
+      _logger.e('❌ Error obteniendo sync metadata: $e');
+      return {
+        'sync_status': 'pending',
+        'intentos_sync': 0,
+        'mensaje_error_sync': null,
+        'fecha_sincronizado': null,
+      };
     }
   }
 }

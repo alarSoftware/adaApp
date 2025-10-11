@@ -183,6 +183,11 @@ class DatabaseTables {
       dynamic_form_id TEXT,
       usuario_id INTEGER,
       estado TEXT,
+      sync_status TEXT DEFAULT 'pending',
+      intentos_sync INTEGER DEFAULT 0,
+      ultimo_intento_sync TEXT,
+      mensaje_error_sync TEXT,
+      fecha_sincronizado TEXT,
       creation_date TEXT,
       creation_user_id INTEGER,
       last_update_date TEXT,
@@ -197,6 +202,7 @@ class DatabaseTables {
       response TEXT,
       dynamic_form_response_id TEXT,
       dynamic_form_detail_id TEXT,
+      sync_status TEXT DEFAULT 'pending',
       FOREIGN KEY (dynamic_form_response_id) REFERENCES dynamic_form_response (id),
       FOREIGN KEY (dynamic_form_detail_id) REFERENCES dynamic_form_detail (id)
     )
@@ -281,12 +287,14 @@ class DatabaseTables {
       // Índices para dynamic_form_response
       'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_form_id ON dynamic_form_response (dynamic_form_id)',
       'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_estado ON dynamic_form_response (estado)',
+      'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_sync_status ON dynamic_form_response (sync_status)',
       'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_usuario_id ON dynamic_form_response (usuario_id)',
       'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_contacto_id ON dynamic_form_response (contacto_id)',
 
       // Índices para dynamic_form_response_detail
       'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_detail_response_id ON dynamic_form_response_detail (dynamic_form_response_id)',
       'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_detail_detail_id ON dynamic_form_response_detail (dynamic_form_detail_id)',
+      'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_detail_sync_status ON dynamic_form_response_detail (sync_status)',
     ];
 
     for (final indice in indices) {

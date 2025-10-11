@@ -34,7 +34,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
 
   Future<void> _loadData() async {
     await _viewModel.loadTemplates();
-    await _viewModel.loadSavedResponses(clienteId: widget.cliente.id.toString());
+    await _viewModel.loadSavedResponsesWithSync(clienteId: widget.cliente.id.toString()); // ✅ CAMBIAR AQUÍ
   }
 
   @override
@@ -176,14 +176,21 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
       case 'completed':
         return allResponses.where((r) => r.status == 'completed').toList();
       case 'pending':
-        return allResponses.where((r) => r.status == 'pending').toList();
+      // ✅ CAMBIAR: Filtrar por sync_status
+        return allResponses.where((r) {
+          final syncStatus = r.metadata?['sync_status'] as String? ?? 'pending';
+          return syncStatus == 'pending';
+        }).toList();
       case 'synced':
-        return allResponses.where((r) => r.status == 'synced').toList();
+      // ✅ CAMBIAR: Filtrar por sync_status
+        return allResponses.where((r) {
+          final syncStatus = r.metadata?['sync_status'] as String? ?? 'pending';
+          return syncStatus == 'synced';
+        }).toList();
       default:
         return allResponses;
     }
   }
-
   Widget _buildResponsesList(List<DynamicFormResponse> responses) {
     return RefreshIndicator(
       onRefresh: _loadData,
@@ -202,6 +209,11 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
   Widget _buildResponseCard(DynamicFormResponse response) {
     final template = _viewModel.getTemplateById(response.formTemplateId);
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+
+    // Obtener sync status
+    final syncStatus = response.metadata?['sync_status'] as String? ?? 'pending';
+    final intentosSync = response.metadata?['intentos_sync'] as int? ?? 0;
+    final mensajeError = response.metadata?['mensaje_error_sync'] as String?;
 
     return Card(
       elevation: 2,
@@ -223,7 +235,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
             children: [
               Row(
                 children: [
-                  // Icono de estado
+                  // Icono del ESTADO DEL FORMULARIO (draft/completed)
                   Container(
                     width: 40,
                     height: 40,
@@ -251,10 +263,25 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
                           ),
                         ),
                         SizedBox(height: 4),
+                        // Badge del estado del formulario
                         _buildStatusBadge(response.status),
                       ],
                     ),
                   ),
+                  // ✅ ÍCONO DE SINCRONIZACIÓN (nubecita)
+                  Container(
+                    padding: EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: _getSyncStatusColor(syncStatus).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(
+                      _getSyncStatusIcon(syncStatus),
+                      color: _getSyncStatusColor(syncStatus),
+                      size: 18,
+                    ),
+                  ),
+                  SizedBox(width: 8),
                   Icon(
                     Icons.arrow_forward_ios,
                     size: 16,
@@ -312,7 +339,8 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
                     ),
                   ),
                   Spacer(),
-                  if (response.status != 'synced') ...[
+                  // Estado de sincronización en texto
+                  if (syncStatus == 'pending') ...[
                     Icon(Icons.cloud_upload, size: 14, color: AppColors.warning),
                     SizedBox(width: 4),
                     Text(
@@ -322,9 +350,58 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
                         color: AppColors.warning,
                       ),
                     ),
+                    if (intentosSync > 0) ...[
+                      SizedBox(width: 4),
+                      Text(
+                        '($intentosSync)',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ],
+                  ] else if (syncStatus == 'synced') ...[
+                    Icon(Icons.cloud_done, size: 14, color: AppColors.success),
+                    SizedBox(width: 4),
+                    Text(
+                      'Sincronizado',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.success,
+                      ),
+                    ),
                   ],
                 ],
               ),
+
+              // Mensaje de error si existe
+              if (mensajeError != null && syncStatus == 'pending') ...[
+                SizedBox(height: 8),
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline, size: 12, color: AppColors.error),
+                      SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          mensajeError,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.error,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -341,17 +418,9 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
         label = 'COMPLETADO';
         color = AppColors.success;
         break;
-      case 'pending':
-        label = 'PENDIENTE';
+      case 'draft':
+        label = 'BORRADOR';
         color = AppColors.warning;
-        break;
-      case 'synced':
-        label = 'SINCRONIZADO';
-        color = AppColors.info;
-        break;
-      case 'error':
-        label = 'ERROR';
-        color = AppColors.error;
         break;
       default:
         label = status.toUpperCase();
@@ -482,16 +551,14 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     }
   }
 
+
+
   Color _getStatusColor(String status) {
     switch (status) {
       case 'completed':
         return AppColors.success;
-      case 'pending':
+      case 'draft':
         return AppColors.warning;
-      case 'synced':
-        return AppColors.info;
-      case 'error':
-        return AppColors.error;
       default:
         return AppColors.neutral400;
     }
@@ -501,12 +568,8 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     switch (status) {
       case 'completed':
         return Icons.check_circle;
-      case 'pending':
-        return Icons.pending;
-      case 'synced':
-        return Icons.cloud_done;
-      case 'error':
-        return Icons.error;
+      case 'draft':
+        return Icons.edit_note;
       default:
         return Icons.help_outline;
     }
@@ -529,10 +592,16 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
   void _viewResponse(DynamicFormResponse response) {
     _viewModel.loadResponseForEditing(response);
 
+    // Si el formulario está completado, abrirlo en modo solo lectura
+    final isReadOnly = response.status == 'completed';
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DynamicFormFillScreen(viewModel: _viewModel),
+        builder: (context) => DynamicFormFillScreen(
+          viewModel: _viewModel,
+          isReadOnly: isReadOnly,
+        ),
       ),
     ).then((_) {
       _loadData();
@@ -679,4 +748,21 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
       await _loadData(); // Recargar la pantalla
     }
   }
+  // ==================== MÉTODOS PARA SYNC STATUS ====================
+
+  Color _getSyncStatusColor(String syncStatus) {
+    if (syncStatus == 'synced') {
+      return AppColors.success;
+    }
+    return AppColors.warning; // Por defecto es pending
+  }
+
+  IconData _getSyncStatusIcon(String syncStatus) {
+    if (syncStatus == 'synced') {
+      return Icons.cloud_done;
+    }
+    return Icons.cloud_upload; // Por defecto es pending
+  }
+
+
 }

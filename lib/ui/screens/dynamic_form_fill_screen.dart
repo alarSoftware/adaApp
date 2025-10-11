@@ -6,10 +6,12 @@ import 'package:ada_app/ui/widgets/dynamic_form/dynamic_form_field_widget.dart';
 /// Pantalla para llenar un formulario dinámico
 class DynamicFormFillScreen extends StatefulWidget {
   final DynamicFormViewModel viewModel;
+  final bool isReadOnly;
 
   const DynamicFormFillScreen({
     super.key,
     required this.viewModel,
+    this.isReadOnly = false,
   });
 
   @override
@@ -29,23 +31,31 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
+        if (widget.isReadOnly) return true; // Si es readonly, salir sin preguntar
         return await _showExitConfirmation();
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            widget.viewModel.currentTemplate?.title ?? 'Formulario',
-            style: TextStyle(color: AppColors.onPrimary),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.viewModel.currentTemplate?.title ?? 'Formulario',
+                style: TextStyle(color: AppColors.onPrimary, fontSize: 18),
+              ),
+              // ✅ MOSTRAR "Solo lectura" si está en readonly
+              if (widget.isReadOnly)
+                Text(
+                  'Solo lectura',
+                  style: TextStyle(
+                    color: AppColors.onPrimary.withOpacity(0.7),
+                    fontSize: 12,
+                  ),
+                ),
+            ],
           ),
           backgroundColor: AppColors.appBarBackground,
           foregroundColor: AppColors.appBarForeground,
-          actions: [
-            IconButton(
-              icon: Icon(Icons.save_outlined, color: AppColors.onPrimary),
-              onPressed: _saveProgress,
-              tooltip: 'Guardar borrador',
-            ),
-          ],
         ),
         body: ListenableBuilder(
           listenable: widget.viewModel,
@@ -61,14 +71,36 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
               );
             }
 
-            // Obtener solo campos visibles según respuestas actuales
             final currentAnswers = widget.viewModel.currentResponse?.answers ?? {};
             final visibleFields = template.getVisibleFields(currentAnswers);
 
             return Column(
               children: [
-                // Barra de progreso
-                _buildProgressBar(),
+                // Barra de progreso (solo si NO es readonly)
+                if (!widget.isReadOnly) _buildProgressBar(),
+
+                // ✅ BANNER DE SOLO LECTURA
+                if (widget.isReadOnly)
+                  Container(
+                    padding: EdgeInsets.all(16),
+                    color: AppColors.info.withOpacity(0.1),
+                    child: Row(
+                      children: [
+                        Icon(Icons.lock_outline, color: AppColors.info, size: 20),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Este formulario está completado y no se puede modificar',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.info,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
                 // Formulario
                 Expanded(
@@ -92,12 +124,17 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
                               key: ValueKey('${field.id}_${currentAnswers[field.id]}'),
                               field: field,
                               value: widget.viewModel.getFieldValue(field.id),
-                              onChanged: (value) {
+                              onChanged: widget.isReadOnly // ✅ Si es readonly, no hacer nada
+                                  ? (_) {}
+                                  : (value) {
                                 widget.viewModel.updateFieldValue(field.id, value);
                               },
                               errorText: widget.viewModel.getFieldError(field.id),
                               allValues: currentAnswers,
-                              onNestedFieldChanged: (fieldId, value) {
+                              isReadOnly: widget.isReadOnly, // ✅ NUEVO parámetro
+                              onNestedFieldChanged: widget.isReadOnly
+                                  ? (_, __) {}
+                                  : (fieldId, value) {
                                 widget.viewModel.updateFieldValue(fieldId, value);
                               },
                             );
@@ -111,10 +148,49 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
                 ),
 
                 // Botón de completar (fijo en la parte inferior)
-                _buildCompleteButton(),
+                if (!widget.isReadOnly)
+                  _buildCompleteButton()
+                else
+                  _buildCloseButton()
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+  Widget _buildCloseButton() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border(
+          top: BorderSide(color: AppColors.border),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowLight,
+            blurRadius: 8,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => Navigator.pop(context),
+            icon: Icon(Icons.close),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            label: Text('Cerrar'),
+          ),
         ),
       ),
     );
@@ -193,7 +269,6 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
           child: ElevatedButton.icon(
             onPressed: _completeForm,
             icon: Icon(Icons.check_circle),
-            label: Text('Completar Formulario'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.success,
               foregroundColor: Colors.white,
@@ -202,6 +277,7 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
+            label: Text('Confirmar formulario'),
           ),
         ),
       ),

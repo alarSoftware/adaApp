@@ -12,6 +12,8 @@ class DynamicFormViewModel extends ChangeNotifier {
   // Estado
   bool _isLoading = false;
   String? _errorMessage;
+  bool _isSyncing = false;
+  bool get isSyncing => _isSyncing;
 
   // Templates
   List<DynamicFormTemplate> _templates = [];
@@ -32,7 +34,8 @@ class DynamicFormViewModel extends ChangeNotifier {
   DynamicFormTemplate? get currentTemplate => _currentTemplate;
   List<DynamicFormResponse> get savedResponses => _savedResponses;
   DynamicFormResponse? get currentResponse => _currentResponse;
-  String? _currentClienteId;
+
+
 
   // ==================== MÉTODOS PARA TEMPLATES ====================
 
@@ -379,6 +382,7 @@ class DynamicFormViewModel extends ChangeNotifier {
 
       _logger.i('✔️ Intentando completar formulario...');
 
+      // Validar campos requeridos
       if (!_validateAllFields()) {
         _errorMessage = 'Por favor completa todos los campos obligatorios';
         _logger.w('⚠️ Validación fallida al completar');
@@ -386,44 +390,107 @@ class DynamicFormViewModel extends ChangeNotifier {
         return false;
       }
 
+      // Preparar response completada
       final completedResponse = _currentResponse!.copyWith(
         answers: Map<String, dynamic>.from(_fieldValues),
         completedAt: DateTime.now(),
         status: 'completed',
       );
 
-      final success = await _repository.saveResponse(completedResponse);
-
-      if (success) {
-        _currentResponse = completedResponse;
-        _logger.i('✅ Formulario completado exitosamente');
-
-        _currentTemplate = null;
-        _currentResponse = null;
-        _fieldValues.clear();
-        _fieldErrors.clear();
-
+      // Guardar en BD (estado='completed', sync_status='pending')
+      final saved = await _repository.saveResponse(completedResponse);
+      if (!saved) {
+        _errorMessage = 'Error al guardar el formulario';
         notifyListeners();
-        return true;
-      } else {
-        _errorMessage = 'Error completando formulario';
-        _logger.e('❌ Error completando formulario en repositorio');
         return false;
       }
+
+      _logger.i('✅ Formulario guardado como completed, sync_status=pending');
+
+      // Iniciar simulación de sincronización
+      _isSyncing = true;
+      notifyListeners();
+
+      final synced = await _repository.simulateSyncToServer(completedResponse.id);
+
+      _isSyncing = false;
+
+      if (synced) {
+        _logger.i('✅ Formulario sincronizado exitosamente');
+      } else {
+        _logger.w('⚠️ Formulario guardado pero no sincronizado');
+      }
+
+      // Limpiar estado actual
+      _currentTemplate = null;
+      _currentResponse = null;
+      _fieldValues.clear();
+      _fieldErrors.clear();
+
+      notifyListeners();
+      return true;
+
     } catch (e) {
       _errorMessage = 'Error completando formulario: $e';
-      _logger.e('❌ Error completando formulario: $e');
+      _logger.e('❌ Error en saveAndComplete: $e');
+      _isSyncing = false;
       notifyListeners();
       return false;
     }
   }
+  Future<Map<String, int>> getSyncCounters() async {
+    try {
+      final pending = await _repository.countPendingSync();
+      final synced = await _repository.countSynced();
+
+      return {
+        'pending': pending,
+        'synced': synced,
+        'total': pending + synced,
+      };
+    } catch (e) {
+      _logger.e('❌ Error obteniendo contadores: $e');
+      return {'pending': 0, 'synced': 0, 'total': 0};
+    }
+  }
+
+  Future<bool> retrySyncResponse(String responseId) async {
+    try {
+      _logger.i('🔄 Reintentando sincronización: $responseId');
+
+      _isSyncing = true;
+      notifyListeners();
+
+      final success = await _repository.simulateSyncToServer(responseId);
+
+      _isSyncing = false;
+      notifyListeners();
+
+      if (success) {
+        _logger.i('✅ Reintento exitoso');
+        return true;
+      } else {
+        _logger.w('⚠️ Reintento fallido');
+        _errorMessage = 'No se pudo sincronizar. Intenta más tarde.';
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _logger.e('❌ Error en reintento: $e');
+      _errorMessage = e.toString();
+      _isSyncing = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
 
   // ==================== MÉTODOS DE SINCRONIZACIÓN ====================
 
   /// Sincronizar respuestas pendientes
   Future<Map<String, int>> syncPendingResponses() async {
     try {
-      _isLoading = true;
+      _isSyncing = true;  // ✅ Cambiar _isLoading por _isSyncing
       notifyListeners();
 
       final result = await _repository.syncAllPendingResponses();
@@ -434,7 +501,7 @@ class DynamicFormViewModel extends ChangeNotifier {
       _logger.e('❌ Error sincronizando: $e');
       return {'success': 0, 'failed': 0};
     } finally {
-      _isLoading = false;
+      _isSyncing = false;  // ✅ Cambiar _isLoading por _isSyncing
       notifyListeners();
     }
   }
@@ -464,24 +531,28 @@ class DynamicFormViewModel extends ChangeNotifier {
   // ==================== MÉTODOS PARA RESPUESTAS GUARDADAS ====================
 
   /// Cargar respuestas guardadas desde la BD
-  Future<void> loadSavedResponses({String? clienteId}) async {
+  /// Cargar respuestas guardadas CON su sync_status desde la BD
+  Future<void> loadSavedResponsesWithSync({String? clienteId}) async {
     try {
       _isLoading = true;
       _errorMessage = null;
       notifyListeners();
 
-      _currentClienteId = clienteId;
-
       final allResponses = await _repository.getLocalResponses();
+      final List<DynamicFormResponse> responsesWithSync = [];
+
+      for (var response in allResponses) {
+        final metadata = await _repository.getSyncMetadata(response.id);
+        final responseWithSync = response.copyWith(metadata: metadata);
+        responsesWithSync.add(responseWithSync);
+      }
 
       if (clienteId != null && clienteId.isNotEmpty) {
-        _savedResponses = allResponses
+        _savedResponses = responsesWithSync
             .where((response) => response.clienteId == clienteId)
             .toList();
-        _logger.i('✅ Respuestas del cliente $clienteId: ${_savedResponses.length}');
       } else {
-        _savedResponses = allResponses;
-        _logger.i('✅ Todas las respuestas: ${_savedResponses.length}');
+        _savedResponses = responsesWithSync;
       }
     } catch (e) {
       _errorMessage = 'Error cargando respuestas: $e';
@@ -554,6 +625,8 @@ class DynamicFormViewModel extends ChangeNotifier {
       return false;
     }
   }
+
+
 
   // ==================== CLEANUP ====================
 
