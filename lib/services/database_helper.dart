@@ -389,6 +389,7 @@ class DatabaseHelper {
       'dynamic_form_detail',
       'dynamic_form_response',
       'dynamic_form_response_detail',
+      'dynamic_form_response_image',
     };
     return !tablesWithoutTimestamps.contains(tableName);
   }

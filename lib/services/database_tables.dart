@@ -38,6 +38,7 @@ class DatabaseTables {
     await db.execute(_sqlDynamicFormDetail());
     await db.execute(_sqlDynamicFormResponse());
     await db.execute(_sqlDynamicFormResponseDetail());
+    await db.execute(_sqlDynamicFormResponseImage());
   }
 
   String _sqlModelos() => '''
@@ -203,12 +204,23 @@ class DatabaseTables {
     dynamic_form_response_id TEXT,
     dynamic_form_detail_id TEXT,
     sync_status TEXT DEFAULT 'pending',
-    imagen_path TEXT,
-    imagen_base64 TEXT,
-    tiene_imagen INTEGER DEFAULT 0,
-    imagen_tamano INTEGER,
     FOREIGN KEY (dynamic_form_response_id) REFERENCES dynamic_form_response (id),
     FOREIGN KEY (dynamic_form_detail_id) REFERENCES dynamic_form_detail (id)
+  )
+''';
+
+  String _sqlDynamicFormResponseImage() => '''
+  CREATE TABLE dynamic_form_response_image (
+    id TEXT PRIMARY KEY,
+    dynamic_form_response_detail_id TEXT NOT NULL,
+    imagen_path TEXT,
+    imagen_base64 TEXT,
+    imagen_tamano INTEGER,
+    mime_type TEXT DEFAULT 'image/jpeg',
+    orden INTEGER DEFAULT 1,
+    created_at TEXT NOT NULL,
+    sync_status TEXT DEFAULT 'pending',
+    FOREIGN KEY (dynamic_form_response_detail_id) REFERENCES dynamic_form_response_detail(id) ON DELETE CASCADE
   )
 ''';
 
@@ -299,6 +311,10 @@ class DatabaseTables {
       'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_detail_response_id ON dynamic_form_response_detail (dynamic_form_response_id)',
       'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_detail_detail_id ON dynamic_form_response_detail (dynamic_form_detail_id)',
       'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_detail_sync_status ON dynamic_form_response_detail (sync_status)',
+
+      // Índices para dynamic_form_response_image
+      'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_image_detail_id ON dynamic_form_response_image(dynamic_form_response_detail_id)',
+      'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_image_sync_status ON dynamic_form_response_image(sync_status)',
     ];
 
     for (final indice in indices) {

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:logger/logger.dart';
 import '../models/dynamic_form/dynamic_form_response.dart';
 import '../models/dynamic_form/dynamic_form_response_detail.dart';
+import '../models/dynamic_form/dynamic_form_response_image.dart';
 import '../services/database_helper.dart';
 
 class DynamicFormResponseRepository {
@@ -11,10 +12,11 @@ class DynamicFormResponseRepository {
 
   String get _responseTableName => 'dynamic_form_response';
   String get _responseDetailTableName => 'dynamic_form_response_detail';
+  String get _responseImageTableName => 'dynamic_form_response_image';
 
   // ==================== MÉTODOS PARA RESPUESTAS ====================
 
-  /// Guardar respuesta completa (con sus detalles)
+  /// Guardar respuesta completa (con sus detalles e imágenes)
   Future<bool> save(DynamicFormResponse response) async {
     try {
       _logger.i('💾 Guardando respuesta: ${response.id}');
@@ -29,8 +31,8 @@ class DynamicFormResponseRepository {
         'id': response.id,
         'version': 1,
         'cliente_id': response.clienteId ?? '',
-        'contacto_id': response.metadata?['contactoId']?.toString(),
-        'edf_vendedor_id': response.metadata?['edfVendedorId']?.toString(),
+        'contacto_id': null,
+        'edf_vendedor_id': null,
         'last_update_user_id': null,
         'dynamic_form_id': response.formTemplateId,
         'usuario_id': response.userId != null ? int.tryParse(response.userId!) : null,
@@ -63,7 +65,7 @@ class DynamicFormResponseRepository {
         _logger.d('➕ Respuesta insertada');
       }
 
-      // Guardar detalles de respuestas
+      // Guardar detalles de respuestas (ahora sin imágenes)
       await _saveResponseDetails(response);
 
       _logger.i('✅ Respuesta guardada exitosamente: ${response.id}');
@@ -172,24 +174,54 @@ class DynamicFormResponseRepository {
     }
   }
 
-  /// Eliminar respuesta y sus detalles
+  /// Eliminar respuesta y sus detalles (las imágenes se eliminan automáticamente por CASCADE)
   Future<bool> delete(String responseId) async {
     try {
-      // Primero eliminar los detalles
+      // 🎯 PASO 1: Obtener todas las imágenes ANTES de eliminar de la BD
+      final images = await getImagesForResponse(responseId);
+
+      _logger.i('🗑️ Eliminando respuesta $responseId con ${images.length} imágenes');
+
+      // 🎯 PASO 2: Eliminar archivos físicos de imágenes
+      for (var image in images) {
+        if (image.imagenPath != null && image.imagenPath!.isNotEmpty) {
+          try {
+            final file = File(image.imagenPath!);
+            if (await file.exists()) {
+              await file.delete();
+              _logger.d('  🗑️ Archivo eliminado: ${image.imagenPath}');
+            }
+          } catch (e) {
+            _logger.w('⚠️ No se pudo eliminar archivo: ${image.imagenPath} - $e');
+          }
+        }
+      }
+
+      // 🎯 PASO 3: Eliminar imágenes de la tabla
+      for (var image in images) {
+        await _dbHelper.eliminar(
+          _responseImageTableName,
+          where: 'id = ?',
+          whereArgs: [image.id],
+        );
+      }
+      _logger.d('  🗑️ ${images.length} registros de imágenes eliminados de la BD');
+
+      // 🎯 PASO 4: Eliminar los detalles
       await _dbHelper.eliminar(
         _responseDetailTableName,
         where: 'dynamic_form_response_id = ?',
         whereArgs: [responseId],
       );
 
-      // Luego eliminar la respuesta
+      // 🎯 PASO 5: Eliminar la respuesta
       await _dbHelper.eliminar(
         _responseTableName,
         where: 'id = ?',
         whereArgs: [responseId],
       );
 
-      _logger.i('✅ Respuesta eliminada: $responseId');
+      _logger.i('✅ Respuesta eliminada completamente: $responseId');
       return true;
     } catch (e) {
       _logger.e('❌ Error eliminando respuesta: $e');
@@ -264,7 +296,7 @@ class DynamicFormResponseRepository {
 
   // ==================== MÉTODOS PARA DETALLES DE RESPUESTAS ====================
 
-  /// Guardar detalles de una respuesta (con soporte condicional para imágenes)
+  /// Guardar detalles de una respuesta (SIN imágenes - ahora van en tabla separada)
   Future<void> _saveResponseDetails(DynamicFormResponse response) async {
     try {
       // Primero eliminar detalles existentes
@@ -283,37 +315,31 @@ class DynamicFormResponseRepository {
           continue;
         }
 
-        // ⚠️ CAMBIO: Solo convertir imágenes si el estado es 'completed'
-        String? imagenPath;
-        String? imagenBase64;
-        bool tieneImagen = false;
-        int? imagenTamano;
-
-        final isCompleted = response.status == 'completed';
-
+        // Detectar si es imagen para guardarla en la tabla separada
         if (entry.value is String && _isImagePath(entry.value as String)) {
-          imagenPath = entry.value as String;
+          await _saveImageForDetail(
+            responseId: response.id,
+            detailId: entry.key,
+            imagePath: entry.value as String,
+            isCompleted: response.status == 'completed',
+          );
 
-          // Solo convertir a Base64 si está completado
-          if (isCompleted) {
-            try {
-              final file = File(imagenPath);
-              if (await file.exists()) {
-                final bytes = await file.readAsBytes();
-                imagenBase64 = base64Encode(bytes);
-                tieneImagen = true;
-                imagenTamano = bytes.length;
-                _logger.d('  📷 Imagen convertida a Base64: ${entry.key} (${imagenTamano} bytes)');
-              }
-            } catch (e) {
-              _logger.w('⚠️ Error convirtiendo imagen: $e');
-            }
-          } else {
-            // Si es borrador, solo guardar la ruta (sin Base64)
-            _logger.d('  📷 Imagen guardada como ruta (borrador): ${entry.key}');
-          }
+          // Guardar el detalle con response especial indicando que tiene imagen
+          final detailData = {
+            'id': '${response.id}_${entry.key}',
+            'version': 1,
+            'response': '[IMAGE]', // Marcador
+            'dynamic_form_response_id': response.id,
+            'dynamic_form_detail_id': entry.key,
+            'sync_status': 'pending',
+          };
+
+          await _dbHelper.insertar(_responseDetailTableName, detailData);
+          _logger.d('  ✓ Campo ${entry.key}: [IMAGEN en tabla separada]');
+          continue;
         }
 
+        // Guardar el detalle normal (campos que NO son imágenes)
         final detailData = {
           'id': '${response.id}_${entry.key}',
           'version': 1,
@@ -321,21 +347,10 @@ class DynamicFormResponseRepository {
           'dynamic_form_response_id': response.id,
           'dynamic_form_detail_id': entry.key,
           'sync_status': 'pending',
-          'imagen_path': imagenPath,
-          'imagen_base64': imagenBase64, // null si es borrador
-          'tiene_imagen': tieneImagen ? 1 : 0,
-          'imagen_tamano': imagenTamano,
         };
 
         await _dbHelper.insertar(_responseDetailTableName, detailData);
-
-        if (isCompleted && tieneImagen) {
-          _logger.d('  ✓ Campo ${entry.key}: imagen con Base64');
-        } else if (imagenPath != null) {
-          _logger.d('  ✓ Campo ${entry.key}: ruta de imagen (borrador)');
-        } else {
-          _logger.d('  ✓ Campo ${entry.key}: ${entry.value}');
-        }
+        _logger.d('  ✓ Campo ${entry.key}: ${entry.value}');
       }
     } catch (e, stackTrace) {
       _logger.e('❌ Error guardando detalles de respuesta: $e');
@@ -344,7 +359,7 @@ class DynamicFormResponseRepository {
     }
   }
 
-  /// Obtener detalles de una respuesta (incluyendo imágenes)
+  /// Obtener detalles de una respuesta
   Future<List<DynamicFormResponseDetail>> getDetails(String responseId) async {
     try {
       final maps = await _dbHelper.consultar(
@@ -356,6 +371,96 @@ class DynamicFormResponseRepository {
       return maps.map((map) => DynamicFormResponseDetail.fromMap(map)).toList();
     } catch (e) {
       _logger.e('❌ Error obteniendo detalles: $e');
+      return [];
+    }
+  }
+
+  // ==================== MÉTODOS PARA IMÁGENES ====================
+
+  /// Guardar imagen en la tabla separada
+  Future<void> _saveImageForDetail({
+    required String responseId,
+    required String detailId,
+    required String imagePath,
+    required bool isCompleted,
+    int orden = 1,
+  }) async {
+    try {
+      final detailRowId = '${responseId}_${detailId}';
+
+      String? imagenBase64;
+      int? imagenTamano;
+
+      // Solo convertir a Base64 si está completado
+      if (isCompleted) {
+        try {
+          final file = File(imagePath);
+          if (await file.exists()) {
+            final bytes = await file.readAsBytes();
+            imagenBase64 = base64Encode(bytes);
+            imagenTamano = bytes.length;
+            _logger.d('  📷 Imagen convertida a Base64: $detailId (${imagenTamano} bytes)');
+          }
+        } catch (e) {
+          _logger.w('⚠️ Error convirtiendo imagen: $e');
+        }
+      } else {
+        _logger.d('  📷 Imagen guardada como ruta (borrador): $detailId');
+      }
+
+      final imageData = {
+        'id': '${detailRowId}_img_$orden',
+        'dynamic_form_response_detail_id': detailRowId,
+        'imagen_path': imagePath,
+        'imagen_base64': imagenBase64,
+        'imagen_tamano': imagenTamano,
+        'mime_type': _getMimeType(imagePath),
+        'orden': orden,
+        'created_at': DateTime.now().toIso8601String(),
+        'sync_status': 'pending',
+      };
+
+      await _dbHelper.insertar(_responseImageTableName, imageData);
+      _logger.d('  ✅ Imagen guardada en tabla separada para detail: $detailId');
+    } catch (e) {
+      _logger.e('❌ Error guardando imagen: $e');
+      rethrow;
+    }
+  }
+
+  /// Obtener imágenes de un detalle específico
+  Future<List<DynamicFormResponseImage>> getImagesForDetail(String detailId) async {
+    try {
+      final maps = await _dbHelper.consultar(
+        _responseImageTableName,
+        where: 'dynamic_form_response_detail_id = ?',
+        whereArgs: [detailId],
+        orderBy: 'orden ASC',
+      );
+
+      return maps.map((map) => DynamicFormResponseImage.fromMap(map)).toList();
+    } catch (e) {
+      _logger.e('❌ Error obteniendo imágenes del detalle: $e');
+      return [];
+    }
+  }
+
+  /// Obtener todas las imágenes de una respuesta
+  Future<List<DynamicFormResponseImage>> getImagesForResponse(String responseId) async {
+    try {
+      final db = await _dbHelper.database;
+      final maps = await db.rawQuery('''
+        SELECT i.* 
+        FROM $_responseImageTableName i
+        INNER JOIN $_responseDetailTableName d 
+          ON i.dynamic_form_response_detail_id = d.id
+        WHERE d.dynamic_form_response_id = ?
+        ORDER BY i.orden ASC
+      ''', [responseId]);
+
+      return maps.map((map) => DynamicFormResponseImage.fromMap(map)).toList();
+    } catch (e) {
+      _logger.e('❌ Error obteniendo imágenes de la respuesta: $e');
       return [];
     }
   }
@@ -382,11 +487,17 @@ class DynamicFormResponseRepository {
       for (var detalle in detalles) {
         final fieldId = detalle['dynamic_form_detail_id']?.toString();
         if (fieldId != null && fieldId.isNotEmpty) {
-          // Si tiene imagen, usar la ruta de la imagen
-          if (detalle['tiene_imagen'] == 1 && detalle['imagen_path'] != null) {
-            answers[fieldId] = detalle['imagen_path'];
+          final response = detalle['response']?.toString();
+
+          // Si el response es [IMAGE], buscar en la tabla de imágenes
+          if (response == '[IMAGE]') {
+            final imagenes = await getImagesForDetail(detalle['id']);
+            if (imagenes.isNotEmpty) {
+              answers[fieldId] = imagenes.first.imagenPath ?? '';
+            }
           } else {
-            answers[fieldId] = detalle['response'];
+            // Respuesta normal (texto, número, etc.)
+            answers[fieldId] = response ?? '';
           }
         }
       }
@@ -416,10 +527,6 @@ class DynamicFormResponseRepository {
         userId: map['usuario_id']?.toString(),
         clienteId: map['cliente_id']?.toString(),
         equipoId: null,
-        metadata: {
-          'contactoId': map['contacto_id'],
-          'edfVendedorId': map['edf_vendedor_id'],
-        },
         errorMessage: map['mensaje_error_sync']?.toString(),
       );
     } catch (e, stackTrace) {
@@ -441,5 +548,14 @@ class DynamicFormResponseRepository {
         lowerValue.endsWith('.webp') ||
         lowerValue.contains('/cache/image_picker') ||
         lowerValue.contains('image_picker');
+  }
+
+  /// Obtener mime type de una ruta de imagen
+  String _getMimeType(String path) {
+    final lowerPath = path.toLowerCase();
+    if (lowerPath.endsWith('.png')) return 'image/png';
+    if (lowerPath.endsWith('.gif')) return 'image/gif';
+    if (lowerPath.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg'; // default
   }
 }

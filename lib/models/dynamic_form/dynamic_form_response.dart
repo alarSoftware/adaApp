@@ -45,7 +45,6 @@ class DynamicFormResponse {
       userId: json['userId'] as String?,
       clienteId: json['clienteId'] as String?,
       equipoId: json['equipoId'] as String?,
-      metadata: json['metadata'] as Map<String, dynamic>?,
       errorMessage: json['errorMessage'] as String?,
     );
   }
@@ -63,7 +62,6 @@ class DynamicFormResponse {
       if (userId != null) 'userId': userId,
       if (clienteId != null) 'clienteId': clienteId,
       if (equipoId != null) 'equipoId': equipoId,
-      if (metadata != null) 'metadata': metadata,
       if (errorMessage != null) 'errorMessage': errorMessage,
     };
   }
