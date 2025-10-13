@@ -292,7 +292,7 @@ class LoginScreenViewModel extends ChangeNotifier {
       if (usuario?.edfVendedorId == null || usuario!.edfVendedorId!.trim().isEmpty) {
         return AuthResult(
             success: false,
-            message: 'Su usuario no tiene clientes asignados.\n\n'
+            message: 'Su usuario no tiene vendedor asociado.\n\n'
                 'Comuníquese con el administrador del sistema para obtener acceso a los clientes.\n\n'
                 'Si es un usuario nuevo, es posible que su cuenta aún no haya sido configurada completamente.',
             icon: Icons.admin_panel_settings

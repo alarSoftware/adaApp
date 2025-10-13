@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/models/dynamic_form/dynamic_form_field.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
 import 'dart:io';
 
 class DynamicFormFieldWidget extends StatelessWidget {
@@ -668,8 +669,33 @@ class DynamicFormFieldWidget extends StatelessWidget {
   }
 
   List<String> _parseSelectedIds(dynamic value) {
-    if (value is List) return List<String>.from(value);
-    if (value is String && value.isNotEmpty) return [value];
+    if (value == null) return [];
+
+    // Si ya es una lista
+    if (value is List) {
+      return value.map((e) => e.toString()).toList();
+    }
+
+    // Si es un string que podría ser JSON
+    if (value is String && value.isNotEmpty) {
+      // Intentar parsear como JSON array
+      if (value.startsWith('[')) {
+        try {
+          final decoded = jsonDecode(value) as List;
+          return decoded.map((e) => e.toString()).toList();
+        } catch (e) {
+          // Si falla, tratarlo como string simple
+          return [value];
+        }
+      }
+      return [value];
+    }
+
+    // Si es un número u otro tipo
+    if (value is int || value is double) {
+      return [value.toString()];
+    }
+
     return [];
   }
 
