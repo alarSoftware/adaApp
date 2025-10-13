@@ -43,15 +43,6 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
                 widget.viewModel.currentTemplate?.title ?? 'Formulario',
                 style: TextStyle(color: AppColors.onPrimary, fontSize: 18),
               ),
-              // ✅ MOSTRAR "Solo lectura" si está en readonly
-              if (widget.isReadOnly)
-                Text(
-                  'Solo lectura',
-                  style: TextStyle(
-                    color: AppColors.onPrimary.withOpacity(0.7),
-                    fontSize: 12,
-                  ),
-                ),
             ],
           ),
           backgroundColor: AppColors.appBarBackground,

@@ -1,19 +1,30 @@
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import '../models/dynamic_form/dynamic_form_template.dart';
 import '../models/dynamic_form/dynamic_form_response.dart';
 import '../models/dynamic_form/dynamic_form_field.dart';
 import '../repositories/dynamic_form_repository.dart';
+import '../repositories/dynamic_form_template_repository.dart';
+import '../repositories/dynamic_form_response_repository.dart';
+import '../repositories/dynamic_form_sync_repository.dart';
 
 class DynamicFormViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
+
+  // ⭐ Repositorios especializados
+  final DynamicFormTemplateRepository _templateRepo = DynamicFormTemplateRepository();
+  final DynamicFormResponseRepository _responseRepo = DynamicFormResponseRepository();
+  final DynamicFormSyncRepository _syncRepo = DynamicFormSyncRepository();
+
+  // También mantener el repository principal para compatibilidad
   final DynamicFormRepository _repository = DynamicFormRepository();
 
   // Estado
   bool _isLoading = false;
   String? _errorMessage;
   bool _isSyncing = false;
-  bool get isSyncing => _isSyncing;
 
   // Templates
   List<DynamicFormTemplate> _templates = [];
@@ -29,13 +40,12 @@ class DynamicFormViewModel extends ChangeNotifier {
 
   // Getters
   bool get isLoading => _isLoading;
+  bool get isSyncing => _isSyncing;
   String? get errorMessage => _errorMessage;
   List<DynamicFormTemplate> get templates => _templates;
   DynamicFormTemplate? get currentTemplate => _currentTemplate;
-  List<DynamicFormResponse> get savedResponses => _savedResponses;
   DynamicFormResponse? get currentResponse => _currentResponse;
-
-
+  List<DynamicFormResponse> get savedResponses => _savedResponses;
 
   // ==================== MÉTODOS PARA TEMPLATES ====================
 
@@ -59,7 +69,6 @@ class DynamicFormViewModel extends ChangeNotifier {
   }
 
   /// Descargar templates desde el servidor
-  /// Descargar templates desde el servidor
   Future<bool> downloadTemplatesFromServer() async {
     try {
       _isLoading = true;
@@ -71,7 +80,6 @@ class DynamicFormViewModel extends ChangeNotifier {
       final success = await _repository.downloadTemplatesFromServer();
 
       if (success) {
-        // Recargar templates desde la BD local
         await loadTemplates();
         _logger.i('✅ Templates descargados: ${_templates.length} disponibles');
         return true;
@@ -148,7 +156,6 @@ class DynamicFormViewModel extends ChangeNotifier {
     return _fieldValues[fieldId];
   }
 
-  /// Actualizar valor de un campo (usa ID en lugar de key)
   /// Actualizar valor de un campo (usa ID en lugar de key)
   void updateFieldValue(String fieldId, dynamic value) {
     // Si es un campo de tipo radio_button o checkbox, limpiar sus hijos
@@ -250,9 +257,11 @@ class DynamicFormViewModel extends ChangeNotifier {
     for (final field in _currentTemplate!.fields) {
       if (field.type == 'titulo') continue;
 
-      if (field.type == 'radio_button' || field.type == 'checkbox') {
-        answerableFields.add(field);
-      } else if (field.type == 'resp_abierta' || field.type == 'resp_abierta_larga') {
+      if (field.type == 'radio_button' ||
+          field.type == 'checkbox' ||
+          field.type == 'resp_abierta' ||
+          field.type == 'resp_abierta_larga' ||
+          field.type == 'image') {
         answerableFields.add(field);
       }
     }
@@ -338,7 +347,7 @@ class DynamicFormViewModel extends ChangeNotifier {
     return filledRequired / requiredFields.length;
   }
 
-  /// Guardar progreso
+  /// Guardar progreso (borrador - NO convierte imágenes a Base64)
   Future<bool> saveProgress() async {
     try {
       if (_currentResponse == null) {
@@ -346,23 +355,24 @@ class DynamicFormViewModel extends ChangeNotifier {
         return false;
       }
 
-      _logger.i('💾 Guardando progreso...');
-      _logger.d('📊 Valores a guardar: $_fieldValues');
+      _logger.i('💾 Guardando progreso como borrador...');
 
+      // Las imágenes se guardan solo como rutas locales
       final updatedResponse = _currentResponse!.copyWith(
         answers: Map<String, dynamic>.from(_fieldValues),
+        status: 'draft', // ⚠️ Estado borrador
       );
 
-      final success = await _repository.saveResponse(updatedResponse);
+      final success = await _responseRepo.save(updatedResponse);
 
       if (success) {
         _currentResponse = updatedResponse;
-        _logger.i('✅ Progreso guardado exitosamente');
+        _logger.i('✅ Progreso guardado (imágenes como rutas)');
         notifyListeners();
         return true;
       } else {
         _errorMessage = 'Error guardando progreso';
-        _logger.e('❌ Error guardando progreso en repositorio');
+        _logger.e('❌ Error guardando progreso');
         return false;
       }
     } catch (e) {
@@ -372,7 +382,41 @@ class DynamicFormViewModel extends ChangeNotifier {
     }
   }
 
-  /// Guardar y completar formulario
+  /// Guardar como borrador (NO convierte imágenes a Base64)
+  Future<bool> saveDraft() async {
+    try {
+      if (_currentResponse == null) {
+        _errorMessage = 'No hay formulario activo';
+        return false;
+      }
+
+      _logger.i('💾 Guardando borrador...');
+
+      // Las imágenes se guardan solo como rutas locales
+      final draftResponse = _currentResponse!.copyWith(
+        answers: Map<String, dynamic>.from(_fieldValues),
+        status: 'draft', // ⚠️ Estado borrador
+      );
+
+      final success = await _responseRepo.save(draftResponse);
+
+      if (success) {
+        _currentResponse = draftResponse;
+        _logger.i('✅ Borrador guardado (imágenes como rutas)');
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = 'Error guardando borrador';
+        return false;
+      }
+    } catch (e) {
+      _errorMessage = 'Error guardando borrador: $e';
+      _logger.e('❌ Error guardando borrador: $e');
+      return false;
+    }
+  }
+
+  /// Guardar y completar formulario (SÍ convierte imágenes a Base64)
   Future<bool> saveAndComplete() async {
     try {
       if (_currentResponse == null) {
@@ -391,27 +435,28 @@ class DynamicFormViewModel extends ChangeNotifier {
       }
 
       // Preparar response completada
+      // ⚠️ AQUÍ las imágenes SÍ se convierten a Base64
       final completedResponse = _currentResponse!.copyWith(
         answers: Map<String, dynamic>.from(_fieldValues),
         completedAt: DateTime.now(),
-        status: 'completed',
+        status: 'completed', // ⚠️ Estado completado - ACTIVA conversión Base64
       );
 
-      // Guardar en BD (estado='completed', sync_status='pending')
-      final saved = await _repository.saveResponse(completedResponse);
+      // Guardar en BD (convierte imágenes a Base64 automáticamente)
+      final saved = await _responseRepo.save(completedResponse);
       if (!saved) {
         _errorMessage = 'Error al guardar el formulario';
         notifyListeners();
         return false;
       }
 
-      _logger.i('✅ Formulario guardado como completed, sync_status=pending');
+      _logger.i('✅ Formulario completado (imágenes convertidas a Base64)');
 
-      // Iniciar simulación de sincronización
+      // Iniciar sincronización
       _isSyncing = true;
       notifyListeners();
 
-      final synced = await _repository.simulateSyncToServer(completedResponse.id);
+      final synced = await _syncRepo.simulateSyncToServer(completedResponse.id);
 
       _isSyncing = false;
 
@@ -438,6 +483,8 @@ class DynamicFormViewModel extends ChangeNotifier {
       return false;
     }
   }
+
+  /// Obtener contadores de sincronización
   Future<Map<String, int>> getSyncCounters() async {
     try {
       final pending = await _repository.countPendingSync();
@@ -454,6 +501,7 @@ class DynamicFormViewModel extends ChangeNotifier {
     }
   }
 
+  /// Reintentar sincronización
   Future<bool> retrySyncResponse(String responseId) async {
     try {
       _logger.i('🔄 Reintentando sincronización: $responseId');
@@ -484,13 +532,12 @@ class DynamicFormViewModel extends ChangeNotifier {
     }
   }
 
-
   // ==================== MÉTODOS DE SINCRONIZACIÓN ====================
 
   /// Sincronizar respuestas pendientes
   Future<Map<String, int>> syncPendingResponses() async {
     try {
-      _isSyncing = true;  // ✅ Cambiar _isLoading por _isSyncing
+      _isSyncing = true;
       notifyListeners();
 
       final result = await _repository.syncAllPendingResponses();
@@ -501,7 +548,7 @@ class DynamicFormViewModel extends ChangeNotifier {
       _logger.e('❌ Error sincronizando: $e');
       return {'success': 0, 'failed': 0};
     } finally {
-      _isSyncing = false;  // ✅ Cambiar _isLoading por _isSyncing
+      _isSyncing = false;
       notifyListeners();
     }
   }
@@ -530,7 +577,6 @@ class DynamicFormViewModel extends ChangeNotifier {
 
   // ==================== MÉTODOS PARA RESPUESTAS GUARDADAS ====================
 
-  /// Cargar respuestas guardadas desde la BD
   /// Cargar respuestas guardadas CON su sync_status desde la BD
   Future<void> loadSavedResponsesWithSync({String? clienteId}) async {
     try {
@@ -591,42 +637,6 @@ class DynamicFormViewModel extends ChangeNotifier {
       return false;
     }
   }
-
-  /// Guardar como borrador
-  Future<bool> saveDraft() async {
-    try {
-      if (_currentResponse == null) {
-        _errorMessage = 'No hay formulario activo';
-        return false;
-      }
-
-      _logger.i('💾 Guardando borrador...');
-
-      final draftResponse = _currentResponse!.copyWith(
-        answers: Map<String, dynamic>.from(_fieldValues),
-        status: 'draft',
-      );
-
-      final success = await _repository.saveResponse(draftResponse);
-
-      if (success) {
-        _currentResponse = draftResponse;
-        _logger.i('✅ Borrador guardado exitosamente');
-        notifyListeners();
-        return true;
-      } else {
-        _errorMessage = 'Error guardando borrador';
-        _logger.e('❌ Error guardando borrador en repositorio');
-        return false;
-      }
-    } catch (e) {
-      _errorMessage = 'Error guardando borrador: $e';
-      _logger.e('❌ Error guardando borrador: $e');
-      return false;
-    }
-  }
-
-
 
   // ==================== CLEANUP ====================
 

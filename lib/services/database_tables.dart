@@ -196,17 +196,21 @@ class DatabaseTables {
   ''';
 
   String _sqlDynamicFormResponseDetail() => '''
-    CREATE TABLE dynamic_form_response_detail (
-      id TEXT PRIMARY KEY,
-      version INTEGER,
-      response TEXT,
-      dynamic_form_response_id TEXT,
-      dynamic_form_detail_id TEXT,
-      sync_status TEXT DEFAULT 'pending',
-      FOREIGN KEY (dynamic_form_response_id) REFERENCES dynamic_form_response (id),
-      FOREIGN KEY (dynamic_form_detail_id) REFERENCES dynamic_form_detail (id)
-    )
-  ''';
+  CREATE TABLE dynamic_form_response_detail (
+    id TEXT PRIMARY KEY,
+    version INTEGER,
+    response TEXT,
+    dynamic_form_response_id TEXT,
+    dynamic_form_detail_id TEXT,
+    sync_status TEXT DEFAULT 'pending',
+    imagen_path TEXT,
+    imagen_base64 TEXT,
+    tiene_imagen INTEGER DEFAULT 0,
+    imagen_tamano INTEGER,
+    FOREIGN KEY (dynamic_form_response_id) REFERENCES dynamic_form_response (id),
+    FOREIGN KEY (dynamic_form_detail_id) REFERENCES dynamic_form_detail (id)
+  )
+''';
 
   // ==================== ÍNDICES ====================
 
