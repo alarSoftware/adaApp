@@ -479,7 +479,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                 ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: double.infinity),
                   child: DropdownButtonFormField<bool?>(
-                    value: estadoUbicacion,  // Será null inicialmente
+                    initialValue: estadoUbicacion,  // Será null inicialmente
                     isExpanded: true,
                     decoration: InputDecoration(
                       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -494,7 +494,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
                         SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            '-- Seleccionar ubicación --',  // ← Placeholder personalizado
+                            '-- Seleccionar ubicación --',
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(color: AppColors.textSecondary),
                           ),

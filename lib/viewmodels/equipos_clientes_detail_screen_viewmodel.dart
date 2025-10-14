@@ -1,9 +1,8 @@
-import 'dart:ui' show Color;
-
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
 import '../repositories/censo_activo_repository.dart';
+import 'package:ada_app/services/post/censo_activo_api_service.dart';
 import '../repositories/equipo_repository.dart';
 import '../models/censo_activo.dart';
 import '../services/location_service.dart';
@@ -300,7 +299,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== GUARDAR CAMBIOS ==========
+// ========== GUARDAR CAMBIOS ==========
   Future<void> saveAllChanges() async {
     if (_estadoUbicacionEquipo == null) {
       _eventController.add(ShowMessageEvent(
@@ -333,7 +332,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       }
 
       final clienteId = equipoCliente['cliente_id'];
-      final codigoBarras = equipoCliente['cod_barras'];  // ← CAMBIO: usar cod_barras
+      final codigoBarras = equipoCliente['cod_barras'];
 
       if (clienteId == null || codigoBarras == null || codigoBarras.isEmpty) {
         throw Exception('Código de barras o cliente no disponible');
@@ -342,13 +341,39 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       _logger.i('Usando codigoBarras: $codigoBarras, clienteId: $clienteId');
 
       final nuevoEstado = await _estadoEquipoRepository.crearNuevoEstado(
-        equipoId: codigoBarras.toString(),  // ← CAMBIO: pasar código de barras
+        equipoId: codigoBarras.toString(),
         clienteId: int.parse(clienteId.toString()),
         enLocal: _estadoUbicacionEquipo!,
         fechaRevision: DateTime.now(),
         latitud: position.latitude,
         longitud: position.longitude,
       );
+
+      // 2. Sincronizar con el servidor - AGREGAR TODOS LOS CAMPOS
+      try {
+        final resultadoSync = await CensoActivoApiService.enviarCambioEstado(
+          codigoBarras: codigoBarras.toString(),
+          clienteId: int.parse(clienteId.toString()),
+          enLocal: _estadoUbicacionEquipo!,
+          position: position,
+          observaciones: nuevoEstado.observaciones,
+          equipoId: equipoCliente['equipo_id']?.toString() ?? codigoBarras.toString(),
+          clienteNombre: equipoCliente['cliente_nombre']?.toString() ?? '',
+          numeroSerie: equipoCliente['numero_serie']?.toString() ?? '',
+          modelo: equipoCliente['modelo_nombre']?.toString() ?? '',
+          marca: equipoCliente['marca_nombre']?.toString() ?? '',
+          logo: equipoCliente['logo_nombre']?.toString() ?? '',
+        );
+
+        if (resultadoSync['exito']) {
+          _logger.i('✅ Sincronizado con servidor: ${resultadoSync['mensaje']}');
+        } else {
+          _logger.w('⚠️ Error al sincronizar: ${resultadoSync['mensaje']}');
+        }
+      } catch (syncError) {
+        _logger.w('⚠️ Excepción al sincronizar: $syncError');
+        // El guardado local ya se hizo, así que continuamos
+      }
 
       _estadoLocalActual = _estadoUbicacionEquipo! ? 1 : 0;
       _estadoUbicacionEquipo = null;
