@@ -41,13 +41,11 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // ✅ ACTUALIZADO: Usar MyApp.routeObserver
     MyApp.routeObserver.subscribe(this, ModalRoute.of(context) as PageRoute);
   }
 
   @override
   void didPopNext() {
-    // Se llama cuando vuelves a esta pantalla desde otra
     logger.i('🔄 Pantalla visible nuevamente - Refrescando datos');
     if (mounted) {
       _viewModel.refresh();
@@ -56,7 +54,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
 
   @override
   void dispose() {
-    // ✅ ACTUALIZADO: Usar MyApp.routeObserver
     MyApp.routeObserver.unsubscribe(this);
     _eventSubscription.cancel();
     _tabController.dispose();
@@ -166,72 +163,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   Widget _buildClienteInfoCard() {
     return ClientInfoCard(
       cliente: widget.cliente,
-      padding: const EdgeInsets.all(20),
-      additionalInfo: [
-        ClientInfoRow(
-          icon: Icons.person_outline,
-          label: 'Propietario',
-          value: widget.cliente.propietario,
-        ),
-        if (_viewModel.shouldShowPhone())
-          ClientInfoRow(
-            icon: Icons.phone_outlined,
-            label: 'Teléfono',
-            value: _viewModel.getClientePhone(),
-          ),
-        if (_viewModel.shouldShowAddress())
-          ClientInfoRow(
-            icon: Icons.location_on_outlined,
-            label: 'Dirección',
-            value: _viewModel.getClienteAddress(),
-          ),
-      ],
-      showDefaultInfo: false,
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.neutral300,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 20, color: AppColors.textSecondary),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 

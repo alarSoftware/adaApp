@@ -3,25 +3,26 @@ import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 
 /// Widget reutilizable para mostrar información del cliente en un card
+/// Diseño consistente en toda la aplicación
 class ClientInfoCard extends StatelessWidget {
   final Cliente cliente;
-  final String? title;
   final List<ClientInfoRow>? additionalInfo;
   final EdgeInsets? padding;
-  final bool showDefaultInfo;
+  final VoidCallback? onTap;
+  final bool showFullDetails; // Nueva opción para mostrar detalles completos
 
   const ClientInfoCard({
     super.key,
     required this.cliente,
-    this.title,
     this.additionalInfo,
     this.padding,
-    this.showDefaultInfo = true,
+    this.onTap,
+    this.showFullDetails = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final card = Card(
       color: AppColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -29,54 +30,70 @@ class ClientInfoCard extends StatelessWidget {
       ),
       elevation: 2,
       child: Padding(
-        padding: padding ?? const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0), // <- Cambia aquí
+        padding: padding ?? const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Título opcional
-            if (title != null) ...[
-              Text(
-                title!,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              SizedBox(height: 8),
-            ],
-
-            // Espacio superior (igual que en el código original)
-            SizedBox(height: 8),
-
-            // Nombre del cliente
+            // Header: Nombre con Código
             Text(
-              cliente.nombre,
+              cliente.displayName,
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
               ),
             ),
 
-            // Propietario
-            if (showDefaultInfo) ...[
-              SizedBox(height: 4),
-              Text(
-                cliente.propietario,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
-              ),
+            // Información básica del cliente
+            if (showFullDetails) ...[
+              const SizedBox(height: 12),
+
+              // RUC/CI
+              if (cliente.rucCi.isNotEmpty)
+                _buildInfoRow(ClientInfoRow(
+                  icon: Icons.badge_outlined,
+                  label: cliente.tipoDocumento,
+                  value: cliente.rucCi,
+                )),
+
+              // Propietario
+              if (cliente.propietario.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _buildInfoRow(ClientInfoRow(
+                  icon: Icons.person_outline,
+                  label: 'Propietario',
+                  value: cliente.propietario,
+                )),
+              ],
+
+              // Teléfono
+              if (cliente.telefono != null && cliente.telefono!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _buildInfoRow(ClientInfoRow(
+                  icon: Icons.phone_outlined,
+                  label: 'Teléfono',
+                  value: cliente.telefono!,
+                )),
+              ],
+
+              // Dirección
+              if (cliente.direccion != null && cliente.direccion!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _buildInfoRow(ClientInfoRow(
+                  icon: Icons.location_on_outlined,
+                  label: 'Dirección',
+                  value: cliente.direccion!,
+                )),
+              ],
             ],
 
-            // Información adicional
+            // Información adicional personalizada
             if (additionalInfo != null && additionalInfo!.isNotEmpty) ...[
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
               ...additionalInfo!.map((info) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 10),
                 child: _buildInfoRow(info),
               )),
             ],
@@ -84,45 +101,65 @@ class ClientInfoCard extends StatelessWidget {
         ),
       ),
     );
+
+    // Si tiene onTap, envolver en InkWell
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: card,
+      );
+    }
+
+    return card;
   }
 
   Widget _buildInfoRow(ClientInfoRow info) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (info.icon != null) ...[
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.neutral300,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(info.icon, size: 20, color: AppColors.textSecondary),
+        // Icono con fondo
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: AppColors.neutral300,
+            borderRadius: BorderRadius.circular(6),
           ),
-          const SizedBox(width: 12),
-        ],
+          child: Icon(
+            info.icon,
+            size: 16,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(width: 10),
+
+        // Label y valor
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Label (opcional)
               if (info.label != null) ...[
                 Text(
                   info.label!,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
-                    letterSpacing: 0.5,
+                    letterSpacing: 0.2,
                   ),
                 ),
                 const SizedBox(height: 2),
               ],
+
+              // Valor
               Text(
                 info.value,
                 style: TextStyle(
-                  fontSize: info.label != null ? 16 : 14,
-                  fontWeight: info.label != null ? FontWeight.w600 : FontWeight.normal,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
                   color: AppColors.textPrimary,
+                  height: 1.2,
                 ),
               ),
             ],
@@ -135,12 +172,12 @@ class ClientInfoCard extends StatelessWidget {
 
 /// Clase para definir filas de información adicional
 class ClientInfoRow {
-  final IconData? icon;
+  final IconData icon;
   final String? label;
   final String value;
 
   ClientInfoRow({
-    this.icon,
+    required this.icon,
     this.label,
     required this.value,
   });

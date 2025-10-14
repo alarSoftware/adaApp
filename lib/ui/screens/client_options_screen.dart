@@ -34,10 +34,12 @@ class ClientOptionsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header con información del cliente
+              // Header con información del cliente (DISEÑO CONSISTENTE)
               Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: ClientInfoCard(cliente: cliente),
+                child: ClientInfoCard(
+                  cliente: cliente,
+                ),
               ),
 
               // Título de opciones
