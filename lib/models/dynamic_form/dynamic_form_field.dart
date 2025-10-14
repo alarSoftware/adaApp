@@ -11,7 +11,7 @@ class DynamicFormField {
   final double? percentage;
   final bool isParent;
   final List<DynamicFormField> children;
-  final Map<String, dynamic>? metadata; // ← NUEVO: para metadata de condiciones
+  final Map<String, dynamic>? metadata;
 
   DynamicFormField({
     required this.id,
@@ -25,7 +25,7 @@ class DynamicFormField {
     this.percentage,
     this.isParent = false,
     this.children = const [],
-    this.metadata, // ← NUEVO
+    this.metadata,
   });
 
   factory DynamicFormField.fromApiJson(Map<String, dynamic> json) {
@@ -52,44 +52,24 @@ class DynamicFormField {
   }
 
   String get widgetType {
-    switch (type) {
-      case 'titulo':
-        return 'header';
-      case 'radio_button':
-        return 'radio_group';
-      case 'checkbox':
-        return 'checkbox_group';
-      case 'resp_abierta':
-        return 'text_field';
-      case 'image':
-        return 'image_picker';
-      case 'opt':
-        return 'option';
-      default:
-        return 'text_field';
-    }
+    return switch (type) {
+      'titulo' => 'header',
+      'radio_button' => 'radio_group',
+      'checkbox' => 'checkbox_group',
+      'resp_abierta' => 'text_field',
+      'image' => 'image_picker',
+      _ => 'text_field',
+    };
   }
 
   String? get placeholder {
-    if (type == 'resp_abierta') {
-      return 'Escribe tu respuesta aquí...';
-    }
-    return null;
+    return type == 'resp_abierta' ? 'Escribe tu respuesta aquí...' : null;
   }
-
-  String? get hint => null;
 
   int? get maxLength => type == 'resp_abierta' ? 500 : null;
 
-  List<String>? get options {
-    if (children.isEmpty) return null;
-    return children.map((c) => c.label).toList();
-  }
-
   String? validate(dynamic value) {
-    if (type == 'titulo' || type == 'opt') {
-      return null;
-    }
+    if (type == 'titulo' || type == 'opt') return null;
 
     if (required && (value == null || value.toString().trim().isEmpty)) {
       return '$label es obligatorio';
@@ -115,7 +95,6 @@ class DynamicFormField {
     );
   }
 
-  ///  NUEVO: copyWith para agregar metadata
   DynamicFormField copyWith({
     String? id,
     String? type,
@@ -167,11 +146,4 @@ class DynamicFormField {
   String toString() {
     return 'DynamicFormField(id: $id, type: $type, label: $label, children: ${children.length})';
   }
-
-  // Compatibilidad con código antiguo
-  String get key => id;
-  String? get defaultValue => null;
-  num? get minValue => null;
-  num? get maxValue => null;
-  Map<String, dynamic>? get validation => null;
 }

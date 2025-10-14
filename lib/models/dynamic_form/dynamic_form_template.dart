@@ -40,7 +40,6 @@ class DynamicFormTemplate {
         .map((detail) => DynamicFormField.fromApiJson(detail))
         .toList();
 
-    // NUEVA ESTRATEGIA: NO aplanar, mantener jerarquía completa
     final organizedFields = _organizeFieldsKeepingHierarchy(allFields);
 
     return DynamicFormTemplate(
@@ -84,15 +83,12 @@ class DynamicFormTemplate {
     return idA.compareTo(idB);
   }
 
-  /// NUEVA ESTRATEGIA: Mantener la jerarquía completa sin aplanar
   static List<DynamicFormField> _organizeFieldsKeepingHierarchy(List<DynamicFormField> allFields) {
-    // 1. Crear mapa de búsqueda rápida
     final Map<String, DynamicFormField> fieldsById = {};
     for (final field in allFields) {
       fieldsById[field.id] = field;
     }
 
-    // 2. Agrupar hijos por parent_id
     Map<String, List<DynamicFormField>> childrenMap = {};
     for (final field in allFields) {
       if (field.parentId != null) {
@@ -100,31 +96,25 @@ class DynamicFormTemplate {
       }
     }
 
-    // 3. Ordenar los hijos de cada padre
     childrenMap.forEach((parentId, children) {
       children.sort(_compareFields);
     });
 
-    // 4. Construir árbol completo recursivamente
     DynamicFormField buildTree(DynamicFormField field) {
       final children = childrenMap[field.id] ?? [];
       final childrenWithTheirChildren = children.map((child) => buildTree(child)).toList();
       return field.withChildren(childrenWithTheirChildren);
     }
 
-    // 5. Obtener campos raíz y construir árbol
     final rootFields = allFields.where((f) => f.parentId == null).toList();
     rootFields.sort(_compareFields);
     final fieldsWithChildren = rootFields.map((root) => buildTree(root)).toList();
 
-    // 6. NUEVA LÓGICA: Solo retornar campos de primer nivel
-    // Los campos anidados se quedan en children y el widget los renderiza
     final List<DynamicFormField> topLevelFields = [];
 
     for (final root in fieldsWithChildren) {
       if (root.type == 'titulo') {
         topLevelFields.add(root);
-        // Agregar solo los hijos directos que sean renderizables (no opts)
         for (final child in root.children) {
           if (child.type == 'radio_button' ||
               child.type == 'checkbox' ||
@@ -134,10 +124,8 @@ class DynamicFormTemplate {
           }
         }
       } else if (root.type == 'radio_button' || root.type == 'checkbox') {
-        // Radio/Checkbox con su jerarquía completa de children
         topLevelFields.add(root);
       } else if (root.type == 'resp_abierta' || root.type == 'resp_abierta_larga') {
-        // Campos de texto standalone
         topLevelFields.add(root);
       }
     }
@@ -155,7 +143,6 @@ class DynamicFormTemplate {
     return null;
   }
 
-  /// Busca un campo en los hijos recursivamente
   DynamicFormField? _findFieldInChildren(DynamicFormField parent, String id) {
     for (final child in parent.children) {
       if (child.id == id) return child;
@@ -163,13 +150,6 @@ class DynamicFormTemplate {
       if (found != null) return found;
     }
     return null;
-  }
-
-  ///SIMPLIFICADO: Ya no necesitamos getVisibleFields porque el widget maneja la visibilidad
-  List<DynamicFormField> getVisibleFields(Map<String, dynamic> answers) {
-    // Simplemente retornar todos los campos de primer nivel
-    // El widget DynamicFormFieldWidget se encarga de mostrar/ocultar los children
-    return fields;
   }
 
   /// Obtiene todos los campos que necesitan respuesta (recursivo)
