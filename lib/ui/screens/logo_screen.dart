@@ -100,14 +100,17 @@ class _LogosScreenState extends State<LogosScreen> {
     try {
       final logoRepo = LogoRepository();
 
-      // Aquí debes agregar tu lógica de descarga desde el servidor
-      // Por ejemplo:
-      // await logoRepo.sincronizarDesdeServidor();
+      _logger.i('Iniciando sincronización de logos desde el servidor...');
 
-      // Después de sincronizar, recargar los logos locales
-      final logosActualizados = await logoRepo.obtenerTodos();
+      // Llamar al método de sincronización del repositorio
+      final resultado = await logoRepo.sincronizarDesdeServidor();
 
-      if (mounted) {
+      if (!mounted) return;
+
+      if (resultado['exito'] == true) {
+        // Recargar logos locales después de la sincronización
+        final logosActualizados = await logoRepo.obtenerTodos();
+
         final logosData = logosActualizados.map((logo) => {
           'id': logo.id,
           'nombre': logo.nombre,
@@ -123,17 +126,38 @@ class _LogosScreenState extends State<LogosScreen> {
         if (_searchController.text.isNotEmpty) {
           _filtrarLogos();
         }
-      }
 
-      _logger.i('Logos sincronizados exitosamente: ${_logos.length}');
+        final cantidadSincronizada = resultado['itemsSincronizados'] ?? 0;
+        _logger.i('Logos sincronizados exitosamente: $cantidadSincronizada');
 
-      // Mostrar mensaje de éxito
-      if (mounted) {
+        // Mostrar mensaje de éxito con la cantidad
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Logos sincronizados exitosamente'),
+            content: Text(
+              cantidadSincronizada > 0
+                  ? 'Se sincronizaron $cantidadSincronizada logo${cantidadSincronizada != 1 ? 's' : ''} exitosamente'
+                  : 'No hay logos nuevos para sincronizar',
+            ),
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        // Error en la sincronización
+        final mensaje = resultado['mensaje'] ?? 'Error desconocido';
+
+        setState(() {
+          _isSyncing = false;
+          _errorMessage = mensaje;
+        });
+
+        _logger.e('Error sincronizando logos: $mensaje');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(mensaje),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -145,12 +169,11 @@ class _LogosScreenState extends State<LogosScreen> {
           _errorMessage = 'Error sincronizando logos: $e';
         });
 
-        // Mostrar mensaje de error
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al sincronizar logos'),
+            content: Text('Error al sincronizar logos: ${e.toString()}'),
             backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
           ),
         );
       }

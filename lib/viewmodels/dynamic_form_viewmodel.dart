@@ -94,9 +94,10 @@ class DynamicFormViewModel extends ChangeNotifier {
 
   void startNewForm(
       String templateId, {
-        String? clienteId,
+        String? contactoId,
         String? equipoId,
         String? userId,
+        String? edfVendedorId, // ← AGREGAR ESTE PARÁMETRO
         DynamicFormResponse? existingResponse,
       }) {
     try {
@@ -119,9 +120,10 @@ class DynamicFormViewModel extends ChangeNotifier {
           answers: {},
           createdAt: DateTime.now(),
           status: 'draft',
-          clienteId: clienteId,
+          contactoId: contactoId,
           equipoId: equipoId,
           userId: userId,
+          edfVendedorId: edfVendedorId, // ← AGREGAR ESTA LÍNEA
         );
 
         _fieldValues.clear();
@@ -533,7 +535,7 @@ class DynamicFormViewModel extends ChangeNotifier {
 
       if (clienteId != null && clienteId.isNotEmpty) {
         _savedResponses = responsesWithSync
-            .where((response) => response.clienteId == clienteId)
+            .where((response) => response.contactoId == clienteId)
             .toList();
       } else {
         _savedResponses = responsesWithSync;

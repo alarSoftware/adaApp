@@ -163,7 +163,7 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
       actions: [
         IconButton(
           onPressed: _viewModel.refrescarDatos,
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(Icons.sync),
           tooltip: 'Actualizar equipos',
         ),
       ],

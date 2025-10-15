@@ -23,7 +23,7 @@ class AuthService {
 
   static final _dbHelper = DatabaseHelper();
 
-  // Método para sincronizar usuarios desde la nueva API
+// Método para sincronizar usuarios desde la nueva API
   static Future<SyncResult> sincronizarSoloUsuarios() async {
     try {
       logger.i('Sincronizando solo usuarios...');
@@ -41,20 +41,11 @@ class AuthService {
         logger.i('=== RESPUESTA DE API ===');
         logger.i('Response data: $responseData');
 
-        // Extraer el array de usuarios del campo "data"
         final String dataString = responseData['data'];
         final List<dynamic> usuariosAPI = jsonDecode(dataString);
 
         logger.i('=== USUARIOS DE API ===');
-        for (int i = 0; i < usuariosAPI.length; i++) {
-          logger.i('Usuario API ${i + 1}: ${usuariosAPI[i]}');
-
-          final usuario = usuariosAPI[i];
-          logger.i('=== DEBUG CAMPOS USUARIO ${i + 1} ===');
-          logger.i('Todos los campos disponibles: ${usuario.keys.toList()}');
-          logger.i('edf_vendedor_id específico: ${usuario['edf_vendedor_id']}');
-          logger.i('¿Existe el campo?: ${usuario.containsKey('edf_vendedor_id')}');
-        }
+        logger.i('Total usuarios recibidos: ${usuariosAPI.length}');
 
         if (usuariosAPI.isEmpty) {
           logger.w('No hay usuarios en el servidor');
@@ -65,24 +56,20 @@ class AuthService {
           );
         }
 
-        // PROCESAMIENTO CORREGIDO - mapear correctamente el ID a code
         final usuariosProcesados = usuariosAPI.map((usuario) {
           String password = usuario['password'].toString();
           if (password.startsWith('{bcrypt}')) {
             password = password.substring(8);
           }
 
-          final now = DateTime.now().toIso8601String();
-
+          // ✅ Mapeo correcto según tu tabla actual
           final usuarioProcesado = {
-            'edf_vendedor_id': usuario['edfVendedorId']?.toString(),
-            'code': usuario['id'], // CRÍTICO: Mapear ID de API a code
+            'id': usuario['id'],  // ✅ ID del servidor
+            'edf_vendedor_id': usuario['edfVendedorId']?.toString(),  // ✅ camelCase de API
+            'code': usuario['id'],  // ✅ code = mismo ID
             'username': usuario['username'],
             'password': password,
             'fullname': usuario['fullname'],
-            'sincronizado': 1,
-            'fecha_creacion': usuario['fecha_creacion'] ?? now,
-            'fecha_actualizacion': usuario['fecha_actualizacion'] ?? now,
           };
 
           logger.i('Usuario procesado: $usuarioProcesado');
@@ -125,9 +112,7 @@ class AuthService {
     try {
       logger.i('Sincronizando clientes del vendedor: $edfVendedorId');
 
-
       final baseUrl = await BaseSyncService.getBaseUrl();
-      // Debug de la URL
       final url = '$baseUrl/api/getEdfClientes?edfvendedorId=$edfVendedorId';
       logger.i('URL completa: $url');
 
@@ -136,7 +121,6 @@ class AuthService {
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
-      // Debug de la respuesta
       logger.i('Status code: ${response.statusCode}');
       logger.i('Response body completo: ${response.body}');
 
@@ -159,7 +143,6 @@ class AuthService {
           );
         }
 
-        // Procesar clientes
         final clientesProcesados = <Map<String, dynamic>>[];
 
         for (int i = 0; i < clientesAPI.length; i++) {
@@ -169,13 +152,11 @@ class AuthService {
           logger.i('Cliente completo: $cliente');
           logger.i('Campos disponibles: ${cliente.keys.toList()}');
 
-          // Validar campos críticos
           if (cliente['cliente'] == null || cliente['cliente'].toString().trim().isEmpty) {
             logger.e('Cliente ${i + 1} tiene nombre null o vacío - SALTANDO');
             continue;
           }
 
-          // Determinar RUC/CI
           String rucCi = '';
           if (cliente['ruc'] != null && cliente['ruc'].toString().trim().isNotEmpty) {
             rucCi = cliente['ruc'].toString().trim();
@@ -240,102 +221,19 @@ class AuthService {
     }
   }
 
-  // Login híbrido (online/offline) actualizado
+  // Login simplificado - solo valida contra base de datos local
   Future<AuthResult> login(String username, String password) async {
     logger.i('Intentando login para: $username');
 
-    // 1. Intentar login online primero
-    final loginOnline = await _intentarLoginOnline(username, password);
-    if (loginOnline.exitoso) {
-      await _saveLoginSuccess(loginOnline.usuario!);
-      return loginOnline;
-    }
-
-    // 2. Si falla online, intentar offline con datos sincronizados
-    final loginOffline = await _loginOffline(username, password);
-    if (loginOffline.exitoso) {
-      await _saveLoginSuccess(loginOffline.usuario!);
-      return loginOffline;
-    }
-
-    // 3. Si ambos fallan, determinar el mensaje apropiado
-    if (loginOffline.mensaje.contains('Usuario no encontrado')) {
-      return AuthResult(
-        exitoso: false,
-        mensaje: 'Sincroniza los datos primero para usar sin conexión',
-      );
-    } else if (loginOffline.mensaje.contains('Contraseña incorrecta') ||
-        loginOnline.mensaje.contains('Credenciales incorrectas')) {
-      return AuthResult(
-        exitoso: false,
-        mensaje: 'Credenciales incorrectas',
-      );
-    } else {
-      return AuthResult(
-        exitoso: false,
-        mensaje: 'Sin conexión. Verifica tu internet',
-      );
-    }
-  }
-
-  // Intentar login online actualizado
-  Future<AuthResult> _intentarLoginOnline(String username, String password) async {
     try {
-      logger.i('Intentando login online...');
-
-      final baseUrl = await BaseSyncService.getBaseUrl();
-
-      final response = await http.post(
-        Uri.parse('$baseUrl/login'),
-        headers: BaseSyncService.headers,
-        body: jsonEncode({'username': username, 'password': password}),
-      ).timeout(Duration(seconds: 5));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true) {
-          final usuarioData = data['usuario'];
-          final usuario = UsuarioAuth(
-            id: usuarioData['id'],
-            username: usuarioData['username'],
-            fullname: usuarioData['fullname'],
-          );
-
-          logger.i('Login online exitoso para: $username');
-          return AuthResult(
-            exitoso: true,
-            mensaje: 'Bienvenido, ${usuarioData['fullname']}',
-            usuario: usuario,
-            esOnline: true,
-          );
-        }
-      } else if (response.statusCode == 401) {
-        return AuthResult(
-          exitoso: false,
-          mensaje: 'Credenciales incorrectas',
-        );
-      }
-    } catch (e) {
-      logger.w('Error en login online: $e');
-    }
-
-    return AuthResult(exitoso: false, mensaje: 'Sin conexión');
-  }
-
-  // Login offline actualizado para nuevos campos
-  Future<AuthResult> _loginOffline(String username, String password) async {
-    try {
-      logger.i('Intentando login offline...');
-
       final usuarios = await _dbHelper.obtenerUsuarios();
 
-      // Buscar usuarios que coincidan
       final usuariosEncontrados = usuarios.where(
             (u) => u.username.toLowerCase() == username.toLowerCase(),
       );
 
       if (usuariosEncontrados.isEmpty) {
-        logger.w('Usuario no encontrado offline: $username');
+        logger.w('Usuario no encontrado: $username');
         return AuthResult(
           exitoso: false,
           mensaje: 'Usuario no encontrado',
@@ -344,19 +242,8 @@ class AuthService {
 
       final usuario = usuariosEncontrados.first;
 
-      bool passwordValido = false;
-
-      // Validar según el tipo de password
-      if (usuario.password.isNotEmpty) {
-        // Hash bcrypt
-        final hash = usuario.password;
-        passwordValido = BCrypt.checkpw(password, hash);
-        logger.i('Validando con bcrypt para: $username');
-      } else {
-        // Password en texto plano (temporal)
-        passwordValido = usuario.password == password;
-        logger.i('Validando texto plano para: $username');
-      }
+      // Validar password con bcrypt
+      final passwordValido = BCrypt.checkpw(password, usuario.password);
 
       if (passwordValido) {
         final usuarioAuth = UsuarioAuth(
@@ -365,25 +252,27 @@ class AuthService {
           fullname: usuario.fullname,
         );
 
+        await _saveLoginSuccess(usuarioAuth);
+
         logger.i('Login exitoso para: $username');
         return AuthResult(
           exitoso: true,
           mensaje: 'Bienvenido, ${usuario.fullname}',
           usuario: usuarioAuth,
-          esOnline: false,
         );
       } else {
-        logger.w('Contraseña incorrecta offline para: $username');
+        logger.w('Contraseña incorrecta para: $username');
         return AuthResult(
           exitoso: false,
           mensaje: 'Contraseña incorrecta',
         );
       }
     } catch (e) {
-      logger.e('Error en login offline: $e');
+      logger.e('Error en login: $e');
+      logger.e('Error en login: $e');
       return AuthResult(
         exitoso: false,
-        mensaje: 'Error en login offline: $e',
+        mensaje: 'Error en el inicio de sesión',
       );
     }
   }
@@ -418,7 +307,7 @@ class AuthService {
     }
   }
 
-  // Obtener usuario actual (si existe sesión)
+  // Obtener usuario actual completo
   Future<Usuario?> getCurrentUser() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -431,7 +320,6 @@ class AuthService {
 
       logger.i('Buscando usuario completo para: $username');
 
-      // Buscar el usuario completo en la base de datos local
       final usuarios = await _dbHelper.obtenerUsuarios();
 
       final usuarioEncontrado = usuarios.where(
@@ -476,7 +364,6 @@ class AuthService {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Solo remover datos de sesión actual, mantener historial de login
       await prefs.remove(_keyCurrentUser);
       await prefs.remove(_keyCurrentUserRole);
 
@@ -486,12 +373,11 @@ class AuthService {
     }
   }
 
-  // Autenticación biométrica CORREGIDA
+  // Autenticación biométrica
   Future<AuthResult> authenticateWithBiometric() async {
     logger.i('Intentando autenticación biométrica');
 
     try {
-      // Verificar si hay un usuario previamente autenticado
       final currentUser = await getCurrentUser();
       logger.i('Usuario actual encontrado: $currentUser');
 
@@ -503,10 +389,8 @@ class AuthService {
         );
       }
 
-      // CORRECCIÓN: Convertir Usuario a UsuarioAuth usando constructor de conversión
       final usuarioAuth = UsuarioAuth.fromUsuario(currentUser);
 
-      // Si hay usuario guardado, la biometría es válida
       logger.i('Autenticación biométrica exitosa para: ${currentUser.username}');
       return AuthResult(
         exitoso: true,
@@ -521,15 +405,6 @@ class AuthService {
         mensaje: 'Error en autenticación biométrica',
       );
     }
-  }
-
-  // Método de conversión auxiliar
-  UsuarioAuth _convertirAUsuarioAuth(Usuario usuario) {
-    return UsuarioAuth(
-      id: usuario.id,
-      username: usuario.username,
-      fullname: usuario.fullname,
-    );
   }
 
   // Limpiar completamente (para testing o reset)
@@ -605,17 +480,15 @@ class AuthResult {
   final bool exitoso;
   final String mensaje;
   final UsuarioAuth? usuario;
-  final bool esOnline;
 
   AuthResult({
     required this.exitoso,
     required this.mensaje,
     this.usuario,
-    this.esOnline = false,
   });
 }
 
-// Usuario para autenticación CORREGIDO
+// Usuario para autenticación
 class UsuarioAuth {
   final int? id;
   final String username;
@@ -627,13 +500,11 @@ class UsuarioAuth {
     required this.fullname,
   });
 
-  // Constructor de conversión desde Usuario
   UsuarioAuth.fromUsuario(Usuario usuario)
       : id = usuario.id,
         username = usuario.username,
         fullname = usuario.fullname;
 
-  // Getter para mantener compatibilidad si necesitas determinar rol
   String get rol {
     if (username == 'admin' || username == 'useradmin') {
       return 'admin';
@@ -641,7 +512,6 @@ class UsuarioAuth {
     return 'user';
   }
 
-  // Getters de conveniencia
   bool get esAdmin => username == 'admin' || username == 'useradmin';
 
   @override

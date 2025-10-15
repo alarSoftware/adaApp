@@ -3,7 +3,6 @@ import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 
 /// Widget reutilizable para mostrar información del cliente en un card
-/// Diseño consistente en toda la aplicación
 class ClientInfoCard extends StatelessWidget {
   final Cliente cliente;
   final List<ClientInfoRow>? additionalInfo;
@@ -67,22 +66,22 @@ class ClientInfoCard extends StatelessWidget {
               ],
 
               // Teléfono
-              if (cliente.telefono != null && cliente.telefono!.isNotEmpty) ...[
+              if (cliente.telefono.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 _buildInfoRow(ClientInfoRow(
                   icon: Icons.phone_outlined,
                   label: 'Teléfono',
-                  value: cliente.telefono!,
+                  value: cliente.telefono,
                 )),
               ],
 
               // Dirección
-              if (cliente.direccion != null && cliente.direccion!.isNotEmpty) ...[
+              if (cliente.direccion.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 _buildInfoRow(ClientInfoRow(
                   icon: Icons.location_on_outlined,
                   label: 'Dirección',
-                  value: cliente.direccion!,
+                  value: cliente.direccion,
                 )),
               ],
             ],

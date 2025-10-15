@@ -1,4 +1,3 @@
-/// Representa un campo/pregunta individual del formulario dinámico
 class DynamicFormField {
   final String id;
   final String type;

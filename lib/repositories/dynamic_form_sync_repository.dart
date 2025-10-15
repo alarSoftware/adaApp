@@ -170,7 +170,7 @@ class DynamicFormSyncRepository {
       final jsonToSend = {
         'id': response.id,
         'dynamicFormId': response.formTemplateId,
-        'clienteId': response.clienteId,
+        'contactoId': response.contactoId,
         'usuarioId': response.userId,
         'equipoId': response.equipoId,
         'estado': response.status,

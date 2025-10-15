@@ -30,9 +30,9 @@ class Usuario {
   // Constructor para crear desde JSON (API)
   factory Usuario.fromJson(Map<String, dynamic> json) {
     return Usuario(
-      id: json['id']?.toInt(),
-      edfVendedorId: json['edf_vendedor_id']?.toString(),
-      code: json['code']?.toInt() ?? 0,
+      id: json['id']?.toInt(),  // ✅ ID viene de la API
+      edfVendedorId: json['edfVendedorId']?.toString(),  // ✅ camelCase de la API
+      code: json['id']?.toInt() ?? 0,  // ✅ code usa el mismo ID de la API
       username: json['username']?.toString() ?? '',
       password: json['password']?.toString() ?? '',
       fullname: json['fullname']?.toString() ?? '',
@@ -55,7 +55,7 @@ class Usuario {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'edf_vendedor_id': edfVendedorId,
+      'edfVendedorId': edfVendedorId,  // ✅ camelCase para la API
       'code': code,
       'username': username,
       'password': password,

@@ -105,16 +105,15 @@ class DatabaseTables {
 ''';
 
   String _sqlUsuarios() => '''
-    CREATE TABLE Users (
-      id INTEGER PRIMARY KEY,
-      edf_vendedor_id TEXT,
-      edf_vendedor_nombre TEXT,
-      code INTEGER,
-      username,
-      password,   
-      fullname
-    )
-  ''';
+  CREATE TABLE Users (
+    id INTEGER PRIMARY KEY,
+    edf_vendedor_id TEXT,
+    code INTEGER,
+    username TEXT NOT NULL,
+    password TEXT NOT NULL,   
+    fullname TEXT NOT NULL
+  )
+''';
 
   String _sqlCensoActivo() => '''
   CREATE TABLE censo_activo (
@@ -178,7 +177,6 @@ class DatabaseTables {
       id TEXT PRIMARY KEY,
       version INTEGER,
       contacto_id TEXT,
-      cliente_id TEXT,
       edf_vendedor_id TEXT,
       last_update_user_id INTEGER,
       dynamic_form_id TEXT,
@@ -190,7 +188,6 @@ class DatabaseTables {
       mensaje_error_sync TEXT,
       fecha_sincronizado TEXT,
       creation_date TEXT,
-      creation_user_id INTEGER,
       last_update_date TEXT,
       FOREIGN KEY (dynamic_form_id) REFERENCES dynamic_form (id)
     )

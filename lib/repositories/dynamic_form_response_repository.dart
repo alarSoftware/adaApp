@@ -30,9 +30,8 @@ class DynamicFormResponseRepository {
       final responseData = {
         'id': response.id,
         'version': 1,
-        'cliente_id': response.clienteId ?? '',
-        'contacto_id': null,
-        'edf_vendedor_id': null,
+        'contacto_id': response.contactoId ?? '',
+        'edf_vendedor_id': response.edfVendedorId,
         'last_update_user_id': null,
         'dynamic_form_id': response.formTemplateId,
         'usuario_id': response.userId != null ? int.tryParse(response.userId!) : null,
@@ -40,7 +39,6 @@ class DynamicFormResponseRepository {
         'sync_status': 'pending',
         'intentos_sync': 0,
         'creation_date': response.createdAt.toIso8601String(),
-        'creation_user_id': response.userId != null ? int.tryParse(response.userId!) : null,
         'last_update_date': response.completedAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
       };
 
@@ -468,6 +466,7 @@ class DynamicFormResponseRepository {
   // ==================== MÉTODOS PRIVADOS ====================
 
   /// Mapear datos de BD a DynamicFormResponse con sus detalles
+  /// Mapear datos de BD a DynamicFormResponse con sus detalles
   Future<DynamicFormResponse?> _mapToResponseWithDetails(Map<String, dynamic> map) async {
     try {
       if (map['id'] == null) {
@@ -525,7 +524,8 @@ class DynamicFormResponseRepository {
         syncedAt: estado == 'synced' ? DateTime.now() : null,
         status: estado,
         userId: map['usuario_id']?.toString(),
-        clienteId: map['cliente_id']?.toString(),
+        contactoId: map['contacto_id']?.toString(),
+        edfVendedorId: map['edf_vendedor_id']?.toString(),
         equipoId: null,
         errorMessage: map['mensaje_error_sync']?.toString(),
       );

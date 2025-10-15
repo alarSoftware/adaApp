@@ -447,17 +447,17 @@ class _SelectScreenState extends State<SelectScreen> {
                       ],
                     ),
                   ),
-                  PopupMenuItem<String>(
-                    value: 'pendientes_envio',
-                    enabled: !_viewModel.isSyncing && !_viewModel.isTestingConnection,
-                    child: Row(
-                      children: [
-                        Icon(Icons.upload_outlined, color: AppColors.warning),
-                        SizedBox(width: 8),
-                        Text('Pendientes de Envío', style: TextStyle(color: AppColors.textPrimary)),
-                      ],
-                    ),
-                  ),
+                  // PopupMenuItem<String>(
+                  //   value: 'pendientes_envio',
+                  //   enabled: !_viewModel.isSyncing && !_viewModel.isTestingConnection,
+                  //   child: Row(
+                  //     children: [
+                  //       Icon(Icons.upload_outlined, color: AppColors.warning),
+                  //       SizedBox(width: 8),
+                  //       Text('Pendientes de Envío', style: TextStyle(color: AppColors.textPrimary)),
+                  //     ],
+                  //   ),
+                  // ),
                 ],
               );
             },

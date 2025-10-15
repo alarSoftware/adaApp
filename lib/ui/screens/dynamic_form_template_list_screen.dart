@@ -4,6 +4,7 @@ import 'package:ada_app/viewmodels/dynamic_form_viewmodel.dart';
 import 'package:ada_app/models/dynamic_form/dynamic_form_template.dart';
 import 'package:ada_app/ui/screens/dynamic_form_fill_screen.dart';
 import 'package:ada_app/models/cliente.dart';
+import 'package:ada_app/services/auth_service.dart'; // ← AGREGAR IMPORT
 
 /// Pantalla que muestra la lista de formularios dinámicos disponibles (templates)
 class DynamicFormTemplateListScreen extends StatefulWidget {
@@ -336,10 +337,15 @@ class _DynamicFormTemplateListScreenState extends State<DynamicFormTemplateListS
       ),
     );
 
-    // Crear el registro en dynamic_form_response
+    // ✅ Obtener usuario actual
+    final usuario = await AuthService().getCurrentUser();
+
+    // ✅ Iniciar formulario con todos los datos
     widget.viewModel.startNewForm(
       template.id,
-      clienteId: widget.cliente.id.toString(),
+      contactoId: widget.cliente.id.toString(),
+      userId: usuario?.id?.toString(),
+      edfVendedorId: usuario?.edfVendedorId,
     );
 
     // ✅ Guardar inmediatamente en la BD como borrador
