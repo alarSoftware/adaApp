@@ -83,6 +83,7 @@ class DatabaseTables {
     modelo_id INTEGER,
     numero_serie TEXT,                      
     logo_id INTEGER,
+    nuevo_equipo INTEGER DEFAULT 0,
     FOREIGN KEY (marca_id) REFERENCES marcas (id),
     FOREIGN KEY (modelo_id) REFERENCES modelos (id),
     FOREIGN KEY (logo_id) REFERENCES logo (id),

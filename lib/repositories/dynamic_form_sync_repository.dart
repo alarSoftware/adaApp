@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
-import '../models/dynamic_form/dynamic_form_response.dart';
 import '../services/database_helper.dart';
+import '../services/sync/base_sync_service.dart';
 import 'dynamic_form_response_repository.dart';
 
 class DynamicFormSyncRepository {
@@ -24,8 +24,8 @@ class DynamicFormSyncRepository {
       final pending = await _responseRepository.getPendingSync();
       _logger.i('📤 Sincronizando ${pending.length} respuestas pendientes');
 
-      for (final response in pending) {
-        final result = await simulateSyncToServer(response.id);
+      for (final formResponse in pending) {
+        final result = await syncToServer(formResponse.id);
         if (result) {
           success++;
         } else {
@@ -144,21 +144,22 @@ class DynamicFormSyncRepository {
         whereArgs: [responseId],
       );
 
-      return await simulateSyncToServer(responseId);
+      return await syncToServer(responseId);
     } catch (e) {
       _logger.e('❌ Error reintentando sync: $e');
       return false;
     }
   }
 
-  /// Simulación de sincronización al servidor (TODO: implementar API real)
-  Future<bool> simulateSyncToServer(String responseId) async {
+  /// Sincronización REAL al servidor
+  /// Sincronización REAL al servidor
+  Future<bool> syncToServer(String responseId) async {
     try {
-      _logger.i('📤 Simulando envío al servidor: $responseId');
+      _logger.i('📤 Enviando formulario al servidor: $responseId');
 
       // Obtener la respuesta completa con detalles
-      final response = await _responseRepository.getById(responseId);
-      if (response == null) {
+      final formResponse = await _responseRepository.getById(responseId);
+      if (formResponse == null) {
         _logger.e('❌ Respuesta no encontrada: $responseId');
         return false;
       }
@@ -166,54 +167,79 @@ class DynamicFormSyncRepository {
       // Obtener detalles (incluyendo imágenes en Base64)
       final details = await _responseRepository.getDetails(responseId);
 
-      // ⭐ GENERAR EL JSON QUE SE ENVIARÍA AL API
-      final jsonToSend = {
-        'id': response.id,
-        'dynamicFormId': response.formTemplateId,
-        'contactoId': response.contactoId,
-        'usuarioId': response.userId,
-        'equipoId': response.equipoId,
-        'estado': response.status,
-        'creationDate': response.createdAt.toIso8601String(),
-        'completedDate': response.completedAt?.toIso8601String(),
-        'metadata': response.metadata,
+      // Obtener imágenes de la tabla separada
+      final images = await _responseRepository.getImagesForResponse(responseId);
+
+      // 🎯 CONSTRUIR EL PAYLOAD PARA EL BACKEND
+      final payload = {
+        'id': formResponse.id,
+        'dynamicFormId': formResponse.formTemplateId,
+        'contactoId': formResponse.contactoId,
+        'edfvendedorId': formResponse.edfVendedorId,
+        'usuarioId': formResponse.userId != null ? int.tryParse(formResponse.userId!) : null,
+        'equipoId': formResponse.equipoId,
+        'estado': formResponse.status,
+        'creationDate': formResponse.createdAt.toIso8601String(),
+        'completedDate': formResponse.completedAt?.toIso8601String(), // ✅ Siempre incluir, aunque sea null
+        'lastUpdateDate': formResponse.completedAt?.toIso8601String() ?? formResponse.createdAt.toIso8601String(), // ✅ Fallback a creationDate
         'details': details.map((d) => {
           'id': d.id,
           'dynamicFormDetailId': d.dynamicFormDetailId,
           'response': d.response,
+          'syncStatus': d.syncStatus,
+        }).toList(),
+        'imagenes': images.map((img) => {
+          'id': img.id,
+          'dynamicFormResponseDetailId': img.dynamicFormResponseDetailId,
+          'imagenBase64': img.imagenBase64,
+          'imagenTamano': img.imagenTamano,
+          'mimeType': img.mimeType,
+          'orden': img.orden,
+          'createdAt': img.createdAt,
         }).toList(),
       };
 
+      _logger.d('📦 Payload construido: ${details.length} detalles, ${images.length} imágenes');
 
-      // Simular delay de red (2-3 segundos)
-      await Future.delayed(Duration(seconds: 2));
+      // Obtener la URL dinámica
+      final baseUrl = await BaseSyncService.getBaseUrl();
+      final url = '$baseUrl/dynamicFormResponse/insertDynamicFormResponse';
 
-      // Simular éxito/falla (90% éxito, 10% falla para testing)
-      final random = DateTime.now().millisecondsSinceEpoch % 10;
-      final success = random < 9;
+      _logger.i('🌐 URL: $url');
 
-      if (success) {
+      // Realizar el POST
+      final httpResponse = await http.post(
+        Uri.parse(url),
+        headers: {
+          ...BaseSyncService.headers,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 60));
+
+      _logger.i('📡 Respuesta del servidor: ${httpResponse.statusCode}');
+
+      if (httpResponse.statusCode >= 200 && httpResponse.statusCode < 300) {
+        // ✅ ÉXITO
+        _logger.i('✅ Formulario enviado exitosamente');
+
+        // Marcar como sincronizado
         await markAsSynced(responseId);
-        _logger.i('✅ Formulario sincronizado exitosamente');
         return true;
+
       } else {
-        await markSyncAttemptFailed(responseId, 'Error simulado de conexión');
-        _logger.w('❌ Fallo simulado en envío');
+        // ❌ ERROR DEL SERVIDOR
+        final errorMsg = BaseSyncService.extractErrorMessage(httpResponse);
+        _logger.e('❌ Error del servidor: $errorMsg');
+        await markSyncAttemptFailed(responseId, errorMsg);
         return false;
       }
+
     } catch (e) {
-      _logger.e('❌ Error en simulación: $e');
+      _logger.e('❌ Error sincronizando al servidor: $e');
       await markSyncAttemptFailed(responseId, e.toString());
       return false;
     }
-  }
-
-
-  /// Formatear bytes a tamaño legible
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(2)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
   }
 
   /// Obtener estadísticas de sincronización

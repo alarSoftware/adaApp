@@ -2,19 +2,18 @@ import 'dart:convert';
 
 /// Representa una respuesta/instancia completada de un formulario dinámico
 class DynamicFormResponse {
-  final String id;                    // ID único de la respuesta
-  final String formTemplateId;        // ID del formulario que se llenó
-  final Map<String, dynamic> answers; // Respuestas: {key: valor}
-  final DateTime createdAt;           // Cuándo se creó
-  final DateTime? completedAt;        // Cuándo se completó
-  final DateTime? syncedAt;           // Cuándo se sincronizó al servidor
-  final String status;                // draft, completed, synced, error
-  final String? userId;               // Usuario que llenó el formulario
-  final String? contactoId;           // Cliente asociado (si aplica)
-  final String? edfVendedorId;        // ID del vendedor (para filtrar respuestas)
-  final String? equipoId;             // Equipo asociado (si aplica)
-  final Map<String, dynamic>? metadata; // Datos adicionales (ubicación, fotos, etc.)
-  final String? errorMessage;         // Mensaje de error si falló el sync
+  final String id;
+  final String formTemplateId;
+  final Map<String, dynamic> answers;
+  final DateTime createdAt;
+  final DateTime? completedAt;
+  final DateTime? syncedAt;
+  final String status;
+  final String? userId;
+  final String? contactoId;
+  final String? edfVendedorId;
+  final String? equipoId;
+  final String? errorMessage;
 
   DynamicFormResponse({
     required this.id,
@@ -28,7 +27,6 @@ class DynamicFormResponse {
     this.contactoId,
     this.edfVendedorId,
     this.equipoId,
-    this.metadata,
     this.errorMessage,
   });
 
@@ -50,9 +48,6 @@ class DynamicFormResponse {
       contactoId: json['contactoId'] as String?,
       edfVendedorId: json['edfVendedorId'] as String?,
       equipoId: json['equipoId'] as String?,
-      metadata: json['metadata'] != null
-          ? Map<String, dynamic>.from(json['metadata'] as Map)
-          : null,
       errorMessage: json['errorMessage'] as String?,
     );
   }
@@ -71,17 +66,14 @@ class DynamicFormResponse {
       if (contactoId != null) 'contactoId': contactoId,
       if (edfVendedorId != null) 'edfVendedorId': edfVendedorId,
       if (equipoId != null) 'equipoId': equipoId,
-      if (metadata != null) 'metadata': metadata,
       if (errorMessage != null) 'errorMessage': errorMessage,
     };
   }
 
-  /// Crea desde Map de base de datos (usa los nombres de columnas de tu BD)
+  /// Crea desde Map de base de datos
   factory DynamicFormResponse.fromMap(Map<String, dynamic> map) {
-    // Reconstruir answers desde los detalles (si existen)
     Map<String, dynamic> answers = {};
 
-    // Si el map incluye 'answers' directamente (guardado como JSON string)
     if (map['answers'] != null) {
       if (map['answers'] is String) {
         answers = Map<String, dynamic>.from(jsonDecode(map['answers']));
@@ -92,19 +84,18 @@ class DynamicFormResponse {
 
     return DynamicFormResponse(
       id: map['id'] as String,
-      formTemplateId: map['dynamic_form_id'] as String, // ← Nombre correcto de tu BD
+      formTemplateId: map['dynamic_form_id'] as String,
       answers: answers,
-      createdAt: DateTime.parse(map['creation_date'] as String), // ← Nombre correcto
+      createdAt: DateTime.parse(map['creation_date'] as String),
       completedAt: map['last_update_date'] != null
           ? DateTime.parse(map['last_update_date'] as String)
           : null,
-      syncedAt: null, // No guardas esto en BD aún
-      status: map['estado'] as String? ?? 'draft', // ← Nombre correcto
-      userId: map['usuario_id']?.toString(), // ← Convertir int a String
+      syncedAt: null,
+      status: map['estado'] as String? ?? 'draft',
+      userId: map['usuario_id']?.toString(),
       contactoId: map['contacto_id'] as String?,
-      edfVendedorId: map['edf_vendedor_id'] as String?, // ← AGREGADO
-      equipoId: null, // No lo guardas en la tabla principal
-      metadata: null, // No lo guardas en la tabla principal
+      edfVendedorId: map['edf_vendedor_id'] as String?,
+      equipoId: null,
       errorMessage: null,
     );
   }
@@ -115,7 +106,7 @@ class DynamicFormResponse {
       'id': id,
       'version': 1,
       'contacto_id': contactoId ?? '',
-      'edf_vendedor_id': edfVendedorId, // ← AGREGADO
+      'edf_vendedor_id': edfVendedorId,
       'last_update_user_id': null,
       'dynamic_form_id': formTemplateId,
       'usuario_id': userId != null ? int.tryParse(userId!) : null,
@@ -127,31 +118,19 @@ class DynamicFormResponse {
     };
   }
 
-  /// Verifica si la respuesta está completa
   bool get isCompleted => status == 'completed' || status == 'synced';
-
-  /// Verifica si está sincronizada
   bool get isSynced => status == 'synced';
-
-  /// Verifica si tiene errores
   bool get hasError => status == 'error';
-
-  /// Verifica si es un borrador
   bool get isDraft => status == 'draft';
 
-  /// Obtiene el valor de una respuesta específica
-  dynamic getAnswer(String key) {
-    return answers[key];
-  }
+  dynamic getAnswer(String key) => answers[key];
 
-  /// Actualiza una respuesta específica
   DynamicFormResponse updateAnswer(String key, dynamic value) {
     final updatedAnswers = Map<String, dynamic>.from(answers);
     updatedAnswers[key] = value;
     return copyWith(answers: updatedAnswers);
   }
 
-  /// Marca como completada
   DynamicFormResponse markAsCompleted() {
     return copyWith(
       status: 'completed',
@@ -159,7 +138,6 @@ class DynamicFormResponse {
     );
   }
 
-  /// Marca como sincronizada
   DynamicFormResponse markAsSynced() {
     return copyWith(
       status: 'synced',
@@ -168,7 +146,6 @@ class DynamicFormResponse {
     );
   }
 
-  /// Marca como error
   DynamicFormResponse markAsError(String error) {
     return copyWith(
       status: 'error',
@@ -176,7 +153,6 @@ class DynamicFormResponse {
     );
   }
 
-  /// Crea una copia con modificaciones
   DynamicFormResponse copyWith({
     String? id,
     String? formTemplateId,
@@ -189,7 +165,6 @@ class DynamicFormResponse {
     String? contactoId,
     String? edfVendedorId,
     String? equipoId,
-    Map<String, dynamic>? metadata,
     String? errorMessage,
   }) {
     return DynamicFormResponse(
@@ -204,7 +179,6 @@ class DynamicFormResponse {
       contactoId: contactoId ?? this.contactoId,
       edfVendedorId: edfVendedorId ?? this.edfVendedorId,
       equipoId: equipoId ?? this.equipoId,
-      metadata: metadata ?? this.metadata,
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }

@@ -8,6 +8,7 @@ class Equipo {
   final int modeloId;
   final String? numeroSerie;
   final int logoId;
+  final bool nuevoEquipo;
   final DateTime fechaCreacion;
   final DateTime? fechaActualizacion;
   final int sincronizado;
@@ -25,6 +26,7 @@ class Equipo {
     required this.modeloId,
     this.numeroSerie,
     required this.logoId,
+    this.nuevoEquipo = false,
     DateTime? fechaCreacion,
     this.fechaActualizacion,
     this.sincronizado = 0,
@@ -42,6 +44,7 @@ class Equipo {
       modeloId: map['modelo_id'] ?? 1,
       numeroSerie: map['numero_serie'],
       logoId: map['logo_id'] ?? 1,
+      nuevoEquipo: map['nuevo_equipo'] == 1,
       fechaCreacion: DateTime.now(),
       fechaActualizacion: null,
       sincronizado: 0,
@@ -68,6 +71,19 @@ class Equipo {
       if (value == null) return null;
       final stringValue = value.toString().trim();
       return stringValue.isEmpty ? null : stringValue;
+    }
+
+    // ✅ AGREGADO: Función auxiliar para parsear booleano
+    bool _safeParseBool(dynamic value, {bool defaultValue = false}) {
+      if (value == null) return defaultValue;
+      if (value is bool) return value;
+      if (value is int) return value == 1;
+      if (value is String) {
+        final lower = value.toLowerCase();
+        if (lower == 'true' || lower == '1') return true;
+        if (lower == 'false' || lower == '0') return false;
+      }
+      return defaultValue;
     }
 
     DateTime fecha;
@@ -103,6 +119,7 @@ class Equipo {
       modeloId: _safeParseInt(json['edfModeloId']),
       numeroSerie: _safeParseString(json['numSerie']),
       logoId: _safeParseInt(json['edfLogoId']),
+      nuevoEquipo: _safeParseBool(json['nuevoEquipo']),
       clienteId: clienteId,
       fechaCreacion: fecha,
       fechaActualizacion: fechaAct,
@@ -122,6 +139,7 @@ class Equipo {
       'modelo_id': modeloId,
       'numero_serie': numeroSerie,
       'logo_id': logoId,
+      'nuevo_equipo': nuevoEquipo ? 1 : 0,
     };
   }
 
@@ -139,14 +157,16 @@ class Equipo {
       'numeroSerie': numeroSerie,
       'logo_id': logoId,
       'logoId': logoId,
+      'nuevo_equipo': nuevoEquipo,  // ✅ AGREGADO: enviar como bool a la API
+      'nuevoEquipo': nuevoEquipo,   // ✅ AGREGADO: camelCase para compatibilidad
       'fecha_creacion': fechaCreacion.toIso8601String(),
-      'fechaCreacion': fechaCreacion.toIso8601String(), // Para compatibilidad
+      'fechaCreacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
-      'fechaActualizacion': fechaActualizacion?.toIso8601String(), // Para compatibilidad
+      'fechaActualizacion': fechaActualizacion?.toIso8601String(),
       'sincronizado': sincronizado,
-      'marca_nombre': marcaNombre, // Incluir para respuestas completas
+      'marca_nombre': marcaNombre,
       'modelo_nombre': modeloNombre,
-      'logo_nombre': logoNombre,   // Incluir para respuestas completas
+      'logo_nombre': logoNombre,
     };
   }
 
@@ -158,6 +178,7 @@ class Equipo {
     int? modeloId,
     String? numeroSerie,
     int? logoId,
+    bool? nuevoEquipo,
     DateTime? fechaCreacion,
     DateTime? fechaActualizacion,
     int? sincronizado,
@@ -190,10 +211,11 @@ class Equipo {
   @override
   String toString() {
     return 'Equipo{id: $id, clienteId: $clienteId, codBarras: $codBarras, marcaId: $marcaId, modeloId: $modeloId, '
-        'numeroSerie: $numeroSerie, logoId: $logoId, '
+        'numeroSerie: $numeroSerie, logoId: $logoId, nuevoEquipo: $nuevoEquipo, '  // ✅ AGREGADO
         'sincronizado: $sincronizado, marcaNombre: $marcaNombre, '
         'modeloNombre: $modeloNombre, logoNombre: $logoNombre}';
   }
+
 
   @override
   bool operator ==(Object other) {

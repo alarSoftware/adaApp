@@ -1,8 +1,5 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 import '../models/logo.dart';
-import '../services/sync/base_sync_service.dart';
 import '../services/database_helper.dart';
 import 'base_repository.dart';
 
@@ -34,80 +31,6 @@ class LogoRepository extends BaseRepository<Logo> {
 
   @override
   String getEntityName() => 'Logo';
-
-  /// Sincronizar logos desde el servidor
-  /// Usa el mismo flujo que EquipmentSyncService.sincronizarLogos()
-  Future<Map<String, dynamic>> sincronizarDesdeServidor() async {
-    try {
-      _logger.i('🎨 Sincronizando logos desde el servidor...');
-
-      final baseUrl = await BaseSyncService.getBaseUrl();
-
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/getEdfLogos'),
-        headers: BaseSyncService.headers,
-      ).timeout(BaseSyncService.timeout);
-
-      _logger.i('📡 Response status: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-
-        // Parsear respuesta (puede venir como Map con 'data' o como List directa)
-        List<dynamic> logosAPI = [];
-        if (responseData is Map<String, dynamic>) {
-          if (responseData.containsKey('data')) {
-            if (responseData['data'] is String) {
-              final String dataString = responseData['data'];
-              logosAPI = jsonDecode(dataString) as List<dynamic>;
-            } else if (responseData['data'] is List) {
-              logosAPI = responseData['data'] as List<dynamic>;
-            }
-          }
-        } else if (responseData is List) {
-          logosAPI = responseData;
-        }
-
-        _logger.i('📊 Logos parseados de la API: ${logosAPI.length}');
-
-        if (logosAPI.isNotEmpty) {
-          // DatabaseHelper.sincronizarLogos() llama a DatabaseSync._mapearLogo()
-          // que mapea logoData['logo'] → 'nombre' en la BD
-          await _dbHelper.sincronizarLogos(logosAPI);
-
-          _logger.i('✅ Logos sincronizados exitosamente: ${logosAPI.length}');
-
-          return {
-            'exito': true,
-            'mensaje': 'Logos sincronizados correctamente',
-            'itemsSincronizados': logosAPI.length,
-          };
-        } else {
-          _logger.w('⚠️ No se encontraron logos en la respuesta');
-          return {
-            'exito': true,
-            'mensaje': 'No se encontraron logos',
-            'itemsSincronizados': 0,
-          };
-        }
-      } else {
-        final mensaje = BaseSyncService.extractErrorMessage(response);
-        _logger.e('❌ Error del servidor: $mensaje');
-        return {
-          'exito': false,
-          'mensaje': mensaje,
-          'itemsSincronizados': 0,
-        };
-      }
-    } catch (e) {
-      _logger.e('💥 Error sincronizando logos: $e');
-      return {
-        'exito': false,
-        'mensaje': BaseSyncService.getErrorMessage(e),
-        'itemsSincronizados': 0,
-      };
-    }
-  }
 
   /// Obtener logo por nombre
   Future<Logo?> obtenerPorNombre(String nombre) async {

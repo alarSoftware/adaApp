@@ -152,21 +152,68 @@ class PreviewScreenViewModel extends ChangeNotifier {
       _logger.i('CONFIRMANDO REGISTRO - GUARDADO DEFINITIVO EN BD [Process: $processId]');
 
       if (_currentProcessId != processId) {
-        _logger.w('Proceso cancelado: ID no coincide');
         return {'success': false, 'error': 'Proceso cancelado'};
       }
 
       final cliente = datos['cliente'] as Cliente?;
-      final equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
       final esCenso = datos['es_censo'] as bool? ?? true;
+      final esNuevoEquipo = datos['es_nuevo_equipo'] as bool? ?? false;  // ✅ NUEVO
+      var equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
 
       if (cliente == null) throw 'Cliente no encontrado en los datos';
-      if (equipoCompleto == null) throw 'No se encontró información del equipo';
       if (cliente.id == null) throw 'El cliente no tiene ID asignado';
-      if (equipoCompleto['id'] == null) throw 'El equipo no tiene ID asignado';
 
       final usuarioId = await _getUsuarioId;
       _logger.i('Usuario ID obtenido: $usuarioId');
+
+      String equipoId;
+      int clienteId = _convertirAInt(cliente.id, 'cliente_id');
+
+      // ✅ CASO 3: EQUIPO NUEVO - Crear en tabla equipos
+      if (esNuevoEquipo) {
+        _setStatusMessage('Registrando equipo nuevo en el sistema...');
+
+        if (_currentProcessId != processId) {
+          return {'success': false, 'error': 'Proceso cancelado'};
+        }
+
+        try {
+          equipoId = await _equipoRepository.crearEquipoNuevo(
+            codigoBarras: datos['codigo_barras']?.toString() ?? '',
+            marcaId: _safeCastToInt(datos['marca_id'], 'marca_id') ?? 1,
+            modeloId: _safeCastToInt(datos['modelo_id'], 'modelo_id') ?? 1,
+            numeroSerie: datos['numero_serie']?.toString(),
+            logoId: _safeCastToInt(datos['logo_id'], 'logo_id') ?? 1,
+            //clienteId: clienteId.toString(),
+          );
+
+          _logger.i('✅ Equipo nuevo creado con ID: $equipoId');
+
+          // Crear equipoCompleto artificial para continuar el flujo
+          equipoCompleto = {
+            'id': equipoId,
+            'cod_barras': datos['codigo_barras'],
+            'marca_id': datos['marca_id'],
+            'modelo_id': datos['modelo_id'],
+            'modelo_nombre': datos['modelo'],
+            'numero_serie': datos['numero_serie'],
+            'logo_id': datos['logo_id'],
+            'logo_nombre': datos['logo'],
+            'marca_nombre': datos['marca'] ?? 'Sin marca',
+            'cliente_id': clienteId,
+            'nuevo_equipo': 1,
+          };
+
+        } catch (e) {
+          _logger.e('❌ Error creando equipo nuevo: $e');
+          throw 'Error registrando equipo nuevo: $e';
+        }
+      } else {
+        // Equipos existentes
+        if (equipoCompleto == null) throw 'No se encontró información del equipo';
+        if (equipoCompleto['id'] == null) throw 'El equipo no tiene ID asignado';
+        equipoId = equipoCompleto['id'].toString();
+      }
 
       _setStatusMessage('Verificando estado del equipo...');
 
@@ -174,34 +221,38 @@ class PreviewScreenViewModel extends ChangeNotifier {
         return {'success': false, 'error': 'Proceso cancelado'};
       }
 
-      final equipoId = equipoCompleto['id'].toString();
-      final clienteId = _convertirAInt(cliente.id, 'cliente_id');
-
-      final yaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(equipoId, clienteId);
+      // Verificar asignación
+      final yaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(
+          equipoId,
+          clienteId
+      );
       _logger.i('Equipo $equipoId ya asignado: $yaAsignado');
 
-      if (esCenso && !yaAsignado) {
-        _setStatusMessage('Registrando censo pendiente...');
+      // ✅ CASO 2 y CASO 3: Crear equipo_pendiente si NO está asignado
+      if (!yaAsignado) {
+        _setStatusMessage('Registrando equipo pendiente de asignación...');
 
         if (_currentProcessId != processId) {
           return {'success': false, 'error': 'Proceso cancelado'};
         }
 
         try {
-          _logger.i('Crear registro pendiente (equipo NO asignado)');
+          _logger.i('Crear registro pendiente - Equipo NO asignado a este cliente');
           await _equipoPendienteRepository.procesarEscaneoCenso(
               equipoId: equipoId,
               clienteId: clienteId
           );
-          _logger.i('Registro pendiente creado exitosamente');
+          _logger.i('✅ Registro pendiente creado exitosamente');
         } catch (e) {
-          _logger.w('Error registrando censo pendiente: $e');
+          _logger.w('⚠️ Error registrando equipo pendiente: $e');
+          // No fallar por esto, continuar
         }
-      } else if (yaAsignado) {
-        _logger.i('Equipo ya asignado - no se crea registro pendiente');
+      } else {
+        _logger.i('ℹ️ Equipo ya asignado - no se crea registro pendiente');
       }
 
-      _setStatusMessage('Registrando estado como CREADO...');
+      // ✅ TODOS LOS CASOS: Crear estado en censo_activo
+      _setStatusMessage('Registrando censo...');
 
       if (_currentProcessId != processId) {
         return {'success': false, 'error': 'Proceso cancelado'};
@@ -230,25 +281,27 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
         if (estadoCreado.id != null) {
           estadoIdActual = estadoCreado.id!;
-          _logger.i('Estado CREADO registrado con ID: $estadoIdActual');
+          _logger.i('✅ Estado creado con ID: $estadoIdActual');
         } else {
-          _logger.w('Estado creado pero sin ID asignado');
+          _logger.w('⚠️ Estado creado pero sin ID asignado');
           estadoIdActual = null;
         }
       } catch (dbError) {
-        _logger.e('Error de base de datos al crear estado: $dbError');
-        throw 'Error creando estado en base de datos: $dbError';
+        _logger.e('❌ Error al crear estado: $dbError');
+        throw 'Error creando censo: $dbError';
       }
+
+      // Continuar con sincronización al servidor...
+      // (resto del código igual)
 
       if (_currentProcessId != processId) {
         return {'success': false, 'error': 'Proceso cancelado'};
       }
 
-      _setStatusMessage('Preparando datos para migración...');
+      _setStatusMessage('Preparando datos para sincronización...');
       Map<String, dynamic> datosCompletos;
 
       if (estadoIdActual != null) {
-        _logger.i('Preparando datos con estadoId: $estadoIdActual');
         final now = DateTime.now().toLocal();
         final timestampId = now.millisecondsSinceEpoch;
 
@@ -257,8 +310,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
           'timestamp_id': timestampId,
           'estado_sincronizacion': 'pendiente',
           'fecha_creacion_local': _formatearFechaLocal(now),
-          'equipo_id': equipoCompleto['id'],
-          'cliente_id': cliente.id,
+          'equipo_id': equipoId,
+          'cliente_id': clienteId,
           'usuario_id': usuarioId,
           'funcionando': true,
           'estado_general': 'Equipo registrado desde APP móvil - ${datos['observaciones'] ?? 'Censo registrado'}',
@@ -274,7 +327,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
           'imagen_base64_2': datos['imagen_base64_2'],
           'tiene_imagen2': datos['tiene_imagen2'] ?? false,
           'imagen_tamano2': datos['imagen_tamano2'],
-          'codigo_barras': equipoCompleto['cod_barras'] ?? datos['codigo_barras'],
+          'codigo_barras': equipoCompleto!['cod_barras'] ?? datos['codigo_barras'],
           'numero_serie': equipoCompleto['numero_serie'] ?? datos['numero_serie'],
           'modelo': equipoCompleto['modelo_nombre'] ?? datos['modelo'],
           'logo': equipoCompleto['logo_nombre'] ?? datos['logo'],
@@ -284,19 +337,18 @@ class PreviewScreenViewModel extends ChangeNotifier {
           'fecha_registro': datos['fecha_registro'],
           'timestamp_gps': datos['timestamp_gps'],
           'es_censo': esCenso,
+          'es_nuevo_equipo': esNuevoEquipo,  // ✅ NUEVO
           'ya_asignado': yaAsignado,
           'version_app': '1.0.0',
           'dispositivo': Platform.operatingSystem,
           'fecha_revision': _formatearFechaLocal(now),
           'en_local': true,
         };
-
-        _logger.i('Datos preparados directamente desde equipoCompleto');
       } else {
-        _logger.i('Usando datos originales (no hay estadoId)');
         datosCompletos = await _prepararDatosParaEnvio(datos);
       }
 
+      // Resto del flujo de sincronización igual...
       if (_currentProcessId != processId) {
         return {'success': false, 'error': 'Proceso cancelado'};
       }
@@ -313,32 +365,38 @@ class PreviewScreenViewModel extends ChangeNotifier {
           return {'success': false, 'error': 'Proceso cancelado'};
         }
 
-        final respuestaServidor = await _intentarEnviarAlServidorConTimeout(datosCompletos, timeoutSegundos: 8);
-        _logger.i('Respuesta del servidor: $respuestaServidor');
+        final respuestaServidor = await _intentarEnviarAlServidorConTimeout(
+            datosCompletos,
+            timeoutSegundos: 8
+        );
 
         if (respuestaServidor['exito'] == true) {
-          _logger.i('Marcando estado como migrado con ID: $estadoIdActual');
-          await _estadoEquipoRepository.marcarComoMigrado(estadoIdActual, servidorId: respuestaServidor['servidor_id']);
+          await _estadoEquipoRepository.marcarComoMigrado(
+              estadoIdActual,
+              servidorId: respuestaServidor['servidor_id']
+          );
           final idLocal = _safeCastToInt(datosCompletos['id_local'], 'id_local');
           if (idLocal != null) await _marcarComoSincronizado(idLocal);
-          mensajeFinal = 'Censo completado y sincronizado al servidor';
+
+          mensajeFinal = esNuevoEquipo
+              ? 'Equipo nuevo registrado y sincronizado'
+              : 'Censo completado y sincronizado';
           migracionExitosa = true;
-          _setStatusMessage('Registro sincronizado exitosamente');
         } else {
-          _logger.w('Migración no exitosa: ${respuestaServidor['motivo']}');
           await _estadoEquipoRepository.marcarComoError(
               estadoIdActual,
-              'Error inicial: ${respuestaServidor['detalle'] ?? respuestaServidor['motivo']}'
+              'Error: ${respuestaServidor['detalle'] ?? respuestaServidor['motivo']}'
           );
-          mensajeFinal = 'Censo guardado localmente. Se sincronizará automáticamente';
-          _setStatusMessage('Censo guardado. Sincronización automática pendiente');
+
+          mensajeFinal = esNuevoEquipo
+              ? 'Equipo nuevo guardado. Se sincronizará automáticamente'
+              : 'Censo guardado. Se sincronizará automáticamente';
         }
       } else {
-        mensajeFinal = 'Censo guardado localmente';
+        mensajeFinal = 'Registro guardado localmente';
       }
 
       _programarSincronizacionBackground();
-
       await Future.delayed(const Duration(milliseconds: 300));
 
       return {
@@ -348,7 +406,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       };
 
     } catch (e) {
-      _logger.e('Error crítico en confirmación de registro: $e');
+      _logger.e('❌ Error crítico en confirmación: $e');
       return {'success': false, 'error': 'Error guardando registro: $e'};
     } finally {
       _setSaving(false);
@@ -545,7 +603,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> _prepararDatosParaApiEstados(Map<String, dynamic> datosLocales) async {
+  Future<Map<String, dynamic>> _prepararDatosParaApiEstados(
+      Map<String, dynamic> datosLocales
+      ) async {
     final usuarioId = await _getUsuarioId;
     final edfVendedorId = await _getEdfVendedorId;
     final now = DateTime.now().toLocal();
@@ -562,6 +622,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'enLocal': datosLocales['en_local'] ?? true,
       'fechaDeRevision': datosLocales['fecha_revision'] ?? _formatearFechaLocal(now),
       'estadoCenso': datosLocales['ya_asignado'] == true ? 'asignado' : 'pendiente',
+      'esNuevoEquipo': datosLocales['es_nuevo_equipo'] ?? false,  // ✅ NUEVO
       'equipo_codigo_barras': datosLocales['codigo_barras'] ?? '',
       'equipo_numero_serie': datosLocales['numero_serie'] ?? '',
       'equipo_modelo': datosLocales['modelo'] ?? '',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../repositories/logo_repository.dart';
+import '../../services/sync/equipment_sync_service.dart';
 import 'package:logger/logger.dart';
 
 final _logger = Logger();
@@ -98,17 +99,16 @@ class _LogosScreenState extends State<LogosScreen> {
     });
 
     try {
-      final logoRepo = LogoRepository();
-
       _logger.i('Iniciando sincronización de logos desde el servidor...');
 
-      // Llamar al método de sincronización del repositorio
-      final resultado = await logoRepo.sincronizarDesdeServidor();
+      // Usar EquipmentSyncService en lugar de LogoRepository
+      final resultado = await EquipmentSyncService.sincronizarLogos();
 
       if (!mounted) return;
 
-      if (resultado['exito'] == true) {
+      if (resultado.exito) {
         // Recargar logos locales después de la sincronización
+        final logoRepo = LogoRepository();
         final logosActualizados = await logoRepo.obtenerTodos();
 
         final logosData = logosActualizados.map((logo) => {
@@ -127,7 +127,7 @@ class _LogosScreenState extends State<LogosScreen> {
           _filtrarLogos();
         }
 
-        final cantidadSincronizada = resultado['itemsSincronizados'] ?? 0;
+        final cantidadSincronizada = resultado.itemsSincronizados;
         _logger.i('Logos sincronizados exitosamente: $cantidadSincronizada');
 
         // Mostrar mensaje de éxito con la cantidad
@@ -144,7 +144,7 @@ class _LogosScreenState extends State<LogosScreen> {
         );
       } else {
         // Error en la sincronización
-        final mensaje = resultado['mensaje'] ?? 'Error desconocido';
+        final mensaje = resultado.mensaje;
 
         setState(() {
           _isSyncing = false;

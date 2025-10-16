@@ -592,6 +592,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
 
+
   // ===============================
   // LÓGICA DE NEGOCIO - NAVEGACIÓN
   // ===============================
@@ -637,22 +638,20 @@ class FormsScreenViewModel extends ChangeNotifier {
       'cliente': _cliente,
       'codigo_barras': codigoBarrasController.text.trim(),
       'modelo': modeloController.text.trim(),
+      'marca_id': _equipoCompleto?['marca_id'],
+      'modelo_id': _equipoCompleto?['modelo_id'],
       'logo_id': _logoSeleccionado,
       'logo': logoSeleccionado['nombre'],
       'numero_serie': numeroSerieController.text.trim(),
       'observaciones': observacionesController.text.trim(),
-
-      // Primera imagen
       'imagen_path': _imagenSeleccionada?.path,
-
-      // Segunda imagen - CORREGIDO: sin guion bajo
       'imagen_path2': _imagenSeleccionada2?.path,
-
       'latitud': ubicacion['latitud'],
       'longitud': ubicacion['longitud'],
       'fecha_registro': DateTime.now().toIso8601String(),
       'timestamp_gps': DateTime.now().millisecondsSinceEpoch,
       'es_censo': _isCensoMode,
+      'es_nuevo_equipo': !_isCensoMode,
       'equipo_completo': _equipoCompleto,
       'ya_asignado': _equipoYaAsignado,
     };

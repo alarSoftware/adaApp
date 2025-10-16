@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/repositories/models_repository.dart';
+import 'package:ada_app/services/sync/equipment_sync_service.dart';
 import 'package:logger/logger.dart';
 
 final _logger = Logger();
@@ -98,57 +99,67 @@ class _ModelosScreenState extends State<ModelosScreen> {
     });
 
     try {
-      final modeloRepo = ModeloRepository();
+      _logger.i('Iniciando sincronización de modelos desde el servidor...');
 
-      // Sincronizar desde el servidor
-      final resultado = await modeloRepo.sincronizarDesdeServidor();
+      // Usar EquipmentSyncService en lugar de ModeloRepository
+      final resultado = await EquipmentSyncService.sincronizarModelos();
 
-      if (mounted) {
-        if (resultado.exito) {
-          // Recargar los modelos locales después de sincronizar
-          final modelosActualizados = await modeloRepo.obtenerTodos();
+      if (!mounted) return;
 
-          final modelosData = modelosActualizados.map((modelo) => {
-            'id': modelo.id,
-            'nombre': modelo.nombre,
-          }).toList();
+      if (resultado.exito) {
+        // Recargar los modelos locales después de sincronizar
+        final modeloRepo = ModeloRepository();
+        final modelosActualizados = await modeloRepo.obtenerTodos();
 
-          setState(() {
-            _modelos = modelosData;
-            _modelosFiltrados = List.from(modelosData);
-            _isSyncing = false;
-          });
+        final modelosData = modelosActualizados.map((modelo) => {
+          'id': modelo.id,
+          'nombre': modelo.nombre,
+        }).toList();
 
-          // Aplicar filtro si hay búsqueda activa
-          if (_searchController.text.isNotEmpty) {
-            _filtrarModelos();
-          }
+        setState(() {
+          _modelos = modelosData;
+          _modelosFiltrados = List.from(modelosData);
+          _isSyncing = false;
+        });
 
-          _logger.i('Modelos sincronizados exitosamente: ${_modelos.length}');
-
-          // Mostrar mensaje de éxito
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${resultado.itemsSincronizados} modelos sincronizados'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        } else {
-          setState(() {
-            _isSyncing = false;
-            _errorMessage = resultado.mensaje;
-          });
-
-          // Mostrar mensaje de error
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${resultado.mensaje}'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
-            ),
-          );
+        // Aplicar filtro si hay búsqueda activa
+        if (_searchController.text.isNotEmpty) {
+          _filtrarModelos();
         }
+
+        final cantidadSincronizada = resultado.itemsSincronizados;
+        _logger.i('Modelos sincronizados exitosamente: $cantidadSincronizada');
+
+        // Mostrar mensaje de éxito
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              cantidadSincronizada > 0
+                  ? 'Se sincronizaron $cantidadSincronizada modelo${cantidadSincronizada != 1 ? 's' : ''} exitosamente'
+                  : 'No hay modelos nuevos para sincronizar',
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        final mensaje = resultado.mensaje;
+
+        setState(() {
+          _isSyncing = false;
+          _errorMessage = mensaje;
+        });
+
+        _logger.e('Error sincronizando modelos: $mensaje');
+
+        // Mostrar mensaje de error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(mensaje),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     } catch (e) {
       _logger.e('Error sincronizando modelos: $e');
@@ -160,10 +171,10 @@ class _ModelosScreenState extends State<ModelosScreen> {
 
         // Mostrar mensaje de error
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error al sincronizar modelos'),
+          SnackBar(
+            content: Text('Error al sincronizar modelos: ${e.toString()}'),
             backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -250,25 +261,6 @@ class _ModelosScreenState extends State<ModelosScreen> {
           filled: true,
           fillColor: Colors.grey[50],
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        child: TextField(
-          controller: _searchController,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'Buscar por nombre o ID...',
-            hintStyle: TextStyle(color: Colors.grey[300]),
-            border: InputBorder.none,
-            prefixIcon: Icon(Icons.search, color: Colors.grey[300]),
-          ),
         ),
       ),
     );

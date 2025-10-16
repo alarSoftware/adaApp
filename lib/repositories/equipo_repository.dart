@@ -356,6 +356,130 @@ class EquipoRepository extends BaseRepository<Equipo> {
   }
 
   // ================================
+// MÉTODOS DE CREACIÓN DE EQUIPOS NUEVOS
+// ================================
+
+  /// Crear equipo nuevo desde la app (modo registro nuevo)
+  Future<String> crearEquipoNuevo({
+    required String codigoBarras,
+    required int marcaId,
+    required int modeloId,
+    required String? numeroSerie,
+    required int logoId,
+  }) async {
+    try {
+      _logger.i('=== CREANDO EQUIPO NUEVO ===');
+      _logger.i('Código: $codigoBarras');
+
+      // Validar que el código no exista
+      if (codigoBarras.isNotEmpty) {
+        final existe = await existeCodigoBarras(codigoBarras);
+        if (existe) {
+          throw Exception('Ya existe un equipo con el código: $codigoBarras');
+        }
+      }
+
+      // Generar ID único si el código está vacío
+      final equipoId = codigoBarras.isEmpty
+          ? 'NUEVO_${DateTime.now().millisecondsSinceEpoch}'
+          : codigoBarras;
+
+      // Preparar datos sin cliente_id (disponible)
+      final equipoMap = {
+        'id': equipoId,
+        'cliente_id': null,
+        'cod_barras': codigoBarras,
+        'marca_id': marcaId,
+        'modelo_id': modeloId,
+        'numero_serie': numeroSerie,
+        'logo_id': logoId,
+        'nuevo_equipo': 1,
+      };
+
+      _logger.i('Datos a insertar: $equipoMap');
+
+      await dbHelper.database.then((db) async {
+        await db.insert(
+          tableName,
+          equipoMap,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      });
+
+      _logger.i('✅ Equipo nuevo creado como DISPONIBLE con ID: $equipoId');
+      return equipoId;
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Error creando equipo nuevo: $e', stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Verificar si un equipo es nuevo (creado desde la app)
+  Future<bool> esEquipoNuevo(String equipoId) async {
+    try {
+      final maps = await dbHelper.consultar(
+        tableName,
+        where: 'id = ?',
+        whereArgs: [equipoId],
+        limit: 1,
+      );
+
+      if (maps.isEmpty) return false;
+
+      final nuevoEquipo = maps.first['nuevo_equipo'] as int?;
+      return nuevoEquipo == 1;
+    } catch (e) {
+      _logger.e('Error verificando si equipo es nuevo: $e');
+      return false;
+    }
+  }
+
+  /// Obtener equipos nuevos creados desde la app
+  Future<List<Map<String, dynamic>>> obtenerEquiposNuevos() async {
+    try {
+      final sql = '''
+      SELECT 
+        e.*,
+        m.nombre as marca_nombre,
+        mo.nombre as modelo_nombre,
+        l.nombre as logo_nombre,
+        c.nombre as cliente_nombre
+      FROM equipos e
+      LEFT JOIN marcas m ON e.marca_id = m.id
+      LEFT JOIN modelos mo ON e.modelo_id = mo.id
+      LEFT JOIN logo l ON e.logo_id = l.id
+      LEFT JOIN clientes c ON e.cliente_id = c.id
+      WHERE e.nuevo_equipo = 1
+      ORDER BY e.id DESC
+    ''';
+
+      final result = await dbHelper.consultarPersonalizada(sql);
+      _logger.i('Equipos nuevos encontrados: ${result.length}');
+      return result;
+    } catch (e) {
+      _logger.e('Error obteniendo equipos nuevos: $e');
+      rethrow;
+    }
+  }
+
+  /// Marcar equipo como sincronizado con el servidor
+  Future<void> marcarEquipoComoSincronizado(String equipoId) async {
+    try {
+      await dbHelper.actualizar(
+        tableName,
+        {'sincronizado': 1},
+        where: 'id = ?',
+        whereArgs: [equipoId],
+      );
+      _logger.i('Equipo $equipoId marcado como sincronizado');
+    } catch (e) {
+      _logger.e('Error marcando equipo como sincronizado: $e');
+      rethrow;
+    }
+  }
+
+  // ================================
   // MÉTODOS DE ESTADÍSTICAS
   // ================================
 
@@ -363,14 +487,15 @@ class EquipoRepository extends BaseRepository<Equipo> {
   Future<Map<String, dynamic>> obtenerEstadisticas() async {
     try {
       final sql = '''
-        SELECT 
-          COUNT(*) as total_equipos,
-          COUNT(CASE WHEN e.cliente_id IS NOT NULL AND e.cliente_id != '' AND e.cliente_id != '0' THEN 1 END) as equipos_asignados,
-          COUNT(CASE WHEN e.cliente_id IS NULL OR e.cliente_id = '' OR e.cliente_id = '0' THEN 1 END) as equipos_disponibles,
-          COUNT(CASE WHEN e.sincronizado = 0 THEN 1 END) as pendientes_sincronizacion,
-          COUNT(DISTINCT e.cliente_id) as clientes_con_equipos
-        FROM equipos e
-      ''';
+      SELECT 
+        COUNT(*) as total_equipos,
+        COUNT(CASE WHEN e.cliente_id IS NOT NULL AND e.cliente_id != '' AND e.cliente_id != '0' THEN 1 END) as equipos_asignados,
+        COUNT(CASE WHEN e.cliente_id IS NULL OR e.cliente_id = '' OR e.cliente_id = '0' THEN 1 END) as equipos_disponibles,
+        COUNT(CASE WHEN e.sincronizado = 0 THEN 1 END) as pendientes_sincronizacion,
+        COUNT(CASE WHEN e.nuevo_equipo = 1 THEN 1 END) as equipos_nuevos,
+        COUNT(DISTINCT e.cliente_id) as clientes_con_equipos
+      FROM equipos e
+    ''';
 
       final result = await dbHelper.consultarPersonalizada(sql);
       return result.isNotEmpty ? result.first : {};
@@ -383,13 +508,14 @@ class EquipoRepository extends BaseRepository<Equipo> {
   /// Obtener resumen para dashboard
   Future<Map<String, dynamic>> obtenerResumenDashboard() async {
     final sql = '''
-      SELECT 
-        COUNT(*) as total_equipos,
-        COUNT(CASE WHEN e.cliente_id IS NOT NULL AND e.cliente_id != '' AND e.cliente_id != '0' THEN 1 END) as asignados,
-        COUNT(CASE WHEN (e.cliente_id IS NULL OR e.cliente_id = '' OR e.cliente_id = '0') THEN 1 END) as disponibles,
-        COUNT(CASE WHEN e.sincronizado = 0 THEN 1 END) as pendientes_sync
-      FROM equipos e
-    ''';
+    SELECT 
+      COUNT(*) as total_equipos,
+      COUNT(CASE WHEN e.cliente_id IS NOT NULL AND e.cliente_id != '' AND e.cliente_id != '0' THEN 1 END) as asignados,
+      COUNT(CASE WHEN (e.cliente_id IS NULL OR e.cliente_id = '' OR e.cliente_id = '0') THEN 1 END) as disponibles,
+      COUNT(CASE WHEN e.sincronizado = 0 THEN 1 END) as pendientes_sync,
+      COUNT(CASE WHEN e.nuevo_equipo = 1 THEN 1 END) as equipos_nuevos
+    FROM equipos e
+  ''';
 
     final result = await dbHelper.consultarPersonalizada(sql);
     return result.isNotEmpty ? result.first : {};

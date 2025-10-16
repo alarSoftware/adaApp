@@ -1,14 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
+import 'package:uuid/uuid.dart';
 import '../models/dynamic_form/dynamic_form_template.dart';
 import '../models/dynamic_form/dynamic_form_response.dart';
 import '../models/dynamic_form/dynamic_form_field.dart';
 import '../repositories/dynamic_form_template_repository.dart';
 import '../repositories/dynamic_form_response_repository.dart';
 import '../repositories/dynamic_form_sync_repository.dart';
+import '../services/sync/dynamic_form_sync_service.dart';
 
 class DynamicFormViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
+  final Uuid _uuid = Uuid();
 
   // Repositorios especializados
   final DynamicFormTemplateRepository _templateRepo = DynamicFormTemplateRepository();
@@ -90,6 +93,8 @@ class DynamicFormViewModel extends ChangeNotifier {
     }
   }
 
+
+
   // ==================== MÉTODOS PARA LLENAR FORMULARIOS ====================
 
   void startNewForm(
@@ -97,7 +102,7 @@ class DynamicFormViewModel extends ChangeNotifier {
         String? contactoId,
         String? equipoId,
         String? userId,
-        String? edfVendedorId, // ← AGREGAR ESTE PARÁMETRO
+        String? edfVendedorId,
         DynamicFormResponse? existingResponse,
       }) {
     try {
@@ -112,7 +117,7 @@ class DynamicFormViewModel extends ChangeNotifier {
         _logger.i('✅ Formulario cargado para editar: ${existingResponse.id}');
         _logger.i('📝 Valores cargados: ${_fieldValues.length} campos');
       } else {
-        final responseId = DateTime.now().millisecondsSinceEpoch.toString();
+        final responseId = _uuid.v4();
 
         _currentResponse = DynamicFormResponse(
           id: responseId,
@@ -123,11 +128,11 @@ class DynamicFormViewModel extends ChangeNotifier {
           contactoId: contactoId,
           equipoId: equipoId,
           userId: userId,
-          edfVendedorId: edfVendedorId, // ← AGREGAR ESTA LÍNEA
+          edfVendedorId: edfVendedorId,
         );
 
         _fieldValues.clear();
-        _logger.i('✅ Formulario nuevo iniciado: ${_currentTemplate?.title} (ID: $responseId)');
+        _logger.i('✅ Formulario nuevo iniciado: ${_currentTemplate?.title} (UUID: $responseId)');
       }
 
       _fieldErrors.clear();
@@ -303,6 +308,8 @@ class DynamicFormViewModel extends ChangeNotifier {
     return filledRequired / requiredFields.length;
   }
 
+
+
   Future<bool> saveProgress() async {
     try {
       if (_currentResponse == null) {
@@ -402,7 +409,8 @@ class DynamicFormViewModel extends ChangeNotifier {
       _isSyncing = true;
       notifyListeners();
 
-      final synced = await _syncRepo.simulateSyncToServer(completedResponse.id);
+      // ✅ CAMBIO AQUÍ: Usar syncToServer en lugar de simulateSyncToServer
+      final synced = await _syncRepo.syncToServer(completedResponse.id);
 
       _isSyncing = false;
 
@@ -452,7 +460,8 @@ class DynamicFormViewModel extends ChangeNotifier {
       _isSyncing = true;
       notifyListeners();
 
-      final success = await _syncRepo.simulateSyncToServer(responseId);
+      // ✅ CAMBIO AQUÍ: Usar retrySyncResponse que internamente llama a syncToServer
+      final success = await _syncRepo.retrySyncResponse(responseId);
 
       _isSyncing = false;
       notifyListeners();
@@ -517,7 +526,6 @@ class DynamicFormViewModel extends ChangeNotifier {
   }
 
   // ==================== MÉTODOS PARA RESPUESTAS GUARDADAS ====================
-
   Future<void> loadSavedResponsesWithSync({String? clienteId}) async {
     try {
       _isLoading = true;
@@ -525,20 +533,14 @@ class DynamicFormViewModel extends ChangeNotifier {
       notifyListeners();
 
       final allResponses = await _responseRepo.getAll();
-      final List<DynamicFormResponse> responsesWithSync = [];
 
-      for (var response in allResponses) {
-        final metadata = await _responseRepo.getSyncMetadata(response.id);
-        final responseWithSync = response.copyWith(metadata: metadata);
-        responsesWithSync.add(responseWithSync);
-      }
-
+      // ✅ Filtrar por clienteId si se proporciona
       if (clienteId != null && clienteId.isNotEmpty) {
-        _savedResponses = responsesWithSync
+        _savedResponses = allResponses
             .where((response) => response.contactoId == clienteId)
             .toList();
       } else {
-        _savedResponses = responsesWithSync;
+        _savedResponses = allResponses;
       }
     } catch (e) {
       _errorMessage = 'Error cargando respuestas: $e';

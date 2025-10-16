@@ -31,6 +31,7 @@ class DatabaseSync {
       mapearEntidad: _mapearUsuario,
       validarEntidad: _validarUsuario,
       limpiarTabla: true,
+      usarReplace: true,
     );
   }
 
@@ -42,7 +43,7 @@ class DatabaseSync {
       nombreEntidad: 'Marcas',
       mapearEntidad: _mapearMarca,
       validarEntidad: _validarEntidadBasica,
-      limpiarTabla: false, // Las marcas se reemplazan, no se limpian
+      limpiarTabla: false,
       usarReplace: true,
     );
   }
@@ -100,7 +101,7 @@ class DatabaseSync {
     bool usarReplace = false,
   }) async {
     logger.i('=== SINCRONIZANDO $nombreEntidad ===');
-    logger.i('${nombreEntidad} recibidos: ${datos.length}');
+    logger.i('$nombreEntidad recibidos: ${datos.length}');
 
     await db.transaction((txn) async {
       if (limpiarTabla) {

@@ -53,10 +53,6 @@ class SyncService {
       BaseSyncService.logger.i('📦 Sincronizando logos...');
       await EquipmentSyncService.sincronizarLogos();
 
-      BaseSyncService.logger.i('👥 Sincronizando usuarios...');
-      final resultadoUsuarios = await UserSyncService.sincronizarUsuarios();
-      BaseSyncService.logger.i('✅ Usuarios sincronizados: ${resultadoUsuarios.itemsSincronizados}');
-
       // Sincronizar clientes (solo si el usuario tiene edf_vendedor_id)
       BaseSyncService.logger.i('🏢 Sincronizando clientes...');
       final resultadoClientes = await ClientSyncService.sincronizarClientesDelUsuario();

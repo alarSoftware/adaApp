@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:ada_app/ui/screens/cliente_detail_screen.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/client_screen_viewmodel.dart';
 import 'package:ada_app/ui/widgets/app_snackbar.dart';
@@ -8,7 +7,11 @@ import 'package:ada_app/ui/widgets/app_loading_more.dart';
 import 'package:ada_app/ui/widgets/app_empty_state.dart';
 import 'package:ada_app/ui/widgets/app_search_bar.dart';
 import 'package:ada_app/ui/screens/client_options_screen.dart';
+import 'package:ada_app/services/sync/client_sync_service.dart';
+import 'package:logger/logger.dart';
 import 'dart:async';
+
+final _logger = Logger();
 
 class ClienteListScreen extends StatefulWidget {
   const ClienteListScreen({super.key});
@@ -21,6 +24,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
   late ClienteListScreenViewModel _viewModel;
   late StreamSubscription<ClienteListUIEvent> _eventSubscription;
   final TextEditingController _searchController = TextEditingController();
+  bool _isSyncing = false;
 
   @override
   void initState() {
@@ -40,7 +44,8 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
   }
 
   void _setupEventListener() {
-    _eventSubscription = _viewModel.uiEvents.listen((event) {
+    _eventSubscription =
+        _viewModel.uiEvents.listen((event) {
       if (!mounted) return;
 
       if (event is ShowErrorEvent) {
@@ -81,6 +86,69 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
     return false;
   }
 
+  Future<void> _sincronizarClientes() async {
+    if (_isSyncing) return;
+
+    setState(() {
+      _isSyncing = true;
+    });
+
+    try {
+      _logger.i('Iniciando sincronización de clientes desde el servidor...');
+
+      // Usar el método correcto del ClientSyncService
+      final resultado = await ClientSyncService.sincronizarClientesDelUsuario();
+
+      if (!mounted) return;
+
+      if (resultado.exito) {
+        final cantidadSincronizada = resultado.itemsSincronizados;
+        _logger.i('Clientes sincronizados exitosamente: $cantidadSincronizada');
+
+        // Recargar la lista de clientes
+        await _viewModel.refresh();
+
+        // Mostrar mensaje de éxito
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                cantidadSincronizada > 0
+                    ? 'Se sincronizaron $cantidadSincronizada cliente${cantidadSincronizada != 1 ? 's' : ''} exitosamente'
+                    : resultado.mensaje,
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        final mensaje = resultado.mensaje;
+        _logger.e('Error sincronizando clientes: $mensaje');
+
+        // Mostrar mensaje de error
+        if (mounted) {
+          AppSnackbar.showError(context, mensaje);
+        }
+      }
+    } catch (e) {
+      _logger.e('Error sincronizando clientes: $e');
+
+      if (mounted) {
+        AppSnackbar.showError(
+          context,
+          'Error al sincronizar clientes: ${e.toString()}',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -89,6 +157,34 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Banner de sincronización
+            if (_isSyncing)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                color: Colors.blue[50],
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Sincronizando clientes...',
+                      style: TextStyle(
+                        color: Colors.blue[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             AppSearchBar(
               controller: _searchController,
               hintText: 'Buscar por nombre, codigo o documento...',
@@ -160,7 +256,6 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
           horizontal: 16,
           vertical: 12,
         ),
-        // leading: null, ← Eliminamos el ícono completamente
         title: Text(
           cliente.displayName,
           style: TextStyle(
@@ -231,6 +326,25 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
             elevation: 2,
             shadowColor: AppColors.shadowLight,
             actions: [
+              // Botón de sincronización
+              IconButton(
+                onPressed: _isSyncing ? null : _sincronizarClientes,
+                icon: _isSyncing
+                    ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+                    : Icon(
+                  Icons.sync,
+                  color: AppColors.appBarForeground,
+                ),
+                tooltip: 'Sincronizar clientes',
+              ),
+              // Botón de actualizar
               IconButton(
                 onPressed: _onRefresh,
                 icon: Icon(

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:logger/logger.dart';
+import 'package:uuid/uuid.dart';
 import '../models/dynamic_form/dynamic_form_response.dart';
 import '../models/dynamic_form/dynamic_form_response_detail.dart';
 import '../models/dynamic_form/dynamic_form_response_image.dart';
@@ -9,6 +10,7 @@ import '../services/database_helper.dart';
 class DynamicFormResponseRepository {
   final Logger _logger = Logger();
   final DatabaseHelper _dbHelper = DatabaseHelper();
+  final Uuid _uuid = Uuid();
 
   String get _responseTableName => 'dynamic_form_response';
   String get _responseDetailTableName => 'dynamic_form_response_detail';
@@ -313,18 +315,22 @@ class DynamicFormResponseRepository {
           continue;
         }
 
+        // Generar UUID para el detalle
+        final detailId = _uuid.v4();
+
         // Detectar si es imagen para guardarla en la tabla separada
         if (entry.value is String && _isImagePath(entry.value as String)) {
           await _saveImageForDetail(
+            detailId: detailId,
             responseId: response.id,
-            detailId: entry.key,
+            fieldId: entry.key,
             imagePath: entry.value as String,
             isCompleted: response.status == 'completed',
           );
 
           // Guardar el detalle con response especial indicando que tiene imagen
           final detailData = {
-            'id': '${response.id}_${entry.key}',
+            'id': detailId,
             'version': 1,
             'response': '[IMAGE]', // Marcador
             'dynamic_form_response_id': response.id,
@@ -339,7 +345,7 @@ class DynamicFormResponseRepository {
 
         // Guardar el detalle normal (campos que NO son imágenes)
         final detailData = {
-          'id': '${response.id}_${entry.key}',
+          'id': detailId,
           'version': 1,
           'response': entry.value?.toString() ?? '',
           'dynamic_form_response_id': response.id,
@@ -377,14 +383,16 @@ class DynamicFormResponseRepository {
 
   /// Guardar imagen en la tabla separada
   Future<void> _saveImageForDetail({
-    required String responseId,
     required String detailId,
+    required String responseId,
+    required String fieldId,
     required String imagePath,
     required bool isCompleted,
     int orden = 1,
   }) async {
     try {
-      final detailRowId = '${responseId}_${detailId}';
+      // Generar UUID para la imagen
+      final imageId = _uuid.v4();
 
       String? imagenBase64;
       int? imagenTamano;
@@ -397,18 +405,18 @@ class DynamicFormResponseRepository {
             final bytes = await file.readAsBytes();
             imagenBase64 = base64Encode(bytes);
             imagenTamano = bytes.length;
-            _logger.d('  📷 Imagen convertida a Base64: $detailId (${imagenTamano} bytes)');
+            _logger.d('  📷 Imagen convertida a Base64: $fieldId (${imagenTamano} bytes)');
           }
         } catch (e) {
           _logger.w('⚠️ Error convirtiendo imagen: $e');
         }
       } else {
-        _logger.d('  📷 Imagen guardada como ruta (borrador): $detailId');
+        _logger.d('  📷 Imagen guardada como ruta (borrador): $fieldId');
       }
 
       final imageData = {
-        'id': '${detailRowId}_img_$orden',
-        'dynamic_form_response_detail_id': detailRowId,
+        'id': imageId,
+        'dynamic_form_response_detail_id': detailId,
         'imagen_path': imagePath,
         'imagen_base64': imagenBase64,
         'imagen_tamano': imagenTamano,
@@ -419,7 +427,7 @@ class DynamicFormResponseRepository {
       };
 
       await _dbHelper.insertar(_responseImageTableName, imageData);
-      _logger.d('  ✅ Imagen guardada en tabla separada para detail: $detailId');
+      _logger.d('  ✅ Imagen guardada en tabla separada con UUID: $imageId');
     } catch (e) {
       _logger.e('❌ Error guardando imagen: $e');
       rethrow;
@@ -465,7 +473,6 @@ class DynamicFormResponseRepository {
 
   // ==================== MÉTODOS PRIVADOS ====================
 
-  /// Mapear datos de BD a DynamicFormResponse con sus detalles
   /// Mapear datos de BD a DynamicFormResponse con sus detalles
   Future<DynamicFormResponse?> _mapToResponseWithDetails(Map<String, dynamic> map) async {
     try {
@@ -534,6 +541,36 @@ class DynamicFormResponseRepository {
       _logger.e('Stack trace: $stackTrace');
       return null;
     }
+  }
+
+  /// Guardar respuestas descargadas del servidor
+  Future<int> saveResponsesFromServer(List<Map<String, dynamic>> responses) async {
+    int count = 0;
+    for (var responseData in responses) {
+      try {
+        final response = DynamicFormResponse.fromJson(responseData);
+        final saved = await save(response);
+        if (saved) count++;
+      } catch (e) {
+        _logger.e('❌ Error guardando response desde servidor: $e');
+      }
+    }
+    return count;
+  }
+
+  /// Guardar detalles de respuestas descargados del servidor
+  Future<int> saveResponseDetailsFromServer(List<Map<String, dynamic>> details) async {
+    int count = 0;
+    for (var detailData in details) {
+      try {
+        // Insertar directamente en la tabla de detalles
+        await _dbHelper.insertar(_responseDetailTableName, detailData);
+        count++;
+      } catch (e) {
+        _logger.e('❌ Error guardando detalle desde servidor: $e');
+      }
+    }
+    return count;
   }
 
   /// Verificar si un string es una ruta de imagen

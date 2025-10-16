@@ -176,17 +176,9 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
       case 'completed':
         return allResponses.where((r) => r.status == 'completed').toList();
       case 'pending':
-      // ✅ CAMBIAR: Filtrar por sync_status
-        return allResponses.where((r) {
-          final syncStatus = r.metadata?['sync_status'] as String? ?? 'pending';
-          return syncStatus == 'pending';
-        }).toList();
+        return allResponses.where((r) => r.syncedAt == null).toList();
       case 'synced':
-      // ✅ CAMBIAR: Filtrar por sync_status
-        return allResponses.where((r) {
-          final syncStatus = r.metadata?['sync_status'] as String? ?? 'pending';
-          return syncStatus == 'synced';
-        }).toList();
+        return allResponses.where((r) => r.syncedAt != null).toList();
       default:
         return allResponses;
     }
@@ -210,10 +202,9 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     final template = _viewModel.getTemplateById(response.formTemplateId);
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
 
-    // Obtener sync status
-    final syncStatus = response.metadata?['sync_status'] as String? ?? 'pending';
-    final intentosSync = response.metadata?['intentos_sync'] as int? ?? 0;
-    final mensajeError = response.metadata?['mensaje_error_sync'] as String?;
+    // ✅ Determinar sync status directamente desde el objeto
+    final isSynced = response.syncedAt != null;
+    final syncStatus = isSynced ? 'synced' : 'pending';
 
     return Card(
       elevation: 2,
@@ -268,7 +259,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
                       ],
                     ),
                   ),
-                  // ✅ ÍCONO DE SINCRONIZACIÓN (nubecita)
+                  // ✅ ÍCONO DE SINCRONIZACIÓN
                   Container(
                     padding: EdgeInsets.all(6),
                     decoration: BoxDecoration(
@@ -325,6 +316,23 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
                 ),
               ],
 
+              if (response.syncedAt != null) ...[
+                SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.cloud_done, size: 14, color: AppColors.success),
+                    SizedBox(width: 4),
+                    Text(
+                      'Sincronizado: ${dateFormat.format(response.syncedAt!)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.success,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
               SizedBox(height: 8),
 
               Row(
@@ -340,7 +348,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
                   ),
                   Spacer(),
                   // Estado de sincronización en texto
-                  if (syncStatus == 'pending') ...[
+                  if (!isSynced) ...[
                     Icon(Icons.cloud_upload, size: 14, color: AppColors.warning),
                     SizedBox(width: 4),
                     Text(
@@ -350,17 +358,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
                         color: AppColors.warning,
                       ),
                     ),
-                    if (intentosSync > 0) ...[
-                      SizedBox(width: 4),
-                      Text(
-                        '($intentosSync)',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: AppColors.error,
-                        ),
-                      ),
-                    ],
-                  ] else if (syncStatus == 'synced') ...[
+                  ] else ...[
                     Icon(Icons.cloud_done, size: 14, color: AppColors.success),
                     SizedBox(width: 4),
                     Text(
@@ -375,7 +373,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
               ),
 
               // Mensaje de error si existe
-              if (mensajeError != null && syncStatus == 'pending') ...[
+              if (response.errorMessage != null && !isSynced) ...[
                 SizedBox(height: 8),
                 Container(
                   padding: EdgeInsets.all(8),
@@ -389,7 +387,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
                       SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          mensajeError,
+                          response.errorMessage!,
                           style: TextStyle(
                             fontSize: 10,
                             color: AppColors.error,

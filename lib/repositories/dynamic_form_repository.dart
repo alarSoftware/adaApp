@@ -89,48 +89,73 @@ class DynamicFormRepository {
 
   // ==================== MÉTODOS DELEGADOS PARA SINCRONIZACIÓN ====================
 
+  /// Sincronizar una respuesta específica al servidor
   Future<bool> syncResponse(DynamicFormResponse response) async {
-    return await _syncRepo.simulateSyncToServer(response.id);
+    return await _syncRepo.syncToServer(response.id);
   }
 
+  /// Sincronizar todas las respuestas pendientes
   Future<Map<String, int>> syncAllPendingResponses() async {
     return await _syncRepo.syncAllPending();
   }
 
+  /// Marcar respuesta como sincronizada
   Future<bool> markResponseAsSynced(String responseId) async {
     return await _syncRepo.markAsSynced(responseId);
   }
 
+  /// Marcar detalles de respuesta como sincronizados
   Future<bool> markResponseDetailsAsSynced(String responseId) async {
     return await _syncRepo.markDetailsAsSynced(responseId);
   }
 
+  /// Registrar intento fallido de sincronización
   Future<bool> markSyncAttemptFailed(String responseId, String errorMessage) async {
     return await _syncRepo.markSyncAttemptFailed(responseId, errorMessage);
   }
 
+  /// Obtener respuestas pendientes de sincronización
   Future<List<DynamicFormResponse>> getPendingSync() async {
     return await _responseRepo.getPendingSync();
   }
 
+  /// Contar respuestas pendientes de sincronización
   Future<int> countPendingSync() async {
     return await _responseRepo.countPendingSync();
   }
 
+  /// Contar respuestas sincronizadas
   Future<int> countSynced() async {
     return await _responseRepo.countSynced();
   }
 
-  Future<bool> simulateSyncToServer(String responseId) async {
-    return await _syncRepo.simulateSyncToServer(responseId);
+  /// Reintentar sincronización de una respuesta
+  Future<bool> retrySyncResponse(String responseId) async {
+    return await _syncRepo.retrySyncResponse(responseId);
   }
 
+  /// Sincronizar respuesta al servidor (método principal)
+  Future<bool> syncToServer(String responseId) async {
+    return await _syncRepo.syncToServer(responseId);
+  }
+
+  /// Obtener estadísticas de sincronización
   Future<Map<String, dynamic>> getSyncStats() async {
     return await _syncRepo.getSyncStats();
   }
 
+  /// Verificar si hay respuestas pendientes de sincronización
   Future<bool> hasPendingSync() async {
     return await _syncRepo.hasPendingSync();
+  }
+
+  Future<int> guardarRespuestasDesdeServidor(List<Map<String, dynamic>> respuestasServidor) async {
+    return await _responseRepo.saveResponsesFromServer(respuestasServidor);
+  }
+
+  /// Guardar detalles de respuestas desde el servidor
+  Future<int> guardarDetallesRespuestasDesdeServidor(List<Map<String, dynamic>> detallesServidor) async {
+    return await _responseRepo.saveResponseDetailsFromServer(detallesServidor);
   }
 
   // ==================== ACCESO DIRECTO A REPOSITORIOS ====================
