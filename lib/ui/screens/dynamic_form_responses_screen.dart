@@ -7,6 +7,7 @@ import 'package:ada_app/ui/widgets/client_info_card.dart';
 import 'package:ada_app/ui/screens/dynamic_form_template_list_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:ada_app/ui/screens/dynamic_form_fill_screen.dart';
+import 'package:ada_app/services/auth_service.dart';
 
 /// Pantalla principal que muestra las respuestas guardadas
 class DynamicFormResponsesScreen extends StatefulWidget {
@@ -23,7 +24,8 @@ class DynamicFormResponsesScreen extends StatefulWidget {
 
 class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen> {
   late DynamicFormViewModel _viewModel;
-  String _filterStatus = 'all'; // all, completed, draft, synced
+  String _filterStatus = 'all';
+  final _dateFormat = DateFormat('dd/MM/yyyy HH:mm');
 
   @override
   void initState() {
@@ -32,41 +34,23 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     _loadData();
   }
 
-  Future<void> _loadData() async {
-    await _viewModel.loadTemplates();
-    await _viewModel.loadSavedResponsesWithSync(clienteId: widget.cliente.id.toString()); // ✅ CAMBIAR AQUÍ
-  }
-
   @override
   void dispose() {
     _viewModel.dispose();
     super.dispose();
   }
 
+  Future<void> _loadData() async {
+    await _viewModel.loadTemplates();
+    await _viewModel.loadSavedResponsesWithSync(
+      clienteId: widget.cliente.id.toString(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Formularios Dinámicos',
-          style: TextStyle(color: AppColors.onPrimary),
-        ),
-        backgroundColor: AppColors.appBarBackground,
-        foregroundColor: AppColors.appBarForeground,
-        actions: [
-          // Botón para descargar formularios
-          IconButton(
-            icon: Icon(Icons.cloud_download, color: AppColors.onPrimary),
-            onPressed: _downloadTemplates,
-            tooltip: 'Descargar formularios del servidor',
-          ),
-          IconButton(
-            icon: Icon(Icons.add_circle_outline, color: AppColors.onPrimary),
-            onPressed: _navigateToFormList,
-            tooltip: 'Nuevo Formulario',
-          ),
-        ],
-      ),
+      appBar: _buildAppBar(),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -78,49 +62,51 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
         child: SafeArea(
           child: Column(
             children: [
-              // Card de información del cliente
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0),
-                child: ClientInfoCard(
-                  cliente: widget.cliente,
-                ),
-              ),
-              // Filtros
+              _buildClientInfo(),
               _buildFilterChips(),
-
-              // Lista de respuestas
-              Expanded(
-                child: ListenableBuilder(
-                  listenable: _viewModel,
-                  builder: (context, child) {
-                    if (_viewModel.isLoading) {
-                      return Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                        ),
-                      );
-                    }
-
-                    if (_viewModel.errorMessage != null) {
-                      return _buildErrorView();
-                    }
-
-                    final responses = _getFilteredResponses();
-
-                    if (responses.isEmpty) {
-                      return _buildEmptyView();
-                    }
-
-                    return _buildResponsesList(responses);
-                  },
-                ),
-              ),
+              _buildResponsesList(),
             ],
           ),
         ),
       ),
     );
   }
+
+  // ==================== APP BAR ====================
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: Text(
+        'Formularios Dinámicos',
+        style: TextStyle(color: AppColors.onPrimary),
+      ),
+      backgroundColor: AppColors.appBarBackground,
+      foregroundColor: AppColors.appBarForeground,
+      actions: [
+        IconButton(
+          icon: Icon(Icons.cloud_download, color: AppColors.onPrimary),
+          onPressed: _downloadTemplates,
+          tooltip: 'Descargar formularios del servidor',
+        ),
+        IconButton(
+          icon: Icon(Icons.add_circle_outline, color: AppColors.onPrimary),
+          onPressed: _navigateToFormList,
+          tooltip: 'Nuevo Formulario',
+        ),
+      ],
+    );
+  }
+
+  // ==================== CLIENT INFO ====================
+
+  Widget _buildClientInfo() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0),
+      child: ClientInfoCard(cliente: widget.cliente),
+    );
+  }
+
+  // ==================== FILTER CHIPS ====================
 
   Widget _buildFilterChips() {
     return Container(
@@ -137,9 +123,9 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
             SizedBox(width: 8),
             _buildFilterChip('Completados', 'completed'),
             SizedBox(width: 8),
-            _buildFilterChip('Pendientes', 'pending'), // ✅ CORREGIDO: de 'draft' a 'pending'
+            _buildFilterChip('Pendientes', 'pending'),
             SizedBox(width: 8),
-            _buildFilterChip('Sincronizados', 'synced'), // ✅ AGREGADO
+            _buildFilterChip('Sincronizados', 'synced'),
           ],
         ),
       ),
@@ -169,6 +155,45 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     );
   }
 
+  // ==================== RESPONSES LIST ====================
+
+  Widget _buildResponsesList() {
+    return Expanded(
+      child: ListenableBuilder(
+        listenable: _viewModel,
+        builder: (context, child) {
+          if (_viewModel.isLoading) {
+            return Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              ),
+            );
+          }
+
+          if (_viewModel.errorMessage != null) {
+            return _buildErrorView();
+          }
+
+          final responses = _getFilteredResponses();
+
+          if (responses.isEmpty) {
+            return _buildEmptyView();
+          }
+
+          return RefreshIndicator(
+            onRefresh: _loadData,
+            color: AppColors.primary,
+            child: ListView.builder(
+              padding: EdgeInsets.all(16),
+              itemCount: responses.length,
+              itemBuilder: (context, index) => _buildResponseCard(responses[index]),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   List<DynamicFormResponse> _getFilteredResponses() {
     final allResponses = _viewModel.savedResponses;
 
@@ -183,28 +208,12 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
         return allResponses;
     }
   }
-  Widget _buildResponsesList(List<DynamicFormResponse> responses) {
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      color: AppColors.primary,
-      child: ListView.builder(
-        padding: EdgeInsets.all(16),
-        itemCount: responses.length,
-        itemBuilder: (context, index) {
-          final response = responses[index];
-          return _buildResponseCard(response);
-        },
-      ),
-    );
-  }
+
+  // ==================== RESPONSE CARD ====================
 
   Widget _buildResponseCard(DynamicFormResponse response) {
     final template = _viewModel.getTemplateById(response.formTemplateId);
-    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
-
-    // ✅ Determinar sync status directamente desde el objeto
     final isSynced = response.syncedAt != null;
-    final syncStatus = isSynced ? 'synced' : 'pending';
 
     return Card(
       elevation: 2,
@@ -224,182 +233,11 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  // Icono del ESTADO DEL FORMULARIO (draft/completed)
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(response.status).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      _getStatusIcon(response.status),
-                      color: _getStatusColor(response.status),
-                      size: 20,
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          template?.title ?? 'Formulario #${response.formTemplateId}',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        // Badge del estado del formulario
-                        _buildStatusBadge(response.status),
-                      ],
-                    ),
-                  ),
-                  // ✅ ÍCONO DE SINCRONIZACIÓN
-                  Container(
-                    padding: EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: _getSyncStatusColor(syncStatus).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Icon(
-                      _getSyncStatusIcon(syncStatus),
-                      color: _getSyncStatusColor(syncStatus),
-                      size: 18,
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: 16,
-                    color: AppColors.textSecondary,
-                  ),
-                ],
-              ),
+              _buildCardHeader(response, template, isSynced),
               SizedBox(height: 12),
               Divider(color: AppColors.border, height: 1),
               SizedBox(height: 12),
-
-              // Información de la respuesta
-              Row(
-                children: [
-                  Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
-                  SizedBox(width: 4),
-                  Text(
-                    'Creado: ${dateFormat.format(response.createdAt)}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-
-              if (response.completedAt != null) ...[
-                SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.check_circle, size: 14, color: AppColors.success),
-                    SizedBox(width: 4),
-                    Text(
-                      'Completado: ${dateFormat.format(response.completedAt!)}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-
-              if (response.syncedAt != null) ...[
-                SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.cloud_done, size: 14, color: AppColors.success),
-                    SizedBox(width: 4),
-                    Text(
-                      'Sincronizado: ${dateFormat.format(response.syncedAt!)}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.success,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-
-              SizedBox(height: 8),
-
-              Row(
-                children: [
-                  Icon(Icons.assignment, size: 14, color: AppColors.textSecondary),
-                  SizedBox(width: 4),
-                  Text(
-                    '${response.answers.length} respuestas',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  Spacer(),
-                  // Estado de sincronización en texto
-                  if (!isSynced) ...[
-                    Icon(Icons.cloud_upload, size: 14, color: AppColors.warning),
-                    SizedBox(width: 4),
-                    Text(
-                      'Sin sincronizar',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.warning,
-                      ),
-                    ),
-                  ] else ...[
-                    Icon(Icons.cloud_done, size: 14, color: AppColors.success),
-                    SizedBox(width: 4),
-                    Text(
-                      'Sincronizado',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.success,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-
-              // Mensaje de error si existe
-              if (response.errorMessage != null && !isSynced) ...[
-                SizedBox(height: 8),
-                Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.error_outline, size: 12, color: AppColors.error),
-                      SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          response.errorMessage!,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: AppColors.error,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              _buildCardDetails(response, isSynced),
             ],
           ),
         ),
@@ -407,41 +245,191 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     );
   }
 
-  Widget _buildStatusBadge(String status) {
-    String label;
-    Color color;
+  Widget _buildCardHeader(
+      DynamicFormResponse response,
+      dynamic template,
+      bool isSynced,
+      ) {
+    return Row(
+      children: [
+        // Icono del estado del formulario
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: _getStatusColor(response.status).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            _getStatusIcon(response.status),
+            color: _getStatusColor(response.status),
+            size: 20,
+          ),
+        ),
+        SizedBox(width: 12),
+        // Título y badge
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                template?.title ?? 'Formulario #${response.formTemplateId}',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              SizedBox(height: 4),
+              _buildStatusBadge(response.status),
+            ],
+          ),
+        ),
+        // Ícono de sincronización
+        Container(
+          padding: EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: (isSynced ? AppColors.success : AppColors.warning)
+                .withOpacity(0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(
+            isSynced ? Icons.cloud_done : Icons.cloud_upload,
+            color: isSynced ? AppColors.success : AppColors.warning,
+            size: 18,
+          ),
+        ),
+        SizedBox(width: 8),
+        Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: AppColors.textSecondary,
+        ),
+      ],
+    );
+  }
 
-    switch (status) {
-      case 'completed':
-        label = 'COMPLETADO';
-        color = AppColors.success;
-        break;
-      case 'draft':
-        label = 'BORRADOR';
-        color = AppColors.warning;
-        break;
-      default:
-        label = status.toUpperCase();
-        color = AppColors.textSecondary;
-    }
+  Widget _buildCardDetails(DynamicFormResponse response, bool isSynced) {
+    return Column(
+      children: [
+        _buildInfoRow(
+          Icons.calendar_today,
+          'Creado: ${_dateFormat.format(response.createdAt)}',
+          AppColors.textSecondary,
+        ),
+        if (response.completedAt != null) ...[
+          SizedBox(height: 4),
+          _buildInfoRow(
+            Icons.check_circle,
+            'Completado: ${_dateFormat.format(response.completedAt!)}',
+            AppColors.success,
+          ),
+        ],
+        if (response.syncedAt != null) ...[
+          SizedBox(height: 4),
+          _buildInfoRow(
+            Icons.cloud_done,
+            'Sincronizado: ${_dateFormat.format(response.syncedAt!)}',
+            AppColors.success,
+          ),
+        ],
+        SizedBox(height: 8),
+        Row(
+          children: [
+            Icon(Icons.assignment, size: 14, color: AppColors.textSecondary),
+            SizedBox(width: 4),
+            Text(
+              '${response.answers.length} respuestas',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            Spacer(),
+            Icon(
+              isSynced ? Icons.cloud_done : Icons.cloud_upload,
+              size: 14,
+              color: isSynced ? AppColors.success : AppColors.warning,
+            ),
+            SizedBox(width: 4),
+            Text(
+              isSynced ? 'Sincronizado' : 'Sin sincronizar',
+              style: TextStyle(
+                fontSize: 11,
+                color: isSynced ? AppColors.success : AppColors.warning,
+              ),
+            ),
+          ],
+        ),
+        if (response.errorMessage != null && !isSynced)
+          _buildErrorMessage(response.errorMessage!),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text, Color color) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color),
+        SizedBox(width: 4),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 11,
+            color: color == AppColors.success ? color : AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildErrorMessage(String message) {
+    return Container(
+      margin: EdgeInsets.only(top: 8),
+      padding: EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.error.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, size: 12, color: AppColors.error),
+          SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(fontSize: 10, color: AppColors.error),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String status) {
+    final config = _getStatusConfig(status);
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: config['color'].withOpacity(0.1),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color, width: 1),
+        border: Border.all(color: config['color'], width: 1),
       ),
       child: Text(
-        label,
+        config['label'],
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.bold,
-          color: color,
+          color: config['color'],
         ),
       ),
     );
   }
+
+  // ==================== EMPTY & ERROR VIEWS ====================
 
   Widget _buildEmptyView() {
     return Center(
@@ -536,6 +524,8 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     );
   }
 
+  // ==================== HELPER METHODS ====================
+
   String _getEmptyMessage() {
     switch (_filterStatus) {
       case 'completed':
@@ -549,17 +539,19 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     }
   }
 
-
-
-  Color _getStatusColor(String status) {
+  Map<String, dynamic> _getStatusConfig(String status) {
     switch (status) {
       case 'completed':
-        return AppColors.success;
+        return {'label': 'COMPLETADO', 'color': AppColors.success};
       case 'draft':
-        return AppColors.warning;
+        return {'label': 'BORRADOR', 'color': AppColors.warning};
       default:
-        return AppColors.neutral400;
+        return {'label': status.toUpperCase(), 'color': AppColors.textSecondary};
     }
+  }
+
+  Color _getStatusColor(String status) {
+    return _getStatusConfig(status)['color'];
   }
 
   IconData _getStatusIcon(String status) {
@@ -573,6 +565,8 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     }
   }
 
+  // ==================== NAVIGATION ====================
+
   void _navigateToFormList() {
     Navigator.push(
       context,
@@ -582,49 +576,157 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
           viewModel: _viewModel,
         ),
       ),
-    ).then((_) {
-      _loadData();
-    });
+    ).then((_) => _loadData());
   }
 
   void _viewResponse(DynamicFormResponse response) {
     _viewModel.loadResponseForEditing(response);
-
-    // Si el formulario está completado, abrirlo en modo solo lectura
-    final isReadOnly = response.status == 'completed';
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => DynamicFormFillScreen(
           viewModel: _viewModel,
-          isReadOnly: isReadOnly,
+          isReadOnly: response.status == 'completed',
         ),
       ),
-    ).then((_) {
-      _loadData();
-    });
+    ).then((_) => _loadData());
   }
 
-  Future<void> _syncResponses() async {
-    final result = await _viewModel.syncPendingResponses();
+  // ==================== DOWNLOAD ====================
+
+  Future<void> _downloadTemplates() async {
+    print('🔴 DESCARGA INICIADA');
+
+    // ✅ Obtener usuario actual (igual que cuando creas formularios)
+    final usuario = await AuthService().getCurrentUser();
+    final edfvendedorId = usuario?.edfVendedorId ?? '';
+
+    print('🔍 edfVendedorId: $edfvendedorId');
+
+    _showLoadingDialog();
+
+    // PASO 1: Descargar templates
+    print('📥 [1/2] Descargando templates...');
+    final templatesSuccess = await _viewModel.downloadTemplatesFromServer();
+    print('📋 Templates: $templatesSuccess');
+
+    // PASO 2: Descargar respuestas
+    print('📥 [2/2] Descargando respuestas...');
+    bool responsesSuccess = false;
+
+    if (edfvendedorId.isNotEmpty) {
+      responsesSuccess = await _viewModel.downloadResponsesFromServer(edfvendedorId);
+      print('📝 Responses: $responsesSuccess');
+    } else {
+      print('⚠️ Sin edfVendedorId - saltando descarga de respuestas');
+    }
 
     if (!mounted) return;
+    Navigator.pop(context);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '✅ ${result['success']} sincronizadas, ${result['failed']} fallidas',
-        ),
-        backgroundColor: result['failed'] == 0 ? AppColors.success : AppColors.warning,
-      ),
-    );
+    // Mostrar resultado
+    final templatesCount = _viewModel.templates.length;
+    final responsesCount = _viewModel.savedResponses.length;
 
-    await _loadData();
+    String message;
+    Color backgroundColor;
+
+    if (edfvendedorId.isEmpty) {
+      message = templatesSuccess
+          ? '✅ Formularios: $templatesCount\n⚠️ Respuestas no descargadas (sin vendedor)'
+          : '❌ Error descargando formularios';
+      backgroundColor = templatesSuccess ? AppColors.warning : AppColors.error;
+    } else if (templatesSuccess && responsesSuccess) {
+      message = '✅ Descarga completa:\n📋 $templatesCount formularios\n📝 $responsesCount respuestas';
+      backgroundColor = AppColors.success;
+    } else if (templatesSuccess && !responsesSuccess) {
+      message = '⚠️ Formularios: OK ($templatesCount)\n❌ Respuestas: Error';
+      backgroundColor = AppColors.warning;
+    } else if (!templatesSuccess && responsesSuccess) {
+      message = '❌ Formularios: Error\n⚠️ Respuestas: OK ($responsesCount)';
+      backgroundColor = AppColors.warning;
+    } else {
+      message = '❌ Error en la descarga';
+      backgroundColor = AppColors.error;
+    }
+
+    _showSnackBar(message, backgroundColor);
+
+    if (templatesSuccess || responsesSuccess) {
+      print('🔄 Recargando datos...');
+      await _loadData();
+    }
+
+    print('🔴 DESCARGA FINALIZADA');
   }
 
+  void _showLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PopScope(
+        canPop: false,
+        child: Center(
+          child: Container(
+            padding: EdgeInsets.all(24),
+            margin: EdgeInsets.symmetric(horizontal: 40),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: AppColors.primary),
+                SizedBox(height: 16),
+                Text(
+                  'Descargando formularios...',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSnackBar(String message, Color backgroundColor) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
+
+  // ==================== DELETE ====================
+
   Future<void> _deleteResponse(DynamicFormResponse response) async {
-    final confirm = await showDialog<bool>(
+    final confirm = await _showDeleteConfirmation();
+
+    if (confirm == true) {
+      final success = await _viewModel.deleteResponse(response.id);
+
+      if (!mounted) return;
+
+      _showSnackBar(
+        success ? '✅ Respuesta eliminada' : '❌ Error al eliminar',
+        success ? AppColors.success : AppColors.error,
+      );
+
+      if (success) await _loadData();
+    }
+  }
+
+  Future<bool?> _showDeleteConfirmation() {
+    return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.surface,
@@ -647,7 +749,10 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -660,107 +765,5 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
         ],
       ),
     );
-
-    if (confirm == true) {
-      final success = await _viewModel.deleteResponse(response.id);
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(success ? '✅ Respuesta eliminada' : '❌ Error al eliminar'),
-          backgroundColor: success ? AppColors.success : AppColors.error,
-        ),
-      );
-
-      if (success) {
-        await _loadData();
-      }
-    }
   }
-  Future<void> _downloadTemplates() async {
-    // Mostrar diálogo de carga
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => WillPopScope(
-        onWillPop: () async => false,
-        child: Center(
-          child: Container(
-            padding: EdgeInsets.all(24),
-            margin: EdgeInsets.symmetric(horizontal: 40),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: AppColors.primary),
-                SizedBox(height: 16),
-                Text(
-                  'Descargando formularios...',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    // Ejecutar descarga
-    final success = await _viewModel.downloadTemplatesFromServer();
-
-    if (!mounted) return;
-    Navigator.pop(context); // Cerrar diálogo de carga
-
-    // Mostrar resultado
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              success ? Icons.check_circle : Icons.error,
-              color: Colors.white,
-            ),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                success
-                    ? '✅ Formularios descargados: ${_viewModel.templates.length} disponibles'
-                    : '❌ ${_viewModel.errorMessage ?? "Error al descargar"}',
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: success ? AppColors.success : AppColors.error,
-        duration: Duration(seconds: 3),
-      ),
-    );
-
-    if (success) {
-      await _loadData(); // Recargar la pantalla
-    }
-  }
-  // ==================== MÉTODOS PARA SYNC STATUS ====================
-
-  Color _getSyncStatusColor(String syncStatus) {
-    if (syncStatus == 'synced') {
-      return AppColors.success;
-    }
-    return AppColors.warning; // Por defecto es pending
-  }
-
-  IconData _getSyncStatusIcon(String syncStatus) {
-    if (syncStatus == 'synced') {
-      return Icons.cloud_done;
-    }
-    return Icons.cloud_upload; // Por defecto es pending
-  }
-
-
 }

@@ -12,7 +12,6 @@ class DynamicFormResponse {
   final String? userId;
   final String? contactoId;
   final String? edfVendedorId;
-  final String? equipoId;
   final String? errorMessage;
 
   DynamicFormResponse({
@@ -26,7 +25,6 @@ class DynamicFormResponse {
     this.userId,
     this.contactoId,
     this.edfVendedorId,
-    this.equipoId,
     this.errorMessage,
   });
 
@@ -47,7 +45,6 @@ class DynamicFormResponse {
       userId: json['userId'] as String?,
       contactoId: json['contactoId'] as String?,
       edfVendedorId: json['edfVendedorId'] as String?,
-      equipoId: json['equipoId'] as String?,
       errorMessage: json['errorMessage'] as String?,
     );
   }
@@ -65,7 +62,6 @@ class DynamicFormResponse {
       if (userId != null) 'userId': userId,
       if (contactoId != null) 'contactoId': contactoId,
       if (edfVendedorId != null) 'edfVendedorId': edfVendedorId,
-      if (equipoId != null) 'equipoId': equipoId,
       if (errorMessage != null) 'errorMessage': errorMessage,
     };
   }
@@ -95,7 +91,6 @@ class DynamicFormResponse {
       userId: map['usuario_id']?.toString(),
       contactoId: map['contacto_id'] as String?,
       edfVendedorId: map['edf_vendedor_id'] as String?,
-      equipoId: null,
       errorMessage: null,
     );
   }
@@ -178,7 +173,6 @@ class DynamicFormResponse {
       userId: userId ?? this.userId,
       contactoId: contactoId ?? this.contactoId,
       edfVendedorId: edfVendedorId ?? this.edfVendedorId,
-      equipoId: equipoId ?? this.equipoId,
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }

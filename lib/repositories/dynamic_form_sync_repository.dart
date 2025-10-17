@@ -151,8 +151,7 @@ class DynamicFormSyncRepository {
     }
   }
 
-  /// Sincronización REAL al servidor
-  /// Sincronización REAL al servidor
+
   Future<bool> syncToServer(String responseId) async {
     try {
       _logger.i('📤 Enviando formulario al servidor: $responseId');
@@ -177,7 +176,6 @@ class DynamicFormSyncRepository {
         'contactoId': formResponse.contactoId,
         'edfvendedorId': formResponse.edfVendedorId,
         'usuarioId': formResponse.userId != null ? int.tryParse(formResponse.userId!) : null,
-        'equipoId': formResponse.equipoId,
         'estado': formResponse.status,
         'creationDate': formResponse.createdAt.toIso8601String(),
         'completedDate': formResponse.completedAt?.toIso8601String(), // ✅ Siempre incluir, aunque sea null
@@ -200,6 +198,22 @@ class DynamicFormSyncRepository {
       };
 
       _logger.d('📦 Payload construido: ${details.length} detalles, ${images.length} imágenes');
+
+      // 🔍 LOG DEL PAYLOAD (sin imágenes completas para no saturar logs)
+      final payloadParaLog = {
+        ...payload,
+        'imagenes': images.map((img) => {
+          'id': img.id,
+          'dynamicFormResponseDetailId': img.dynamicFormResponseDetailId,
+          'imagenBase64': img.imagenBase64 != null ? '${img.imagenBase64!.substring(0, img.imagenBase64!.length > 50 ? 50 : img.imagenBase64!.length)}...' : null,
+          'imagenTamano': img.imagenTamano,
+          'mimeType': img.mimeType,
+          'orden': img.orden,
+          'createdAt': img.createdAt,
+        }).toList(),
+      };
+
+      _logger.d('🔍 JSON a enviar (resumido): ${jsonEncode(payloadParaLog)}');
 
       // Obtener la URL dinámica
       final baseUrl = await BaseSyncService.getBaseUrl();

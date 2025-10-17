@@ -174,15 +174,13 @@ class DynamicFormResponseRepository {
     }
   }
 
-  /// Eliminar respuesta y sus detalles (las imágenes se eliminan automáticamente por CASCADE)
+  /// Eliminar respuesta y sus detalles
   Future<bool> delete(String responseId) async {
     try {
-      // 🎯 PASO 1: Obtener todas las imágenes ANTES de eliminar de la BD
       final images = await getImagesForResponse(responseId);
 
       _logger.i('🗑️ Eliminando respuesta $responseId con ${images.length} imágenes');
 
-      // 🎯 PASO 2: Eliminar archivos físicos de imágenes
       for (var image in images) {
         if (image.imagenPath != null && image.imagenPath!.isNotEmpty) {
           try {
@@ -197,7 +195,6 @@ class DynamicFormResponseRepository {
         }
       }
 
-      // 🎯 PASO 3: Eliminar imágenes de la tabla
       for (var image in images) {
         await _dbHelper.eliminar(
           _responseImageTableName,
@@ -207,14 +204,12 @@ class DynamicFormResponseRepository {
       }
       _logger.d('  🗑️ ${images.length} registros de imágenes eliminados de la BD');
 
-      // 🎯 PASO 4: Eliminar los detalles
       await _dbHelper.eliminar(
         _responseDetailTableName,
         where: 'dynamic_form_response_id = ?',
         whereArgs: [responseId],
       );
 
-      // 🎯 PASO 5: Eliminar la respuesta
       await _dbHelper.eliminar(
         _responseTableName,
         where: 'id = ?',
@@ -296,10 +291,9 @@ class DynamicFormResponseRepository {
 
   // ==================== MÉTODOS PARA DETALLES DE RESPUESTAS ====================
 
-  /// Guardar detalles de una respuesta (SIN imágenes - ahora van en tabla separada)
+  /// Guardar detalles de una respuesta
   Future<void> _saveResponseDetails(DynamicFormResponse response) async {
     try {
-      // Primero eliminar detalles existentes
       await _dbHelper.eliminar(
         _responseDetailTableName,
         where: 'dynamic_form_response_id = ?',
@@ -308,17 +302,14 @@ class DynamicFormResponseRepository {
 
       _logger.d('📝 Guardando ${response.answers.length} respuestas detalle');
 
-      // Insertar nuevos detalles
       for (var entry in response.answers.entries) {
         if (entry.key.isEmpty) {
           _logger.w('⚠️ Campo con ID vacío, omitiendo');
           continue;
         }
 
-        // Generar UUID para el detalle
         final detailId = _uuid.v4();
 
-        // Detectar si es imagen para guardarla en la tabla separada
         if (entry.value is String && _isImagePath(entry.value as String)) {
           await _saveImageForDetail(
             detailId: detailId,
@@ -328,11 +319,10 @@ class DynamicFormResponseRepository {
             isCompleted: response.status == 'completed',
           );
 
-          // Guardar el detalle con response especial indicando que tiene imagen
           final detailData = {
             'id': detailId,
             'version': 1,
-            'response': '[IMAGE]', // Marcador
+            'response': '[IMAGE]',
             'dynamic_form_response_id': response.id,
             'dynamic_form_detail_id': entry.key,
             'sync_status': 'pending',
@@ -343,7 +333,6 @@ class DynamicFormResponseRepository {
           continue;
         }
 
-        // Guardar el detalle normal (campos que NO son imágenes)
         final detailData = {
           'id': detailId,
           'version': 1,
@@ -391,13 +380,11 @@ class DynamicFormResponseRepository {
     int orden = 1,
   }) async {
     try {
-      // Generar UUID para la imagen
       final imageId = _uuid.v4();
 
       String? imagenBase64;
       int? imagenTamano;
 
-      // Solo convertir a Base64 si está completado
       if (isCompleted) {
         try {
           final file = File(imagePath);
@@ -471,6 +458,138 @@ class DynamicFormResponseRepository {
     }
   }
 
+  // ==================== MÉTODOS PARA SINCRONIZACIÓN CON SERVIDOR ====================
+
+  /// Guardar respuestas descargadas del servidor
+  Future<int> saveResponsesFromServer(List<Map<String, dynamic>> responses) async {
+    int count = 0;
+
+    for (var responseData in responses) {
+      try {
+        _logger.d('📦 Procesando response del servidor: ${responseData['id']}');
+
+        // 🎯 MAPEAR RESPUESTA PRINCIPAL
+        final responseId = responseData['id'].toString(); // Convertir a string
+        final formTemplateId = responseData['dynamicFormId'].toString();
+        final contactoId = responseData['contactoId']?.toString();
+        final edfVendedorId = responseData['edfVendedorId']?.toString();
+        final usuarioId = responseData['usuarioId']?.toString();
+        final estado = responseData['estado'] as String? ?? 'completed';
+        final creationDate = responseData['creationDate'] as String;
+        final completedDate = responseData['completedDate'] as String?;
+
+        // Guardar en tabla dynamic_form_response
+        final responseMap = {
+          'id': responseId,
+          'version': 1,
+          'contacto_id': contactoId ?? '',
+          'edf_vendedor_id': edfVendedorId, // No viene del servidor
+          'last_update_user_id': null,
+          'dynamic_form_id': formTemplateId,
+          'usuario_id': usuarioId != null ? int.tryParse(usuarioId) : null,
+          'estado': estado,
+          'sync_status': 'synced', // ✅ Ya está sincronizado desde el servidor
+          'intentos_sync': 0,
+          'creation_date': creationDate,
+          'last_update_date': completedDate ?? creationDate,
+          'fecha_sincronizado': DateTime.now().toIso8601String(),
+        };
+
+        // Verificar si existe
+        final existing = await _dbHelper.consultar(
+          _responseTableName,
+          where: 'id = ?',
+          whereArgs: [responseId],
+          limit: 1,
+        );
+
+        if (existing.isNotEmpty) {
+          await _dbHelper.actualizar(
+            _responseTableName,
+            responseMap,
+            where: 'id = ?',
+            whereArgs: [responseId],
+          );
+          _logger.d('  🔄 Response actualizado');
+        } else {
+          await _dbHelper.insertar(_responseTableName, responseMap);
+          _logger.d('  ➕ Response insertado');
+        }
+
+        // 🎯 GUARDAR DETALLES
+        final details = responseData['details'] as List<dynamic>? ?? [];
+
+        if (details.isNotEmpty) {
+          _logger.d('  📝 Guardando ${details.length} detalles');
+
+          // Eliminar detalles existentes para este response
+          await _dbHelper.eliminar(
+            _responseDetailTableName,
+            where: 'dynamic_form_response_id = ?',
+            whereArgs: [responseId],
+          );
+
+          // Insertar nuevos detalles
+          for (var detail in details) {
+            final detailId = detail['id'].toString(); // Convertir a string
+            final dynamicFormDetailId = detail['dynamicFormDetailId'].toString();
+            final response = detail['response']?.toString() ?? '';
+
+            final detailMap = {
+              'id': detailId,
+              'version': 1,
+              'response': response,
+              'dynamic_form_response_id': responseId,
+              'dynamic_form_detail_id': dynamicFormDetailId,
+              'sync_status': 'synced',
+            };
+
+            await _dbHelper.insertar(_responseDetailTableName, detailMap);
+            _logger.d('    ✓ Detalle guardado: $dynamicFormDetailId = $response');
+          }
+        }
+
+        count++;
+        _logger.i('✅ Response guardado: $responseId con ${details.length} detalles');
+
+      } catch (e, stackTrace) {
+        _logger.e('❌ Error guardando response desde servidor: $e');
+        _logger.e('Stack trace: $stackTrace');
+      }
+    }
+
+    _logger.i('💾 Total de responses guardados desde servidor: $count');
+    return count;
+  }
+
+  /// Guardar detalles de respuestas descargados del servidor
+  Future<int> saveResponseDetailsFromServer(List<Map<String, dynamic>> details) async {
+    int count = 0;
+
+    for (var detailData in details) {
+      try {
+        // Construir datos para insertar en la tabla local
+        final detailForDB = {
+          'id': detailData['id']?.toString() ?? _uuid.v4(),
+          'version': 1,
+          'response': detailData['response']?.toString() ?? '',
+          'dynamic_form_response_id': detailData['dynamicFormResponseId']?.toString() ?? '',
+          'dynamic_form_detail_id': detailData['dynamicFormDetailId']?.toString() ?? '',
+          'sync_status': 'synced', // Viene del servidor, ya está sincronizado
+        };
+
+        await _dbHelper.insertar(_responseDetailTableName, detailForDB);
+        count++;
+
+      } catch (e) {
+        _logger.e('❌ Error guardando detalle desde servidor: $e');
+      }
+    }
+
+    _logger.i('✅ Total detalles guardados: $count');
+    return count;
+  }
+
   // ==================== MÉTODOS PRIVADOS ====================
 
   /// Mapear datos de BD a DynamicFormResponse con sus detalles
@@ -481,34 +600,29 @@ class DynamicFormResponseRepository {
         return null;
       }
 
-      // Obtener los detalles de respuestas
       final detalles = await _dbHelper.consultar(
         _responseDetailTableName,
         where: 'dynamic_form_response_id = ?',
         whereArgs: [map['id']],
       );
 
-      // Construir el Map de answers
       Map<String, dynamic> answers = {};
       for (var detalle in detalles) {
         final fieldId = detalle['dynamic_form_detail_id']?.toString();
         if (fieldId != null && fieldId.isNotEmpty) {
           final response = detalle['response']?.toString();
 
-          // Si el response es [IMAGE], buscar en la tabla de imágenes
           if (response == '[IMAGE]') {
             final imagenes = await getImagesForDetail(detalle['id']);
             if (imagenes.isNotEmpty) {
               answers[fieldId] = imagenes.first.imagenPath ?? '';
             }
           } else {
-            // Respuesta normal (texto, número, etc.)
             answers[fieldId] = response ?? '';
           }
         }
       }
 
-      // Parsear fechas
       DateTime? parseDateTime(dynamic value) {
         if (value == null) return null;
         try {
@@ -533,7 +647,6 @@ class DynamicFormResponseRepository {
         userId: map['usuario_id']?.toString(),
         contactoId: map['contacto_id']?.toString(),
         edfVendedorId: map['edf_vendedor_id']?.toString(),
-        equipoId: null,
         errorMessage: map['mensaje_error_sync']?.toString(),
       );
     } catch (e, stackTrace) {
@@ -541,36 +654,6 @@ class DynamicFormResponseRepository {
       _logger.e('Stack trace: $stackTrace');
       return null;
     }
-  }
-
-  /// Guardar respuestas descargadas del servidor
-  Future<int> saveResponsesFromServer(List<Map<String, dynamic>> responses) async {
-    int count = 0;
-    for (var responseData in responses) {
-      try {
-        final response = DynamicFormResponse.fromJson(responseData);
-        final saved = await save(response);
-        if (saved) count++;
-      } catch (e) {
-        _logger.e('❌ Error guardando response desde servidor: $e');
-      }
-    }
-    return count;
-  }
-
-  /// Guardar detalles de respuestas descargados del servidor
-  Future<int> saveResponseDetailsFromServer(List<Map<String, dynamic>> details) async {
-    int count = 0;
-    for (var detailData in details) {
-      try {
-        // Insertar directamente en la tabla de detalles
-        await _dbHelper.insertar(_responseDetailTableName, detailData);
-        count++;
-      } catch (e) {
-        _logger.e('❌ Error guardando detalle desde servidor: $e');
-      }
-    }
-    return count;
   }
 
   /// Verificar si un string es una ruta de imagen
@@ -593,6 +676,6 @@ class DynamicFormResponseRepository {
     if (lowerPath.endsWith('.png')) return 'image/png';
     if (lowerPath.endsWith('.gif')) return 'image/gif';
     if (lowerPath.endsWith('.webp')) return 'image/webp';
-    return 'image/jpeg'; // default
+    return 'image/jpeg';
   }
 }

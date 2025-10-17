@@ -19,6 +19,7 @@ class DynamicFormFillScreen extends StatefulWidget {
 
 class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
   final _scrollController = ScrollController();
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -30,14 +31,71 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
+        // 🔒 Bloquear el botón de atrás si está guardando
+        if (_isSaving) return false;
         if (widget.isReadOnly) return true;
         return await _showExitConfirmation();
       },
-      child: Scaffold(
-        appBar: _buildAppBar(),
-        body: ListenableBuilder(
-          listenable: widget.viewModel,
-          builder: (context, child) => _buildBody(),
+      child: Stack(
+        children: [
+          Scaffold(
+            appBar: _buildAppBar(),
+            body: ListenableBuilder(
+              listenable: widget.viewModel,
+              builder: (context, child) => _buildBody(),
+            ),
+          ),
+          // 🔒 OVERLAY DE BLOQUEO (mismo diseño que el otro)
+          if (_isSaving) _buildSavingOverlay(),
+        ],
+      ),
+    );
+  }
+
+  // 🔒 OVERLAY DE BLOQUEO CON EL MISMO DISEÑO
+  Widget _buildSavingOverlay() {
+    return Container(
+      color: Colors.black54,
+      child: Center(
+        child: Card(
+          color: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 4,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Guardando Formulario',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Por favor espera...',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -51,6 +109,17 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
       ),
       backgroundColor: AppColors.appBarBackground,
       foregroundColor: AppColors.appBarForeground,
+      // 🔒 Mostrar spinner en lugar del botón de atrás si está guardando
+      automaticallyImplyLeading: !_isSaving,
+      leading: _isSaving
+          ? Container(
+        margin: const EdgeInsets.all(12),
+        child: CircularProgressIndicator(
+          color: AppColors.onPrimary,
+          strokeWidth: 2,
+        ),
+      )
+          : null,
     );
   }
 
@@ -161,6 +230,8 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
       ),
       child: SingleChildScrollView(
         controller: _scrollController,
+        // 🔒 Deshabilitar scroll si está guardando
+        physics: _isSaving ? NeverScrollableScrollPhysics() : null,
         padding: EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -170,13 +241,13 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
                 key: ValueKey('${field.id}_${currentAnswers[field.id]}'),
                 field: field,
                 value: widget.viewModel.getFieldValue(field.id),
-                onChanged: widget.isReadOnly
+                onChanged: widget.isReadOnly || _isSaving
                     ? (_) {}
                     : (value) => widget.viewModel.updateFieldValue(field.id, value),
                 errorText: widget.viewModel.getFieldError(field.id),
                 allValues: currentAnswers,
-                isReadOnly: widget.isReadOnly,
-                onNestedFieldChanged: widget.isReadOnly
+                isReadOnly: widget.isReadOnly || _isSaving,
+                onNestedFieldChanged: widget.isReadOnly || _isSaving
                     ? (_, __) {}
                     : (fieldId, value) => widget.viewModel.updateFieldValue(fieldId, value),
               );
@@ -206,7 +277,8 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: _completeForm,
+            // 🔒 Deshabilitar botón mientras guarda
+            onPressed: _isSaving ? null : _completeForm,
             icon: Icon(Icons.check_circle),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.success,
@@ -215,8 +287,11 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
+              // 🔒 Estilo deshabilitado
+              disabledBackgroundColor: AppColors.success.withOpacity(0.5),
+              disabledForegroundColor: Colors.white.withOpacity(0.7),
             ),
-            label: Text('Confirmar formulario'),
+            label: Text(_isSaving ? 'Guardando...' : 'Confirmar formulario'),
           ),
         ),
       ),
@@ -268,23 +343,37 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
 
     if (confirm != true) return;
 
-    final success = await widget.viewModel.saveAndComplete();
+    // 🔒 ACTIVAR BLOQUEO
+    setState(() {
+      _isSaving = true;
+    });
 
-    if (!mounted) return;
+    try {
+      final success = await widget.viewModel.saveAndComplete();
 
-    if (success) {
-      _showSnackBar(
-        message: '✅ Formulario completado exitosamente',
-        backgroundColor: AppColors.success,
-      );
-      Navigator.pop(context);
-    } else {
-      final errorMessage = widget.viewModel.errorMessage ?? 'Error al completar formulario';
-      _showSnackBar(
-        message: '❌ $errorMessage',
-        backgroundColor: AppColors.error,
-        duration: Duration(seconds: 3),
-      );
+      if (!mounted) return;
+
+      if (success) {
+        _showSnackBar(
+          message: '✅ Formulario completado exitosamente',
+          backgroundColor: AppColors.success,
+        );
+        Navigator.pop(context);
+      } else {
+        final errorMessage = widget.viewModel.errorMessage ?? 'Error al completar formulario';
+        _showSnackBar(
+          message: '❌ $errorMessage',
+          backgroundColor: AppColors.error,
+          duration: Duration(seconds: 3),
+        );
+      }
+    } finally {
+      // 🔒 DESACTIVAR BLOQUEO
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
 
@@ -365,6 +454,7 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),

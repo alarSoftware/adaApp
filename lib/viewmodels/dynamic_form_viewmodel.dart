@@ -126,7 +126,6 @@ class DynamicFormViewModel extends ChangeNotifier {
           createdAt: DateTime.now(),
           status: 'draft',
           contactoId: contactoId,
-          equipoId: equipoId,
           userId: userId,
           edfVendedorId: edfVendedorId,
         );
@@ -575,6 +574,35 @@ class DynamicFormViewModel extends ChangeNotifier {
       _errorMessage = 'Error eliminando respuesta: $e';
       _logger.e('❌ Error eliminando respuesta: $e');
       return false;
+    }
+  }
+
+  Future<bool> downloadResponsesFromServer(String edfvendedorId) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      _logger.i('📥 Descargando respuestas desde servidor...');
+
+      final resultado = await DynamicFormSyncService.obtenerRespuestasPorVendedor(edfvendedorId);
+
+      if (resultado.exito) {
+        await loadSavedResponsesWithSync();
+        _logger.i('✅ Respuestas descargadas: ${resultado.itemsSincronizados}');
+        return true;
+      } else {
+        _errorMessage = 'Error descargando respuestas del servidor';
+        _logger.e('❌ Error descargando respuestas');
+        return false;
+      }
+    } catch (e) {
+      _errorMessage = 'Error de conexión: $e';
+      _logger.e('❌ Error descargando respuestas: $e');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
