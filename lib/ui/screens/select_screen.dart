@@ -43,6 +43,10 @@ class _SelectScreenState extends State<SelectScreen> {
         _mostrarExito(event.message);
       } else if (event is RequestSyncConfirmationEvent) {
         _handleSyncConfirmation();
+      } else if (event is RequiredSyncEvent) {
+        _handleRequiredSync(event);
+      } else if (event is RedirectToLoginEvent) {
+        _redirectToLogin();
       } else if (event is RequestDeleteConfirmationEvent) {
         _handleDeleteConfirmation();
       } else if (event is SyncCompletedEvent) {
@@ -600,6 +604,69 @@ class _SelectScreenState extends State<SelectScreen> {
           ),
         ],
       ),
+    );
+  }
+  Future<void> _handleRequiredSync(RequiredSyncEvent event) async {
+    await _mostrarDialogoSincronizacionObligatoria(event);
+  }
+
+  void _redirectToLogin() {
+    Navigator.pushReplacementNamed(context, '/login');
+  }
+
+  Future<void> _mostrarDialogoSincronizacionObligatoria(RequiredSyncEvent event) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: Row(
+            children: [
+              Icon(Icons.sync_problem, color: AppColors.warning),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                    'Sincronización Requerida',
+                    style: TextStyle(color: AppColors.textPrimary)
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  event.validationResult.razon,
+                  style: TextStyle(color: AppColors.textPrimary),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _viewModel.cancelAndLogout();
+              },
+              child: Text('Login', style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _viewModel.executeMandatorySync();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.warning,
+                foregroundColor: AppColors.onPrimary,
+              ),
+              child: Text('Sincronizar'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -9,12 +9,31 @@ import 'package:ada_app/models/usuario.dart';
 
 var logger = Logger();
 
+// Clase para el resultado de validación de sincronización
+class SyncValidationResult {
+  final bool requiereSincronizacion;
+  final String razon;
+  final String? vendedorAnterior;
+  final String vendedorActual;
+
+  SyncValidationResult({
+    required this.requiereSincronizacion,
+    required this.razon,
+    required this.vendedorAnterior,
+    required this.vendedorActual,
+  });
+
+  @override
+  String toString() => 'SyncValidationResult(requiere: $requiereSincronizacion, razon: $razon, anterior: $vendedorAnterior, actual: $vendedorActual)';
+}
+
 class AuthService {
   // Keys para SharedPreferences
   static const String _keyHasLoggedIn = 'has_logged_in_before';
   static const String _keyCurrentUser = 'current_user';
   static const String _keyCurrentUserRole = 'current_user_role';
   static const String _keyLastLoginDate = 'last_login_date';
+  static const String _keyLastSyncedVendedor = 'last_synced_vendedor_id'; // NUEVA KEY
 
   // Singleton
   static AuthService? _instance;
@@ -23,7 +42,90 @@ class AuthService {
 
   static final _dbHelper = DatabaseHelper();
 
-// Método para sincronizar usuarios desde la nueva API
+  // NUEVOS MÉTODOS PARA VALIDACIÓN DE VENDEDOR
+
+  // Método para verificar si se necesita sincronización forzada
+  Future<SyncValidationResult> validateSyncRequirement(String currentEdfVendedorId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastSyncedVendedor = prefs.getString(_keyLastSyncedVendedor);
+
+      logger.i('Validando sincronización: Usuario actual edf_vendedor_id: $currentEdfVendedorId');
+      logger.i('Último vendedor sincronizado: $lastSyncedVendedor');
+
+      // Si es la primera vez o no hay vendedor previo
+      if (lastSyncedVendedor == null) {
+        logger.i('Primera sincronización - se requiere sincronizar');
+        return SyncValidationResult(
+          requiereSincronizacion: true,
+          razon: 'Primera sincronización requerida',
+          vendedorAnterior: null,
+          vendedorActual: currentEdfVendedorId,
+        );
+      }
+
+      // Si el vendedor es diferente al último sincronizado
+      if (lastSyncedVendedor != currentEdfVendedorId) {
+        logger.w('Vendedor diferente detectado - sincronización obligatoria');
+        return SyncValidationResult(
+          requiereSincronizacion: true,
+          razon: 'Cambio de vendedor detectado',
+          vendedorAnterior: lastSyncedVendedor,
+          vendedorActual: currentEdfVendedorId,
+        );
+      }
+
+      // Vendedor es el mismo, no requiere sincronización forzada
+      logger.i('Mismo vendedor - no requiere sincronización forzada');
+      return SyncValidationResult(
+        requiereSincronizacion: false,
+        razon: 'Mismo vendedor que la sincronización anterior',
+        vendedorAnterior: lastSyncedVendedor,
+        vendedorActual: currentEdfVendedorId,
+      );
+
+    } catch (e) {
+      logger.e('Error validando requerimiento de sincronización: $e');
+      // En caso de error, mejor requerir sincronización por seguridad
+      return SyncValidationResult(
+        requiereSincronizacion: true,
+        razon: 'Error en validación - sincronización por seguridad',
+        vendedorAnterior: null,
+        vendedorActual: currentEdfVendedorId,
+      );
+    }
+  }
+
+  // Método para marcar que se completó la sincronización
+  Future<void> markSyncCompleted(String edfVendedorId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyLastSyncedVendedor, edfVendedorId);
+      await prefs.setString('last_sync_date', DateTime.now().toIso8601String());
+
+      logger.i('Sincronización marcada como completada para vendedor: $edfVendedorId');
+    } catch (e) {
+      logger.e('Error marcando sincronización completada: $e');
+    }
+  }
+
+  // Método para limpiar datos de sincronización
+  Future<void> clearSyncData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_keyLastSyncedVendedor);
+      await prefs.remove('last_sync_date');
+
+      // También limpiar los clientes de la base de datos local
+      await _dbHelper.eliminar('clientes');
+
+      logger.i('Datos de sincronización limpiados');
+    } catch (e) {
+      logger.e('Error limpiando datos de sincronización: $e');
+    }
+  }
+
+  // Método para sincronizar usuarios desde la nueva API
   static Future<SyncResult> sincronizarSoloUsuarios() async {
     try {
       logger.i('Sincronizando solo usuarios...');
@@ -245,30 +347,26 @@ class AuthService {
       // Validar password con bcrypt
       final passwordValido = BCrypt.checkpw(password, usuario.password);
 
-      if (passwordValido) {
-        final usuarioAuth = UsuarioAuth(
-          id: usuario.id,
-          username: usuario.username,
-          fullname: usuario.fullname,
-        );
-
-        await _saveLoginSuccess(usuarioAuth);
-
-        logger.i('Login exitoso para: $username');
-        return AuthResult(
-          exitoso: true,
-          mensaje: 'Bienvenido, ${usuario.fullname}',
-          usuario: usuarioAuth,
-        );
-      } else {
-        logger.w('Contraseña incorrecta para: $username');
+      if (!passwordValido) {
+        logger.w('Password incorrecto para: $username');
         return AuthResult(
           exitoso: false,
-          mensaje: 'Contraseña incorrecta',
+          mensaje: 'Credenciales incorrectas',
         );
       }
+
+      final usuarioAuth = UsuarioAuth.fromUsuario(usuario);
+
+      await _saveLoginSuccess(usuarioAuth);
+
+      logger.i('Login exitoso para: $username');
+      return AuthResult(
+        exitoso: true,
+        mensaje: 'Bienvenido, ${usuario.fullname}',
+        usuario: usuarioAuth,
+      );
+
     } catch (e) {
-      logger.e('Error en login: $e');
       logger.e('Error en login: $e');
       return AuthResult(
         exitoso: false,
@@ -407,7 +505,7 @@ class AuthService {
     }
   }
 
-  // Limpiar completamente (para testing o reset)
+  // Limpiar completamente (para testing o reset) - MÉTODO ACTUALIZADO
   Future<void> clearAllData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -416,6 +514,8 @@ class AuthService {
       await prefs.remove(_keyCurrentUser);
       await prefs.remove(_keyCurrentUserRole);
       await prefs.remove(_keyLastLoginDate);
+      await prefs.remove(_keyLastSyncedVendedor); // NUEVA LÍNEA
+      await prefs.remove('last_sync_date'); // NUEVA LÍNEA
 
       logger.i('Todos los datos limpiados');
     } catch (e) {
@@ -456,7 +556,7 @@ class AuthService {
     }
   }
 
-  // Obtener información de sesión (para debug)
+  // Obtener información de sesión (para debug) - MÉTODO ACTUALIZADO
   Future<Map<String, dynamic>> getSessionInfo() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -467,6 +567,8 @@ class AuthService {
         'currentUserRole': prefs.getString(_keyCurrentUserRole),
         'lastLoginDate': prefs.getString(_keyLastLoginDate),
         'hasActiveSession': prefs.getString(_keyCurrentUser) != null,
+        'lastSyncedVendedor': prefs.getString(_keyLastSyncedVendedor), // NUEVA LÍNEA
+        'lastSyncDate': prefs.getString('last_sync_date'), // NUEVA LÍNEA
       };
     } catch (e) {
       logger.e('Error obteniendo info de sesión: $e');
