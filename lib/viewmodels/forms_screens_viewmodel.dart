@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/repositories/logo_repository.dart';
+import 'package:ada_app/repositories/models_repository.dart'; // NUEVO: Necesitas crear este repositorio
 import 'package:logger/logger.dart';
 import 'package:barcode_scan2/barcode_scan2.dart';
 import 'package:ada_app/services/image_service.dart';
@@ -56,18 +57,24 @@ class FormsScreenViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
   final EquipoRepository _equipoRepository = EquipoRepository();
   final ImageService _imageService = ImageService();
-  final LocationService _locationService = LocationService(); // AGREGADO
+  final LocationService _locationService = LocationService();
 
   // Controladores de texto
   final TextEditingController codigoBarrasController = TextEditingController();
-  final TextEditingController modeloController = TextEditingController();
+  // ELIMINADO: modeloController ya no es necesario porque ahora es un dropdown
   final TextEditingController numeroSerieController = TextEditingController();
-  final TextEditingController observacionesController = TextEditingController(); // NUEVO
+  final TextEditingController observacionesController = TextEditingController();
 
   // Estado privado
   bool _isCensoMode = true;
   bool _isLoading = false;
   bool _isScanning = false;
+  bool _isTakingPhoto = false; // Faltaba esta variable
+
+  // NUEVO: Lista de modelos y modelo seleccionado
+  List<Map<String, dynamic>> _modelos = [];
+  int? _modeloSeleccionado;
+
   List<Map<String, dynamic>> _logos = [];
   int? _logoSeleccionado;
   Cliente? _cliente;
@@ -83,6 +90,11 @@ class FormsScreenViewModel extends ChangeNotifier {
   bool get isCensoMode => _isCensoMode;
   bool get isLoading => _isLoading;
   bool get isScanning => _isScanning;
+
+  // NUEVO: Getters para modelos
+  List<Map<String, dynamic>> get modelos => _modelos;
+  int? get modeloSeleccionado => _modeloSeleccionado;
+
   List<Map<String, dynamic>> get logos => _logos;
   int? get logoSeleccionado => _logoSeleccionado;
   File? get imagenSeleccionada => _imagenSeleccionada;
@@ -102,14 +114,19 @@ class FormsScreenViewModel extends ChangeNotifier {
     _cliente = cliente;
     _logger.i('Inicializando FormsScreenViewModel para cliente: ${cliente.nombre}');
 
-    await _cargarLogos();
-    _logger.i('Inicialización completa. Logos cargados: ${_logos.length}');
+    // MODIFICADO: Ahora cargamos tanto logos como modelos
+    await Future.wait([
+      _cargarLogos(),
+      _cargarModelos(), // NUEVO
+    ]);
+
+    _logger.i('Inicialización completa. Logos: ${_logos.length}, Modelos: ${_modelos.length}');
   }
 
   @override
   void dispose() {
     codigoBarrasController.dispose();
-    modeloController.dispose();
+    // ELIMINADO: modeloController.dispose();
     numeroSerieController.dispose();
     observacionesController.dispose();
     _eventController.close();
@@ -161,6 +178,40 @@ class FormsScreenViewModel extends ChangeNotifier {
 
   void setLogoSeleccionado(int? logoId) {
     _logoSeleccionado = logoId;
+    notifyListeners();
+  }
+
+  // ===============================
+  // NUEVO: LÓGICA DE NEGOCIO - MODELOS
+  // ===============================
+
+  Future<void> _cargarModelos() async {
+    try {
+      _logger.i('Iniciando carga de modelos...');
+
+      // IMPORTANTE: Necesitas crear ModeloRepository similar a LogoRepository
+      // Este es un ejemplo de cómo debería funcionar:
+      final modeloRepo = ModeloRepository();
+      final modelos = await modeloRepo.obtenerTodos();
+
+      _modelos = modelos.map((modelo) => {
+        'id': modelo.id,
+        'nombre': modelo.nombre,
+        // Si tienes más campos como marca_id, agrégalos aquí:
+        // 'marca_id': modelo.marcaId,
+      }).toList();
+
+      _logger.i('Modelos cargados exitosamente: ${_modelos.length}');
+      notifyListeners();
+    } catch (e) {
+      _logger.e('Error cargando modelos: $e');
+      _showError('Error cargando modelos');
+    }
+  }
+
+  void setModeloSeleccionado(int? modeloId) {
+    _modeloSeleccionado = modeloId;
+    _logger.i('Modelo seleccionado: $modeloId');
     notifyListeners();
   }
 
@@ -249,6 +300,7 @@ class FormsScreenViewModel extends ChangeNotifier {
       _showError('Error procesando equipo: $e');
     }
   }
+
   Future<void> _verificarAsignacionEquipo(Map<String, dynamic> equipo) async {
     try {
       // equipoId es STRING (código de barras), NO convertir a int
@@ -262,112 +314,82 @@ class FormsScreenViewModel extends ChangeNotifier {
       _logger.i('Verificando asignación - EquipoID: "$equipoId" (String), ClienteID: $clienteId (int)');
 
       // Pasar equipoId como String (código de barras) y clienteId como int
-      _equipoYaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(
-          equipoId,      // String - código de barras
-          clienteId      // int - ID del cliente
+      final yaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(
+        equipoId,
+        clienteId,
       );
 
-      _logger.i('Resultado verificación: $_equipoYaAsignado');
+      _equipoYaAsignado = yaAsignado;
+
+      if (yaAsignado) {
+        _logger.i('✅ Equipo YA ESTÁ asignado al cliente ${_cliente!.nombre}');
+      } else {
+        _logger.w('⚠️ Equipo NO está asignado al cliente ${_cliente!.nombre}');
+      }
 
     } catch (e) {
-      _logger.e('Error verificando asignación de equipo: $e');
-      _logger.e('equipo[id]: ${equipo['id']} (${equipo['id'].runtimeType})');
-      _logger.e('cliente.id: ${_cliente!.id!} (${_cliente!.id!.runtimeType})');
-
-      // En caso de error, asumir que no está asignado
+      _logger.e('Error verificando asignación: $e');
       _equipoYaAsignado = false;
+      throw 'Error verificando asignación del equipo';
     }
   }
 
-// In FormsScreenViewModel.dart
+  void _llenarCamposFormulario(Map<String, dynamic> equipoCompleto) {
+    // MODIFICADO: Ahora llenamos el dropdown de modelo en lugar del TextField
+    _modeloSeleccionado = equipoCompleto['modelo_id'];
+    _logger.i('Modelo seleccionado del equipo: $_modeloSeleccionado');
 
-  void _llenarCamposFormulario(Map<String, dynamic> equipo) {
-    _isCensoMode = true;
-    modeloController.text = equipo['modelo_nombre']?.toString() ?? '';
-    numeroSerieController.text = equipo['numero_serie']?.toString() ?? '';
+    numeroSerieController.text = equipoCompleto['numero_serie'] ?? '';
+    _logoSeleccionado = equipoCompleto['logo_id'];
 
-    // Handle logo_id - VERSIÓN ROBUSTA
-    if (equipo['logo_id'] != null) {
-      final equipoLogoId = equipo['logo_id'];
-
-      // Buscar el logo utilizando comparación flexible (int o String)
-      final logoEncontrado = _logos.firstWhere(
-            (logo) {
-          // Comparar tanto como int como String para máxima compatibilidad
-          return logo['id'] == equipoLogoId ||
-              logo['id'].toString() == equipoLogoId.toString();
-        },
-        orElse: () => <String, dynamic>{}, // Retornar mapa vacío si no se encuentra
-      );
-
-      if (logoEncontrado.isNotEmpty) {
-        // Intentar convertir a int si es posible, sino mantener el tipo original
-        if (equipoLogoId is int) {
-          _logoSeleccionado = equipoLogoId;
-        } else {
-          final int? parsedLogoId = int.tryParse(equipoLogoId.toString());
-          _logoSeleccionado = parsedLogoId;
-        }
-
-        _logger.i("Logo encontrado: ${logoEncontrado['nombre']} (ID: ${_logoSeleccionado})");
-      } else {
-        _logger.w("Logo con ID '${equipoLogoId}' no encontrado en la lista de logos.");
-        _logoSeleccionado = null;
-      }
-    } else {
-      _logoSeleccionado = null;
-    }
-
-    notifyListeners();
+    _logger.i('Campos autocompletados: Modelo ID=$_modeloSeleccionado, Serie=${numeroSerieController.text}, Logo ID=$_logoSeleccionado');
   }
 
-
-  void _prepararDatosPreview(Map<String, dynamic> equipo) {
-    _equipoCompleto = equipo;
+  void _prepararDatosPreview(Map<String, dynamic> equipoCompleto) {
+    _equipoCompleto = equipoCompleto;
+    _logger.i('Datos del equipo preparados para preview');
   }
 
-  void _mostrarEstadoEquipo(Map<String, dynamic> equipo) {
-    final nombreEquipo = '${equipo['marca_nombre']} ${equipo['modelo_nombre']}';
-    final clienteIdEquipo = equipo['cliente_id'];
+  void _mostrarEstadoEquipo(Map<String, dynamic> equipoCompleto) {
+    final nombreCompleto = '${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']}';
 
     if (_equipoYaAsignado) {
-      _showSuccess('Equipo ya registrado');
-    } else if (clienteIdEquipo != null && clienteIdEquipo.toString() != '0' && clienteIdEquipo.toString().isNotEmpty) {
-      _showWarning('Pendiente');
+      _showSuccess(
+        '✅ Equipo encontrado y YA ASIGNADO a ${_cliente!.nombre}\n'
+            'Modelo: $nombreCompleto\n'
+            'Las fotos son OPCIONALES',
+      );
     } else {
-      _showInfo('Equipo disponible');
+      _showWarning(
+        '⚠️ Equipo encontrado pero AÚN NO ASIGNADO a ${_cliente!.nombre}\n'
+            'Modelo: $nombreCompleto\n'
+            '📸 Debe tomar AL MENOS UNA FOTO para asignar el equipo',
+      );
     }
   }
 
   void _procesarEquipoNoEncontrado(String codigo) {
-    _logger.w('Visicooler no encontrado con código: $codigo');
-    _limpiarDatosAutocompletados();
-    _mostrarDialogoEquipoNoEncontrado(codigo);
-  }
+    _logger.w('Equipo no encontrado con código: $codigo');
 
-  void _mostrarDialogoEquipoNoEncontrado(String codigo) {
     final actions = [
       DialogAction(
-        text: 'Registrar nuevo equipo',
-        onPressed: habilitarModoNuevoEquipo,
-        isDefault: false,
-      ),
-      DialogAction(
-        text: 'Corregir código',
+        text: 'Cancelar',
         onPressed: () {
-          codigoBarrasController.selection = TextSelection(
-            baseOffset: 0,
-            extentOffset: codigoBarrasController.text.length,
-          );
+          codigoBarrasController.clear();
           _limpiarDatosAutocompletados();
         },
+      ),
+      DialogAction(
+        text: 'Registrar Nuevo',
+        onPressed: habilitarModoNuevoEquipo,
         isDefault: true,
       ),
     ];
 
     _eventController.add(ShowDialogEvent(
       'Equipo no encontrado',
-      'El código "$codigo" no se encuentra en el sistema.',
+      'No se encontró ningún equipo con el código "$codigo" en la base de datos.\n\n'
+          '¿Desea registrar este código como un nuevo equipo?',
       actions,
     ));
   }
@@ -376,9 +398,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   // LÓGICA DE NEGOCIO - IMÁGENES
   // ===============================
 
-  bool _isTakingPhoto = false;
-
-  Future<void> tomarFoto({bool esPrimeraFoto = true}) async {
+  Future<void> tomarFoto({required bool esPrimeraFoto}) async {
     // Prevenir múltiples aperturas de cámara
     if (_isTakingPhoto) {
       _showWarning('Ya hay una captura en proceso');
@@ -407,8 +427,7 @@ class FormsScreenViewModel extends ChangeNotifier {
     }
   }
 
-
-  Future<void> _procesarImagenSeleccionada(File imagen, {bool esPrimeraFoto = true}) async {
+  Future<void> _procesarImagenSeleccionada(File imagen, {required bool esPrimeraFoto}) async {
     try {
       if (!_imageService.esImagenValida(imagen)) {
         _showError('El archivo seleccionado no es una imagen válida');
@@ -451,59 +470,33 @@ class FormsScreenViewModel extends ChangeNotifier {
 
     } catch (e) {
       _logger.e('Error procesando imagen: $e');
-      _showError('Error al procesar la imagen: $e');
+      _showError('Error al procesar la imagen');
     }
   }
 
-  Future<void> _eliminarImagenTemporal() async {
-    if (_imagenSeleccionada != null) {
-      try {
-        await _imageService.eliminarImagen(_imagenSeleccionada!);
-      } catch (e) {
-        _logger.w('No se pudo eliminar imagen temporal 1: $e');
-      }
+  void eliminarImagen({required bool esPrimeraFoto}) {
+    if (esPrimeraFoto) {
       _imagenSeleccionada = null;
-    }
-
-    if (_imagenSeleccionada2 != null) {
-      try {
-        await _imageService.eliminarImagen(_imagenSeleccionada2!);
-      } catch (e) {
-        _logger.w('No se pudo eliminar imagen temporal 2: $e');
-      }
+      _logger.i('Imagen 1 eliminada');
+    } else {
       _imagenSeleccionada2 = null;
+      _logger.i('Imagen 2 eliminada');
     }
+    notifyListeners();
   }
 
-  Future<void> eliminarImagen({bool esPrimeraFoto = true}) async {
-    final imagen = esPrimeraFoto ? _imagenSeleccionada : _imagenSeleccionada2;
-
-    if (imagen != null) {
-      try {
-        await _imageService.eliminarImagen(imagen);
-
-        if (esPrimeraFoto) {
-          _imagenSeleccionada = null;
-        } else {
-          _imagenSeleccionada2 = null;
-        }
-
-        _showWarning('Foto ${esPrimeraFoto ? "1" : "2"} eliminada');
-        notifyListeners();
-      } catch (e) {
-        _logger.e('Error eliminando imagen: $e');
-        _showError('Error al eliminar la imagen');
-      }
-    }
+  void _eliminarImagenTemporal() {
+    _imagenSeleccionada = null;
+    _imagenSeleccionada2 = null;
+    notifyListeners();
   }
 
   // ===============================
-  // LÓGICA DE NEGOCIO - MODOS
+  // LÓGICA DE NEGOCIO - FORMULARIO
   // ===============================
 
   void onCodigoChanged(String codigo) {
-    if (codigo.isEmpty) {
-      _limpiarDatosAutocompletados();
+    if (_isCensoMode && codigo.length >= 3) {
       _isCensoMode = true;
       notifyListeners();
     }
@@ -520,7 +513,8 @@ class FormsScreenViewModel extends ChangeNotifier {
 
   void habilitarModoNuevoEquipo() {
     _isCensoMode = false;
-    modeloController.clear();
+    // MODIFICADO: Limpiar modelo seleccionado en lugar del controller
+    _modeloSeleccionado = null;
     numeroSerieController.clear();
     _logoSeleccionado = null;
 
@@ -541,7 +535,8 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   void _limpiarDatosAutocompletados() {
-    modeloController.clear();
+    // MODIFICADO: Limpiar modelo seleccionado en lugar del controller
+    _modeloSeleccionado = null;
     numeroSerieController.clear();
     _logoSeleccionado = null;
     // Limpiar imagen
@@ -567,7 +562,15 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   String? validarCodigoBarras(String? value) => _validarCampo(value, 'El código de barras', minLength: 3);
-  String? validarModelo(String? value) => _validarCampo(value, 'El modelo del visicooler');
+
+  // MODIFICADO: Validar modelo ahora valida el ID seleccionado en lugar del texto
+  String? validarModelo(int? value) {
+    if (value == null) {
+      return 'El modelo es requerido';
+    }
+    return null;
+  }
+
   String? validarNumeroSerie(String? value) => _validarCampo(value, 'El número de serie');
 
   String? validarLogo(int? value) {
@@ -634,12 +637,21 @@ class FormsScreenViewModel extends ChangeNotifier {
         orElse: () => {'nombre': ''}
     );
 
+    // NUEVO: Obtener el nombre del modelo seleccionado
+    final modeloSeleccionadoData = _modelos.firstWhere(
+            (modelo) => modelo['id'] == _modeloSeleccionado,
+        orElse: () => {'nombre': ''}
+    );
+
     return {
       'cliente': _cliente,
       'codigo_barras': codigoBarrasController.text.trim(),
-      'modelo': modeloController.text.trim(),
+
+      // MODIFICADO: Ahora enviamos el nombre del modelo obtenido del dropdown
+      'modelo': modeloSeleccionadoData['nombre'],
+      'modelo_id': _modeloSeleccionado,
+
       'marca_id': _equipoCompleto?['marca_id'],
-      'modelo_id': _equipoCompleto?['modelo_id'],
       'logo_id': _logoSeleccionado,
       'logo': logoSeleccionado['nombre'],
       'numero_serie': numeroSerieController.text.trim(),
@@ -727,9 +739,10 @@ class FormsScreenViewModel extends ChangeNotifier {
       ? 'Escanea o ingresa y presiona Enter'
       : 'Código del nuevo equipo';
 
+  // MODIFICADO: Hint para el dropdown de modelo
   String get modeloHint => _isCensoMode
-      ? 'Se completará automáticamente...'
-      : 'Ingrese el modelo del equipo';
+      ? 'Se completará automáticamente'
+      : 'Seleccionar modelo';
 
   String get serieHint => _isCensoMode
       ? 'Se completará automáticamente...'

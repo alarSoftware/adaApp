@@ -234,15 +234,26 @@ class _FormsScreenState extends State<FormsScreen> {
   IconData _getIconForTitle(String title) {
     switch (title.toLowerCase()) {
       case 'equipo no encontrado':
-        return Icons.search_off_outlined;
-      case 'error':
-        return Icons.error_outline;
-      case 'confirmación':
-        return Icons.check_circle_outline;
-      case 'advertencia':
-        return Icons.warning_amber_outlined;
+        return Icons.search_off;
+      case 'error de ubicación':
+        return Icons.location_off;
+      case 'éxito':
+        return Icons.check_circle;
       default:
-        return Icons.info_outline;
+        return Icons.info;
+    }
+  }
+
+  Color _getIconBackgroundColor(String title) {
+    switch (title.toLowerCase()) {
+      case 'equipo no encontrado':
+        return AppColors.warning.withValues(alpha: 0.1);
+      case 'error de ubicación':
+        return AppColors.error.withValues(alpha: 0.1);
+      case 'éxito':
+        return AppColors.success.withValues(alpha: 0.1);
+      default:
+        return AppColors.info.withValues(alpha: 0.1);
     }
   }
 
@@ -250,72 +261,46 @@ class _FormsScreenState extends State<FormsScreen> {
     switch (title.toLowerCase()) {
       case 'equipo no encontrado':
         return AppColors.warning;
-      case 'error':
+      case 'error de ubicación':
         return AppColors.error;
-      case 'confirmación':
+      case 'éxito':
         return AppColors.success;
-      case 'advertencia':
-        return AppColors.warning;
       default:
-        return AppColors.primary;
+        return AppColors.info;
     }
-  }
-
-  Color _getIconBackgroundColor(String title) {
-    return _getIconColor(title).withValues(alpha: 0.1);
   }
 
   String _getSubtitle(String title) {
     switch (title.toLowerCase()) {
       case 'equipo no encontrado':
-        return 'Sistema de Inventario';
-      case 'error':
-        return 'Se requiere atención';
-      case 'confirmación':
-        return 'Operación completada';
+        return 'Acción requerida';
+      case 'error de ubicación':
+        return 'GPS necesario';
       default:
         return '';
     }
   }
 
   bool _shouldShowAdditionalInfo(String title) {
-    return ['equipo no encontrado', 'error'].contains(title.toLowerCase());
+    return title.toLowerCase() == 'error de ubicación';
   }
 
   String _getAdditionalInfo(String title) {
     switch (title.toLowerCase()) {
-      case 'equipo no encontrado':
-        return 'Contacte al administrador si el problema persiste.';
-      case 'error':
-        return 'Verifique su conexión e intente nuevamente.';
+      case 'error de ubicación':
+        return 'Asegúrese de tener el GPS activado y de haber otorgado permisos de ubicación a la app.';
       default:
         return '';
     }
   }
 
-  IconData _getButtonIcon(String buttonText) {
-    switch (buttonText.toLowerCase()) {
-      case 'corregir código':
-      case 'corregir':
-      case 'editar código':
-        return Icons.edit;
-      case 'registrar':
-      case 'crear':
-      case 'agregar':
+  IconData _getButtonIcon(String text) {
+    switch (text.toLowerCase()) {
       case 'registrar nuevo':
-      case 'registrar nuevo equipo':
-        return Icons.add_circle_outline;
-      case 'reintentar':
-        return Icons.refresh;
       case 'continuar':
-        return Icons.arrow_forward;
-      case 'guardar':
-        return Icons.save;
-      case 'cancelar':
-        return Icons.close;
-      case 'aceptar':
-      case 'ok':
-        return Icons.check;
+        return Icons.add_circle;
+      case 'reintentar gps':
+        return Icons.refresh;
       default:
         return Icons.check;
     }
@@ -333,142 +318,121 @@ class _FormsScreenState extends State<FormsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: _viewModel,
-      builder: (context, child) {
-        return Stack(
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: ListenableBuilder(
+          listenable: _viewModel,
+          builder: (context, child) {
+            return Text(_viewModel.titleText);
+          },
+        ),
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.background,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _viewModel.limpiarFormulario,
+            tooltip: 'Limpiar formulario',
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
           children: [
-            Scaffold(
-              resizeToAvoidBottomInset: true,
-              appBar: _buildAppBar(),
-              body: SafeArea(
-                child: Column(
-                  children: [
-                    // Contenido scrolleable
-                    Expanded(
-                      child: _buildBody(),
-                    ),
-                    // Botones AQUÍ - esto es lo que faltaba agregar
-                    _buildBottomButtons(),
-                  ],
-                ),
-              ),
-              // NO pongas bottomNavigationBar aquí
-            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildModeCard(),
+                      const SizedBox(height: 20),
+                      _buildCodigoBarrasField(),
+                      const SizedBox(height: 16),
 
-            // Overlay de bloqueo cuando está procesando
-            if (_viewModel.isLoading)
-              Container(
-                color: Colors.black.withOpacity(0.5),
-                child: Center(
-                  child: Card(
-                    elevation: 8,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const CircularProgressIndicator(),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Procesando...',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Por favor espere',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                      // MODIFICADO: Ahora usa dropdown en lugar de TextField
+                      _buildModeloDropdown(),
+
+                      const SizedBox(height: 16),
+                      _buildSerieField(),
+                      const SizedBox(height: 16),
+                      _buildLogoDropdown(),
+                      const SizedBox(height: 16),
+                      _buildImagenField(),
+                      const SizedBox(height: 16),
+                      _buildObservacionesField(),
+                      const SizedBox(height: 100),
+                    ],
                   ),
                 ),
               ),
-          ],
-        );
-      },
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      title: ListenableBuilder(
-        listenable: _viewModel,
-        builder: (context, child) {
-          return Text(_viewModel.titleText);
-        },
-      ),
-      backgroundColor: AppColors.appBarBackground,
-      foregroundColor: AppColors.appBarForeground,
-      elevation: 2,
-      shadowColor: AppColors.shadowLight,
-    );
-  }
-
-  Widget _buildBody() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildModeIndicator(),
-            const SizedBox(height: 16),
-            _buildFormulario(),
+            ),
+            _buildBottomButtons(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildModeIndicator() {
+  Widget _buildModeCard() {
     return ListenableBuilder(
       listenable: _viewModel,
       builder: (context, child) {
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.surfaceVariant,
-            border: Border.all(
-              color: AppColors.border,
+            gradient: LinearGradient(
+              colors: [AppColors.primary, AppColors.primaryDark],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.shadowLight,
+                spreadRadius: 2,
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: Row(
             children: [
-              Icon(
-                _viewModel.modeIcon,
-                color: AppColors.primary,
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  _viewModel.modeIcon,
+                  color: AppColors.background,
+                  size: 28,
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       _viewModel.modeTitle,
-                      style: TextStyle(
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
                       ),
                     ),
+                    const SizedBox(height: 4),
                     Text(
                       _viewModel.modeSubtitle,
                       style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 13,
                       ),
                     ),
                   ],
@@ -481,40 +445,6 @@ class _FormsScreenState extends State<FormsScreen> {
     );
   }
 
-  Widget _buildFormulario() {
-    return Card(
-      elevation: 2,
-      color: AppColors.surface,
-      shadowColor: AppColors.shadowLight,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: AppColors.border,
-          width: 0.5,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildCodigoBarrasField(),
-            const SizedBox(height: 16),
-            _buildModeloField(),
-            const SizedBox(height: 16),
-            _buildLogoDropdown(),
-            const SizedBox(height: 16),
-            _buildSerieField(),
-            const SizedBox(height: 16,),
-            _buildImagenField(),
-            const SizedBox(height: 16,),
-            _buildObservacionesField(),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildCodigoBarrasField() {
     return ListenableBuilder(
       listenable: _viewModel,
@@ -523,7 +453,7 @@ class _FormsScreenState extends State<FormsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Código de activo:',
+              'Código de barras:',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
@@ -539,14 +469,10 @@ class _FormsScreenState extends State<FormsScreen> {
                     validator: _viewModel.validarCodigoBarras,
                     onChanged: _viewModel.onCodigoChanged,
                     onFieldSubmitted: _viewModel.onCodigoSubmitted,
-                    textInputAction: TextInputAction.search,
+                    enabled: !_viewModel.isLoading,
                     decoration: InputDecoration(
                       hintText: _viewModel.codigoHint,
-                      prefixIcon: const Icon(Icons.qr_code),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: _viewModel.limpiarFormulario,
-                      ),
+                      prefixIcon: const Icon(Icons.qr_code_2),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -565,6 +491,7 @@ class _FormsScreenState extends State<FormsScreen> {
                   const SizedBox(width: 12),
                   Container(
                     height: 56,
+                    width: 56,
                     decoration: BoxDecoration(
                       color: AppColors.primary,
                       borderRadius: BorderRadius.circular(8),
@@ -599,18 +526,79 @@ class _FormsScreenState extends State<FormsScreen> {
     );
   }
 
-  Widget _buildModeloField() {
+  // NUEVO: Método para construir el dropdown de modelo (igual que el de logo)
+  Widget _buildModeloDropdown() {
     return ListenableBuilder(
       listenable: _viewModel,
       builder: (context, child) {
-        return _buildTextField(
-          controller: _viewModel.modeloController,
-          label: 'Modelo:',
-          hint: _viewModel.modeloHint,
-          icon: Icons.devices,
-          validator: _viewModel.validarModelo,
-          enabled: _viewModel.areFieldsEnabled,
-          backgroundColor: _viewModel.fieldBackgroundColor,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Modelo:',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: DropdownButtonFormField<int>(
+                value: _viewModel.modelos.isNotEmpty &&
+                    _viewModel.modeloSeleccionado != null &&
+                    _viewModel.modelos.any((modelo) => modelo['id'] == _viewModel.modeloSeleccionado)
+                    ? _viewModel.modeloSeleccionado
+                    : null,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.devices),
+                  fillColor: _viewModel.fieldBackgroundColor,
+                  filled: _viewModel.fieldBackgroundColor != null,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: AppColors.focus),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                ),
+                hint: Text(
+                  _viewModel.modeloHint,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                items: _viewModel.modelos.map((modelo) {
+                  final modeloId = modelo['id'] is int ? modelo['id'] : int.tryParse(modelo['id'].toString());
+                  return DropdownMenuItem<int>(
+                    value: modeloId,
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Text(
+                        '${modelo['nombre']} (ID: $modeloId)',
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                  );
+                }).toList(),
+                onChanged: _viewModel.areFieldsEnabled
+                    ? (value) {
+                  print('Modelo dropdown onChanged: $value');
+                  _viewModel.setModeloSeleccionado(value);
+                }
+                    : null,
+                validator: (value) {
+                  final result = _viewModel.validarModelo(value);
+                  print('Modelo dropdown validation: $value -> $result');
+                  return result;
+                },
+              ),
+            ),
+          ],
         );
       },
     );
@@ -892,7 +880,7 @@ class _FormsScreenState extends State<FormsScreen> {
         left: 16,
         right: 16,
         top: 16,
-        bottom: 16,  // ← Simplificado, el SafeArea ya maneja el padding inferior
+        bottom: 16,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
