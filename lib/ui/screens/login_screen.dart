@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:ada_app/viewmodels/login_screen_viewmodel.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -142,6 +143,311 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     }
   }
 
+  Future<void> _showMandatorySyncDialog(
+      LoginScreenViewModel viewModel,
+      SyncValidationResult validation,
+      ) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        bool isSyncing = false;
+        double progress = 0.0;
+        String currentStep = '';
+        List<String> completedSteps = [];
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return WillPopScope(
+              onWillPop: () async => false,
+              child: AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                backgroundColor: AppColors.cardBackground,
+                title: Row(
+                  children: [
+                    Icon(Icons.sync_problem, color: AppColors.warning, size: 28),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Sincronización Obligatoria',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ✅ SOLO LA RAZÓN (sin mostrar vendedores)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.warning),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, color: AppColors.warning, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                validation.razon,
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Mensaje importante
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceVariant,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.warning_amber, color: AppColors.warning, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Importante',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Debes sincronizar para continuar. Esto descargará:',
+                              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                            ),
+                            const SizedBox(height: 8),
+                            _buildSyncBulletPoint('Usuarios actualizados'),
+                            _buildSyncBulletPoint('Clientes de tu zona'),
+                            _buildSyncBulletPoint('Equipos y datos maestros'),
+                          ],
+                        ),
+                      ),
+
+                      // Progreso de sincronización
+                      if (isSyncing) ...[
+                        const SizedBox(height: 16),
+                        LinearProgressIndicator(
+                          value: progress,
+                          backgroundColor: AppColors.surfaceVariant,
+                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          minHeight: 6,
+                        ),
+                        if (currentStep.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            currentStep,
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                        if (completedSteps.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceVariant,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: completedSteps.map((step) => Padding(
+                                padding: const EdgeInsets.only(bottom: 4.0),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.check_circle, color: AppColors.success, size: 14),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        step,
+                                        style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )).toList(),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: isSyncing ? null : () {
+                      Navigator.of(dialogContext).pop();
+                      viewModel.usernameController.clear();
+                      viewModel.passwordController.clear();
+                    },
+                    child: Text(
+                      'Cancelar',
+                      style: TextStyle(
+                        color: isSyncing ? AppColors.textSecondary : AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: isSyncing ? null : () async {
+                      setDialogState(() {
+                        isSyncing = true;
+                        progress = 0.0;
+                        currentStep = 'Iniciando sincronización...';
+                        completedSteps.clear();
+                      });
+
+                      try {
+                        if (validation.vendedorAnterior != null) {
+                          setDialogState(() {
+                            currentStep = 'Limpiando datos anteriores...';
+                            progress = 0.1;
+                          });
+
+                          final authService = AuthService();
+                          await authService.clearSyncData();
+
+                          setDialogState(() {
+                            completedSteps.add('Datos anteriores limpiados');
+                          });
+
+                          await Future.delayed(const Duration(milliseconds: 300));
+                        }
+
+                        setDialogState(() {
+                          currentStep = 'Sincronizando usuarios...';
+                          progress = 0.3;
+                        });
+
+                        final userSyncResult = await viewModel.syncUsers();
+
+                        if (!userSyncResult.exito) {
+                          throw Exception('Error sincronizando usuarios: ${userSyncResult.mensaje}');
+                        }
+
+                        setDialogState(() {
+                          completedSteps.add('${userSyncResult.itemsSincronizados} usuarios');
+                        });
+
+                        await Future.delayed(const Duration(milliseconds: 300));
+
+                        setDialogState(() {
+                          currentStep = 'Sincronizando tus clientes...';
+                          progress = 0.6;
+                        });
+
+                        final clientSyncResult = await viewModel.syncClientsForVendor(validation.vendedorActual);
+
+                        if (!clientSyncResult.exito) {
+                          throw Exception('Error sincronizando clientes: ${clientSyncResult.mensaje}');
+                        }
+
+                        setDialogState(() {
+                          completedSteps.add('${clientSyncResult.itemsSincronizados} clientes');
+                          progress = 0.9;
+                          currentStep = 'Finalizando...';
+                        });
+
+                        await Future.delayed(const Duration(milliseconds: 500));
+
+                        setDialogState(() {
+                          progress = 1.0;
+                          currentStep = '¡Completado!';
+                          completedSteps.add('Sincronización registrada');
+                        });
+
+                        await Future.delayed(const Duration(milliseconds: 500));
+
+                        if (!mounted) return;
+                        Navigator.of(dialogContext).pop();
+
+                        _showSuccessSnackBar('Sincronización completada exitosamente', Icons.cloud_done);
+
+                        await Future.delayed(const Duration(milliseconds: 300));
+                        Navigator.of(context).pushReplacementNamed('/home');
+                      } catch (e) {
+                        setDialogState(() {
+                          isSyncing = false;
+                          currentStep = '';
+                        });
+
+                        if (!mounted) return;
+                        Navigator.of(dialogContext).pop();
+                        _showErrorSnackBar('Error en sincronización: $e');
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isSyncing ? AppColors.buttonDisabled : AppColors.warning,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: isSyncing
+                        ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                        : const Text('Sincronizar Ahora'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+
+  Widget _buildSyncBulletPoint(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8.0, bottom: 4.0),
+      child: Row(
+        children: [
+          Icon(Icons.circle, size: 6, color: AppColors.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -208,6 +514,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     );
   }
 
+  // ✅ MODIFICADO: Ahora valida sincronización
   Future<void> _handleLogin(LoginScreenViewModel viewModel) async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -215,19 +522,28 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
     if (mounted) {
       if (result.success) {
-        _showSuccessSnackBar(result.message, result.icon ?? Icons.check);
-        Navigator.of(context).pushReplacementNamed('/home');
+        if (result.requiresSync && result.syncValidation != null) {
+          await _showMandatorySyncDialog(viewModel, result.syncValidation!);
+        } else {
+          _showSuccessSnackBar(result.message, result.icon ?? Icons.check);
+          Navigator.of(context).pushReplacementNamed('/home');
+        }
       }
     }
   }
 
+  // ✅ MODIFICADO: Ahora valida sincronización
   Future<void> _handleBiometricLogin(LoginScreenViewModel viewModel) async {
     final result = await viewModel.authenticateWithBiometric();
 
     if (mounted) {
       if (result.success) {
-        _showSuccessSnackBar(result.message, result.icon ?? Icons.check);
-        Navigator.of(context).pushReplacementNamed('/home');
+        if (result.requiresSync && result.syncValidation != null) {
+          await _showMandatorySyncDialog(viewModel, result.syncValidation!);
+        } else {
+          _showSuccessSnackBar(result.message, result.icon ?? Icons.check);
+          Navigator.of(context).pushReplacementNamed('/home');
+        }
       } else {
         _showErrorSnackBar(result.message);
       }
@@ -244,34 +560,48 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (context) => LoginScreenViewModel(),
+      create: (_) => LoginScreenViewModel(),
       child: Scaffold(
         backgroundColor: AppColors.background,
+        extendBodyBehindAppBar: true,
         appBar: _buildAppBar(),
         body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: MediaQuery.of(context).size.width < 600 ? 24.0 : 32.0,
-                vertical: 24.0,
-              ),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 400),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox(height: 32),
-                        _buildHeader(),
-                        const SizedBox(height: 48),
-                        _buildLoginForm(),
-                        const SizedBox(height: 32),
-                        _buildFooter(),
-                      ],
-                    ),
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Consumer<LoginScreenViewModel>(
+                    builder: (context, viewModel, child) {
+                      return Form(
+                        key: _formKey,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const SizedBox(height: 40),
+                            _buildLogo(),
+                            const SizedBox(height: 48),
+                            _buildUsernameField(viewModel),
+                            const SizedBox(height: 16),
+                            _buildPasswordField(viewModel),
+                            const SizedBox(height: 24),
+                            _buildErrorMessage(viewModel),
+                            _buildLoginButton(viewModel),
+                            if (viewModel.biometricAvailable) ...[
+                              const SizedBox(height: 24),
+                              _buildDivider(),
+                              const SizedBox(height: 24),
+                              _buildBiometricButton(viewModel),
+                            ],
+                            const SizedBox(height: 40),
+                            _buildFooter(),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -282,112 +612,56 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildLogo() {
     return Column(
       children: [
-        Semantics(
-          header: true,
-          child: Text(
-            'Iniciar Sesión',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w300,
-              color: AppColors.textPrimary,
-              letterSpacing: 0.5,
-            ),
-            textAlign: TextAlign.center,
+        const SizedBox(height: 24),
+        Text(
+          'Bienvenido',
+          style: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+            letterSpacing: -0.5,
           ),
+          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
-        Semantics(
-          hint: 'Descripción de la pantalla de login',
-          child: Text(
-            'Ingresa tus credenciales para continuar',
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w400,
-            ),
-            textAlign: TextAlign.center,
+        Text(
+          'Ingresa tus credenciales para continuar',
+          style: TextStyle(
+            fontSize: 16,
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w400,
           ),
+          textAlign: TextAlign.center,
         ),
       ],
     );
   }
 
-  Widget _buildLoginForm() {
-    return Consumer<LoginScreenViewModel>(
-      builder: (context, viewModel, child) {
-        return Semantics(
-          label: 'Formulario de inicio de sesión',
-          child: Card(
-            elevation: 8,
-            shadowColor: AppColors.shadowLight,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            color: AppColors.cardBackground,
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildUsernameField(viewModel),
-                    const SizedBox(height: 24),
-                    _buildPasswordField(viewModel),
-                    const SizedBox(height: 32),
-                    _buildErrorMessage(viewModel),
-                    _buildLoginButton(viewModel),
-                    if (viewModel.biometricAvailable) ...[
-                      const SizedBox(height: 24),
-                      _buildDivider(),
-                      const SizedBox(height: 24),
-                      _buildBiometricButton(viewModel),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildUsernameField(LoginScreenViewModel viewModel) {
-    final hasContent = viewModel.usernameController.text.isNotEmpty;
-
     return TextFormField(
       controller: viewModel.usernameController,
       focusNode: viewModel.usernameFocusNode,
+      enabled: !viewModel.isLoading,
       decoration: InputDecoration(
         labelText: 'Usuario',
-        prefixIcon: Icon(
-          Icons.person_outline_rounded,
-          color: AppColors.getValidationIconColor(viewModel.usernameValid, hasContent),
-        ),
-        suffixIcon: hasContent
-            ? Icon(
-          viewModel.usernameValid ? Icons.check_circle_outline : Icons.error_outline,
-          color: AppColors.getValidationIconColor(viewModel.usernameValid, hasContent),
-          size: 20,
-        )
-            : null,
+        labelStyle: TextStyle(color: AppColors.textSecondary),
+        hintText: 'Ingresa tu usuario',
+        hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+        prefixIcon: Icon(Icons.person_outline, color: AppColors.textSecondary),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-            color: AppColors.getValidationBorderColor(viewModel.usernameValid, hasContent),
-          ),
+          borderSide: BorderSide(color: AppColors.border, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: AppColors.focus, width: 2),
+          borderSide: BorderSide(color: AppColors.primary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -400,44 +674,28 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
       validator: viewModel.validateUsername,
       textInputAction: TextInputAction.next,
-      keyboardType: TextInputType.emailAddress,
       onFieldSubmitted: (_) => viewModel.focusNextField(),
     );
   }
 
   Widget _buildPasswordField(LoginScreenViewModel viewModel) {
-    final hasContent = viewModel.passwordController.text.isNotEmpty;
-
     return TextFormField(
       controller: viewModel.passwordController,
       focusNode: viewModel.passwordFocusNode,
+      enabled: !viewModel.isLoading,
       obscureText: viewModel.obscurePassword,
       decoration: InputDecoration(
         labelText: 'Contraseña',
+        labelStyle: TextStyle(color: AppColors.textSecondary),
         hintText: 'Ingresa tu contraseña',
-        prefixIcon: Icon(
-          Icons.lock_outline_rounded,
-          color: AppColors.getValidationIconColor(viewModel.passwordValid, hasContent),
-        ),
-        suffixIcon: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (hasContent)
-              Icon(
-                viewModel.passwordValid ? Icons.check_circle_outline : Icons.error_outline,
-                color: AppColors.getValidationIconColor(viewModel.passwordValid, hasContent),
-                size: 20,
-              ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: Icon(
-                viewModel.obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                color: AppColors.neutral500,
-              ),
-              onPressed: viewModel.togglePasswordVisibility,
-              tooltip: viewModel.obscurePassword ? 'Mostrar contraseña' : 'Ocultar contraseña',
-            ),
-          ],
+        hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+        prefixIcon: Icon(Icons.lock_outline, color: AppColors.textSecondary),
+        suffixIcon: IconButton(
+          icon: Icon(
+            viewModel.obscurePassword ? Icons.visibility_off : Icons.visibility,
+            color: AppColors.textSecondary,
+          ),
+          onPressed: viewModel.togglePasswordVisibility,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -445,13 +703,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-            color: AppColors.getValidationBorderColor(viewModel.passwordValid, hasContent),
-          ),
+          borderSide: BorderSide(color: AppColors.border, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: AppColors.focus, width: 2),
+          borderSide: BorderSide(color: AppColors.primary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -609,7 +865,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                   case 'delete_users':
                     _showDeleteUsersConfirmation();
                     break;
-                  case 'api_settings': // AGREGAR ESTE CASO
+                  case 'api_settings':
                     Navigator.of(context).pushNamed('/api-settings');
                     break;
                 }
@@ -663,7 +919,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                   ),
                 ),
                 const PopupMenuDivider(),
-                // MOVER LA CONFIGURACIÓN AL FINAL:
                 PopupMenuItem<String>(
                   value: 'api_settings',
                   child: Row(

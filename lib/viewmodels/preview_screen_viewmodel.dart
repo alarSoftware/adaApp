@@ -11,6 +11,7 @@ import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/services/auth_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'dart:async';
+import 'package:path_provider/path_provider.dart';
 
 final _logger = Logger();
 
@@ -447,32 +448,133 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Future<Map<String, dynamic>> _enviarAApiEstadosConTimeout(Map<String, dynamic> datos, int timeoutSegundos) async {
     try {
-
       final baseUrl = await BaseSyncService.getBaseUrl();
       final estadosEndpoint = '/censoActivo/insertCensoActivo';
+      final fullUrl = '$baseUrl$estadosEndpoint';
+
+      // ============================================
+      // LOGGING DETALLADO - INICIO
+      // ============================================
+
+      final timestamp = DateTime.now().toIso8601String();
+      final jsonBody = json.encode(datos);
+
+      // 1️⃣ LOG EN CONSOLA (Logcat)
+      _logger.i('═══════════════════════════════════════════════════════');
+      _logger.i('🚀 POST NUEVO EQUIPO - ${timestamp}');
+      _logger.i('═══════════════════════════════════════════════════════');
+      _logger.i('📍 URL: $fullUrl');
+      _logger.i('⏱️ Timeout: $timeoutSegundos segundos');
+      _logger.i('📦 Headers:');
+      _logger.i('   Content-Type: application/json');
+      _logger.i('   Accept: application/json');
+      _logger.i('');
+      _logger.i('📄 REQUEST BODY (JSON):');
+      _logger.i('─────────────────────────────────────────────────────');
+
+      // Pretty print del JSON en el log
+      final prettyJson = JsonEncoder.withIndent('  ').convert(datos);
+      prettyJson.split('\n').forEach((line) => _logger.i(line));
+
+      _logger.i('─────────────────────────────────────────────────────');
+      _logger.i('📊 Tamaño del payload: ${jsonBody.length} caracteres');
+      _logger.i('');
+
+      // 2️⃣ GUARDAR EN ARCHIVO TXT (Carpeta Downloads)
+      try {
+        await _guardarLogEnArchivo(
+          url: fullUrl,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: datos,
+          timestamp: timestamp,
+        );
+      } catch (e) {
+        _logger.w('⚠️ No se pudo guardar el log en archivo: $e');
+      }
+
+      // ============================================
+      // ENVÍO REAL AL SERVIDOR
+      // ============================================
 
       final response = await http.post(
-        Uri.parse('$baseUrl$estadosEndpoint'),
-        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-        body: json.encode(datos),
+        Uri.parse(fullUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: jsonBody,
       ).timeout(Duration(seconds: timeoutSegundos));
 
+      // ============================================
+      // LOGGING DE RESPUESTA
+      // ============================================
+
+      _logger.i('');
+      _logger.i('📥 RESPUESTA DEL SERVIDOR:');
+      _logger.i('─────────────────────────────────────────────────────');
+      _logger.i('📊 Status Code: ${response.statusCode}');
+      _logger.i('📊 Status Text: ${response.reasonPhrase}');
+      _logger.i('');
+      _logger.i('📄 Response Body:');
+
+      if (response.body.isNotEmpty) {
+        try {
+          final responseJson = json.decode(response.body);
+          final prettyResponse = JsonEncoder.withIndent('  ').convert(responseJson);
+          prettyResponse.split('\n').forEach((line) => _logger.i(line));
+        } catch (e) {
+          _logger.i(response.body);
+        }
+      } else {
+        _logger.i('(Body vacío)');
+      }
+
+      _logger.i('─────────────────────────────────────────────────────');
+      _logger.i('═══════════════════════════════════════════════════════');
+
+      // Procesar respuesta como antes
       if (response.statusCode >= 200 && response.statusCode < 300) {
         dynamic servidorId = DateTime.now().millisecondsSinceEpoch;
         String mensaje = 'Estado registrado correctamente';
+
         try {
           final responseBody = json.decode(response.body);
-          servidorId = responseBody['estado']?['id'] ?? responseBody['id'] ?? responseBody['insertId'] ?? servidorId;
-          if (responseBody['message'] != null) mensaje = responseBody['message'].toString();
-        } catch (e) {}
-        return {'exito': true, 'id': servidorId, 'mensaje': mensaje};
+          servidorId = responseBody['estado']?['id'] ??
+              responseBody['id'] ??
+              responseBody['insertId'] ??
+              servidorId;
+
+          if (responseBody['message'] != null) {
+            mensaje = responseBody['message'].toString();
+          }
+        } catch (e) {
+          _logger.w('No se pudo parsear response body: $e');
+        }
+
+        return {
+          'exito': true,
+          'id': servidorId,
+          'mensaje': mensaje
+        };
       } else {
-        return {'exito': false, 'mensaje': 'Error del servidor: ${response.statusCode}'};
+        return {
+          'exito': false,
+          'mensaje': 'Error del servidor: ${response.statusCode}'
+        };
       }
+
     } catch (e) {
-      return {'exito': false, 'mensaje': 'Error de conexión: $e'};
+      _logger.e('❌ ERROR EN POST: $e');
+      return {
+        'exito': false,
+        'mensaje': 'Error de conexión: $e'
+      };
     }
   }
+
 
   void _programarSincronizacionBackground() {
     Timer(Duration(seconds: 5), () async {
@@ -622,7 +724,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'enLocal': datosLocales['en_local'] ?? true,
       'fechaDeRevision': datosLocales['fecha_revision'] ?? _formatearFechaLocal(now),
       'estadoCenso': datosLocales['ya_asignado'] == true ? 'asignado' : 'pendiente',
-      'esNuevoEquipo': datosLocales['es_nuevo_equipo'] ?? false,  // ✅ NUEVO
+      'esNuevoEquipo': datosLocales['es_nuevo_equipo'] ?? false,
       'equipo_codigo_barras': datosLocales['codigo_barras'] ?? '',
       'equipo_numero_serie': datosLocales['numero_serie'] ?? '',
       'equipo_modelo': datosLocales['modelo'] ?? '',
@@ -633,23 +735,23 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'observaciones': datosLocales['observaciones'] ?? '',
       'cliente_id': datosLocales['cliente_id'] ?? 0,
       'usuario_id': usuarioId,
-      'imagenPath': datosLocales['imagen_path'],
+
+      // ✅ SOLO formato con sufijo _1 y _2
       'imageBase64_1': datosLocales['imagen_base64'],
       'imageBase64_2': datosLocales['imagen_base64_2'],
+      'imagenPath': datosLocales['imagen_path'],
       'imageSize': datosLocales['imagen_tamano']?.toString(),
+
+      // Flags de control
+      'tiene_imagen': datosLocales['tiene_imagen'] ?? false,
+      'tiene_imagen2': datosLocales['tiene_imagen2'] ?? false,
+
+      // Metadata
       'en_local': datosLocales['en_local'] ?? true,
       'dispositivo': datosLocales['dispositivo'] ?? 'android',
       'es_censo': datosLocales['es_censo'] ?? true,
       'version_app': datosLocales['version_app'] ?? '1.0.0',
       'estado_general': datosLocales['estado_general'] ?? '',
-      'imagen_tamano': datosLocales['imagen_tamano'],
-      'imagen_base64': datosLocales['imagen_base64'],
-      'imagen_base64_2': datosLocales['imagen_base64_2'],
-      'imagen_tamano2': datosLocales['imagen_tamano2'],
-      'tiene_imagen': datosLocales['tiene_imagen'] ?? false,
-      'tiene_imagen2': datosLocales['tiene_imagen2'] ?? false,
-      'imagen_path': datosLocales['imagen_path'],
-      'imagen_path2': datosLocales['imagen_path2'],
     };
   }
 
@@ -853,5 +955,145 @@ class PreviewScreenViewModel extends ChangeNotifier {
     try {
       _logger.i('Registro marcado como sincronizado: $idLocal');
     } catch (e) {}
+  }
+  Future<void> _guardarLogEnArchivo({
+    required String url,
+    required Map<String, String> headers,
+    required Map<String, dynamic> body,
+    required String timestamp,
+  }) async {
+    try {
+      // Obtener directorio de descargas
+      Directory? downloadsDir;
+
+      if (Platform.isAndroid) {
+        // En Android, usar el directorio público de Downloads
+        downloadsDir = Directory('/storage/emulated/0/Download');
+
+        // Si no existe, intentar con getExternalStorageDirectory
+        if (!await downloadsDir.exists()) {
+          final externalDir = await getExternalStorageDirectory();
+          downloadsDir = Directory('${externalDir?.path}/Download');
+        }
+      } else if (Platform.isIOS) {
+        // En iOS, usar el directorio de documentos
+        downloadsDir = await getApplicationDocumentsDirectory();
+      }
+
+      if (downloadsDir == null) {
+        _logger.w('No se pudo obtener directorio de descargas');
+        return;
+      }
+
+      // Crear directorio si no existe
+      if (!await downloadsDir.exists()) {
+        await downloadsDir.create(recursive: true);
+      }
+
+      // Nombre del archivo con timestamp
+      final fileName = 'post_nuevo_equipo_${DateTime.now().millisecondsSinceEpoch}.txt';
+      final file = File('${downloadsDir.path}/$fileName');
+
+      // Construir contenido del archivo
+      final buffer = StringBuffer();
+
+      buffer.writeln('═══════════════════════════════════════════════════════════');
+      buffer.writeln('🚀 POST REQUEST - REGISTRO NUEVO EQUIPO');
+      buffer.writeln('═══════════════════════════════════════════════════════════');
+      buffer.writeln('');
+      buffer.writeln('📅 Timestamp: $timestamp');
+      buffer.writeln('📱 Dispositivo: ${Platform.operatingSystem}');
+      buffer.writeln('');
+      buffer.writeln('───────────────────────────────────────────────────────────');
+      buffer.writeln('📍 REQUEST INFO');
+      buffer.writeln('───────────────────────────────────────────────────────────');
+      buffer.writeln('');
+      buffer.writeln('Method: POST');
+      buffer.writeln('URL: $url');
+      buffer.writeln('');
+      buffer.writeln('Headers:');
+      headers.forEach((key, value) {
+        buffer.writeln('  $key: $value');
+      });
+      buffer.writeln('');
+      buffer.writeln('───────────────────────────────────────────────────────────');
+      buffer.writeln('📄 REQUEST BODY (JSON)');
+      buffer.writeln('───────────────────────────────────────────────────────────');
+      buffer.writeln('');
+
+      // Pretty print del JSON
+      final prettyJson = JsonEncoder.withIndent('  ').convert(body);
+      buffer.writeln(prettyJson);
+
+      buffer.writeln('');
+      buffer.writeln('───────────────────────────────────────────────────────────');
+      buffer.writeln('📊 METADATA');
+      buffer.writeln('───────────────────────────────────────────────────────────');
+      buffer.writeln('');
+      buffer.writeln('Tamaño del payload: ${json.encode(body).length} caracteres');
+      buffer.writeln('Número de campos: ${body.keys.length}');
+      buffer.writeln('');
+      buffer.writeln('Campos clave para nuevo equipo:');
+      buffer.writeln('  ✓ esNuevoEquipo: ${body['esNuevoEquipo']}');
+      buffer.writeln('  ✓ es_censo: ${body['es_censo']}');
+      buffer.writeln('  ✓ estadoCenso: ${body['estadoCenso']}');
+      buffer.writeln('  ✓ tiene_imagen: ${body['tiene_imagen']}');
+      buffer.writeln('  ✓ equipo_id: ${body['equipo_id']}');
+      buffer.writeln('  ✓ cliente_id: ${body['cliente_id']}');
+      buffer.writeln('');
+      buffer.writeln('═══════════════════════════════════════════════════════════');
+      buffer.writeln('Archivo generado por: ADA App v${body['version_app']}');
+      buffer.writeln('═══════════════════════════════════════════════════════════');
+
+      // Escribir archivo
+      await file.writeAsString(buffer.toString());
+
+      _logger.i('✅ Log guardado en: ${file.path}');
+      _logger.i('📁 Archivo: $fileName');
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Error guardando log en archivo: $e');
+      _logger.e('StackTrace: $stackTrace');
+    }
+  }
+
+// ============================================
+// MÉTODO AUXILIAR: Ver todos los archivos guardados
+// ============================================
+
+  Future<List<String>> obtenerLogsGuardados() async {
+    try {
+      Directory? downloadsDir;
+
+      if (Platform.isAndroid) {
+        downloadsDir = Directory('/storage/emulated/0/Download');
+        if (!await downloadsDir.exists()) {
+          final externalDir = await getExternalStorageDirectory();
+          downloadsDir = Directory('${externalDir?.path}/Download');
+        }
+      } else if (Platform.isIOS) {
+        downloadsDir = await getApplicationDocumentsDirectory();
+      }
+
+      if (downloadsDir == null || !await downloadsDir.exists()) {
+        return [];
+      }
+
+      final files = downloadsDir
+          .listSync()
+          .whereType<File>()
+          .where((file) => file.path.contains('post_nuevo_equipo_'))
+          .map((file) => file.path)
+          .toList();
+
+      files.sort((a, b) => b.compareTo(a)); // Más reciente primero
+
+      _logger.i('📂 Encontrados ${files.length} logs guardados');
+
+      return files;
+    } catch (e) {
+      _logger.e('Error listando logs: $e');
+      return [];
+    }
   }
 }

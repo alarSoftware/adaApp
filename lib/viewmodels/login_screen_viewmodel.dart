@@ -3,8 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:ada_app/services/auth_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
-import 'package:ada_app/services/sync/equipment_sync_service.dart';
-import 'package:ada_app/services/database_helper.dart'; // ← AGREGAR ESTE IMPORT
+import 'package:ada_app/services/database_helper.dart';
 
 class LoginScreenViewModel extends ChangeNotifier {
   final _authService = AuthService();
@@ -97,6 +96,12 @@ class LoginScreenViewModel extends ChangeNotifier {
 
     try {
       final SyncResult resultado = await AuthService.sincronizarClientesDelVendedor(edfVendedorId);
+
+      // ✅ MARCAR SINCRONIZACIÓN COMO COMPLETADA
+      if (resultado.exito) {
+        await _authService.markSyncCompleted(edfVendedorId);
+      }
+
       return resultado;
     } catch (e) {
       return SyncResult(
@@ -110,15 +115,12 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ← MÉTODO PARA ELIMINAR SOLO LA TABLA USERS
   Future<SyncResult> deleteUsersTable() async {
     _isLoading = true;
     notifyListeners();
 
     try {
       final dbHelper = DatabaseHelper();
-
-      // Eliminar SOLO la tabla Users
       await dbHelper.eliminar('Users');
 
       return SyncResult(
@@ -207,15 +209,23 @@ class LoginScreenViewModel extends ChangeNotifier {
             return validationResult;
           }
 
+          // ✅ VERIFICAR SINCRONIZACIÓN TAMBIÉN EN BIOMÉTRICO
+          final syncValidation = await _validateAndCheckSync();
+          if (!syncValidation.success) {
+            return syncValidation;
+          }
+
           return AuthResult(
-              success: true,
-              message: result.mensaje,
-              icon: Icons.fingerprint
+            success: true,
+            message: result.mensaje,
+            icon: Icons.fingerprint,
+            requiresSync: syncValidation.requiresSync,
+            syncValidation: syncValidation.syncValidation,
           );
         } else {
           return AuthResult(
-              success: false,
-              message: result.mensaje
+            success: false,
+            message: result.mensaje,
           );
         }
       } else {
@@ -224,8 +234,8 @@ class LoginScreenViewModel extends ChangeNotifier {
     } on PlatformException catch (e) {
       debugPrint('Error en autenticación biométrica: $e');
       return AuthResult(
-          success: false,
-          message: 'Error: ${e.message ?? 'Error desconocido'}'
+        success: false,
+        message: 'Error: ${e.message ?? 'Error desconocido'}',
       );
     }
   }
@@ -256,12 +266,22 @@ class LoginScreenViewModel extends ChangeNotifier {
           return validationResult;
         }
 
+        // ✅ NUEVO: Verificar si necesita sincronización forzada
+        final syncValidation = await _validateAndCheckSync();
+        if (!syncValidation.success) {
+          _errorMessage = syncValidation.message;
+          notifyListeners();
+          return syncValidation;
+        }
+
         await _checkBiometricAvailability();
 
         return AuthResult(
-            success: true,
-            message: result.mensaje,
-            icon: Icons.check_circle_outline
+          success: true,
+          message: result.mensaje,
+          icon: Icons.check_circle_outline,
+          requiresSync: syncValidation.requiresSync,
+          syncValidation: syncValidation.syncValidation,
         );
       } else {
         HapticFeedback.heavyImpact();
@@ -276,12 +296,53 @@ class LoginScreenViewModel extends ChangeNotifier {
       notifyListeners();
 
       return AuthResult(
-          success: false,
-          message: 'Error de conexión. Intenta nuevamente.'
+        success: false,
+        message: 'Error de conexión. Intenta nuevamente.',
       );
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  // ✅ NUEVO MÉTODO: Validar si necesita sincronización
+  Future<AuthResult> _validateAndCheckSync() async {
+    try {
+      final usuario = await _authService.getCurrentUser();
+
+      if (usuario?.edfVendedorId == null || usuario!.edfVendedorId!.trim().isEmpty) {
+        return AuthResult(
+          success: false,
+          message: 'Su usuario no tiene vendedor asociado. Contacte al administrador.',
+        );
+      }
+
+      // Verificar si necesita sincronización
+      final syncValidation = await _authService.validateSyncRequirement(usuario.edfVendedorId!);
+
+      debugPrint('🔍 Validación de sincronización: $syncValidation');
+
+      if (syncValidation.requiereSincronizacion) {
+        return AuthResult(
+          success: true,
+          message: 'Sincronización requerida',
+          requiresSync: true,
+          syncValidation: syncValidation,
+        );
+      }
+
+      return AuthResult(
+        success: true,
+        message: 'Validación exitosa',
+        requiresSync: false,
+      );
+
+    } catch (e) {
+      debugPrint('❌ Error en validación de sincronización: $e');
+      return AuthResult(
+        success: false,
+        message: 'Error validando sincronización: $e',
+      );
     }
   }
 
@@ -291,27 +352,27 @@ class LoginScreenViewModel extends ChangeNotifier {
 
       if (usuario?.edfVendedorId == null || usuario!.edfVendedorId!.trim().isEmpty) {
         return AuthResult(
-            success: false,
-            message: 'Su usuario no tiene vendedor asociado.\n\n'
-                'Comuníquese con el administrador del sistema para obtener acceso a los clientes.\n\n'
-                'Si es un usuario nuevo, es posible que su cuenta aún no haya sido configurada completamente.',
-            icon: Icons.admin_panel_settings
+          success: false,
+          message: 'Su usuario no tiene vendedor asociado.\n\n'
+              'Comuníquese con el administrador del sistema para obtener acceso a los clientes.\n\n'
+              'Si es un usuario nuevo, es posible que su cuenta aún no haya sido configurada completamente.',
+          icon: Icons.admin_panel_settings,
         );
       }
 
       debugPrint('Usuario validado - edf_vendedor_id: ${usuario.edfVendedorId}');
       return AuthResult(
-          success: true,
-          message: 'Usuario validado correctamente'
+        success: true,
+        message: 'Usuario validado correctamente',
       );
 
     } catch (e) {
       debugPrint('Error validando asignación de usuario: $e');
       return AuthResult(
-          success: false,
-          message: 'Error validando información del usuario. Intente nuevamente.\n\n'
-              'Si el problema persiste, contacte al administrador.',
-          icon: Icons.error_outline
+        success: false,
+        message: 'Error validando información del usuario. Intente nuevamente.\n\n'
+            'Si el problema persiste, contacte al administrador.',
+        icon: Icons.error_outline,
       );
     }
   }
@@ -334,10 +395,14 @@ class AuthResult {
   final bool success;
   final String message;
   final IconData? icon;
+  final bool requiresSync;
+  final SyncValidationResult? syncValidation;
 
   AuthResult({
     required this.success,
     required this.message,
     this.icon,
+    this.requiresSync = false,
+    this.syncValidation,
   });
 }
