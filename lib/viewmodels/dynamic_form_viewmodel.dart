@@ -13,15 +13,15 @@ class DynamicFormViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
   final Uuid _uuid = Uuid();
 
-  // Repositorios especializados
+  // Repositorios
   final DynamicFormTemplateRepository _templateRepo = DynamicFormTemplateRepository();
   final DynamicFormResponseRepository _responseRepo = DynamicFormResponseRepository();
   final DynamicFormSyncRepository _syncRepo = DynamicFormSyncRepository();
 
   // Estado
   bool _isLoading = false;
-  String? _errorMessage;
   bool _isSyncing = false;
+  String? _errorMessage;
 
   // Templates
   List<DynamicFormTemplate> _templates = [];
@@ -44,32 +44,17 @@ class DynamicFormViewModel extends ChangeNotifier {
   DynamicFormResponse? get currentResponse => _currentResponse;
   List<DynamicFormResponse> get savedResponses => _savedResponses;
 
-  // ==================== MÉTODOS PARA TEMPLATES ====================
+  // ==================== TEMPLATES ====================
 
   Future<void> loadTemplates() async {
-    try {
-      _isLoading = true;
-      _errorMessage = null;
-      notifyListeners();
-
+    await _executeWithLoading(() async {
       _templates = await _templateRepo.getAll();
-
       _logger.i('✅ Templates cargados: ${_templates.length}');
-    } catch (e) {
-      _errorMessage = 'Error cargando formularios: $e';
-      _logger.e('❌ Error cargando templates: $e');
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+    });
   }
 
   Future<bool> downloadTemplatesFromServer() async {
-    try {
-      _isLoading = true;
-      _errorMessage = null;
-      notifyListeners();
-
+    return await _executeWithLoading(() async {
       _logger.i('📥 Descargando formularios desde servidor...');
 
       final success = await _templateRepo.downloadFromServer();
@@ -78,24 +63,23 @@ class DynamicFormViewModel extends ChangeNotifier {
         await loadTemplates();
         _logger.i('✅ Templates descargados: ${_templates.length} disponibles');
         return true;
-      } else {
-        _errorMessage = 'Error descargando formularios del servidor';
-        _logger.e('❌ Error descargando templates');
-        return false;
       }
-    } catch (e) {
-      _errorMessage = 'Error de conexión: $e';
-      _logger.e('❌ Error descargando templates: $e');
+
+      _errorMessage = 'Error descargando formularios del servidor';
+      _logger.e('❌ Error descargando templates');
       return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+    }, defaultValue: false);
+  }
+
+  DynamicFormTemplate? getTemplateById(String templateId) {
+    try {
+      return _templates.firstWhere((t) => t.id == templateId);
+    } catch (e) {
+      return null;
     }
   }
 
-
-
-  // ==================== MÉTODOS PARA LLENAR FORMULARIOS ====================
+  // ==================== FORM LIFECYCLE ====================
 
   void startNewForm(
       String templateId, {
@@ -112,26 +96,9 @@ class DynamicFormViewModel extends ChangeNotifier {
       );
 
       if (existingResponse != null) {
-        _currentResponse = existingResponse;
-        _fieldValues = Map<String, dynamic>.from(existingResponse.answers);
-        _logger.i('✅ Formulario cargado para editar: ${existingResponse.id}');
-        _logger.i('📝 Valores cargados: ${_fieldValues.length} campos');
+        _loadExistingResponse(existingResponse);
       } else {
-        final responseId = _uuid.v4();
-
-        _currentResponse = DynamicFormResponse(
-          id: responseId,
-          formTemplateId: templateId,
-          answers: {},
-          createdAt: DateTime.now(),
-          status: 'draft',
-          contactoId: contactoId,
-          userId: userId,
-          edfVendedorId: edfVendedorId,
-        );
-
-        _fieldValues.clear();
-        _logger.i('✅ Formulario nuevo iniciado: ${_currentTemplate?.title} (UUID: $responseId)');
+        _createNewResponse(templateId, contactoId, userId, edfVendedorId);
       }
 
       _fieldErrors.clear();
@@ -143,10 +110,62 @@ class DynamicFormViewModel extends ChangeNotifier {
     }
   }
 
+  void _loadExistingResponse(DynamicFormResponse response) {
+    _currentResponse = response;
+    _fieldValues = Map<String, dynamic>.from(response.answers);
+    _logger.i('✅ Formulario cargado para editar: ${response.id}');
+    _logger.i('📝 Valores cargados: ${_fieldValues.length} campos');
+  }
+
+  void _createNewResponse(
+      String templateId,
+      String? contactoId,
+      String? userId,
+      String? edfVendedorId,
+      ) {
+    final responseId = _uuid.v4();
+
+    _currentResponse = DynamicFormResponse(
+      id: responseId,
+      formTemplateId: templateId,
+      answers: {},
+      createdAt: DateTime.now(),
+      status: 'draft',
+      contactoId: contactoId,
+      userId: userId,
+      edfVendedorId: edfVendedorId,
+    );
+
+    _fieldValues.clear();
+    _logger.i('✅ Formulario nuevo iniciado: ${_currentTemplate?.title} (UUID: $responseId)');
+  }
+
+  void loadResponseForEditing(DynamicFormResponse response) {
+    try {
+      _currentTemplate = _templates.firstWhere(
+            (t) => t.id == response.formTemplateId,
+        orElse: () => throw Exception('Template no encontrado'),
+      );
+
+      _loadExistingResponse(response);
+      _logger.i('✅ Respuesta cargada para edición: ${response.id}');
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = 'Error cargando respuesta: $e';
+      _logger.e('❌ Error cargando respuesta: $e');
+      notifyListeners();
+    }
+  }
+
+  // ==================== FIELD MANAGEMENT ====================
+
   dynamic getFieldValue(String fieldId) => _fieldValues[fieldId];
 
+  String? getFieldError(String fieldId) => _fieldErrors[fieldId];
+
   void updateFieldValue(String fieldId, dynamic value) {
-    final field = _findFieldById(fieldId);
+    final field = _currentTemplate?.getFieldById(fieldId);
+
     if (field != null && (field.type == 'radio_button' || field.type == 'checkbox')) {
       _clearChildrenValues(field, value);
     }
@@ -155,47 +174,33 @@ class DynamicFormViewModel extends ChangeNotifier {
     _fieldErrors.remove(fieldId);
 
     if (_currentResponse != null) {
-      _currentResponse = _currentResponse!.copyWith(
-        answers: {..._fieldValues},
-      );
+      _currentResponse = _currentResponse!.copyWith(answers: {..._fieldValues});
     }
 
     _logger.d('📝 Campo actualizado: $fieldId = $value');
     notifyListeners();
   }
 
-  DynamicFormField? _findFieldById(String fieldId) {
-    if (_currentTemplate == null) return null;
-
-    for (var field in _currentTemplate!.fields) {
-      if (field.id == fieldId) return field;
-      final found = _findFieldInChildren(field, fieldId);
-      if (found != null) return found;
-    }
-
-    return null;
-  }
-
-  DynamicFormField? _findFieldInChildren(DynamicFormField parent, String fieldId) {
-    for (var child in parent.children) {
-      if (child.id == fieldId) return child;
-      final found = _findFieldInChildren(child, fieldId);
-      if (found != null) return found;
-    }
-    return null;
-  }
-
   void _clearChildrenValues(DynamicFormField field, dynamic newValue) {
     if (field.type == 'radio_button') {
-      for (var option in field.children.where((c) => c.type == 'opt')) {
-        _clearFieldAndDescendants(option);
-      }
+      _clearAllOptions(field);
     } else if (field.type == 'checkbox') {
-      final selectedIds = newValue is List ? List<String>.from(newValue) : <String>[];
-      for (var option in field.children.where((c) => c.type == 'opt')) {
-        if (!selectedIds.contains(option.id)) {
-          _clearFieldAndDescendants(option);
-        }
+      _clearUnselectedOptions(field, newValue);
+    }
+  }
+
+  void _clearAllOptions(DynamicFormField field) {
+    for (var option in field.children.where((c) => c.type == 'opt')) {
+      _clearFieldAndDescendants(option);
+    }
+  }
+
+  void _clearUnselectedOptions(DynamicFormField field, dynamic newValue) {
+    final selectedIds = newValue is List ? List<String>.from(newValue) : <String>[];
+
+    for (var option in field.children.where((c) => c.type == 'opt')) {
+      if (!selectedIds.contains(option.id)) {
+        _clearFieldAndDescendants(option);
       }
     }
   }
@@ -212,27 +217,7 @@ class DynamicFormViewModel extends ChangeNotifier {
     }
   }
 
-  String? getFieldError(String fieldId) => _fieldErrors[fieldId];
-
-  List<DynamicFormField> _getAllAnswerableFields() {
-    if (_currentTemplate == null) return [];
-
-    final List<DynamicFormField> answerableFields = [];
-
-    for (final field in _currentTemplate!.fields) {
-      if (field.type == 'titulo') continue;
-
-      if (field.type == 'radio_button' ||
-          field.type == 'checkbox' ||
-          field.type == 'resp_abierta' ||
-          field.type == 'resp_abierta_larga' ||
-          field.type == 'image') {
-        answerableFields.add(field);
-      }
-    }
-
-    return answerableFields;
-  }
+  // ==================== VALIDATION ====================
 
   bool _validateAllFields() {
     if (_currentTemplate == null) return false;
@@ -240,19 +225,13 @@ class DynamicFormViewModel extends ChangeNotifier {
     _fieldErrors.clear();
     bool isValid = true;
 
-    final answerableFields = _getAllAnswerableFields();
+    final answerableFields = _currentTemplate!.answerableFields;
 
     for (final field in answerableFields) {
-      if (field.required) {
-        final value = _fieldValues[field.id];
-
-        if (value == null ||
-            (value is String && value.trim().isEmpty) ||
-            (value is List && value.isEmpty)) {
-          _fieldErrors[field.id] = '${field.label} es obligatorio';
-          isValid = false;
-          _logger.w('⚠️ Campo obligatorio sin completar: ${field.label} (${field.id})');
-        }
+      if (field.required && _isFieldEmpty(_fieldValues[field.id])) {
+        _fieldErrors[field.id] = '${field.label} es obligatorio';
+        isValid = false;
+        _logger.w('⚠️ Campo obligatorio sin completar: ${field.label} (${field.id})');
       }
     }
 
@@ -266,112 +245,38 @@ class DynamicFormViewModel extends ChangeNotifier {
   bool isFormComplete() {
     if (_currentTemplate == null) return false;
 
-    final answerableFields = _getAllAnswerableFields();
-
-    for (final field in answerableFields) {
-      if (field.required) {
-        final value = _fieldValues[field.id];
-
-        if (value == null ||
-            (value is String && value.trim().isEmpty) ||
-            (value is List && value.isEmpty)) {
-          return false;
-        }
-      }
-    }
-
-    return true;
+    return _currentTemplate!.requiredFields
+        .every((field) => !_isFieldEmpty(_fieldValues[field.id]));
   }
 
   double getFormProgress() {
     if (_currentTemplate == null) return 0.0;
 
-    final answerableFields = _getAllAnswerableFields();
-    final requiredFields = answerableFields.where((f) => f.required).toList();
-
+    final requiredFields = _currentTemplate!.requiredFields;
     if (requiredFields.isEmpty) return 1.0;
 
-    int filledRequired = 0;
+    final filledCount = requiredFields
+        .where((field) => !_isFieldEmpty(_fieldValues[field.id]))
+        .length;
 
-    for (final field in requiredFields) {
-      final value = _fieldValues[field.id];
-
-      if (value != null &&
-          ((value is String && value.trim().isNotEmpty) ||
-              (value is List && value.isNotEmpty) ||
-              (value is! String && value is! List))) {
-        filledRequired++;
-      }
-    }
-
-    return filledRequired / requiredFields.length;
+    return filledCount / requiredFields.length;
   }
 
+  bool _isFieldEmpty(dynamic value) {
+    if (value == null) return true;
+    if (value is String) return value.trim().isEmpty;
+    if (value is List) return value.isEmpty;
+    return false;
+  }
 
+  // ==================== SAVING ====================
 
   Future<bool> saveProgress() async {
-    try {
-      if (_currentResponse == null) {
-        _errorMessage = 'No hay formulario activo';
-        return false;
-      }
-
-      _logger.i('💾 Guardando progreso como borrador...');
-
-      final updatedResponse = _currentResponse!.copyWith(
-        answers: Map<String, dynamic>.from(_fieldValues),
-        status: 'draft',
-      );
-
-      final success = await _responseRepo.save(updatedResponse);
-
-      if (success) {
-        _currentResponse = updatedResponse;
-        _logger.i('✅ Progreso guardado (imágenes como rutas)');
-        notifyListeners();
-        return true;
-      } else {
-        _errorMessage = 'Error guardando progreso';
-        _logger.e('❌ Error guardando progreso');
-        return false;
-      }
-    } catch (e) {
-      _errorMessage = 'Error guardando progreso: $e';
-      _logger.e('❌ Error guardando progreso: $e');
-      return false;
-    }
+    return await _saveWithStatus('draft', 'Guardando progreso como borrador...');
   }
 
   Future<bool> saveDraft() async {
-    try {
-      if (_currentResponse == null) {
-        _errorMessage = 'No hay formulario activo';
-        return false;
-      }
-
-      _logger.i('💾 Guardando borrador...');
-
-      final draftResponse = _currentResponse!.copyWith(
-        answers: Map<String, dynamic>.from(_fieldValues),
-        status: 'draft',
-      );
-
-      final success = await _responseRepo.save(draftResponse);
-
-      if (success) {
-        _currentResponse = draftResponse;
-        _logger.i('✅ Borrador guardado (imágenes como rutas)');
-        notifyListeners();
-        return true;
-      } else {
-        _errorMessage = 'Error guardando borrador';
-        return false;
-      }
-    } catch (e) {
-      _errorMessage = 'Error guardando borrador: $e';
-      _logger.e('❌ Error guardando borrador: $e');
-      return false;
-    }
+    return await _saveWithStatus('draft', 'Guardando borrador...');
   }
 
   Future<bool> saveAndComplete() async {
@@ -405,31 +310,120 @@ class DynamicFormViewModel extends ChangeNotifier {
 
       _logger.i('✅ Formulario completado (imágenes convertidas a Base64)');
 
-      _isSyncing = true;
-      notifyListeners();
+      // Sincronizar
+      await _syncResponse(completedResponse.id);
 
-      // ✅ CAMBIO AQUÍ: Usar syncToServer en lugar de simulateSyncToServer
-      final synced = await _syncRepo.syncToServer(completedResponse.id);
-
-      _isSyncing = false;
-
-      if (synced) {
-        _logger.i('✅ Formulario sincronizado exitosamente');
-      } else {
-        _logger.w('⚠️ Formulario guardado pero no sincronizado');
-      }
-
-      _currentTemplate = null;
-      _currentResponse = null;
-      _fieldValues.clear();
-      _fieldErrors.clear();
-
+      _clearCurrentForm();
       notifyListeners();
       return true;
-
     } catch (e) {
       _errorMessage = 'Error completando formulario: $e';
       _logger.e('❌ Error en saveAndComplete: $e');
+      _isSyncing = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> _saveWithStatus(String status, String logMessage) async {
+    try {
+      if (_currentResponse == null) {
+        _errorMessage = 'No hay formulario activo';
+        return false;
+      }
+
+      _logger.i('💾 $logMessage');
+
+      final updatedResponse = _currentResponse!.copyWith(
+        answers: Map<String, dynamic>.from(_fieldValues),
+        status: status,
+      );
+
+      final success = await _responseRepo.save(updatedResponse);
+
+      if (success) {
+        _currentResponse = updatedResponse;
+        _logger.i('✅ Guardado exitoso');
+        notifyListeners();
+        return true;
+      }
+
+      _errorMessage = 'Error guardando';
+      _logger.e('❌ Error guardando');
+      return false;
+    } catch (e) {
+      _errorMessage = 'Error guardando: $e';
+      _logger.e('❌ Error guardando: $e');
+      return false;
+    }
+  }
+
+  void _clearCurrentForm() {
+    _currentTemplate = null;
+    _currentResponse = null;
+    _fieldValues.clear();
+    _fieldErrors.clear();
+  }
+
+  // ==================== SYNC ====================
+
+  Future<void> _syncResponse(String responseId) async {
+    _isSyncing = true;
+    notifyListeners();
+
+    final synced = await _syncRepo.syncToServer(responseId);
+
+    _isSyncing = false;
+
+    if (synced) {
+      _logger.i('✅ Formulario sincronizado exitosamente');
+    } else {
+      _logger.w('⚠️ Formulario guardado pero no sincronizado');
+    }
+  }
+
+  Future<Map<String, int>> syncPendingResponses() async {
+    try {
+      _isSyncing = true;
+      notifyListeners();
+
+      final result = await _syncRepo.syncAllPending();
+      _logger.i('✅ Sincronización completada: ${result['success']} exitosas, ${result['failed']} fallidas');
+
+      return result;
+    } catch (e) {
+      _logger.e('❌ Error sincronizando: $e');
+      return {'success': 0, 'failed': 0};
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> retrySyncResponse(String responseId) async {
+    try {
+      _logger.i('🔄 Reintentando sincronización: $responseId');
+
+      _isSyncing = true;
+      notifyListeners();
+
+      final success = await _syncRepo.retrySyncResponse(responseId);
+
+      _isSyncing = false;
+      notifyListeners();
+
+      if (success) {
+        _logger.i('✅ Reintento exitoso');
+        return true;
+      }
+
+      _logger.w('⚠️ Reintento fallido');
+      _errorMessage = 'No se pudo sincronizar. Intenta más tarde.';
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _logger.e('❌ Error en reintento: $e');
+      _errorMessage = e.toString();
       _isSyncing = false;
       notifyListeners();
       return false;
@@ -452,110 +446,16 @@ class DynamicFormViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> retrySyncResponse(String responseId) async {
-    try {
-      _logger.i('🔄 Reintentando sincronización: $responseId');
+  // ==================== RESPONSES ====================
 
-      _isSyncing = true;
-      notifyListeners();
-
-      // ✅ CAMBIO AQUÍ: Usar retrySyncResponse que internamente llama a syncToServer
-      final success = await _syncRepo.retrySyncResponse(responseId);
-
-      _isSyncing = false;
-      notifyListeners();
-
-      if (success) {
-        _logger.i('✅ Reintento exitoso');
-        return true;
-      } else {
-        _logger.w('⚠️ Reintento fallido');
-        _errorMessage = 'No se pudo sincronizar. Intenta más tarde.';
-        notifyListeners();
-        return false;
-      }
-    } catch (e) {
-      _logger.e('❌ Error en reintento: $e');
-      _errorMessage = e.toString();
-      _isSyncing = false;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  // ==================== MÉTODOS DE SINCRONIZACIÓN ====================
-
-  Future<Map<String, int>> syncPendingResponses() async {
-    try {
-      _isSyncing = true;
-      notifyListeners();
-
-      final result = await _syncRepo.syncAllPending();
-
-      _logger.i('✅ Sincronización completada: ${result['success']} exitosas, ${result['failed']} fallidas');
-      return result;
-    } catch (e) {
-      _logger.e('❌ Error sincronizando: $e');
-      return {'success': 0, 'failed': 0};
-    } finally {
-      _isSyncing = false;
-      notifyListeners();
-    }
-  }
-
-  void loadResponseForEditing(DynamicFormResponse response) {
-    try {
-      _currentTemplate = _templates.firstWhere(
-            (t) => t.id == response.formTemplateId,
-        orElse: () => throw Exception('Template no encontrado'),
-      );
-
-      _currentResponse = response;
-      _fieldValues = Map<String, dynamic>.from(response.answers);
-      _fieldErrors.clear();
-
-      _logger.i('✅ Respuesta cargada para edición: ${response.id}');
-      _logger.d('📝 ${_fieldValues.length} valores cargados');
-      notifyListeners();
-    } catch (e) {
-      _errorMessage = 'Error cargando respuesta: $e';
-      _logger.e('❌ Error cargando respuesta: $e');
-      notifyListeners();
-    }
-  }
-
-  // ==================== MÉTODOS PARA RESPUESTAS GUARDADAS ====================
   Future<void> loadSavedResponsesWithSync({String? clienteId}) async {
-    try {
-      _isLoading = true;
-      _errorMessage = null;
-      notifyListeners();
-
+    await _executeWithLoading(() async {
       final allResponses = await _responseRepo.getAll();
 
-      // ✅ Filtrar por clienteId si se proporciona
-      if (clienteId != null && clienteId.isNotEmpty) {
-        _savedResponses = allResponses
-            .where((response) => response.contactoId == clienteId)
-            .toList();
-      } else {
-        _savedResponses = allResponses;
-      }
-    } catch (e) {
-      _errorMessage = 'Error cargando respuestas: $e';
-      _logger.e('❌ Error cargando respuestas: $e');
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  DynamicFormTemplate? getTemplateById(String templateId) {
-    try {
-      return _templates.firstWhere((t) => t.id == templateId);
-    } catch (e) {
-      return null;
-    }
+      _savedResponses = clienteId != null && clienteId.isNotEmpty
+          ? allResponses.where((r) => r.contactoId == clienteId).toList()
+          : allResponses;
+    });
   }
 
   Future<bool> deleteResponse(String responseId) async {
@@ -578,11 +478,7 @@ class DynamicFormViewModel extends ChangeNotifier {
   }
 
   Future<bool> downloadResponsesFromServer(String edfvendedorId) async {
-    try {
-      _isLoading = true;
-      _errorMessage = null;
-      notifyListeners();
-
+    return await _executeWithLoading(() async {
       _logger.i('📥 Descargando respuestas desde servidor...');
 
       final resultado = await DynamicFormSyncService.obtenerRespuestasPorVendedor(edfvendedorId);
@@ -591,15 +487,31 @@ class DynamicFormViewModel extends ChangeNotifier {
         await loadSavedResponsesWithSync();
         _logger.i('✅ Respuestas descargadas: ${resultado.itemsSincronizados}');
         return true;
-      } else {
-        _errorMessage = 'Error descargando respuestas del servidor';
-        _logger.e('❌ Error descargando respuestas');
-        return false;
       }
-    } catch (e) {
-      _errorMessage = 'Error de conexión: $e';
-      _logger.e('❌ Error descargando respuestas: $e');
+
+      _errorMessage = 'Error descargando respuestas del servidor';
+      _logger.e('❌ Error descargando respuestas');
       return false;
+    }, defaultValue: false);
+  }
+
+  // ==================== HELPERS ====================
+
+  Future<T> _executeWithLoading<T>(
+      Future<T> Function() action, {
+        T? defaultValue,
+      }) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      return await action();
+    } catch (e) {
+      _errorMessage = 'Error: $e';
+      _logger.e('❌ Error: $e');
+      if (defaultValue != null) return defaultValue;
+      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();

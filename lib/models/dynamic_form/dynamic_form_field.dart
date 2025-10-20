@@ -42,13 +42,23 @@ class DynamicFormField {
     );
   }
 
+  // ==================== HELPERS ESTÁTICOS ====================
+
   static bool _isParentType(String type) {
-    return ['titulo', 'radio_button', 'checkbox'].contains(type);
+    return const ['titulo', 'radio_button', 'checkbox'].contains(type);
   }
 
-  bool get required {
-    return type != 'titulo' && type != 'opt';
+  static bool isAnswerableType(String type) {
+    return !const ['titulo', 'opt'].contains(type);
   }
+
+  // ==================== GETTERS ====================
+
+  bool get required {
+    return false;  // ✅ TODO OPCIONAL - Cambiado de la lógica anterior
+  }
+
+  bool get isAnswerable => isAnswerableType(type);
 
   String get widgetType {
     return switch (type) {
@@ -67,15 +77,49 @@ class DynamicFormField {
 
   int? get maxLength => type == 'resp_abierta' ? 500 : null;
 
-  String? validate(dynamic value) {
-    if (type == 'titulo' || type == 'opt') return null;
+  // ==================== VALIDACIÓN ====================
 
-    if (required && (value == null || value.toString().trim().isEmpty)) {
-      return '$label es obligatorio';
+  String? validate(dynamic value) {
+    // Como nada es obligatorio, siempre retorna null
+    return null;
+  }
+
+  // ==================== BÚSQUEDA RECURSIVA ====================
+
+  /// Busca un campo por ID en este campo y sus hijos recursivamente
+  DynamicFormField? findById(String targetId) {
+    if (id == targetId) return this;
+
+    for (var child in children) {
+      final found = child.findById(targetId);
+      if (found != null) return found;
     }
 
     return null;
   }
+
+  /// Obtiene todos los campos que pueden responderse (recursivo)
+  List<DynamicFormField> getAllAnswerableFields() {
+    final List<DynamicFormField> result = [];
+
+    if (isAnswerable) {
+      result.add(this);
+    }
+
+    for (var child in children) {
+      result.addAll(child.getAllAnswerableFields());
+    }
+
+    return result;
+  }
+
+  /// Obtiene todos los campos obligatorios (recursivo)
+  List<DynamicFormField> getAllRequiredFields() {
+    // Como nada es obligatorio, retorna lista vacía
+    return [];
+  }
+
+  // ==================== COPIA Y MODIFICACIÓN ====================
 
   DynamicFormField withChildren(List<DynamicFormField> children) {
     return DynamicFormField(
@@ -123,6 +167,8 @@ class DynamicFormField {
       metadata: metadata ?? this.metadata,
     );
   }
+
+  // ==================== SERIALIZACIÓN ====================
 
   Map<String, dynamic> toJson() {
     return {
