@@ -101,9 +101,9 @@ class _SelectScreenState extends State<SelectScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('• Clientes del servidor', style: TextStyle(color: AppColors.textSecondary)),
-                    Text('• Equipos y refrigeradores', style: TextStyle(color: AppColors.textSecondary)),
-                    Text('• Estados y asignaciones', style: TextStyle(color: AppColors.textSecondary)),
+                    Text('• Clientes', style: TextStyle(color: AppColors.textSecondary)),
+                    Text('• Equipos', style: TextStyle(color: AppColors.textSecondary)),
+                    Text('• Formularios', style: TextStyle(color: AppColors.textSecondary)),
                   ],
                 ),
               ),

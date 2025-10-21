@@ -115,6 +115,11 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
+  // Método público para marcar sincronización completada
+  Future<void> markSyncCompleted(String edfVendedorId) async {
+    await _authService.markSyncCompleted(edfVendedorId);
+  }
+
   Future<SyncResult> deleteUsersTable() async {
     _isLoading = true;
     notifyListeners();

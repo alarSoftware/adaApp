@@ -151,21 +151,33 @@ class _PreviewScreenState extends State<PreviewScreen> {
       return; // Ignorar silenciosamente
     }
 
-    if (!viewModel.canConfirm) {
-      _mostrarSnackBar('Ya hay un proceso en curso. Por favor espere.', AppColors.warning);
-      return;
-    }
-
-    final bool? confirmado = await PreviewDialogs.mostrarConfirmacion(context);
-    if (confirmado != true) return;
-
-    // Marcar como confirmado inmediatamente después de aceptar el diálogo
+    // ✅ CRÍTICO: Marcar como confirmado INMEDIATAMENTE, antes de cualquier otra cosa
     setState(() {
       _yaConfirmado = true;
     });
 
     if (!viewModel.canConfirm) {
       _mostrarSnackBar('Ya hay un proceso en curso. Por favor espere.', AppColors.warning);
+      return;
+    }
+
+    final bool? confirmado = await PreviewDialogs.mostrarConfirmacion(context);
+
+    // ✅ Si cancela el diálogo, rehabilitar el botón
+    if (confirmado != true) {
+      setState(() {
+        _yaConfirmado = false;
+      });
+      return;
+    }
+
+    // Ya no necesitamos volver a marcar _yaConfirmado aquí porque ya lo hicimos arriba
+
+    if (!viewModel.canConfirm) {
+      _mostrarSnackBar('Ya hay un proceso en curso. Por favor espere.', AppColors.warning);
+      setState(() {
+        _yaConfirmado = false;
+      });
       return;
     }
 
@@ -200,7 +212,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
 
     print('🔍 DEBUG: Iniciando confirmación de registro...');
-    //final resultado = await viewModel.confirmarRegistro(datosCompletos);
     final resultado = await viewModel.confirmarRegistro(datosCompletos);
     print('🔍 DEBUG: Resultado recibido: $resultado');
 
@@ -210,17 +221,17 @@ class _PreviewScreenState extends State<PreviewScreen> {
       if (resultado['success']) {
         print('✅ DEBUG: Resultado success = true');
 
+        // ✅ Mostrar mensaje breve
         _mostrarSnackBar(resultado['message'], AppColors.success);
-        await Future.delayed(const Duration(seconds: 2));
 
-        print('✅ DEBUG: Delay completado, verificando mounted...');
+        // ✅ Pequeño delay solo para que se vea el snackbar (opcional)
+        await Future.delayed(const Duration(milliseconds: 500));
 
+        // ✅ Navegar inmediatamente - el POST se hace en background
         if (mounted) {
-          print('✅ DEBUG: Aún mounted, navegando ahora...');
+          print('✅ DEBUG: Navegando a detalle del equipo...');
           await _navegarAEquipoClienteDetail();
           print('✅ DEBUG: Navegación completada');
-        } else {
-          print('❌ DEBUG: Widget ya no está mounted después del delay');
         }
       } else {
         print('❌ DEBUG: Resultado success = false, error: ${resultado['error']}');

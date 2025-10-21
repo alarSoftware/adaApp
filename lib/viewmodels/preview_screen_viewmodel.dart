@@ -140,7 +140,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
     }
   }
-
   Future<Map<String, dynamic>> _ejecutarConfirmacion(
       Map<String, dynamic> datos,
       String processId
@@ -158,7 +157,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       final cliente = datos['cliente'] as Cliente?;
       final esCenso = datos['es_censo'] as bool? ?? true;
-      final esNuevoEquipo = datos['es_nuevo_equipo'] as bool? ?? false;  // ✅ NUEVO
+      final esNuevoEquipo = datos['es_nuevo_equipo'] as bool? ?? false;
       var equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
 
       if (cliente == null) throw 'Cliente no encontrado en los datos';
@@ -185,12 +184,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
             modeloId: _safeCastToInt(datos['modelo_id'], 'modelo_id') ?? 1,
             numeroSerie: datos['numero_serie']?.toString(),
             logoId: _safeCastToInt(datos['logo_id'], 'logo_id') ?? 1,
-            //clienteId: clienteId.toString(),
           );
 
           _logger.i('✅ Equipo nuevo creado con ID: $equipoId');
 
-          // Crear equipoCompleto artificial para continuar el flujo
           equipoCompleto = {
             'id': equipoId,
             'cod_barras': datos['codigo_barras'],
@@ -210,7 +207,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
           throw 'Error registrando equipo nuevo: $e';
         }
       } else {
-        // Equipos existentes
         if (equipoCompleto == null) throw 'No se encontró información del equipo';
         if (equipoCompleto['id'] == null) throw 'El equipo no tiene ID asignado';
         equipoId = equipoCompleto['id'].toString();
@@ -246,13 +242,12 @@ class PreviewScreenViewModel extends ChangeNotifier {
           _logger.i('✅ Registro pendiente creado exitosamente');
         } catch (e) {
           _logger.w('⚠️ Error registrando equipo pendiente: $e');
-          // No fallar por esto, continuar
         }
       } else {
         _logger.i('ℹ️ Equipo ya asignado - no se crea registro pendiente');
       }
 
-      // ✅ TODOS LOS CASOS: Crear estado en censo_activo
+      // ✅ CREAR ESTADO EN CENSO_ACTIVO
       _setStatusMessage('Registrando censo...');
 
       if (_currentProcessId != processId) {
@@ -292,21 +287,17 @@ class PreviewScreenViewModel extends ChangeNotifier {
         throw 'Error creando censo: $dbError';
       }
 
-      // Continuar con sincronización al servidor...
-      // (resto del código igual)
+      // ================================================================
+      // ✅ CAMBIO PRINCIPAL: Preparar datos y lanzar POST en background
+      // ================================================================
 
-      if (_currentProcessId != processId) {
-        return {'success': false, 'error': 'Proceso cancelado'};
-      }
-
-      _setStatusMessage('Preparando datos para sincronización...');
-      Map<String, dynamic> datosCompletos;
+      _setStatusMessage('Preparando sincronización...');
 
       if (estadoIdActual != null) {
         final now = DateTime.now().toLocal();
         final timestampId = now.millisecondsSinceEpoch;
 
-        datosCompletos = {
+        final datosCompletos = {
           'id_local': estadoIdActual,
           'timestamp_id': timestampId,
           'estado_sincronizacion': 'pendiente',
@@ -338,73 +329,37 @@ class PreviewScreenViewModel extends ChangeNotifier {
           'fecha_registro': datos['fecha_registro'],
           'timestamp_gps': datos['timestamp_gps'],
           'es_censo': esCenso,
-          'es_nuevo_equipo': esNuevoEquipo,  // ✅ NUEVO
+          'es_nuevo_equipo': esNuevoEquipo,
           'ya_asignado': yaAsignado,
           'version_app': '1.0.0',
           'dispositivo': Platform.operatingSystem,
           'fecha_revision': _formatearFechaLocal(now),
           'en_local': true,
         };
+
+        // 🔥 Guardar registro local maestro
+        await _guardarRegistroLocal(datosCompletos);
+
+        // 🔥 Lanzar sincronización en BACKGROUND (sin await)
+        _sincronizarEnBackground(estadoIdActual, datosCompletos);
+
+        _logger.i('✅ Registro guardado localmente. Sincronización en segundo plano iniciada.');
+
+        // Retornar éxito inmediatamente
+        final mensajeFinal = esNuevoEquipo
+            ? 'Equipo nuevo registrado. Sincronizando en segundo plano...'
+            : 'Censo registrado. Sincronizando en segundo plano...';
+
+        return {
+          'success': true,
+          'message': mensajeFinal,
+          'migrado_inmediatamente': false,
+          'estado_id': estadoIdActual,
+          'equipo_completo': equipoCompleto,
+        };
       } else {
-        datosCompletos = await _prepararDatosParaEnvio(datos);
+        throw 'No se pudo crear el estado en la base de datos';
       }
-
-      // Resto del flujo de sincronización igual...
-      if (_currentProcessId != processId) {
-        return {'success': false, 'error': 'Proceso cancelado'};
-      }
-
-      _setStatusMessage('Guardando registro local maestro...');
-      await _guardarRegistroLocal(datosCompletos);
-
-      _setStatusMessage('Sincronizando registro actual...');
-      String mensajeFinal;
-      bool migracionExitosa = false;
-
-      if (estadoIdActual != null) {
-        if (_currentProcessId != processId) {
-          return {'success': false, 'error': 'Proceso cancelado'};
-        }
-
-        final respuestaServidor = await _intentarEnviarAlServidorConTimeout(
-            datosCompletos,
-            timeoutSegundos: 8
-        );
-
-        if (respuestaServidor['exito'] == true) {
-          await _estadoEquipoRepository.marcarComoMigrado(
-              estadoIdActual,
-              servidorId: respuestaServidor['servidor_id']
-          );
-          final idLocal = _safeCastToInt(datosCompletos['id_local'], 'id_local');
-          if (idLocal != null) await _marcarComoSincronizado(idLocal);
-
-          mensajeFinal = esNuevoEquipo
-              ? 'Equipo nuevo registrado y sincronizado'
-              : 'Censo completado y sincronizado';
-          migracionExitosa = true;
-        } else {
-          await _estadoEquipoRepository.marcarComoError(
-              estadoIdActual,
-              'Error: ${respuestaServidor['detalle'] ?? respuestaServidor['motivo']}'
-          );
-
-          mensajeFinal = esNuevoEquipo
-              ? 'Equipo nuevo guardado. Se sincronizará automáticamente'
-              : 'Censo guardado. Se sincronizará automáticamente';
-        }
-      } else {
-        mensajeFinal = 'Registro guardado localmente';
-      }
-
-      _programarSincronizacionBackground();
-      await Future.delayed(const Duration(milliseconds: 300));
-
-      return {
-        'success': true,
-        'message': mensajeFinal,
-        'migrado_inmediatamente': migracionExitosa
-      };
 
     } catch (e) {
       _logger.e('❌ Error crítico en confirmación: $e');
@@ -412,6 +367,47 @@ class PreviewScreenViewModel extends ChangeNotifier {
     } finally {
       _setSaving(false);
     }
+  }
+
+// ================================================================
+// ✅ NUEVO MÉTODO: Sincronización en segundo plano
+// ================================================================
+
+  void _sincronizarEnBackground(int estadoId, Map<String, dynamic> datosCompletos) {
+    // Ejecutar sin await para que no bloquee
+    Future.delayed(Duration.zero, () async {
+      try {
+        _logger.i('🔄 Iniciando sincronización en segundo plano para estado $estadoId');
+
+        final datosApi = await _prepararDatosParaApiEstados(datosCompletos);
+        final respuestaServidor = await _enviarAApiEstadosConTimeout(datosApi, 10);
+
+        if (respuestaServidor['exito'] == true) {
+          await _estadoEquipoRepository.marcarComoMigrado(
+              estadoId,
+              servidorId: respuestaServidor['servidor_id']
+          );
+          final idLocal = _safeCastToInt(datosCompletos['id_local'], 'id_local');
+          if (idLocal != null) await _marcarComoSincronizado(idLocal);
+
+          _logger.i('✅ Sincronización en segundo plano exitosa para estado $estadoId');
+        } else {
+          await _estadoEquipoRepository.marcarComoError(
+              estadoId,
+              'Error: ${respuestaServidor['detalle'] ?? respuestaServidor['motivo']}'
+          );
+          _logger.w('⚠️ Error en sincronización de segundo plano: ${respuestaServidor['motivo']}');
+        }
+      } catch (e) {
+        _logger.e('❌ Excepción en sincronización de segundo plano: $e');
+        try {
+          await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción: $e');
+        } catch (_) {}
+      }
+
+      // Programar sincronización automática de otros registros pendientes
+      _programarSincronizacionBackground();
+    });
   }
 
   void cancelarProcesoActual() {

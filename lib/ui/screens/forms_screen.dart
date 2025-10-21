@@ -1,6 +1,6 @@
 // ui/screens/forms_screen.dart
 import 'dart:io';
-
+import 'package:ada_app/ui/widgets/searchable_dropdown.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:ada_app/models/cliente.dart';
@@ -531,78 +531,44 @@ class _FormsScreenState extends State<FormsScreen> {
     return ListenableBuilder(
       listenable: _viewModel,
       builder: (context, child) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Modelo:',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: DropdownButtonFormField<int>(
-                value: _viewModel.modelos.isNotEmpty &&
-                    _viewModel.modeloSeleccionado != null &&
-                    _viewModel.modelos.any((modelo) => modelo['id'] == _viewModel.modeloSeleccionado)
-                    ? _viewModel.modeloSeleccionado
-                    : null,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.devices),
-                  fillColor: _viewModel.fieldBackgroundColor,
-                  filled: _viewModel.fieldBackgroundColor != null,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: AppColors.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: AppColors.focus),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                ),
-                hint: Text(
-                  _viewModel.modeloHint,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                items: _viewModel.modelos.map((modelo) {
-                  final modeloId = modelo['id'] is int ? modelo['id'] : int.tryParse(modelo['id'].toString());
-                  return DropdownMenuItem<int>(
-                    value: modeloId,
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: Text(
-                        '${modelo['nombre']} (ID: $modeloId)',
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
-                    ),
-                  );
-                }).toList(),
-                onChanged: _viewModel.areFieldsEnabled
-                    ? (value) {
-                  print('Modelo dropdown onChanged: $value');
-                  _viewModel.setModeloSeleccionado(value);
-                }
-                    : null,
-                validator: (value) {
-                  final result = _viewModel.validarModelo(value);
-                  print('Modelo dropdown validation: $value -> $result');
-                  return result;
-                },
-              ),
-            ),
-          ],
+        // Convertir la lista de modelos a DropdownItems
+        final modeloItems = _viewModel.modelos.map((modelo) {
+          final modeloId = modelo['id'] is int
+              ? modelo['id']
+              : int.tryParse(modelo['id'].toString());
+
+          return DropdownItem<int>(
+            value: modeloId!,
+            label: '${modelo['nombre']} (ID: $modeloId)',
+          );
+        }).toList();
+
+        return SearchableDropdown<int>(
+          label: 'Modelo:',
+          hint: _viewModel.modeloHint,
+          value: _viewModel.modeloSeleccionado,
+          items: modeloItems,
+          prefixIcon: Icons.devices,
+          enabled: _viewModel.areFieldsEnabled,
+          onChanged: (value) {
+            print('Modelo dropdown onChanged: $value');
+            _viewModel.setModeloSeleccionado(value);
+
+            // ✅ AGREGAR: Forzar revalidación del formulario
+            Future.microtask(() {
+              _formKey.currentState?.validate();
+            });
+          },
+          validator: (value) {
+            final result = _viewModel.validarModelo(value);
+            print('Modelo dropdown validation: $value -> $result');
+            return result;
+          },
         );
       },
     );
   }
+
 
   Widget _buildSerieField() {
     return ListenableBuilder(
@@ -678,74 +644,39 @@ class _FormsScreenState extends State<FormsScreen> {
     return ListenableBuilder(
       listenable: _viewModel,
       builder: (context, child) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Logo:',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: DropdownButtonFormField<int>(
-                value: _viewModel.logos.isNotEmpty &&
-                    _viewModel.logoSeleccionado != null &&
-                    _viewModel.logos.any((logo) => logo['id'] == _viewModel.logoSeleccionado)
-                    ? _viewModel.logoSeleccionado
-                    : null,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.branding_watermark),
-                  fillColor: _viewModel.fieldBackgroundColor,
-                  filled: _viewModel.fieldBackgroundColor != null,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: AppColors.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: AppColors.focus),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                ),
-                hint: Text(
-                  _viewModel.logoHint,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                items: _viewModel.logos.map((logo) {
-                  final logoId = logo['id'] is int ? logo['id'] : int.tryParse(logo['id'].toString());
-                  return DropdownMenuItem<int>(
-                    value: logoId,
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: Text(
-                        '${logo['nombre']} (ID: $logoId)',
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
-                    ),
-                  );
-                }).toList(),
-                onChanged: _viewModel.areFieldsEnabled
-                    ? (value) {
-                  print('Dropdown onChanged: $value');
-                  _viewModel.setLogoSeleccionado(value);
-                }
-                    : null,
-                validator: (value) {
-                  final result = _viewModel.validarLogo(value);
-                  print('Dropdown validation: $value -> $result');
-                  return result;
-                },
-              ),
-            ),
-          ],
+        // Convertir la lista de logos a DropdownItems
+        final logoItems = _viewModel.logos.map((logo) {
+          final logoId = logo['id'] is int
+              ? logo['id']
+              : int.tryParse(logo['id'].toString());
+
+          return DropdownItem<int>(
+            value: logoId!,
+            label: '${logo['nombre']} (ID: $logoId)',
+          );
+        }).toList();
+
+        return SearchableDropdown<int>(
+          label: 'Logo:',
+          hint: _viewModel.logoHint,
+          value: _viewModel.logoSeleccionado,
+          items: logoItems,
+          prefixIcon: Icons.branding_watermark,
+          enabled: _viewModel.areFieldsEnabled,
+          onChanged: (value) {
+            print('Logo dropdown onChanged: $value');
+            _viewModel.setLogoSeleccionado(value);
+
+            // ✅ AGREGAR: Forzar revalidación del formulario
+            Future.microtask(() {
+              _formKey.currentState?.validate();
+            });
+          },
+          validator: (value) {
+            final result = _viewModel.validarLogo(value);
+            print('Logo dropdown validation: $value -> $result');
+            return result;
+          },
         );
       },
     );

@@ -69,7 +69,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   bool _isCensoMode = true;
   bool _isLoading = false;
   bool _isScanning = false;
-  bool _isTakingPhoto = false; // Faltaba esta variable
+  bool _isTakingPhoto = false;
 
   // NUEVO: Lista de modelos y modelo seleccionado
   List<Map<String, dynamic>> _modelos = [];
