@@ -317,6 +317,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
           'Creado: ${_dateFormat.format(response.createdAt)}',
           AppColors.textSecondary,
         ),
+
         if (response.completedAt != null) ...[
           SizedBox(height: 4),
           _buildInfoRow(
@@ -325,7 +326,9 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
             AppColors.success,
           ),
         ],
-        if (response.syncedAt != null) ...[
+
+        // ✅ Mostrar estado de sincronización
+        if (response.isSynced && response.syncedAt != null) ...[
           SizedBox(height: 4),
           _buildInfoRow(
             Icons.cloud_done,
@@ -333,6 +336,27 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
             AppColors.success,
           ),
         ],
+
+        // ⚠️ Mostrar si está pendiente de sync
+        if (response.isCompleted && !response.isSynced) ...[
+          SizedBox(height: 4),
+          _buildInfoRow(
+            Icons.cloud_upload,
+            'Pendiente de sincronización',
+            AppColors.warning,
+          ),
+        ],
+
+        // ❌ Mostrar si hay error
+        if (response.hasError && !response.isSynced) ...[
+          SizedBox(height: 4),
+          _buildInfoRow(
+            Icons.error_outline,
+            'Error: ${response.errorMessage}',
+            AppColors.error,
+          ),
+        ],
+
         SizedBox(height: 8),
         Row(
           children: [
@@ -340,29 +364,10 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
             SizedBox(width: 4),
             Text(
               '${response.answers.length} respuestas',
-              style: TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            Spacer(),
-            Icon(
-              isSynced ? Icons.cloud_done : Icons.cloud_upload,
-              size: 14,
-              color: isSynced ? AppColors.success : AppColors.warning,
-            ),
-            SizedBox(width: 4),
-            Text(
-              isSynced ? 'Sincronizado' : 'Sin sincronizar',
-              style: TextStyle(
-                fontSize: 11,
-                color: isSynced ? AppColors.success : AppColors.warning,
-              ),
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ],
         ),
-        if (response.errorMessage != null && !isSynced)
-          _buildErrorMessage(response.errorMessage!),
       ],
     );
   }

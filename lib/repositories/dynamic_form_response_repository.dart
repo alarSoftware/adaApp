@@ -101,17 +101,17 @@ class DynamicFormResponseRepository {
   Future<List<DynamicFormResponse>> getPendingSync() async {
     try {
       final maps = await _dbHelper.consultar(
-        _responseTable,
-        where: 'estado = ? AND sync_status = ?',
-        whereArgs: ['completed', 'pending'],
+        'dynamic_form_response',
+        where: 'estado = ?',  // ✅ Solo buscar 'completed'
+        whereArgs: ['completed'],
         orderBy: 'creation_date ASC',
       );
 
-      final responses = await _mapListToResponses(maps);
-      _logger.i('✅ Respuestas pendientes de sync: ${responses.length}');
-      return responses;
+      _logger.d('📤 Formularios completados para sincronizar: ${maps.length}');
+      return await _mapListToResponses(maps);
+
     } catch (e) {
-      _logger.e('❌ Error obteniendo pendientes de sync: $e');
+      _logger.e('❌ Error obteniendo pendientes: $e');
       return [];
     }
   }
@@ -137,10 +137,22 @@ class DynamicFormResponseRepository {
   // ==================== MÉTODOS PÚBLICOS - CONTADORES ====================
 
   Future<int> countPendingSync() async {
-    return await _count(
-      where: 'estado = ? AND sync_status = ?',
-      whereArgs: ['completed', 'pending'],
-    );
+    try {
+      final result = await _dbHelper.database.then((db) =>
+          db.rawQuery(
+              'SELECT COUNT(*) as count FROM dynamic_form_response WHERE estado = ?',
+              ['completed']
+          )
+      );
+
+      // ✅ CORRECCIÓN: Usar el método correcto
+      final count = result.first['count'] as int?;
+      return count ?? 0;
+
+    } catch (e) {
+      _logger.e('❌ Error contando pendientes: $e');
+      return 0;
+    }
   }
 
   Future<int> countSynced() async {
@@ -528,10 +540,11 @@ class DynamicFormResponseRepository {
         formTemplateId: map['dynamic_form_id']?.toString() ?? '',
         answers: answers,
         createdAt: _parseDateTime(map['creation_date']) ?? DateTime.now(),
-        completedAt: map['estado'] == 'completed'
+        completedAt: map['estado'] == 'completed' || map['estado'] == 'synced'
             ? _parseDateTime(map['last_update_date'])
             : null,
-        syncedAt: map['estado'] == 'synced' ? DateTime.now() : null,
+        // ✅ CORREGIR: Leer fecha_sincronizado de la BD
+        syncedAt: _parseDateTime(map['fecha_sincronizado']),
         status: map['estado']?.toString() ?? 'draft',
         userId: map['usuario_id']?.toString(),
         contactoId: map['contacto_id']?.toString(),

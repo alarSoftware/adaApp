@@ -86,12 +86,16 @@ class DynamicFormResponse {
       completedAt: map['last_update_date'] != null
           ? DateTime.parse(map['last_update_date'] as String)
           : null,
-      syncedAt: null,
+      // ✅ CAMBIAR ESTA LÍNEA:
+      syncedAt: map['fecha_sincronizado'] != null
+          ? DateTime.parse(map['fecha_sincronizado'] as String)
+          : null,
       status: map['estado'] as String? ?? 'draft',
       userId: map['usuario_id']?.toString(),
       contactoId: map['contacto_id'] as String?,
       edfVendedorId: map['edf_vendedor_id'] as String?,
-      errorMessage: null,
+      // ✅ Y CAMBIAR ESTA LÍNEA:
+      errorMessage: map['mensaje_error_sync'] as String?,
     );
   }
 
@@ -113,10 +117,11 @@ class DynamicFormResponse {
     };
   }
 
-  bool get isCompleted => status == 'completed' || status == 'synced';
-  bool get isSynced => status == 'synced';
-  bool get hasError => status == 'error';
+// Getters simplificados
   bool get isDraft => status == 'draft';
+  bool get isCompleted => status == 'completed';
+  bool get isSynced => status == 'synced' || syncedAt != null;
+  bool get hasError => errorMessage != null && errorMessage!.isNotEmpty;
 
   dynamic getAnswer(String key) => answers[key];
 
