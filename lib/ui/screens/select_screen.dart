@@ -7,6 +7,7 @@ import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/select_screen_viewmodel.dart';
 import 'package:ada_app/ui/screens/dynamic_form_responses_screen.dart';
 import 'package:ada_app/services/sync/full_sync_service.dart';
+import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart'; // ✅ Reutilizar widget
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -53,6 +54,8 @@ class _SelectScreenState extends State<SelectScreen> {
       } else if (event is SyncCompletedEvent) {
         _mostrarExito(event.result.message);
       }
+      // 🆕 No necesitamos manejar SyncProgressEvent aquí porque
+      // el overlay se actualiza automáticamente con notifyListeners()
     });
   }
 
@@ -285,6 +288,7 @@ class _SelectScreenState extends State<SelectScreen> {
     );
   }
 
+  // 🔥 NUEVO: Overlay mejorado con progreso detallado
   Widget _buildSyncOverlay() {
     return Container(
       color: Colors.black54,
@@ -292,20 +296,18 @@ class _SelectScreenState extends State<SelectScreen> {
         child: Card(
           color: AppColors.surface,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          margin: EdgeInsets.symmetric(horizontal: 24),
           child: Padding(
-            padding: const EdgeInsets.all(32.0),
+            padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
-                  width: 60,
-                  height: 60,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 4,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                  ),
+                Icon(
+                  Icons.sync,
+                  size: 48,
+                  color: AppColors.primary,
                 ),
-                SizedBox(height: 24),
+                SizedBox(height: 16),
                 Text(
                   'Sincronizando Datos',
                   style: TextStyle(
@@ -314,11 +316,12 @@ class _SelectScreenState extends State<SelectScreen> {
                     color: AppColors.textPrimary,
                   ),
                 ),
-                SizedBox(height: 12),
-                Text(
-                  'Descargando clientes y equipos...',
-                  style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-                  textAlign: TextAlign.center,
+                SizedBox(height: 16),
+                // ✅ Reutilizar el mismo widget que usa el login
+                SyncProgressWidget(
+                  progress: _viewModel.syncProgress,
+                  currentStep: _viewModel.syncCurrentStep,
+                  completedSteps: _viewModel.syncCompletedSteps,
                 ),
                 SizedBox(height: 16),
                 Text(
@@ -328,6 +331,7 @@ class _SelectScreenState extends State<SelectScreen> {
                     color: AppColors.textSecondary,
                     fontStyle: FontStyle.italic,
                   ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -452,17 +456,6 @@ class _SelectScreenState extends State<SelectScreen> {
                       ],
                     ),
                   ),
-                  // PopupMenuItem<String>(
-                  //   value: 'pendientes_envio',
-                  //   enabled: !_viewModel.isSyncing && !_viewModel.isTestingConnection,
-                  //   child: Row(
-                  //     children: [
-                  //       Icon(Icons.upload_outlined, color: AppColors.warning),
-                  //       SizedBox(width: 8),
-                  //       Text('Pendientes de Envío', style: TextStyle(color: AppColors.textPrimary)),
-                  //     ],
-                  //   ),
-                  // ),
                 ],
               );
             },
@@ -595,7 +588,7 @@ class _SelectScreenState extends State<SelectScreen> {
             ),
           ),
 
-          // Overlay de sincronización
+          // 🔥 Overlay de sincronización mejorado con progreso
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {
@@ -607,6 +600,7 @@ class _SelectScreenState extends State<SelectScreen> {
       ),
     );
   }
+
   Future<void> _handleRequiredSync(RequiredSyncEvent event) async {
     await _mostrarDialogoSincronizacionObligatoria(event);
   }

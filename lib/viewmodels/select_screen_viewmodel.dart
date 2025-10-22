@@ -8,7 +8,7 @@ import 'package:logger/logger.dart';
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ada_app/services/sync/full_sync_service.dart';
+import 'package:ada_app/services/sync/full_sync_service.dart'; // ✅ Ya importado
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/models/usuario.dart';
 
@@ -59,6 +59,19 @@ class SyncCompletedEvent extends UIEvent {
 }
 
 class RedirectToLoginEvent extends UIEvent {}
+
+// 🆕 NUEVO: Evento para actualizar progreso de sincronización
+class SyncProgressEvent extends UIEvent {
+  final double progress;
+  final String currentStep;
+  final List<String> completedSteps;
+
+  SyncProgressEvent({
+    required this.progress,
+    required this.currentStep,
+    required this.completedSteps,
+  });
+}
 
 // ========== DATOS PUROS (SIN UI) ==========
 class SyncInfo {
@@ -130,6 +143,11 @@ class SelectScreenViewModel extends ChangeNotifier {
     type: ConnectionType.noInternet,
   );
 
+  // 🆕 NUEVO: Estado de progreso de sincronización
+  double _syncProgress = 0.0;
+  String _syncCurrentStep = '';
+  List<String> _syncCompletedSteps = [];
+
   // ESTADO DEL USUARIO
   String _userFullName = 'Usuario';
   bool _isLoadingUser = true;
@@ -152,6 +170,11 @@ class SelectScreenViewModel extends ChangeNotifier {
   bool get isTestingConnection => _isTestingConnection;
   ConnectionStatus get connectionStatus => _connectionStatus;
   bool get isConnected => _connectionStatus.hasInternet && _connectionStatus.hasApiConnection;
+
+  // 🆕 NUEVO: Getters de progreso
+  double get syncProgress => _syncProgress;
+  String get syncCurrentStep => _syncCurrentStep;
+  List<String> get syncCompletedSteps => List.from(_syncCompletedSteps);
 
   // GETTERS DEL USUARIO
   String get userDisplayName => _userFullName;
@@ -473,98 +496,110 @@ class SelectScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// NUEVO: Ejecuta sincronización obligatoria
+  // ========== 🎯 MÉTODO UNIFICADO DE SINCRONIZACIÓN ==========
+  /// Ejecuta sincronización usando el servicio centralizado FullSyncService
+  Future<void> _executeUnifiedSync({
+    required String edfVendedorId,
+    String? previousVendedorId,
+  }) async {
+    _setSyncLoading(true);
+    _resetSyncProgress();
+
+    try {
+      // 🔥 USAR EL SERVICIO UNIFICADO
+      final result = await FullSyncService.syncAllDataWithProgress(
+        edfVendedorId: edfVendedorId,
+        previousVendedorId: previousVendedorId,
+        onProgress: ({
+          required double progress,
+          required String currentStep,
+          required List<String> completedSteps,
+        }) {
+          // Actualizar estado interno
+          _syncProgress = progress;
+          _syncCurrentStep = currentStep;
+          _syncCompletedSteps = List.from(completedSteps);
+
+          // Emitir evento para la UI
+          _eventController.add(SyncProgressEvent(
+            progress: progress,
+            currentStep: currentStep,
+            completedSteps: completedSteps,
+          ));
+
+          notifyListeners();
+        },
+      );
+
+      if (!result.exito) {
+        throw Exception(result.mensaje);
+      }
+
+      // Sincronización exitosa
+      final syncResult = SyncResult(
+        success: true,
+        clientsSynced: result.itemsSincronizados,
+        equipmentsSynced: 0, // FullSyncService no devuelve este dato separado
+        message: result.mensaje,
+      );
+
+      _eventController.add(SyncCompletedEvent(syncResult));
+      await _checkApiConnection();
+
+      _logger.i('✅ Sincronización unificada completada exitosamente');
+
+    } catch (e) {
+      _logger.e('❌ Error en sincronización unificada: $e');
+      _eventController.add(ShowErrorEvent('Error en sincronización: $e'));
+    } finally {
+      _setSyncLoading(false);
+      _resetSyncProgress();
+    }
+  }
+
+  /// NUEVO: Ejecuta sincronización obligatoria usando el método unificado
   Future<void> executeMandatorySync() async {
     if (_currentUser == null) {
       _eventController.add(ShowErrorEvent('No hay usuario válido'));
       return;
     }
 
-    _setSyncLoading(true);
-
     try {
-      // 1. Verificar conexión
+      // Verificar conexión
       final conexion = await SyncService.probarConexion();
       if (!conexion.exito) {
         _eventController.add(ShowErrorEvent('Sin conexión al servidor: ${conexion.mensaje}'));
         return;
       }
 
-      // 2. Limpiar datos previos si es cambio de vendedor
-      if (_syncValidationResult?.vendedorAnterior != null) {
-        await _clearSyncData();
-        _logger.i('Datos de vendedor anterior limpiados');
-      }
-
-      // 3. Sincronizar usuarios primero
-      final userSyncResult = await AuthService.sincronizarSoloUsuarios();
-      if (!userSyncResult.exito) {
-        throw Exception('Error sincronizando usuarios: ${userSyncResult.mensaje}');
-      }
-
-      // 4. Sincronizar clientes del vendedor actual
-      final clientSyncResult = await AuthService.sincronizarClientesDelVendedor(
-        _currentUser!.edfVendedorId ?? '',
+      // 🔥 USAR MÉTODO UNIFICADO
+      await _executeUnifiedSync(
+        edfVendedorId: _currentUser!.edfVendedorId ?? '',
+        previousVendedorId: _syncValidationResult?.vendedorAnterior,
       );
-      if (!clientSyncResult.exito) {
-        throw Exception('Error sincronizando clientes: ${clientSyncResult.mensaje}');
-      }
 
-      // 5. Sincronizar el resto de datos
-      final resultado = await SyncService.sincronizarTodosLosDatos();
-
-      // 6. Marcar sincronización como completada
-      await _markSyncCompleted(_currentUser!.edfVendedorId ?? '');
-
-      // 7. Actualizar estado
+      // Actualizar estado de validación
       _syncValidationState = SyncValidationState.optional;
-
-      final syncResult = SyncResult(
-        success: true,
-        clientsSynced: clientSyncResult.itemsSincronizados + (resultado.clientesSincronizados ?? 0),
-        equipmentsSynced: resultado.equiposSincronizados ?? 0,
-        message: _buildMandatorySyncMessage(userSyncResult, clientSyncResult, resultado),
-      );
-
-      _eventController.add(SyncCompletedEvent(syncResult));
-      await _checkApiConnection();
-
-      _logger.i('Sincronización obligatoria completada exitosamente');
+      notifyListeners();
 
     } catch (e) {
       _logger.e('Error en sincronización obligatoria: $e');
       _eventController.add(ShowErrorEvent('Error en sincronización: $e'));
-    } finally {
-      _setSyncLoading(false);
     }
   }
 
-  /// Ejecuta la sincronización (después de confirmación)
+  /// Ejecuta la sincronización opcional (después de confirmación)
   Future<void> executeSync() async {
-    _setSyncLoading(true);
-
-    try {
-      final resultado = await SyncService.sincronizarTodosLosDatos();
-
-      final syncResult = SyncResult(
-        success: resultado.exito,
-        clientsSynced: resultado.clientesSincronizados,
-        equipmentsSynced: resultado.equiposSincronizados,
-        message: _buildSyncMessage(resultado),
-      );
-
-      if (resultado.exito) {
-        _eventController.add(SyncCompletedEvent(syncResult));
-
-        await _checkApiConnection();
-      } else {
-        _eventController.add(ShowErrorEvent('Error en sincronización: ${resultado.mensaje}'));
-      }
-    } catch (e) {
-      _eventController.add(ShowErrorEvent('Error inesperado: $e'));
-    } finally {
-      _setSyncLoading(false);
+    if (_currentUser == null) {
+      _eventController.add(ShowErrorEvent('No hay usuario válido'));
+      return;
     }
+
+    // 🔥 USAR MÉTODO UNIFICADO
+    await _executeUnifiedSync(
+      edfVendedorId: _currentUser!.edfVendedorId ?? '',
+      previousVendedorId: null, // No hay cambio de vendedor en sync opcional
+    );
   }
 
   /// Prueba la conexión manualmente
@@ -680,94 +715,11 @@ class SelectScreenViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _buildSyncMessage(dynamic resultado) {
-    String mensaje = 'Sincronización completada';
-
-    List<String> detalles = [];
-
-    if (resultado.clientesSincronizados > 0) {
-      detalles.add('Clientes: ${resultado.clientesSincronizados}');
-    }
-
-    if (resultado.equiposSincronizados > 0) {
-      detalles.add('Equipos: ${resultado.equiposSincronizados}');
-    }
-
-    if (resultado.censosSincronizados > 0) {
-      detalles.add('Censos: ${resultado.censosSincronizados}');
-    }
-
-    if (resultado.equiposPendientesSincronizados > 0) {
-      detalles.add('Equipos Pendientes: ${resultado.equiposPendientesSincronizados}');
-    }
-
-    if (resultado.formulariosSincronizados > 0) {
-      detalles.add('Formularios: ${resultado.formulariosSincronizados}');
-    }
-
-    if (resultado.detallesFormulariosSincronizados > 0) {
-      detalles.add('Detalles: ${resultado.detallesFormulariosSincronizados}');
-    }
-
-    // 🆕 NUEVO: Mostrar respuestas sincronizadas
-    if (resultado.respuestasFormulariosSincronizadas > 0) {
-      detalles.add('Respuestas: ${resultado.respuestasFormulariosSincronizadas}');
-    }
-
-    if (resultado.asignacionesSincronizadas > 0) {
-      detalles.add('Asignaciones: ${resultado.asignacionesSincronizadas}');
-    }
-
-    if (detalles.isNotEmpty) {
-      mensaje += '\n• ${detalles.join('\n• ')}';
-    }
-
-    return mensaje;
-  }
-
-  String _buildMandatorySyncMessage(dynamic userSync, dynamic clientSync, dynamic fullSync) {
-    String mensaje = 'Sincronización obligatoria completada';
-
-    List<String> detalles = [];
-
-    if (userSync.itemsSincronizados > 0) {
-      detalles.add('Usuarios: ${userSync.itemsSincronizados}');
-    }
-
-    if (clientSync.itemsSincronizados > 0) {
-      detalles.add('Clientes: ${clientSync.itemsSincronizados}');
-    }
-
-    if (fullSync.equiposSincronizados > 0) {
-      detalles.add('Equipos: ${fullSync.equiposSincronizados}');
-    }
-
-    if (fullSync.censosSincronizados > 0) {
-      detalles.add('Censos: ${fullSync.censosSincronizados}');
-    }
-
-    if (fullSync.equiposPendientesSincronizados > 0) {
-      detalles.add('Equipos Pendientes: ${fullSync.equiposPendientesSincronizados}');
-    }
-
-    if (fullSync.formulariosSincronizados > 0) {
-      detalles.add('Formularios: ${fullSync.formulariosSincronizados}');
-    }
-
-    if (fullSync.detallesFormulariosSincronizados > 0) {
-      detalles.add('Detalles: ${fullSync.detallesFormulariosSincronizados}');
-    }
-
-    // 🆕 NUEVO: Mostrar respuestas sincronizadas
-    if (fullSync.respuestasFormulariosSincronizadas > 0) {
-      detalles.add('Respuestas: ${fullSync.respuestasFormulariosSincronizadas}');
-    }
-
-    if (detalles.isNotEmpty) {
-      mensaje += '\n• ${detalles.join('\n• ')}';
-    }
-
-    return mensaje;
+  void _resetSyncProgress() {
+    _syncProgress = 0.0;
+    _syncCurrentStep = '';
+    _syncCompletedSteps.clear();
+    notifyListeners();
   }
 
   Future<int> _getEstimatedClients() async {
