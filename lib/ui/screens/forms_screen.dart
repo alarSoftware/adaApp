@@ -349,15 +349,18 @@ class _FormsScreenState extends State<FormsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _buildModeCard(),
                       const SizedBox(height: 20),
                       _buildCodigoBarrasField(),
                       const SizedBox(height: 16),
 
-                      // MODIFICADO: Ahora usa dropdown en lugar de TextField
-                      _buildModeloDropdown(),
-
+                      // NUEVO: Dropdown de marca
+                      _buildMarcaDropdown(),
                       const SizedBox(height: 16),
+
+                      // Dropdown de modelo
+                      _buildModeloDropdown(),
+                      const SizedBox(height: 16),
+
                       _buildSerieField(),
                       const SizedBox(height: 16),
                       _buildLogoDropdown(),
@@ -378,72 +381,6 @@ class _FormsScreenState extends State<FormsScreen> {
     );
   }
 
-  Widget _buildModeCard() {
-    return ListenableBuilder(
-      listenable: _viewModel,
-      builder: (context, child) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.primary, AppColors.primaryDark],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.shadowLight,
-                spreadRadius: 2,
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  _viewModel.modeIcon,
-                  color: AppColors.background,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _viewModel.modeTitle,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _viewModel.modeSubtitle,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
   Widget _buildCodigoBarrasField() {
     return ListenableBuilder(
@@ -526,7 +463,49 @@ class _FormsScreenState extends State<FormsScreen> {
     );
   }
 
-  // NUEVO: Método para construir el dropdown de modelo (igual que el de logo)
+  // NUEVO: Widget para construir el dropdown de marca
+  Widget _buildMarcaDropdown() {
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, child) {
+        // Convertir la lista de marcas a DropdownItems
+        final marcaItems = _viewModel.marcas.map((marca) {
+          final marcaId = marca['id'] is int
+              ? marca['id']
+              : int.tryParse(marca['id'].toString());
+
+          return DropdownItem<int>(
+            value: marcaId!,
+            label: '${marca['nombre']} (ID: $marcaId)',
+          );
+        }).toList();
+
+        return SearchableDropdown<int>(
+          label: 'Marca:',
+          hint: _viewModel.marcaHint,
+          value: _viewModel.marcaSeleccionada,
+          items: marcaItems,
+          prefixIcon: Icons.business,
+          enabled: _viewModel.areFieldsEnabled,
+          onChanged: (value) {
+            print('Marca dropdown onChanged: $value');
+            _viewModel.setMarcaSeleccionada(value);
+
+            // Forzar revalidación del formulario
+            Future.microtask(() {
+              _formKey.currentState?.validate();
+            });
+          },
+          validator: (value) {
+            final result = _viewModel.validarMarca(value);
+            print('Marca dropdown validation: $value -> $result');
+            return result;
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildModeloDropdown() {
     return ListenableBuilder(
       listenable: _viewModel,
@@ -554,7 +533,7 @@ class _FormsScreenState extends State<FormsScreen> {
             print('Modelo dropdown onChanged: $value');
             _viewModel.setModeloSeleccionado(value);
 
-            // ✅ AGREGAR: Forzar revalidación del formulario
+            // Forzar revalidación del formulario
             Future.microtask(() {
               _formKey.currentState?.validate();
             });
@@ -568,7 +547,6 @@ class _FormsScreenState extends State<FormsScreen> {
       },
     );
   }
-
 
   Widget _buildSerieField() {
     return ListenableBuilder(
@@ -667,7 +645,7 @@ class _FormsScreenState extends State<FormsScreen> {
             print('Logo dropdown onChanged: $value');
             _viewModel.setLogoSeleccionado(value);
 
-            // ✅ AGREGAR: Forzar revalidación del formulario
+            // Forzar revalidación del formulario
             Future.microtask(() {
               _formKey.currentState?.validate();
             });

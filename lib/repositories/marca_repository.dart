@@ -26,12 +26,29 @@ class MarcaRepository extends BaseRepository<Marca> {
   @override
   String getEntityName() => 'Marca';
 
+  /// ✅ CORREGIDO: Obtener todas las marcas (SIN filtro activo)
+  Future<List<Marca>> obtenerTodos() async {
+    try {
+      final maps = await dbHelper.consultar(
+        tableName,
+        // ❌ REMOVIDO: where: 'activo = ?',
+        // ❌ REMOVIDO: whereArgs: [1],
+        orderBy: 'nombre ASC',
+      );
+
+      return maps.map((map) => fromMap(map)).toList();
+    } catch (e) {
+      print('Error obteniendo todas las marcas: $e');
+      return [];
+    }
+  }
+
   /// Obtener marca por nombre
   Future<Marca?> obtenerPorNombre(String nombre) async {
     final maps = await dbHelper.consultar(
       tableName,
-      where: 'LOWER(nombre) = LOWER(?) AND activo = ?',
-      whereArgs: [nombre.trim(), 1],
+      where: 'LOWER(nombre) = LOWER(?)',
+      whereArgs: [nombre.trim()],
       limit: 1,
     );
     return maps.isNotEmpty ? fromMap(maps.first) : null;
@@ -39,8 +56,8 @@ class MarcaRepository extends BaseRepository<Marca> {
 
   /// Verificar si existe una marca por nombre
   Future<bool> existeNombre(String nombre, {int? excludeId}) async {
-    String where = 'LOWER(nombre) = LOWER(?) AND activo = ?';
-    List<dynamic> whereArgs = [nombre.trim(), 1];
+    String where = 'LOWER(nombre) = LOWER(?)';
+    List<dynamic> whereArgs = [nombre.trim()];
 
     if (excludeId != null) {
       where += ' AND id != ?';
@@ -49,6 +66,7 @@ class MarcaRepository extends BaseRepository<Marca> {
 
     return await dbHelper.existeRegistro(tableName, where, whereArgs);
   }
+
   /// Borrar todas las marcas/logos
   Future<void> borrarTodos() async {
     await dbHelper.eliminar(tableName);
@@ -64,9 +82,8 @@ class MarcaRepository extends BaseRepository<Marca> {
         COUNT(CASE WHEN ec.id IS NOT NULL THEN 1 END) as equipos_asignados,
         COUNT(CASE WHEN ec.id IS NULL THEN 1 END) as equipos_disponibles
       FROM marcas m
-      LEFT JOIN equipos e ON m.id = e.marca_id AND e.activo = 1 AND e.estado_local = 1
-      LEFT JOIN equipo_cliente ec ON e.id = ec.equipo_id AND ec.activo = 1 AND ec.fecha_retiro IS NULL
-      WHERE m.activo = 1
+      LEFT JOIN equipos e ON m.id = e.marca_id AND e.estado_local = 1
+      LEFT JOIN equipo_cliente ec ON e.id = ec.equipo_id AND ec.fecha_retiro IS NULL
       GROUP BY m.id, m.nombre
       ORDER BY m.nombre
     ''';
