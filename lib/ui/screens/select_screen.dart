@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/ui/screens/equipos_screen.dart';
 import 'package:ada_app/ui/screens/modelos_screen.dart';
 import 'package:ada_app/ui/screens/logo_screen.dart';
+import 'package:ada_app/ui/screens/marca_screen.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/select_screen_viewmodel.dart';
-import 'package:ada_app/ui/screens/dynamic_form_responses_screen.dart';
-import 'package:ada_app/services/sync/full_sync_service.dart';
-import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart'; // ✅ Reutilizar widget
+import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -565,6 +564,13 @@ class _SelectScreenState extends State<SelectScreen> {
                           page: const LogosScreen(),
                         ),
                         SizedBox(height: 12),
+                        _buildMenuCard(
+                          label: 'Marcas',
+                          description: 'lista de las Marcas',
+                          icon: Icons.newspaper,
+                          color: AppColors.primary,
+                          page: const MarcaScreen(),
+                        ),
                       ],
                     ),
                   ),
