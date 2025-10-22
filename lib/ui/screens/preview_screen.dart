@@ -221,13 +221,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
       if (resultado['success']) {
         print('✅ DEBUG: Resultado success = true');
 
-        // ✅ Mostrar mensaje breve
-        _mostrarSnackBar(resultado['message'], AppColors.success);
-
-        // ✅ Pequeño delay solo para que se vea el snackbar (opcional)
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        // ✅ Navegar inmediatamente - el POST se hace en background
+        // ✅ Navegar INMEDIATAMENTE sin delays
         if (mounted) {
           print('✅ DEBUG: Navegando a detalle del equipo...');
           await _navegarAEquipoClienteDetail();

@@ -6,6 +6,7 @@ import 'package:ada_app/ui/screens/logo_screen.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/select_screen_viewmodel.dart';
 import 'package:ada_app/ui/screens/dynamic_form_responses_screen.dart';
+import 'package:ada_app/services/sync/full_sync_service.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {

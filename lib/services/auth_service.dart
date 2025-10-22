@@ -5,6 +5,7 @@ import 'package:bcrypt/bcrypt.dart';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
+import 'package:ada_app/services/sync/dynamic_form_sync_service.dart';
 import 'package:ada_app/models/usuario.dart';
 
 var logger = Logger();
@@ -322,6 +323,31 @@ class AuthService {
       );
     }
   }
+
+  static Future<SyncResult> sincronizarRespuestasDelVendedor(String edfVendedorId) async {
+    try {
+      print('🔄 Iniciando sincronización de respuestas para vendedor: $edfVendedorId');
+      print('🕐 Timestamp: ${DateTime.now()}');
+
+      final resultado = await DynamicFormSyncService.obtenerRespuestasPorVendedor(edfVendedorId);
+
+      if (resultado.exito) {
+        print('✅ Sincronización de respuestas completada: ${resultado.itemsSincronizados} items');
+      } else {
+        print('❌ Error en sincronización de respuestas: ${resultado.mensaje}');
+      }
+
+      return resultado;
+    } catch (e) {
+      print('❌ Error sincronizando respuestas: $e');
+      return SyncResult(
+        exito: false,
+        mensaje: 'Error al sincronizar respuestas: $e',
+        itemsSincronizados: 0,
+      );
+    }
+  }
+
 
   // Login simplificado - solo valida contra base de datos local
   Future<AuthResult> login(String username, String password) async {

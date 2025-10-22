@@ -8,6 +8,7 @@ import 'package:logger/logger.dart';
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ada_app/services/sync/full_sync_service.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/models/usuario.dart';
 
@@ -696,8 +697,21 @@ class SelectScreenViewModel extends ChangeNotifier {
       detalles.add('Censos: ${resultado.censosSincronizados}');
     }
 
+    if (resultado.equiposPendientesSincronizados > 0) {
+      detalles.add('Equipos Pendientes: ${resultado.equiposPendientesSincronizados}');
+    }
+
     if (resultado.formulariosSincronizados > 0) {
       detalles.add('Formularios: ${resultado.formulariosSincronizados}');
+    }
+
+    if (resultado.detallesFormulariosSincronizados > 0) {
+      detalles.add('Detalles: ${resultado.detallesFormulariosSincronizados}');
+    }
+
+    // 🆕 NUEVO: Mostrar respuestas sincronizadas
+    if (resultado.respuestasFormulariosSincronizadas > 0) {
+      detalles.add('Respuestas: ${resultado.respuestasFormulariosSincronizadas}');
     }
 
     if (resultado.asignacionesSincronizadas > 0) {
@@ -732,8 +746,21 @@ class SelectScreenViewModel extends ChangeNotifier {
       detalles.add('Censos: ${fullSync.censosSincronizados}');
     }
 
+    if (fullSync.equiposPendientesSincronizados > 0) {
+      detalles.add('Equipos Pendientes: ${fullSync.equiposPendientesSincronizados}');
+    }
+
     if (fullSync.formulariosSincronizados > 0) {
       detalles.add('Formularios: ${fullSync.formulariosSincronizados}');
+    }
+
+    if (fullSync.detallesFormulariosSincronizados > 0) {
+      detalles.add('Detalles: ${fullSync.detallesFormulariosSincronizados}');
+    }
+
+    // 🆕 NUEVO: Mostrar respuestas sincronizadas
+    if (fullSync.respuestasFormulariosSincronizadas > 0) {
+      detalles.add('Respuestas: ${fullSync.respuestasFormulariosSincronizadas}');
     }
 
     if (detalles.isNotEmpty) {

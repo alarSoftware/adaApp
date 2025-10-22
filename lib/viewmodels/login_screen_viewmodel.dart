@@ -114,6 +114,27 @@ class LoginScreenViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+  Future<SyncResult> syncResponsesForVendor(String edfVendedorId) async {
+    _isSyncingClients = true;
+    notifyListeners();
+
+    try {
+      print('🔄 [INICIO] syncResponsesForVendor - vendedor: $edfVendedorId');
+      final SyncResult resultado = await AuthService.sincronizarRespuestasDelVendedor(edfVendedorId);
+      print('✅ [FIN] syncResponsesForVendor - ${resultado.itemsSincronizados} items');
+      return resultado;
+    } catch (e) {
+      print('❌ Error en syncResponsesForVendor: $e');
+      return SyncResult(
+        exito: false,
+        mensaje: 'Error: $e',
+        itemsSincronizados: 0,
+      );
+    } finally {
+      _isSyncingClients = false;
+      notifyListeners();
+    }
+  }
 
   // Método público para marcar sincronización completada
   Future<void> markSyncCompleted(String edfVendedorId) async {

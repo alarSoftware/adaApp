@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/viewmodels/login_screen_viewmodel.dart';
 import 'package:ada_app/services/auth_service.dart';
-import 'package:ada_app/services/sync/base_sync_service.dart';
-import 'package:ada_app/services/sync/sync_service.dart';
+import 'package:ada_app/services/sync/full_sync_service.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
 import 'package:ada_app/ui/common/snackbar_helper.dart';
@@ -217,86 +216,39 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
     });
 
     try {
-      // 1. Limpiar datos anteriores si es cambio de vendedor
-      if (widget.validation.vendedorAnterior != null) {
-        setState(() {
-          _currentStep = 'Limpiando datos anteriores...';
-          _progress = 0.05;
-        });
+      // ✅ USAR SERVICIO CENTRALIZADO
+      final result = await FullSyncService.syncAllDataWithProgress(
+        edfVendedorId: widget.validation.vendedorActual,
+        previousVendedorId: widget.validation.vendedorAnterior,
+        onProgress: ({
+          required double progress,
+          required String currentStep,
+          required List<String> completedSteps,
+        }) {
+          setState(() {
+            _progress = progress;
+            _currentStep = currentStep;
+            _completedSteps = List.from(completedSteps);
+          });
+        },
+      );
 
-        final authService = AuthService();
-        await authService.clearSyncData();
-
-        setState(() {
-          _completedSteps.add('Datos anteriores limpiados');
-        });
-        await Future.delayed(const Duration(milliseconds: 300));
+      if (!result.exito) {
+        throw Exception(result.mensaje);
       }
-
-      // 2. Sincronizar usuarios (10%)
-      setState(() {
-        _currentStep = 'Sincronizando usuarios...';
-        _progress = 0.1;
-      });
-
-      final userSyncResult = await widget.viewModel.syncUsers();
-      if (!userSyncResult.exito) {
-        throw Exception('Error sincronizando usuarios: ${userSyncResult.mensaje}');
-      }
-
-      setState(() {
-        _completedSteps.add('${userSyncResult.itemsSincronizados} usuarios');
-        _progress = 0.15;
-      });
-      await Future.delayed(const Duration(milliseconds: 200));
-
-      // 3. Sincronizar clientes (25%)
-      setState(() {
-        _currentStep = 'Descargando clientes...';
-        _progress = 0.2;
-      });
-
-      // Llamar al método completo pero mostrar progreso incremental
-      final syncService = await _sincronizarConProgreso();
-
-      if (!syncService.exito) {
-        throw Exception('Error en sincronización: ${syncService.mensaje}');
-      }
-
-      // 4. Marcar sincronización como completada (95%)
-      setState(() {
-        _currentStep = 'Finalizando...';
-        _progress = 0.95;
-      });
-
-      await widget.viewModel.markSyncCompleted(widget.validation.vendedorActual);
-
-      setState(() {
-        _completedSteps.add('Sincronización registrada');
-      });
-
-      await Future.delayed(const Duration(milliseconds: 300));
-
-      // 5. Completado (100%)
-      setState(() {
-        _progress = 1.0;
-        _currentStep = '¡Completado!';
-      });
-
-      await Future.delayed(const Duration(milliseconds: 500));
 
       if (!mounted) return;
       Navigator.of(context).pop();
 
-      final parentContext = context;
       SnackbarHelper.showSuccess(
-        parentContext,
+        context,
         'Sincronización completada exitosamente',
         Icons.cloud_done,
       );
 
       await Future.delayed(const Duration(milliseconds: 300));
-      Navigator.of(parentContext).pushReplacementNamed('/home');
+      Navigator.of(context).pushReplacementNamed('/home');
+
     } catch (e) {
       setState(() {
         _isSyncing = false;
@@ -307,148 +259,5 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
       Navigator.of(context).pop();
       SnackbarHelper.showError(context, 'Error en sincronización: $e');
     }
-  }
-
-  // Método auxiliar que sincroniza TODO y actualiza el progreso
-  Future<SyncResultUnificado> _sincronizarConProgreso() async {
-    // Clientes (20% -> 35%)
-    setState(() {
-      _currentStep = 'Descargando clientes...';
-      _progress = 0.25;
-    });
-
-    final syncResult = await SyncService.sincronizarTodosLosDatos();
-
-    // Simular progreso mientras se descargan los datos
-    if (syncResult.clientesSincronizados > 0) {
-      setState(() {
-        _completedSteps.add('${syncResult.clientesSincronizados} clientes');
-        _progress = 0.35;
-      });
-      await Future.delayed(const Duration(milliseconds: 200));
-    }
-
-    // Equipos (35% -> 50%)
-    if (syncResult.equiposSincronizados > 0) {
-      setState(() {
-        _currentStep = 'Descargando equipos...';
-        _completedSteps.add('${syncResult.equiposSincronizados} equipos');
-        _progress = 0.5;
-      });
-      await Future.delayed(const Duration(milliseconds: 200));
-    }
-
-    // Censos (50% -> 65%)
-    if (syncResult.censosSincronizados > 0) {
-      setState(() {
-        _currentStep = 'Descargando censos activos...';
-        _completedSteps.add('${syncResult.censosSincronizados} censos');
-        _progress = 0.65;
-      });
-      await Future.delayed(const Duration(milliseconds: 200));
-    }
-
-    // Equipos Pendientes (65% -> 75%)
-    if (syncResult.equiposPendientesSincronizados > 0) {
-      setState(() {
-        _currentStep = 'Descargando equipos pendientes...';
-        _completedSteps.add('${syncResult.equiposPendientesSincronizados} equipos pendientes');
-        _progress = 0.75;
-      });
-      await Future.delayed(const Duration(milliseconds: 200));
-    }
-
-    // Formularios (75% -> 85%)
-    if (syncResult.formulariosSincronizados > 0) {
-      setState(() {
-        _currentStep = 'Descargando formularios...';
-        _completedSteps.add('${syncResult.formulariosSincronizados} formularios');
-        _progress = 0.85;
-      });
-      await Future.delayed(const Duration(milliseconds: 200));
-    }
-
-    // Detalles de formularios (85% -> 90%)
-    if (syncResult.detallesFormulariosSincronizados > 0) {
-      setState(() {
-        _currentStep = 'Descargando detalles de formularios...';
-        _completedSteps.add('${syncResult.detallesFormulariosSincronizados} detalles');
-        _progress = 0.9;
-      });
-      await Future.delayed(const Duration(milliseconds: 200));
-    }
-
-    return syncResult;
-  }
-
-  Future<void> _cleanPreviousData() async {
-    setState(() {
-      _currentStep = 'Limpiando datos anteriores...';
-      _progress = 0.1;
-    });
-
-    final authService = AuthService();
-    await authService.clearSyncData();
-
-    setState(() {
-      _completedSteps.add('Datos anteriores limpiados');
-    });
-
-    await Future.delayed(const Duration(milliseconds: 300));
-  }
-
-  Future<void> _syncUsers() async {
-    setState(() {
-      _currentStep = 'Sincronizando usuarios...';
-      _progress = 0.3;
-    });
-
-    final userSyncResult = await widget.viewModel.syncUsers();
-
-    if (!userSyncResult.exito) {
-      throw Exception('Error sincronizando usuarios: ${userSyncResult.mensaje}');
-    }
-
-    setState(() {
-      _completedSteps.add('${userSyncResult.itemsSincronizados} usuarios');
-    });
-
-    await Future.delayed(const Duration(milliseconds: 300));
-  }
-
-  Future<void> _syncClients() async {
-    setState(() {
-      _currentStep = 'Sincronizando tus clientes...';
-      _progress = 0.6;
-    });
-
-    final clientSyncResult = await widget.viewModel.syncClientsForVendor(
-      widget.validation.vendedorActual,
-    );
-
-    if (!clientSyncResult.exito) {
-      throw Exception('Error sincronizando clientes: ${clientSyncResult.mensaje}');
-    }
-
-    setState(() {
-      _completedSteps.add('${clientSyncResult.itemsSincronizados} clientes');
-    });
-  }
-
-  Future<void> _finishSync() async {
-    setState(() {
-      _progress = 0.9;
-      _currentStep = 'Finalizando...';
-    });
-
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    setState(() {
-      _progress = 1.0;
-      _currentStep = '¡Completado!';
-      _completedSteps.add('Sincronización registrada');
-    });
-
-    await Future.delayed(const Duration(milliseconds: 500));
   }
 }

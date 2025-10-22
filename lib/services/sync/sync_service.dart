@@ -124,8 +124,15 @@ class SyncService {
       }
 
       // Sincronizar detalles de formularios
-      BaseSyncService.logger.i('📋 Sincronizando detalles de formularios...');
+      // NOTA: Los detalles ya se sincronizaron automáticamente en obtenerFormulariosDinamicos()
+      // No es necesario volver a llamar a sincronizarTodosLosDetalles()
+      BaseSyncService.logger.i('📋 Detalles de formularios ya sincronizados con los formularios');
 
+      // Marcar como exitoso ya que los detalles se obtuvieron en el paso anterior
+      resultado.detallesFormulariosSincronizados = 0; // Los detalles están incluidos en formularios
+      resultado.detallesFormulariosExito = true;
+
+      /* ELIMINADO PARA EVITAR DUPLICADO:
       try {
         final resultadoDetalles = await DynamicFormSyncService.sincronizarTodosLosDetalles();
         resultado.detallesFormulariosSincronizados = resultadoDetalles.itemsSincronizados;
@@ -138,10 +145,28 @@ class SyncService {
         resultado.erroresDetallesFormularios = 'Error al sincronizar detalles: $e';
         resultado.detallesFormulariosSincronizados = 0;
       }
+      */
+
+      // ========== 🆕 NUEVA SECCIÓN: SINCRONIZAR RESPUESTAS ==========
+      BaseSyncService.logger.i('📝 Sincronizando respuestas de formularios...');
+
+      try {
+        final resultadoRespuestas = await DynamicFormSyncService.obtenerRespuestasPorVendedor(edfVendedorId);
+        resultado.respuestasFormulariosSincronizadas = resultadoRespuestas.itemsSincronizados;
+        resultado.respuestasFormulariosExito = resultadoRespuestas.exito;
+        if (!resultadoRespuestas.exito) resultado.erroresRespuestasFormularios = resultadoRespuestas.mensaje;
+        BaseSyncService.logger.i('✅ Respuestas sincronizadas: ${resultadoRespuestas.itemsSincronizados} (Éxito: ${resultadoRespuestas.exito})');
+      } catch (e) {
+        BaseSyncService.logger.e('❌ ERROR EN RESPUESTAS DE FORMULARIOS: $e');
+        resultado.respuestasFormulariosExito = false;
+        resultado.erroresRespuestasFormularios = 'Error al sincronizar respuestas: $e';
+        resultado.respuestasFormulariosSincronizadas = 0;
+      }
+      // ============================================================
 
       BaseSyncService.logger.i('🏁 EVALUANDO RESULTADO GENERAL...');
 
-      // Evaluar resultado general
+      // Evaluar resultado general (ACTUALIZADO: ahora incluye respuestas)
       final exitosos = [
         resultado.clientesExito,
         resultado.equiposExito,
@@ -149,15 +174,16 @@ class SyncService {
         resultado.equiposPendientesExito,
         resultado.formulariosExito,
         resultado.detallesFormulariosExito,
+        resultado.respuestasFormulariosExito, // 🆕 Añadido
         resultado.asignacionesExito
       ];
       final totalExitosos = exitosos.where((e) => e).length;
 
-      BaseSyncService.logger.i('📊 Resultados: Clientes(${resultado.clientesExito}), Equipos(${resultado.equiposExito}), Censos(${resultado.censosExito}), EquiposPendientes(${resultado.equiposPendientesExito}), Formularios(${resultado.formulariosExito}), Detalles(${resultado.detallesFormulariosExito}), Total exitosos: $totalExitosos');
+      BaseSyncService.logger.i('📊 Resultados: Clientes(${resultado.clientesExito}), Equipos(${resultado.equiposExito}), Censos(${resultado.censosExito}), EquiposPendientes(${resultado.equiposPendientesExito}), Formularios(${resultado.formulariosExito}), Detalles(${resultado.detallesFormulariosExito}), Respuestas(${resultado.respuestasFormulariosExito}), Total exitosos: $totalExitosos');
 
-      if (totalExitosos >= 5) {
+      if (totalExitosos >= 6) { // Cambiado de 5 a 6
         resultado.exito = true;
-        resultado.mensaje = 'Sincronización completa: ${resultado.clientesSincronizados} clientes, ${resultado.equiposSincronizados} equipos, ${resultado.censosSincronizados} censos, ${resultado.equiposPendientesSincronizados} equipos pendientes, ${resultado.formulariosSincronizados} formularios, ${resultado.detallesFormulariosSincronizados} detalles y ${resultado.asignacionesSincronizadas} asignaciones';
+        resultado.mensaje = 'Sincronización completa: ${resultado.clientesSincronizados} clientes, ${resultado.equiposSincronizados} equipos, ${resultado.censosSincronizados} censos, ${resultado.equiposPendientesSincronizados} equipos pendientes, ${resultado.formulariosSincronizados} formularios, ${resultado.detallesFormulariosSincronizados} detalles, ${resultado.respuestasFormulariosSincronizadas} respuestas y ${resultado.asignacionesSincronizadas} asignaciones';
       } else if (totalExitosos > 0) {
         resultado.exito = true;
         final partes = <String>[];
@@ -167,6 +193,7 @@ class SyncService {
         if (resultado.equiposPendientesExito) partes.add('${resultado.equiposPendientesSincronizados} equipos pendientes');
         if (resultado.formulariosExito) partes.add('${resultado.formulariosSincronizados} formularios');
         if (resultado.detallesFormulariosExito) partes.add('${resultado.detallesFormulariosSincronizados} detalles');
+        if (resultado.respuestasFormulariosExito) partes.add('${resultado.respuestasFormulariosSincronizadas} respuestas'); // 🆕 Añadido
         if (resultado.asignacionesExito) partes.add('${resultado.asignacionesSincronizadas} asignaciones');
         resultado.mensaje = 'Sincronización parcial: ${partes.join(', ')}';
       } else {
@@ -212,6 +239,10 @@ class SyncService {
 
   static Future<SyncResult> sincronizarDetallesFormularios() =>
       DynamicFormSyncService.sincronizarTodosLosDetalles();
+
+  // 🆕 Método para sincronizar respuestas de formularios
+  static Future<SyncResult> sincronizarRespuestasFormularios({String? edfVendedorId}) =>
+      DynamicFormSyncService.obtenerRespuestasFormularios(edfvendedorId: edfVendedorId);
 
   // Métodos de envío
   static Future<SyncResult> enviarClientesPendientes() => ClientSyncService.enviarClientesPendientes();
@@ -358,7 +389,7 @@ class SyncService {
   }
 }
 
-// Clase de resultado unificado - CON SOPORTE PARA CENSOS Y FORMULARIOS
+// Clase de resultado unificado - ACTUALIZADA CON RESPUESTAS
 class SyncResultUnificado {
   bool exito = false;
   String mensaje = '';
@@ -390,12 +421,17 @@ class SyncResultUnificado {
   int detallesFormulariosSincronizados = 0;
   String? erroresDetallesFormularios;
 
+  // 🆕 NUEVOS CAMPOS PARA RESPUESTAS
+  bool respuestasFormulariosExito = false;
+  int respuestasFormulariosSincronizadas = 0;
+  String? erroresRespuestasFormularios;
+
   bool asignacionesExito = false;
   int asignacionesSincronizadas = 0;
   String? erroresAsignaciones;
 
   @override
   String toString() {
-    return 'SyncResultUnificado(exito: $exito, clientes: $clientesSincronizados, equipos: $equiposSincronizados, censos: $censosSincronizados, equiposPendientes: $equiposPendientesSincronizados, formularios: $formulariosSincronizados, detalles: $detallesFormulariosSincronizados, asignaciones: $asignacionesSincronizadas, mensaje: $mensaje)';
+    return 'SyncResultUnificado(exito: $exito, clientes: $clientesSincronizados, equipos: $equiposSincronizados, censos: $censosSincronizados, equiposPendientes: $equiposPendientesSincronizados, formularios: $formulariosSincronizados, detalles: $detallesFormulariosSincronizados, respuestas: $respuestasFormulariosSincronizadas, asignaciones: $asignacionesSincronizadas, mensaje: $mensaje)';
   }
 }
