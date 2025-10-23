@@ -123,8 +123,6 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
             SizedBox(width: 8),
             _buildFilterChip('Completados', 'completed'),
             SizedBox(width: 8),
-            _buildFilterChip('Pendientes', 'pending'),
-            SizedBox(width: 8),
             _buildFilterChip('Sincronizados', 'synced'),
           ],
         ),
@@ -200,8 +198,6 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     switch (_filterStatus) {
       case 'completed':
         return allResponses.where((r) => r.status == 'completed').toList();
-      case 'pending':
-        return allResponses.where((r) => r.syncedAt == null).toList();
       case 'synced':
         return allResponses.where((r) => r.syncedAt != null).toList();
       default:
@@ -227,7 +223,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _viewResponse(response),
-        onLongPress: () => _deleteResponse(response),
+        onLongPress: response.status == 'completed' ? null : () => _deleteResponse(response),
         child: Padding(
           padding: EdgeInsets.all(16),
           child: Column(
@@ -299,6 +295,18 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
             size: 18,
           ),
         ),
+        // Ícono de protección para completados
+        if (response.status == 'completed') ...[
+          SizedBox(width: 8),
+          Tooltip(
+            message: 'No se puede eliminar (completado)',
+            child: Icon(
+              Icons.lock,
+              size: 18,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
         SizedBox(width: 8),
         Icon(
           Icons.arrow_forward_ios,
@@ -535,8 +543,6 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     switch (_filterStatus) {
       case 'completed':
         return 'No hay formularios completados';
-      case 'pending':
-        return 'No hay formularios pendientes';
       case 'synced':
         return 'No hay formularios sincronizados';
       default:

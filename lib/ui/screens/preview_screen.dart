@@ -430,7 +430,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
         future: vm.obtenerInfoSincronizacion(estadoId),
         builder: (context, snapshot) {
           final info = snapshot.data;
-          final envioFallido = info?['pendiente'] == true;
+          // ✅ SOLO mostrar reintentar si el estado es 'error' (no 'creado' o 'pendiente')
+          final envioFallido = info?['estado'] == 'error';
 
           return PreviewBottomBar(
             esHistorial: esHistorial,

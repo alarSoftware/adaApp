@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/dynamic_form_viewmodel.dart';
 import 'package:ada_app/ui/widgets/dynamic_form/dynamic_form_field_widget.dart';
+import 'package:ada_app/ui/widgets/exit_confimation_dialog.dart'; // ✅ NUEVO
 
 class DynamicFormFillScreen extends StatefulWidget {
   final DynamicFormViewModel viewModel;
@@ -377,57 +378,17 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
     }
   }
 
+  // ✅ MÉTODO SIMPLIFICADO usando el widget reutilizable
   Future<bool> _showExitConfirmation() async {
-    final progress = widget.viewModel.getFormProgress();
-
-    if (progress == 0) return true;
-
-    final confirm = await showDialog<bool>(
+    final shouldExit = await ExitConfirmationDialog.show(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: AppColors.warning),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '¿Salir sin guardar?',
-                style: TextStyle(color: AppColors.textPrimary),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          'Tienes cambios sin guardar. ¿Deseas guardar el progreso antes de salir?',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              'Salir sin guardar',
-              style: TextStyle(color: AppColors.error),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await widget.viewModel.saveProgress();
-              if (context.mounted) {
-                Navigator.pop(context, true);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.onPrimary,
-            ),
-            child: Text('Guardar progreso'),
-          ),
-        ],
-      ),
+      progress: widget.viewModel.getFormProgress(),
+      onSave: () async {
+        await widget.viewModel.saveProgress();
+      },
     );
 
-    return confirm ?? false;
+    return shouldExit ?? false;
   }
 
   Future<bool?> _showConfirmDialog({

@@ -65,6 +65,9 @@ class FormsScreenViewModel extends ChangeNotifier {
   final TextEditingController numeroSerieController = TextEditingController();
   final TextEditingController observacionesController = TextEditingController();
 
+  // ✅ NUEVO: Variable para rastrear el último código buscado
+  String _ultimoCodigoBuscado = '';
+
   // Estado privado
   bool _isCensoMode = true;
   bool _isLoading = false;
@@ -98,12 +101,49 @@ class FormsScreenViewModel extends ChangeNotifier {
   List<Map<String, dynamic>> get marcas => _marcas;
   int? get marcaSeleccionada => _marcaSeleccionada;
 
+  // ✅ NUEVO: Getter para mostrar marcas sin IDs en la UI
+  List<String> get marcasParaUI => _marcas.map((m) => m['nombre'] as String).toList();
+
   // Getters para modelos
   List<Map<String, dynamic>> get modelos => _modelos;
   int? get modeloSeleccionado => _modeloSeleccionado;
 
+  // ✅ NUEVO: Getter para mostrar modelos sin IDs en la UI
+  List<String> get modelosParaUI => _modelos.map((m) => m['nombre'] as String).toList();
+
   List<Map<String, dynamic>> get logos => _logos;
   int? get logoSeleccionado => _logoSeleccionado;
+
+  // ✅ NUEVO: Getter para mostrar logos sin IDs en la UI
+  List<String> get logosParaUI => _logos.map((l) => l['nombre'] as String).toList();
+
+  // ✅ NUEVOS: Getters para obtener el nombre del elemento seleccionado
+  String? get marcaSeleccionadaNombre {
+    if (_marcaSeleccionada == null) return null;
+    final marca = _marcas.firstWhere(
+          (m) => m['id'] == _marcaSeleccionada,
+      orElse: () => {'nombre': null},
+    );
+    return marca['nombre'] as String?;
+  }
+
+  String? get modeloSeleccionadoNombre {
+    if (_modeloSeleccionado == null) return null;
+    final modelo = _modelos.firstWhere(
+          (m) => m['id'] == _modeloSeleccionado,
+      orElse: () => {'nombre': null},
+    );
+    return modelo['nombre'] as String?;
+  }
+
+  String? get logoSeleccionadoNombre {
+    if (_logoSeleccionado == null) return null;
+    final logo = _logos.firstWhere(
+          (l) => l['id'] == _logoSeleccionado,
+      orElse: () => {'nombre': null},
+    );
+    return logo['nombre'] as String?;
+  }
   File? get imagenSeleccionada => _imagenSeleccionada;
   File? get imagenSeleccionada2 => _imagenSeleccionada2;
 
@@ -172,14 +212,14 @@ class FormsScreenViewModel extends ChangeNotifier {
 
       _marcas = marcas.map((marca) => {
         'id': marca.id,
-        'nombre': marca.nombre,
+        'nombre': marca.nombre, // Solo mostrar el nombre, sin el ID
       }).toList();
 
       _logger.i('Marcas cargadas exitosamente: ${_marcas.length}');
       notifyListeners();
     } catch (e) {
       _logger.e('Error cargando marcas: $e');
-      _showError('Error cargando marcas');
+      _showError('No se pudieron cargar las marcas disponibles');
     }
   }
 
@@ -208,7 +248,7 @@ class FormsScreenViewModel extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _logger.e('Error cargando logos: $e');
-      _showError('Error cargando logos');
+      _showError('No se pudieron cargar los logos disponibles');
     }
   }
 
@@ -236,7 +276,7 @@ class FormsScreenViewModel extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _logger.e('Error cargando modelos: $e');
-      _showError('Error cargando modelos');
+      _showError('No se pudieron cargar los modelos disponibles');
     }
   }
 
@@ -271,13 +311,13 @@ class FormsScreenViewModel extends ChangeNotifier {
 
     } on PlatformException catch (e) {
       if (e.code == BarcodeScanner.cameraAccessDenied) {
-        _showError('Permisos de cámara denegados');
+        _showError('Se requieren permisos de cámara para escanear códigos');
       } else {
-        _showError('Error desconocido: ${e.message}');
+        _showError('Error al escanear: ${e.message}');
       }
     } catch (e) {
       _logger.e('Error escaneando código: $e');
-      _showError('Error al escanear código');
+      _showError('No se pudo escanear el código de barras');
     } finally {
       _setScanning(false);
     }
@@ -292,7 +332,42 @@ class FormsScreenViewModel extends ChangeNotifier {
   // LÓGICA DE NEGOCIO - BÚSQUEDA EQUIPOS
   // ===============================
 
+  // ✅ NUEVO: Busca el equipo SOLO si el código es diferente al último buscado
+  Future<void> buscarEquipoSiHuboCambios() async {
+    // ✅ NO BUSCAR si estamos en modo "Nuevo Equipo"
+    if (!_isCensoMode) {
+      _logger.i('Modo nuevo equipo activo - búsqueda deshabilitada');
+      return;
+    }
+
+    final codigoActual = codigoBarrasController.text.trim();
+
+    // Validar longitud mínima
+    if (codigoActual.length < 3) {
+      _logger.i('Código muy corto para buscar: ${codigoActual.length} caracteres');
+      return;
+    }
+
+    // Verificar si hay cambios
+    if (codigoActual == _ultimoCodigoBuscado) {
+      _logger.i('No hay cambios en el código de barras, búsqueda omitida');
+      return;
+    }
+
+    // Si hay cambios, ejecutar la búsqueda
+    await buscarEquipoPorCodigo(codigoActual);
+  }
+
   Future<void> buscarEquipoPorCodigo(String codigo) async {
+    // ✅ NO BUSCAR si estamos en modo "Nuevo Equipo"
+    if (!_isCensoMode) {
+      _logger.i('Modo nuevo equipo activo - búsqueda deshabilitada');
+      return;
+    }
+
+    // ✅ ACTUALIZAR el último código buscado
+    _ultimoCodigoBuscado = codigo.trim();
+
     try {
       _logger.i('Buscando visicooler con código: $codigo');
 
@@ -310,7 +385,7 @@ class FormsScreenViewModel extends ChangeNotifier {
     } catch (e, stackTrace) {
       _logger.e('Error buscando visicooler: $e', stackTrace: stackTrace);
       _limpiarDatosAutocompletados();
-      _showError('Error al consultar la base de datos');
+      _showError('No se pudo buscar el equipo. Verifique su conexión');
     }
   }
 
@@ -385,15 +460,11 @@ class FormsScreenViewModel extends ChangeNotifier {
 
     if (_equipoYaAsignado) {
       _showSuccess(
-        '✅ Equipo encontrado y YA ASIGNADO a ${_cliente!.nombre}\n'
-            'Modelo: $nombreCompleto\n'
-            'Las fotos son OPCIONALES',
+        '¡Equipo encontrado!',
       );
     } else {
       _showWarning(
-        '⚠️ Equipo encontrado pero AÚN NO ASIGNADO a ${_cliente!.nombre}\n'
-            'Modelo: $nombreCompleto\n'
-            '📸 Debe tomar AL MENOS UNA FOTO para asignar el equipo',
+        'Equipo encontrado pero no asignado al cliente, se censara como pendiente',
       );
     }
   }
@@ -418,8 +489,8 @@ class FormsScreenViewModel extends ChangeNotifier {
 
     _eventController.add(ShowDialogEvent(
       'Equipo no encontrado',
-      'No se encontró ningún equipo con el código "$codigo" en la base de datos.\n\n'
-          '¿Desea registrar este código como un nuevo equipo?',
+      'No existe un equipo registrado con el código "$codigo".\n\n'
+          '¿Desea registrarlo como un equipo nuevo?',
       actions,
     ));
   }
@@ -430,7 +501,7 @@ class FormsScreenViewModel extends ChangeNotifier {
 
   Future<void> tomarFoto({required bool esPrimeraFoto}) async {
     if (_isTakingPhoto) {
-      _showWarning('Ya hay una captura en proceso');
+      _showWarning('Espere a que termine la captura actual');
       return;
     }
 
@@ -449,7 +520,7 @@ class FormsScreenViewModel extends ChangeNotifier {
       }
     } catch (e) {
       _logger.e('Error tomando foto: $e');
-      _showError('Error al tomar la foto: $e');
+      _showError('No se pudo capturar la foto');
     } finally {
       _isTakingPhoto = false;
       notifyListeners();
@@ -459,13 +530,13 @@ class FormsScreenViewModel extends ChangeNotifier {
   Future<void> _procesarImagenSeleccionada(File imagen, {required bool esPrimeraFoto}) async {
     try {
       if (!_imageService.esImagenValida(imagen)) {
-        _showError('El archivo seleccionado no es una imagen válida');
+        _showError('El archivo seleccionado no es válido');
         return;
       }
 
       final double tamanoMB = await _imageService.obtenerTamanoImagen(imagen);
       if (tamanoMB > 15.0) {
-        _showError('La imagen es demasiado grande (${tamanoMB.toStringAsFixed(1)}MB). Máximo 15MB.');
+        _showError('La imagen es muy grande (${tamanoMB.toStringAsFixed(1)}MB). Máximo: 15MB');
         return;
       }
 
@@ -492,12 +563,12 @@ class FormsScreenViewModel extends ChangeNotifier {
       }
 
       _logger.i('Imagen ${esPrimeraFoto ? "1" : "2"} procesada: ${imagenGuardada.path}');
-      _showSuccess('Foto ${esPrimeraFoto ? "1" : "2"} agregada (${tamanoMB.toStringAsFixed(1)}MB)');
+      _showSuccess('Foto ${esPrimeraFoto ? "1" : "2"} capturada correctamente (${tamanoMB.toStringAsFixed(1)}MB)');
       notifyListeners();
 
     } catch (e) {
       _logger.e('Error procesando imagen: $e');
-      _showError('Error al procesar la imagen');
+      _showError('No se pudo procesar la foto capturada');
     }
   }
 
@@ -527,6 +598,11 @@ class FormsScreenViewModel extends ChangeNotifier {
       _isCensoMode = true;
       notifyListeners();
     }
+
+    // ✅ RESETEAR el último código buscado si se borra el campo
+    if (codigo.trim().isEmpty) {
+      _ultimoCodigoBuscado = '';
+    }
   }
 
   void onCodigoSubmitted(String codigo) {
@@ -534,7 +610,7 @@ class FormsScreenViewModel extends ChangeNotifier {
     if (codigo.length >= 3) {
       buscarEquipoPorCodigo(codigo);
     } else if (codigo.isNotEmpty) {
-      _showWarning('El código debe tener al menos 3 caracteres');
+      _showWarning('Ingrese un código de al menos 3 caracteres');
     }
   }
 
@@ -550,7 +626,10 @@ class FormsScreenViewModel extends ChangeNotifier {
     _equipoCompleto = null;
     _equipoYaAsignado = false;
 
-    _showInfo('Modo: Registrar nuevo equipo. Complete todos los campos');
+    // ✅ RESETEAR el último código buscado
+    _ultimoCodigoBuscado = '';
+
+    _showInfo('Ahora puede registrar un equipo nuevo completando todos los campos');
     notifyListeners();
   }
 
@@ -559,6 +638,10 @@ class FormsScreenViewModel extends ChangeNotifier {
     observacionesController.clear();
     _limpiarDatosAutocompletados();
     _isCensoMode = true;
+
+    // ✅ RESETEAR el último código buscado
+    _ultimoCodigoBuscado = '';
+
     notifyListeners();
   }
 
@@ -620,7 +703,7 @@ class FormsScreenViewModel extends ChangeNotifier {
     }
 
     if (_imagenSeleccionada == null && _imagenSeleccionada2 == null) {
-      return 'Debe tomar al menos una foto del equipo';
+      return 'Debe capturar al menos una foto del equipo para continuar';
     }
 
     return null;
@@ -749,7 +832,7 @@ class FormsScreenViewModel extends ChangeNotifier {
 
     _eventController.add(ShowDialogEvent(
       'Error de Ubicación',
-      'No se pudo obtener la ubicación GPS del visicooler.\n\nError: $error\n\nLa ubicación GPS es obligatoria para registrar visicoolers. Asegúrese de estar en la ubicación exacta del equipo.',
+      'No se pudo obtener la ubicación GPS del equipo.\n\nError: $error\n\nLa ubicación GPS es obligatoria. Asegúrese de tener el GPS activado y estar en la ubicación exacta del equipo.',
       actions,
     ));
   }

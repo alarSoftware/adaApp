@@ -558,7 +558,7 @@ class _SelectScreenState extends State<SelectScreen> {
                         SizedBox(height: 12),
                         _buildMenuCard(
                           label: 'Logos',
-                          description: 'lista de los logos de la empresa',
+                          description: 'Lista de los logos de la empresa',
                           icon: Icons.newspaper,
                           color: AppColors.primary,
                           page: const LogosScreen(),
@@ -566,8 +566,8 @@ class _SelectScreenState extends State<SelectScreen> {
                         SizedBox(height: 12),
                         _buildMenuCard(
                           label: 'Marcas',
-                          description: 'lista de las Marcas',
-                          icon: Icons.newspaper,
+                          description: 'Lista de las Marcas',
+                          icon: Icons.domain,
                           color: AppColors.primary,
                           page: const MarcaScreen(),
                         ),

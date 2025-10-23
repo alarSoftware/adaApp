@@ -20,6 +20,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   String? _statusMessage;
   bool _isProcessing = false;
   String? _currentProcessId;
+  String _ultimoCodigoBuscado = '';
 
   final EquipoRepository _equipoRepository = EquipoRepository();
   final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();

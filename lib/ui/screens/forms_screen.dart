@@ -1,11 +1,13 @@
 // ui/screens/forms_screen.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:ada_app/ui/widgets/searchable_dropdown.dart';
 import 'package:flutter/material.dart';
-import 'dart:async';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/viewmodels/forms_screens_viewmodel.dart';
 import 'package:ada_app/ui/theme/colors.dart';
+import 'package:ada_app/ui/widgets/app_notification.dart';
+import 'package:ada_app/ui/widgets/inline_notification.dart';
 import 'preview_screen.dart';
 
 class FormsScreen extends StatefulWidget {
@@ -24,6 +26,15 @@ class _FormsScreenState extends State<FormsScreen> {
   final _formKey = GlobalKey<FormState>();
   late FormsScreenViewModel _viewModel;
   late StreamSubscription<FormsUIEvent> _eventSubscription;
+  late FocusNode _codigoBarrasFocusNode;
+
+  // ✅ NUEVA: Bandera para evitar búsquedas durante acciones específicas
+  bool _ejecutandoAccion = false;
+
+  // ✅ Variables para notificaciones inline
+  String? _inlineNotificationMessage;
+  InlineNotificationType? _inlineNotificationType;
+  bool _isInlineNotificationVisible = false;
 
   @override
   void initState() {
@@ -31,21 +42,80 @@ class _FormsScreenState extends State<FormsScreen> {
     _viewModel = FormsScreenViewModel();
     _setupEventListener();
     _viewModel.initialize(widget.cliente);
+    // Inicializar FocusNode para el campo de código
+    _codigoBarrasFocusNode = FocusNode();
+    _codigoBarrasFocusNode.addListener(_onCodigoBarrasFocusChanged);
   }
 
   @override
   void dispose() {
     _eventSubscription.cancel();
+    _codigoBarrasFocusNode.removeListener(_onCodigoBarrasFocusChanged);
+    _codigoBarrasFocusNode.dispose();
     _viewModel.dispose();
     super.dispose();
   }
 
+  // ✅ MODIFICADO: Método que detecta cuando el campo pierde el foco
+  void _onCodigoBarrasFocusChanged() {
+    if (!_codigoBarrasFocusNode.hasFocus) {
+      // ✅ Solo buscar si NO estamos ejecutando una acción (Continuar/Cancelar)
+      if (!_ejecutandoAccion) {
+        _viewModel.buscarEquipoSiHuboCambios();
+      }
+    }
+  }
+
+  // ✅ MODIFICADO: Ahora usa notificaciones inline para mensajes de equipo con colores específicos
   void _setupEventListener() {
     _eventSubscription = _viewModel.uiEvents.listen((event) {
       if (!mounted) return;
 
       if (event is ShowSnackBarEvent) {
-        _showSnackBar(event.message, event.color);
+        // ✅ Detectar si es un mensaje relacionado con búsqueda de equipo
+        final mensajesInline = [
+          'Equipo encontrado',
+          'pendiente',
+          'No se encontró',
+          'encontrado',
+        ];
+
+        bool esInline = mensajesInline.any((msg) =>
+            event.message.toLowerCase().contains(msg.toLowerCase())
+        );
+
+        if (esInline) {
+          // ✅ NUEVO: Determinar color según el contenido exacto del mensaje
+          Color color;
+          final message = event.message;
+
+          // 🟢 Verde: "¡Equipo encontrado!" (mensaje corto, equipo YA asignado)
+          if (message.contains('¡Equipo encontrado!') ||
+              (message.contains('Equipo encontrado') && !message.contains('pero no asignado'))) {
+            color = AppColors.success;
+          }
+          // 🟠 Amarillo/Naranja: "Equipo encontrado pero no asignado..." (mensaje largo, pendiente)
+          else if (message.contains('pero no asignado') ||
+              message.contains('pendiente') ||
+              message.contains('se censara como pendiente')) {
+            color = AppColors.warning;
+          }
+          // 🔴 Rojo: No encontrado
+          else if (message.toLowerCase().contains('no se encontró') ||
+              message.toLowerCase().contains('no encontrado')) {
+            color = AppColors.error;
+          }
+          // Por defecto usar el color original
+          else {
+            color = event.color;
+          }
+
+          // Usar notificación inline con el color correcto
+          _showInlineNotification(event.message, color);
+        } else {
+          // Usar SnackBar normal para otros mensajes
+          _showSnackBar(event.message, event.color);
+        }
       } else if (event is ShowDialogEvent) {
         _showDialog(event.title, event.message, event.actions);
       } else if (event is NavigateToPreviewEvent) {
@@ -57,18 +127,65 @@ class _FormsScreenState extends State<FormsScreen> {
   }
 
   void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
+    // ✅ Determinar tipo de notificación según el color
+    NotificationType type;
+    if (color == AppColors.success) {
+      type = NotificationType.success;
+    } else if (color == AppColors.error) {
+      type = NotificationType.error;
+    } else if (color == AppColors.warning) {
+      type = NotificationType.warning;
+    } else {
+      type = NotificationType.info;
+    }
+
+    // ✅ Mostrar notificación moderna
+    AppNotification.show(
+      context,
+      message: message,
+      type: type,
     );
   }
 
-  Future<void> _showDialog(String title, String message, List<DialogAction> actions) async {
+  // ✅ NUEVO: Método para mostrar notificación inline
+  void _showInlineNotification(String message, Color color) {
+    // Determinar tipo de notificación según el color
+    InlineNotificationType type;
+    if (color == AppColors.success) {
+      type = InlineNotificationType.success;
+    } else if (color == AppColors.error) {
+      type = InlineNotificationType.error;
+    } else if (color == AppColors.warning) {
+      type = InlineNotificationType.warning;
+    } else {
+      type = InlineNotificationType.info;
+    }
+
+    setState(() {
+      _inlineNotificationMessage = message;
+      _inlineNotificationType = type;
+      _isInlineNotificationVisible = true;
+    });
+
+    // Auto-ocultar después de 5 segundos
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() {
+          _isInlineNotificationVisible = false;
+        });
+      }
+    });
+  }
+
+  // ✅ NUEVO: Método para ocultar notificación inline
+  void _dismissInlineNotification() {
+    setState(() {
+      _isInlineNotificationVisible = false;
+    });
+  }
+
+  Future<void> _showDialog(String title, String message,
+      List<DialogAction> actions) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -130,7 +247,10 @@ class _FormsScreenState extends State<FormsScreen> {
 
           content: ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.5,
+              maxHeight: MediaQuery
+                  .of(context)
+                  .size
+                  .height * 0.5,
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -199,189 +319,196 @@ class _FormsScreenState extends State<FormsScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.buttonPrimary,
                     foregroundColor: AppColors.buttonTextPrimary,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     elevation: 2,
-                    textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                 )
-                    : OutlinedButton(
+                    : TextButton.icon(
                   onPressed: () {
                     Navigator.of(context).pop();
                     action.onPressed();
                   },
-                  style: OutlinedButton.styleFrom(
+                  icon: Icon(_getButtonIcon(action.text), size: 16),
+                  label: Text(action.text),
+                  style: TextButton.styleFrom(
                     foregroundColor: AppColors.textSecondary,
-                    side: BorderSide(color: AppColors.textSecondary.withValues(alpha: 0.3)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
                   ),
-                  child: Text(action.text),
                 ),
               );
-            }).toList(),
+            }),
           ],
         );
       },
     );
   }
 
-  IconData _getIconForTitle(String title) {
-    switch (title.toLowerCase()) {
-      case 'equipo no encontrado':
-        return Icons.search_off;
-      case 'error de ubicación':
-        return Icons.location_off;
-      case 'éxito':
-        return Icons.check_circle;
-      default:
-        return Icons.info;
+  Color _getIconBackgroundColor(String title) {
+    if (title.contains('Advertencia') || title.contains('Atención')) {
+      return AppColors.warning.withOpacity(0.1);
+    } else if (title.contains('Error') || title.contains('Problema')) {
+      return AppColors.error.withOpacity(0.1);
+    } else if (title.contains('Éxito') || title.contains('Completado')) {
+      return AppColors.success.withOpacity(0.1);
     }
+    return AppColors.info.withOpacity(0.1);
   }
 
-  Color _getIconBackgroundColor(String title) {
-    switch (title.toLowerCase()) {
-      case 'equipo no encontrado':
-        return AppColors.warning.withValues(alpha: 0.1);
-      case 'error de ubicación':
-        return AppColors.error.withValues(alpha: 0.1);
-      case 'éxito':
-        return AppColors.success.withValues(alpha: 0.1);
-      default:
-        return AppColors.info.withValues(alpha: 0.1);
+  IconData _getIconForTitle(String title) {
+    if (title.contains('Advertencia') || title.contains('Atención')) {
+      return Icons.warning_amber_rounded;
+    } else if (title.contains('Error') || title.contains('Problema')) {
+      return Icons.error_outline;
+    } else if (title.contains('Éxito') || title.contains('Completado')) {
+      return Icons.check_circle_outline;
+    } else if (title.contains('Equipo Encontrado')) {
+      return Icons.qr_code_scanner;
     }
+    return Icons.info_outline;
   }
 
   Color _getIconColor(String title) {
-    switch (title.toLowerCase()) {
-      case 'equipo no encontrado':
-        return AppColors.warning;
-      case 'error de ubicación':
-        return AppColors.error;
-      case 'éxito':
-        return AppColors.success;
-      default:
-        return AppColors.info;
+    if (title.contains('Advertencia') || title.contains('Atención')) {
+      return AppColors.warning;
+    } else if (title.contains('Error') || title.contains('Problema')) {
+      return AppColors.error;
+    } else if (title.contains('Éxito') || title.contains('Completado')) {
+      return AppColors.success;
     }
+    return AppColors.info;
   }
 
   String _getSubtitle(String title) {
-    switch (title.toLowerCase()) {
-      case 'equipo no encontrado':
-        return 'Acción requerida';
-      case 'error de ubicación':
-        return 'GPS necesario';
-      default:
-        return '';
+    if (title.contains('Equipo Encontrado')) {
+      return 'Datos recuperados del sistema';
+    } else if (title.contains('Equipo no encontrado')) {
+      return 'Complete los datos manualmente';
     }
+    return '';
   }
 
   bool _shouldShowAdditionalInfo(String title) {
-    return title.toLowerCase() == 'error de ubicación';
+    return title.contains('Equipo no encontrado') ||
+        title.contains('Error') ||
+        title.contains('Advertencia');
   }
 
   String _getAdditionalInfo(String title) {
-    switch (title.toLowerCase()) {
-      case 'error de ubicación':
-        return 'Asegúrese de tener el GPS activado y de haber otorgado permisos de ubicación a la app.';
-      default:
-        return '';
+    if (title.contains('Equipo no encontrado')) {
+      return 'Recuerde verificar que el código sea correcto y que el equipo esté registrado en el sistema.';
+    } else if (title.contains('Error')) {
+      return 'Si el problema persiste, contacte con el administrador del sistema.';
+    } else if (title.contains('Advertencia')) {
+      return 'Por favor, revise la información antes de continuar.';
     }
+    return '';
   }
 
   IconData _getButtonIcon(String text) {
-    switch (text.toLowerCase()) {
-      case 'registrar nuevo':
-      case 'continuar':
-        return Icons.add_circle;
-      case 'reintentar gps':
-        return Icons.refresh;
-      default:
-        return Icons.check;
+    if (text.contains('Continuar') || text.contains('Aceptar')) {
+      return Icons.check;
+    } else if (text.contains('Cancelar')) {
+      return Icons.close;
+    } else if (text.contains('Reintentar')) {
+      return Icons.refresh;
     }
+    return Icons.arrow_forward;
   }
 
-  Future<void> _navigateToPreview(Map<String, dynamic> datos) async {
-    final result = await Navigator.push(
+  void _navigateToPreview(Map<String, dynamic> datos) {
+    Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PreviewScreen(datos: datos),
+        builder: (context) => PreviewScreen(
+          datos: datos,
+        ),
       ),
     );
-    _viewModel.onNavigationResult(result);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: ListenableBuilder(
-          listenable: _viewModel,
-          builder: (context, child) {
-            return Text(_viewModel.titleText);
-          },
-        ),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.background,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _viewModel.limpiarFormulario,
-            tooltip: 'Limpiar formulario',
+    return PopScope(
+      canPop: false, // ✅ Evita que se cierre automáticamente
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+
+        // ✅ Mostrar diálogo de confirmación
+        final shouldExit = await _showCancelConfirmation();
+        if (shouldExit && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: ListenableBuilder(
+            listenable: _viewModel,
+            builder: (context, child) {
+              return Text(_viewModel.titleText);
+            },
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 20),
-                      _buildCodigoBarrasField(),
-                      const SizedBox(height: 16),
-
-                      // NUEVO: Dropdown de marca
-                      _buildMarcaDropdown(),
-                      const SizedBox(height: 16),
-
-                      // Dropdown de modelo
-                      _buildModeloDropdown(),
-                      const SizedBox(height: 16),
-
-                      _buildSerieField(),
-                      const SizedBox(height: 16),
-                      _buildLogoDropdown(),
-                      const SizedBox(height: 16),
-                      _buildImagenField(),
-                      const SizedBox(height: 16),
-                      _buildObservacionesField(),
-                      const SizedBox(height: 100),
-                    ],
+          backgroundColor: AppColors.primary,
+          foregroundColor: AppColors.background,
+          elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _viewModel.limpiarFormulario,
+              tooltip: 'Limpiar formulario',
+            ),
+          ],
+        ),
+        body: GestureDetector(
+          onTap: () {
+            FocusScope.of(context).unfocus();
+          },
+          child: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const SizedBox(height: 20),
+                          _buildCodigoBarrasField(),
+                          const SizedBox(height: 16),
+                          _buildMarcaDropdown(),
+                          const SizedBox(height: 16),
+                          _buildModeloDropdown(),
+                          const SizedBox(height: 16),
+                          _buildSerieField(),
+                          const SizedBox(height: 16),
+                          _buildLogoDropdown(),
+                          const SizedBox(height: 16),
+                          _buildImagenField(),
+                          const SizedBox(height: 16),
+                          _buildObservacionesField(),
+                          const SizedBox(height: 100),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                _buildBottomButtons(),
+              ],
             ),
-            _buildBottomButtons(),
-          ],
+          ),
         ),
       ),
     );
   }
 
-
+  // ✅ MODIFICADO: Ahora incluye la notificación inline debajo del campo
   Widget _buildCodigoBarrasField() {
     return ListenableBuilder(
       listenable: _viewModel,
@@ -403,13 +530,14 @@ class _FormsScreenState extends State<FormsScreen> {
                 Expanded(
                   child: TextFormField(
                     controller: _viewModel.codigoBarrasController,
+                    focusNode: _codigoBarrasFocusNode,
                     validator: _viewModel.validarCodigoBarras,
                     onChanged: _viewModel.onCodigoChanged,
                     onFieldSubmitted: _viewModel.onCodigoSubmitted,
                     enabled: !_viewModel.isLoading,
                     decoration: InputDecoration(
                       hintText: _viewModel.codigoHint,
-                      prefixIcon: const Icon(Icons.qr_code_2),
+                      prefixIcon: const Icon(Icons.barcode_reader),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -457,6 +585,17 @@ class _FormsScreenState extends State<FormsScreen> {
                 ],
               ],
             ),
+
+            // ✅ NUEVA: Notificación inline debajo del campo de código
+            if (_isInlineNotificationVisible &&
+                _inlineNotificationMessage != null &&
+                _inlineNotificationType != null)
+              InlineNotification(
+                message: _inlineNotificationMessage!,
+                type: _inlineNotificationType!,
+                visible: _isInlineNotificationVisible,
+                onDismiss: _dismissInlineNotification,
+              ),
           ],
         );
       },
@@ -476,7 +615,7 @@ class _FormsScreenState extends State<FormsScreen> {
 
           return DropdownItem<int>(
             value: marcaId!,
-            label: '${marca['nombre']} (ID: $marcaId)',
+            label: '${marca['nombre']}',
           );
         }).toList();
 
@@ -518,7 +657,7 @@ class _FormsScreenState extends State<FormsScreen> {
 
           return DropdownItem<int>(
             value: modeloId!,
-            label: '${modelo['nombre']} (ID: $modeloId)',
+            label: '${modelo['nombre']}',
           );
         }).toList();
 
@@ -574,6 +713,7 @@ class _FormsScreenState extends State<FormsScreen> {
     int maxLines = 1,
     bool enabled = true,
     Color? backgroundColor,
+    FocusNode? focusNode,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -592,6 +732,7 @@ class _FormsScreenState extends State<FormsScreen> {
           validator: validator,
           maxLines: maxLines,
           enabled: enabled,
+          focusNode: focusNode,
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: Icon(icon),
@@ -630,7 +771,7 @@ class _FormsScreenState extends State<FormsScreen> {
 
           return DropdownItem<int>(
             value: logoId!,
-            label: '${logo['nombre']} (ID: $logoId)',
+            label: '${logo['nombre']} ',
           );
         }).toList();
 
@@ -716,53 +857,70 @@ class _FormsScreenState extends State<FormsScreen> {
           ),
         ),
         const SizedBox(height: 8),
-
-        if (imagen != null) ...[
-          Container(
-            height: 180,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.file(
-                imagen,
-                fit: BoxFit.cover,
+        if (imagen != null)
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  imagen,
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                    onPressed: onEliminar,
+                  ),
+                ),
+              ),
+            ],
+          )
+        else
+          InkWell(
+            onTap: onTomar,
+            child: Container(
+              height: 150,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.border,
+                  style: BorderStyle.solid,
+                  width: 2,
+                ),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add_a_photo,
+                      size: 48,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tomar foto',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 8),
-        ],
-
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: onTomar,
-            icon: Icon(imagen != null ? Icons.camera_alt : Icons.add_a_photo),
-            label: Text(imagen != null ? 'Cambiar $titulo' : 'Tomar $titulo'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              side: BorderSide(color: AppColors.primary),
-              foregroundColor: AppColors.primary,
-            ),
-          ),
-        ),
-
-        if (imagen != null) ...[
-          const SizedBox(height: 8),
-          Center(
-            child: TextButton.icon(
-              onPressed: onEliminar,
-              icon: const Icon(Icons.delete_outline, size: 18),
-              label: Text('Eliminar $titulo'),
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.error,
-              ),
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -809,7 +967,7 @@ class _FormsScreenState extends State<FormsScreen> {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: _viewModel.isLoading ? null : _viewModel.cancelar,
+                  onPressed: _viewModel.isLoading ? null : _handleCancel,
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     side: BorderSide(color: AppColors.border),
@@ -832,7 +990,7 @@ class _FormsScreenState extends State<FormsScreen> {
                 child: ElevatedButton(
                   onPressed: _viewModel.isLoading
                       ? null
-                      : () => _viewModel.continuarAPreview(_formKey),
+                      : _handleContinuar,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.buttonPrimary,
                     foregroundColor: AppColors.buttonTextPrimary,
@@ -876,5 +1034,125 @@ class _FormsScreenState extends State<FormsScreen> {
         },
       ),
     );
+  }
+
+  // ✅ NUEVO: Método para manejar el botón Continuar
+  Future<void> _handleContinuar() async {
+    // ✅ Activar bandera para evitar búsqueda automática
+    setState(() {
+      _ejecutandoAccion = true;
+    });
+
+    // ✅ Verificar cambios manualmente ANTES de continuar
+    await _viewModel.buscarEquipoSiHuboCambios();
+
+    // ✅ Continuar con el flujo normal
+    _viewModel.continuarAPreview(_formKey);
+
+    // ✅ Desactivar bandera después de un pequeño delay
+    // (para evitar que se dispare la búsqueda durante la navegación)
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() {
+          _ejecutandoAccion = false;
+        });
+      }
+    });
+  }
+
+  // ✅ MODIFICADO: Método para manejar el botón Cancelar
+  Future<void> _handleCancel() async {
+    // ✅ Activar bandera para evitar búsqueda automática
+    setState(() {
+      _ejecutandoAccion = true;
+    });
+
+    final shouldExit = await _showCancelConfirmation();
+    if (shouldExit) {
+      _viewModel.cancelar();
+      // No hace falta desactivar la bandera porque salimos de la pantalla
+    } else {
+      // ✅ Si decide continuar, desactivar bandera
+      setState(() {
+        _ejecutandoAccion = false;
+      });
+    }
+  }
+
+  // ✅ NUEVO: Diálogo de confirmación simple
+  Future<bool> _showCancelConfirmation() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) =>
+          AlertDialog(
+            backgroundColor: AppColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: AppColors.warning,
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '¿Cancelar censo?',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              '¿Estás seguro que quieres cancelar el censo? Se perderán los datos ingresados.',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, false),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Continuar censo',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(
+                  'Cancelar',
+                  style: TextStyle(
+                    color: AppColors.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+
+    return confirmed ?? false;
   }
 }

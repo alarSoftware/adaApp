@@ -64,7 +64,7 @@ class ClientOptionsScreen extends StatelessWidget {
                       context: context,
                       title: 'Realizar Censo de Equipo',
                       description: 'Censo de los equipos de frio del cliente',
-                      icon: Icons.qr_code_scanner,
+                      icon: Icons.barcode_reader,
                       color: AppColors.primary,
                       onTap: () => _navigateToCenso(context),
                     ),
