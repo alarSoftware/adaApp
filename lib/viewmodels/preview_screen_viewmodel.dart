@@ -3,6 +3,7 @@ import 'package:logger/logger.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
+import 'package:uuid/uuid.dart';
 import '../../models/cliente.dart';
 import '../../models/usuario.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
@@ -14,6 +15,7 @@ import 'dart:async';
 import 'package:path_provider/path_provider.dart';
 
 final _logger = Logger();
+final Uuid _uuid = const Uuid();
 
 class PreviewScreenViewModel extends ChangeNotifier {
   bool _isSaving = false;
@@ -128,7 +130,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       };
     }
 
-    final processId = DateTime.now().millisecondsSinceEpoch.toString();
+    final processId = _uuid.v4();
     _currentProcessId = processId;
     _isProcessing = true;
 
@@ -296,7 +298,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       if (estadoIdActual != null) {
         final now = DateTime.now().toLocal();
-        final timestampId = now.millisecondsSinceEpoch;
+        final timestampId = _uuid.v4();
 
         final datosCompletos = {
           'id_local': estadoIdActual,
@@ -534,7 +536,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       // Procesar respuesta como antes
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        dynamic servidorId = DateTime.now().millisecondsSinceEpoch;
+        dynamic servidorId = _uuid.v4();
         String mensaje = 'Estado registrado correctamente';
 
         try {
@@ -659,7 +661,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   Future<Map<String, dynamic>> _prepararDatosParaEnvio(Map<String, dynamic> datos) async {
     final cliente = datos['cliente'] as Cliente;
     final equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
-    final idLocal = DateTime.now().millisecondsSinceEpoch;
+    final idLocal = _uuid.v4();
     final usuarioId = await _getUsuarioId;
     final now = DateTime.now().toLocal();
 
@@ -710,7 +712,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     final now = DateTime.now().toLocal();
 
     return {
-      'id': datosLocales['timestamp_id']?.toString() ?? now.millisecondsSinceEpoch.toString(),
+      'id': datosLocales['timestamp_id']?.toString() ?? _uuid.v4(),
       'edfVendedorSucursalId': '$edfVendedorId',
       'edfEquipoId': (datosLocales['equipo_id'] ?? '').toString(),
       'usuarioId': usuarioId,
@@ -878,7 +880,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final usuarioId = await _getUsuarioId;
       final edfVendedorId = await _getEdfVendedorId;
       final now = DateTime.now().toLocal();
-      final timestampId = now.millisecondsSinceEpoch;
+      final timestampId = _uuid.v4();
 
       final datosParaApi = {
         'id': timestampId.toString(),
@@ -988,7 +990,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
 
       // Nombre del archivo con timestamp
-      final fileName = 'post_nuevo_equipo_${DateTime.now().millisecondsSinceEpoch}.txt';
+      final fileName = 'post_nuevo_equipo_${_uuid.v4().substring(0, 13)}.txt';
       final file = File('${downloadsDir.path}/$fileName');
 
       // Construir contenido del archivo
