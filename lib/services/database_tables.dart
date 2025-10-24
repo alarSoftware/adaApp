@@ -118,7 +118,7 @@ class DatabaseTables {
 
   String _sqlCensoActivo() => '''
   CREATE TABLE censo_activo (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT,
     equipo_id TEXT NOT NULL,
     cliente_id INTEGER NOT NULL,   
     en_local INTEGER DEFAULT 0,

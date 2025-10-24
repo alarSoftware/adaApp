@@ -13,7 +13,6 @@ import 'package:ada_app/services/auth_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'dart:async';
 import 'package:path_provider/path_provider.dart';
-
 final _logger = Logger();
 final Uuid _uuid = const Uuid();
 
@@ -149,7 +148,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       ) async {
     _setSaving(true);
     _setStatusMessage(null);
-    int? estadoIdActual;
+    String? estadoIdActual;
 
     try {
       _logger.i('CONFIRMANDO REGISTRO - GUARDADO DEFINITIVO EN BD [Process: $processId]');
@@ -279,7 +278,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         );
 
         if (estadoCreado.id != null) {
-          estadoIdActual = estadoCreado.id!;
+          estadoIdActual = estadoCreado.id!;  // Sin cast a int
           _logger.i('✅ Estado creado con ID: $estadoIdActual');
         } else {
           _logger.w('⚠️ Estado creado pero sin ID asignado');
@@ -344,7 +343,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         await _guardarRegistroLocal(datosCompletos);
 
         // 🔥 Lanzar sincronización en BACKGROUND (sin await)
-        _sincronizarEnBackground(estadoIdActual, datosCompletos);
+        _sincronizarEnBackground(estadoIdActual , datosCompletos);
 
         _logger.i('✅ Registro guardado localmente. Sincronización en segundo plano iniciada.');
 
@@ -376,13 +375,18 @@ class PreviewScreenViewModel extends ChangeNotifier {
 // ✅ NUEVO MÉTODO: Sincronización en segundo plano
 // ================================================================
 
-  void _sincronizarEnBackground(int estadoId, Map<String, dynamic> datosCompletos) {
+  void _sincronizarEnBackground(String? estadoId, Map<String, dynamic> datos) async {
+    if (estadoId == null) {
+      _logger.e('❌ No se puede sincronizar sin estadoId');
+      return;
+    }
+
     // Ejecutar sin await para que no bloquee
     Future.delayed(Duration.zero, () async {
       try {
         _logger.i('🔄 Iniciando sincronización en segundo plano para estado $estadoId');
 
-        final datosApi = await _prepararDatosParaApiEstados(datosCompletos);
+        final datosApi = await _prepararDatosParaApiEstados(datos);  // ✅ Cambiado
         final respuestaServidor = await _enviarAApiEstadosConTimeout(datosApi, 10);
 
         if (respuestaServidor['exito'] == true) {
@@ -390,7 +394,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
               estadoId,
               servidorId: respuestaServidor['servidor_id']
           );
-          final idLocal = _safeCastToInt(datosCompletos['id_local'], 'id_local');
+          final idLocal = _safeCastToInt(datos['id_local'], 'id_local');  // ✅ Ya está bien
           if (idLocal != null) await _marcarComoSincronizado(idLocal);
 
           _logger.i('✅ Sincronización en segundo plano exitosa para estado $estadoId');
@@ -408,7 +412,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
         } catch (_) {}
       }
 
-      // Programar sincronización automática de otros registros pendientes
       _programarSincronizacionBackground();
     });
   }
@@ -913,7 +916,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       if (respuesta['exito'] == true) {
         await _estadoEquipoRepository.marcarComoMigrado(
-          estadoId,
+          estadoId as String,
           servidorId: respuesta['id'],
         );
 
@@ -925,7 +928,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         };
       } else {
         await _estadoEquipoRepository.marcarComoError(
-            estadoId,
+            estadoId as String,
             'Error del servidor: ${respuesta['mensaje']}'
         );
 
@@ -940,7 +943,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       _logger.e('Error en reintento de envío: $e');
 
       try {
-        await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción: $e');
+        await _estadoEquipoRepository.marcarComoError(estadoId as String, 'Excepción: $e');
       } catch (_) {}
 
       return {

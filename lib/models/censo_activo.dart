@@ -33,9 +33,9 @@ extension EstadoEquipoCensoExtension on EstadoEquipoCenso {
 }
 
 class EstadoEquipo {
-  final int? id;
-  final String equipoId;      // ← CAMBIO: String en lugar de int equipoPendienteId
-  final int clienteId;        // ← CAMBIO: Nuevo campo
+  final String? id;
+  final String equipoId;
+  final int clienteId;
   final bool enLocal;
   final double? latitud;
   final double? longitud;
@@ -60,8 +60,8 @@ class EstadoEquipo {
 
   EstadoEquipo({
     this.id,
-    required this.equipoId,     // ← CAMBIO
-    required this.clienteId,    // ← CAMBIO
+    required this.equipoId,
+    required this.clienteId,
     required this.enLocal,
     this.latitud,
     this.longitud,
@@ -85,41 +85,41 @@ class EstadoEquipo {
 
   factory EstadoEquipo.fromMap(Map<String, dynamic> map) {
     return EstadoEquipo(
-        id: map['id'] as int?,
-        equipoId: map['equipo_id'] as String? ?? '0',        // ← CAMBIO
-        clienteId: map['cliente_id'] as int? ?? 0,           // ← CAMBIO
+        id: map['id'] as String?,
+        equipoId: map['equipo_id'] as String? ?? '0',
+        clienteId: map['cliente_id'] as int? ?? 0,
         enLocal: (map['en_local'] as int?) == 1,
-      latitud: map['latitud'] as double?,
-      longitud: map['longitud'] as double?,
-      fechaRevision: map['fecha_revision'] != null
-          ? DateTime.parse(map['fecha_revision'] as String)
-          : DateTime.now(),
-      fechaCreacion: map['fecha_creacion'] != null
-          ? DateTime.parse(map['fecha_creacion'] as String)
-          : DateTime.now(),
-      fechaActualizacion: map['fecha_actualizacion'] != null
-          ? DateTime.parse(map['fecha_actualizacion'] as String)
-          : DateTime.now(),
-      estaSincronizado: (map['sincronizado'] as int?) == 1,
-      // Primera imagen
-      imagenPath: map['imagen_path'] as String?,
-      imagenBase64: map['imagen_base64'] as String?,
-      tieneImagen: (map['tiene_imagen'] as int?) == 1,
-      imagenTamano: map['imagen_tamano'] as int?,
-      // Segunda imagen
-      imagenPath2: map['imagen_path2'] as String?,
-      imagenBase64_2: map['imagen_base64_2'] as String?,
-      tieneImagen2: (map['tiene_imagen2'] as int?) == 1,
-      imagenTamano2: map['imagen_tamano2'] as int?,
-      estadoCenso: map['estado_censo'] as String?,
-      observaciones: map ['observaciones'] as String?
+        latitud: map['latitud'] as double?,
+        longitud: map['longitud'] as double?,
+        fechaRevision: map['fecha_revision'] != null
+            ? DateTime.parse(map['fecha_revision'] as String)
+            : DateTime.now(),
+        fechaCreacion: map['fecha_creacion'] != null
+            ? DateTime.parse(map['fecha_creacion'] as String)
+            : DateTime.now(),
+        fechaActualizacion: map['fecha_actualizacion'] != null
+            ? DateTime.parse(map['fecha_actualizacion'] as String)
+            : DateTime.now(),
+        estaSincronizado: (map['sincronizado'] as int?) == 1,
+        // Primera imagen
+        imagenPath: map['imagen_path'] as String?,
+        imagenBase64: map['imagen_base64'] as String?,
+        tieneImagen: (map['tiene_imagen'] as int?) == 1,
+        imagenTamano: map['imagen_tamano'] as int?,
+        // Segunda imagen
+        imagenPath2: map['imagen_path2'] as String?,
+        imagenBase64_2: map['imagen_base64_2'] as String?,
+        tieneImagen2: (map['tiene_imagen2'] as int?) == 1,
+        imagenTamano2: map['imagen_tamano2'] as int?,
+        estadoCenso: map['estado_censo'] as String?,
+        observaciones: map['observaciones'] as String?
     );
   }
 
   Map<String, dynamic> toMap() {
     final map = {
       'id': id,
-      'equipo_id': equipoId,        // ← CAMBIO
+      'equipo_id': equipoId,
       'cliente_id': clienteId,
       'en_local': enLocal ? 1 : 0,
       'latitud': latitud,
@@ -151,7 +151,7 @@ class EstadoEquipo {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'equipo_id': equipoId,        // ← CAMBIO
+      'equipo_id': equipoId,
       'cliente_id': clienteId,
       'en_local': enLocal,
       'latitud': latitud,
@@ -174,7 +174,7 @@ class EstadoEquipo {
   }
 
   EstadoEquipo copyWith({
-    int? id,
+    String? id,  // ✅ CORREGIDO: String? en lugar de int?
     int? equipoClienteId,
     bool? enLocal,
     double? latitud,

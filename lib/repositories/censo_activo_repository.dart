@@ -2,9 +2,11 @@ import '../models/censo_activo.dart';
 import 'base_repository.dart';
 import 'package:logger/logger.dart';
 import 'dart:convert';
+import 'package:uuid/uuid.dart'; // ✅ AGREGADO
 
 class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   final Logger _logger = Logger();
+  final Uuid _uuid = Uuid(); // ✅ AGREGADO
 
   @override
   String get tableName => 'censo_activo';
@@ -55,8 +57,15 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }) async {
     try {
       final now = DateTime.now();
+      final uuidId = _uuid.v4(); // ✅ GENERAR UUID
+
+      _logger.i('📝 Creando nuevo estado en BD local');
+      _logger.i('   UUID (id): $uuidId');
+      _logger.i('   Equipo ID: $equipoId');
+      _logger.i('   Cliente ID: $clienteId');
 
       final datosEstado = {
+        'id': uuidId, // ✅ USAR UUID COMO ID
         'equipo_id': equipoId,
         'cliente_id': clienteId,
         'en_local': enLocal ? 1 : 0,
@@ -80,12 +89,12 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         'imagen_tamano2': imagenTamano2,
       };
 
-      final id = await dbHelper.insertar(tableName, datosEstado);
+      await dbHelper.insertar(tableName, datosEstado); // ✅ SIN CAPTURAR RETORNO
 
-      _logger.i('Estado CREADO para equipo: $equipoId, cliente: $clienteId (ID: $id)');
+      _logger.i('✅ Estado insertado en BD con UUID: $uuidId');
 
       return EstadoEquipo(
-        id: id,
+        id: uuidId, // ✅ PASAR UUID
         equipoId: equipoId,
         clienteId: clienteId,
         enLocal: enLocal,
@@ -109,7 +118,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         imagenTamano2: imagenTamano2,
       );
     } catch (e) {
-      _logger.e('Error creando nuevo estado: $e');
+      _logger.e('❌ Error creando nuevo estado: $e');
       rethrow;
     }
   }
@@ -163,8 +172,12 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
 
           _logger.i('📝 Observaciones extraídas: $observacionesExtraidas');
 
+          // ✅ GENERAR UUID SI NO VIENE DEL SERVIDOR
+          final idCenso = censo['id']?.toString() ?? _uuid.v4();
+
           // Mapear campos del servidor a estructura local
           final datosLocal = {
+            'id': idCenso, // ✅ USAR ID DEL SERVIDOR O GENERAR UUID
             'equipo_id': equipoId,
             'cliente_id': clienteId,
             'en_local': (censo['enLocal'] == true || censo['enLocal'] == 1) ? 1 : 0,
@@ -175,7 +188,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
             'fecha_actualizacion': DateTime.now().toIso8601String(),
             'sincronizado': 1,
             'estado_censo': 'migrado',
-            'observaciones': observacionesExtraidas, // ✅ USAR OBSERVACIONES EXTRAÍDAS
+            'observaciones': observacionesExtraidas,
 
             // Imágenes
             'imagen_path': censo['imagenPath'] ?? censo['imagen_path'],
@@ -191,7 +204,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
 
           await dbHelper.insertar(tableName, datosLocal);
           guardados++;
-          _logger.i('✅ Censo insertado con observaciones');
+          _logger.i('✅ Censo insertado con UUID: $idCenso');
 
         } catch (e) {
           _logger.w('Error guardando censo individual: $e');
@@ -207,7 +220,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-// ✅ NUEVO MÉTODO HELPER
+  // ✅ NUEVO MÉTODO HELPER
   String? _extraerObservacionesDeJson(Map<String, dynamic> censo) {
     try {
       // Intentar campo directo primero
@@ -236,7 +249,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-// 🔧 MÉTODO AUXILIAR para parsear booleanos
+  // 🔧 MÉTODO AUXILIAR para parsear booleanos
   int _parsearBoolean(dynamic valor) {
     if (valor == null) return 0;
     if (valor is bool) return valor ? 1 : 0;
@@ -283,6 +296,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       return [];
     }
   }
+
   /// Obtener últimos N cambios por equipo_id y cliente_id
   Future<List<EstadoEquipo>> obtenerUltimosCambios(String equipoId, int clienteId, {int limite = 5}) async {
     try {
@@ -303,7 +317,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   // ========== MÉTODOS PARA MANEJO DE ESTADOS DE CENSO ==========
 
   /// Marcar estado como migrado exitosamente
-  Future<bool> marcarComoMigrado(int estadoId, {int? servidorId}) async {
+  Future<bool> marcarComoMigrado(String estadoId, {dynamic servidorId}) async { // ✅ CAMBIAR int a String
     try {
       final datosActualizacion = <String, dynamic>{
         'estado_censo': EstadoEquipoCenso.migrado.valor,
@@ -332,12 +346,12 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   /// Marcar estado como error en migración
-  Future<bool> marcarComoError(int estadoId, String mensajeError) async {
+  Future<bool> marcarComoError(String estadoId, String mensajeError) async { // ✅ CAMBIAR int a String
     try {
       final datosActualizacion = <String, dynamic>{
         'estado_censo': EstadoEquipoCenso.error.valor,
         'fecha_actualizacion': DateTime.now().toIso8601String(),
-        'sincronizado': 0, // Mantener como no sincronizado para reintentar
+        'sincronizado': 0,
       };
 
       final count = await dbHelper.actualizar(
@@ -392,7 +406,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   /// Reintentar migración de registros con error
-  Future<void> reintentarMigracion(int estadoId) async {
+  Future<void> reintentarMigracion(String estadoId) async { // ✅ CAMBIAR int a String
     try {
       final datosActualizacion = <String, dynamic>{
         'estado_censo': EstadoEquipoCenso.creado.valor,
@@ -433,7 +447,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   /// Marcar como sincronizado
-  Future<void> marcarComoSincronizado(int id) async {
+  Future<void> marcarComoSincronizado(String id) async { // ✅ CAMBIAR int a String
     try {
       await dbHelper.actualizar(
         tableName,
@@ -451,11 +465,11 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   /// Marcar múltiples como sincronizados
-  Future<void> marcarMultiplesComoSincronizados(List<int> ids) async {
+  Future<void> marcarMultiplesComoSincronizados(List<String> ids) async { // ✅ CAMBIAR List<int> a List<String>
     if (ids.isEmpty) return;
 
     try {
-      final idsString = ids.join(',');
+      final idsString = ids.map((id) => "'$id'").join(',');
       await dbHelper.actualizar(
         tableName,
         {
@@ -602,14 +616,14 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   /// Marcar imagen como sincronizada y limpiar Base64
-  Future<void> marcarImagenComoSincronizada(int estadoId, {dynamic servidorId}) async {
+  Future<void> marcarImagenComoSincronizada(String estadoId, {dynamic servidorId}) async { // ✅ CAMBIAR int a String
     try {
       final datosActualizacion = <String, dynamic>{
         'sincronizado': 1,
         'estado_censo': EstadoEquipoCenso.migrado.valor,
         'fecha_actualizacion': DateTime.now().toIso8601String(),
-        'imagen_base64': null, // Limpiar Base64 inmediatamente después de envío exitoso
-        'imagen_base64_2': null, // También limpiar segunda imagen si existe
+        'imagen_base64': null,
+        'imagen_base64_2': null,
       };
 
       await dbHelper.actualizar(
@@ -626,19 +640,19 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-  /// Limpiar Base64 después de sincronización exitosa (para ahorrar espacio)
-  Future<void> limpiarBase64DespuesDeSincronizacion(int estadoId) async {
+  /// Limpiar Base64 después de sincronización exitosa
+  Future<void> limpiarBase64DespuesDeSincronizacion(String estadoId) async { // ✅ CAMBIAR int a String
     try {
       final datosActualizacion = <String, dynamic>{
-        'imagen_base64': null, // Limpiar Base64 para ahorrar espacio
-        'imagen_base64_2': null, // También segunda imagen
+        'imagen_base64': null,
+        'imagen_base64_2': null,
         'fecha_actualizacion': DateTime.now().toIso8601String(),
       };
 
       await dbHelper.actualizar(
         tableName,
         datosActualizacion,
-        where: 'id = ? AND sincronizado = 1', // Solo si ya está sincronizado
+        where: 'id = ? AND sincronizado = 1',
         whereArgs: [estadoId],
       );
 
