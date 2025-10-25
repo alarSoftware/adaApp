@@ -93,7 +93,7 @@ class DatabaseTables {
 
   String _sqlEquiposPendientes() => '''
   CREATE TABLE equipos_pendientes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY,
     equipo_id TEXT,
     cliente_id TEXT,
     fecha_censo DATETIME,

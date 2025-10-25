@@ -1,6 +1,6 @@
 class EquiposPendientes {
-  final int? id;
-  final int equipoId;
+  final String? id;
+  final String equipoId;
   final int clienteId;
   final DateTime fechaCenso;
   final int usuarioCensoId;
@@ -39,8 +39,8 @@ class EquiposPendientes {
 
   factory EquiposPendientes.fromMap(Map<String, dynamic> map) {
     return EquiposPendientes(
-      id: map['id'] as int?,
-      equipoId: map['equipo_id'] as int,
+      id: map['id']?.toString(),  // ✅ Convertir a String
+      equipoId: map['equipo_id'].toString(),  // ✅ Siempre String
       clienteId: map['cliente_id'] as int,
       fechaCenso: DateTime.parse(map['fecha_censo'] as String),
       usuarioCensoId: map['usuario_censo_id'] as int,

@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
+import 'package:uuid/uuid.dart';  // ✅ AÑADIR IMPORT
 
 class EquiposPendientesApiService {
+  static const Uuid _uuid = Uuid();  // ✅ INSTANCIA UUID
 
   static Future<Map<String, dynamic>> enviarEquipoPendiente({
     required String equipoId,
@@ -11,16 +13,12 @@ class EquiposPendientesApiService {
   }) async {
     try {
       BaseSyncService.logger.i('💡 Enviando equipo pendiente...');
-
       final payload = _construirPayload(equipoId, clienteId, edfVendedorId);
-
       BaseSyncService.logger.i('📦 Payload completo: $payload');
-
       print(jsonEncode(payload));
 
       // CAMBIO AQUÍ: Obtener la URL dinámica
       final baseUrl = await BaseSyncService.getBaseUrl();
-
       final response = await http.post(
         Uri.parse('$baseUrl/edfEquipoPendiente/insertEquipoPendiente'),
         headers: {'Content-Type': 'application/json'},
@@ -45,7 +43,7 @@ class EquiposPendientesApiService {
     return {
       'equipoId': equipoId,
       'clienteId': clienteId.toString(),
-      'appId': DateTime.now().millisecondsSinceEpoch.toString(),
+      'appId': _uuid.v4(),  // ✅ UUID en lugar de timestamp
       'vendedorSucursalId': edfVendedorId,
     };
   }
