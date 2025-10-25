@@ -300,7 +300,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
   }
 
-  Future<void> _reintentarEnvioHistorial(int? estadoId) async {
+  Future<void> _reintentarEnvioHistorial(String? estadoId) async {
     if (estadoId == null) {
       _mostrarSnackBar('Error: ID de estado no disponible', AppColors.error);
       return;
@@ -378,7 +378,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   Widget _buildBody(Cliente cliente) {
     final esHistorial = widget.datos['es_historial'] == true;
-    final estadoId = widget.datos['id'] as int?;
+    final estadoId = widget.datos['id'] as String?;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -424,7 +424,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     if (_imagePath2 != null || _imageBase64_2 != null) cantidadImagenes++;
 
     if (esHistorial) {
-      final estadoId = widget.datos['id'] as int?;
+      final estadoId = widget.datos['id'] as String?;
 
       return FutureBuilder<Map<String, dynamic>>(
         future: vm.obtenerInfoSincronizacion(estadoId),
@@ -507,7 +507,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
-  Widget _buildSyncStatusIndicator(int? estadoId) {
+  Widget _buildSyncStatusIndicator(String? estadoId) {
     if (widget.datos['es_historial'] != true || estadoId == null) {
       return const SizedBox.shrink();
     }

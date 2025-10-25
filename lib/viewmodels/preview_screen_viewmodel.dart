@@ -394,7 +394,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
               estadoId,
               servidorId: respuestaServidor['servidor_id']
           );
-          final idLocal = _safeCastToInt(datos['id_local'], 'id_local');  // ✅ Ya está bien
+          final idLocal = datos['id_local'] as String?;
           if (idLocal != null) await _marcarComoSincronizado(idLocal);
 
           _logger.i('✅ Sincronización en segundo plano exitosa para estado $estadoId');
@@ -757,7 +757,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     };
   }
 
-  Future<bool> verificarSincronizacionPendiente(int? estadoId) async {
+  Future<bool> verificarSincronizacionPendiente(String? estadoId) async {
     if (estadoId == null) return false;
 
     try {
@@ -786,7 +786,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> obtenerInfoSincronizacion(int? estadoId) async {
+  Future<Map<String, dynamic>> obtenerInfoSincronizacion(String? estadoId) async {
     if (estadoId == null) {
       return {
         'pendiente': false,
@@ -861,7 +861,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       };
     }
   }
-  Future<Map<String, dynamic>> reintentarEnvio(int estadoId) async {
+  Future<Map<String, dynamic>> reintentarEnvio(String estadoId) async {
     try {
       _logger.i('Reintentando envío del estado ID: $estadoId');
 
@@ -916,7 +916,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       if (respuesta['exito'] == true) {
         await _estadoEquipoRepository.marcarComoMigrado(
-          estadoId as String,
+          estadoId,
           servidorId: respuesta['id'],
         );
 
@@ -943,7 +943,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       _logger.e('Error en reintento de envío: $e');
 
       try {
-        await _estadoEquipoRepository.marcarComoError(estadoId as String, 'Excepción: $e');
+        await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción: $e');
       } catch (_) {}
 
       return {
@@ -953,7 +953,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> _marcarComoSincronizado(int idLocal) async {
+  Future<void> _marcarComoSincronizado(String idLocal) async {
     try {
       _logger.i('Registro marcado como sincronizado: $idLocal');
     } catch (e) {}
