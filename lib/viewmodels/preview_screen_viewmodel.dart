@@ -13,6 +13,7 @@ import 'package:ada_app/services/auth_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'dart:async';
 import 'package:path_provider/path_provider.dart';
+
 final _logger = Logger();
 final Uuid _uuid = const Uuid();
 
@@ -142,6 +143,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
     }
   }
+
   Future<Map<String, dynamic>> _ejecutarConfirmacion(
       Map<String, dynamic> datos,
       String processId
@@ -278,8 +280,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
         );
 
         if (estadoCreado.id != null) {
-          estadoIdActual = estadoCreado.id!;  // Sin cast a int
-          _logger.i('✅ Estado creado con ID: $estadoIdActual');
+          estadoIdActual = estadoCreado.id!;  // ✅ Ya es String
+          _logger.i('✅ Estado creado con UUID: $estadoIdActual');
         } else {
           _logger.w('⚠️ Estado creado pero sin ID asignado');
           estadoIdActual = null;
@@ -343,7 +345,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         await _guardarRegistroLocal(datosCompletos);
 
         // 🔥 Lanzar sincronización en BACKGROUND (sin await)
-        _sincronizarEnBackground(estadoIdActual , datosCompletos);
+        _sincronizarEnBackground(estadoIdActual, datosCompletos);
 
         _logger.i('✅ Registro guardado localmente. Sincronización en segundo plano iniciada.');
 
@@ -371,9 +373,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-// ================================================================
-// ✅ NUEVO MÉTODO: Sincronización en segundo plano
-// ================================================================
+  // ================================================================
+  // ✅ NUEVO MÉTODO: Sincronización en segundo plano
+  // ================================================================
 
   void _sincronizarEnBackground(String? estadoId, Map<String, dynamic> datos) async {
     if (estadoId == null) {
@@ -386,7 +388,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       try {
         _logger.i('🔄 Iniciando sincronización en segundo plano para estado $estadoId');
 
-        final datosApi = await _prepararDatosParaApiEstados(datos);  // ✅ Cambiado
+        final datosApi = await _prepararDatosParaApiEstados(datos);
         final respuestaServidor = await _enviarAApiEstadosConTimeout(datosApi, 10);
 
         if (respuestaServidor['exito'] == true) {
@@ -394,7 +396,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
               estadoId,
               servidorId: respuestaServidor['servidor_id']
           );
-          final idLocal = _safeCastToInt(datos['id_local'], 'id_local');  // ✅ Ya está bien
+
+          // ✅ CORRECCIÓN: id_local es String (UUID), no int
+          final idLocal = datos['id_local'] as String?;
           if (idLocal != null) await _marcarComoSincronizado(idLocal);
 
           _logger.i('✅ Sincronización en segundo plano exitosa para estado $estadoId');
@@ -577,7 +581,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-
   void _programarSincronizacionBackground() {
     Timer(Duration(seconds: 5), () async {
       try {
@@ -757,7 +760,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
     };
   }
 
-  Future<bool> verificarSincronizacionPendiente(int? estadoId) async {
+  // ✅ CORRECCIÓN: Cambiar int? a String?
+  Future<bool> verificarSincronizacionPendiente(String? estadoId) async {
     if (estadoId == null) return false;
 
     try {
@@ -786,7 +790,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> obtenerInfoSincronizacion(int? estadoId) async {
+  // ✅ CORRECCIÓN: Cambiar int? a String?
+  Future<Map<String, dynamic>> obtenerInfoSincronizacion(String? estadoId) async {
     if (estadoId == null) {
       return {
         'pendiente': false,
@@ -861,7 +866,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
       };
     }
   }
-  Future<Map<String, dynamic>> reintentarEnvio(int estadoId) async {
+
+  // ✅ CORRECCIÓN: Cambiar int a String
+  Future<Map<String, dynamic>> reintentarEnvio(String estadoId) async {
     try {
       _logger.i('Reintentando envío del estado ID: $estadoId');
 
@@ -916,7 +923,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       if (respuesta['exito'] == true) {
         await _estadoEquipoRepository.marcarComoMigrado(
-          estadoId as String,
+          estadoId,  // ✅ Ya es String, no necesita cast
           servidorId: respuesta['id'],
         );
 
@@ -928,7 +935,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         };
       } else {
         await _estadoEquipoRepository.marcarComoError(
-            estadoId as String,
+            estadoId,  // ✅ Ya es String, no necesita cast
             'Error del servidor: ${respuesta['mensaje']}'
         );
 
@@ -943,7 +950,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       _logger.e('Error en reintento de envío: $e');
 
       try {
-        await _estadoEquipoRepository.marcarComoError(estadoId as String, 'Excepción: $e');
+        await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción: $e');
       } catch (_) {}
 
       return {
@@ -953,11 +960,13 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> _marcarComoSincronizado(int idLocal) async {
+  // ✅ CORRECCIÓN: Cambiar int a String
+  Future<void> _marcarComoSincronizado(String idLocal) async {
     try {
       _logger.i('Registro marcado como sincronizado: $idLocal');
     } catch (e) {}
   }
+
   Future<void> _guardarLogEnArchivo({
     required String url,
     required Map<String, String> headers,
@@ -1059,9 +1068,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-// ============================================
-// MÉTODO AUXILIAR: Ver todos los archivos guardados
-// ============================================
+  // ============================================
+  // MÉTODO AUXILIAR: Ver todos los archivos guardados
+  // ============================================
 
   Future<List<String>> obtenerLogsGuardados() async {
     try {

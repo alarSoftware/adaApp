@@ -63,6 +63,13 @@ class _PreviewScreenState extends State<PreviewScreen> {
           });
 
           debugPrint('✅ Imagen 1 cargada desde archivo: $imagenPath');
+          debugPrint('📊 Tamaño: ${bytes.length} bytes (${(bytes.length / 1024).toStringAsFixed(2)} KB)');
+
+          // ⚠️ ADVERTENCIA si es muy pequeña
+          if (bytes.length < 10240) {
+            debugPrint('⚠️ ADVERTENCIA: Imagen 1 muy pequeña (< 10 KB)');
+          }
+
           return;
         } else {
           debugPrint('⚠️ Archivo de imagen 1 no encontrado: $imagenPath');
@@ -80,6 +87,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
             });
 
             debugPrint('✅ Imagen 1 cargada desde base64 (${bytes.length} bytes)');
+
+            // ⚠️ ADVERTENCIA si es muy pequeña
+            if (bytes.length < 10240) {
+              debugPrint('⚠️ ADVERTENCIA: Imagen 1 muy pequeña (< 10 KB)');
+            }
+
             return;
           }
         } catch (e) {
@@ -108,6 +121,13 @@ class _PreviewScreenState extends State<PreviewScreen> {
           });
 
           debugPrint('✅ Imagen 2 cargada desde archivo: $imagenPath2');
+          debugPrint('📊 Tamaño: ${bytes.length} bytes (${(bytes.length / 1024).toStringAsFixed(2)} KB)');
+
+          // ⚠️ ADVERTENCIA si es muy pequeña
+          if (bytes.length < 10240) {
+            debugPrint('⚠️ ADVERTENCIA: Imagen 2 muy pequeña (< 10 KB)');
+          }
+
           return;
         } else {
           debugPrint('⚠️ Archivo de imagen 2 no encontrado: $imagenPath2');
@@ -125,6 +145,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
             });
 
             debugPrint('✅ Imagen 2 cargada desde base64 (${bytes.length} bytes)');
+
+            // ⚠️ ADVERTENCIA si es muy pequeña
+            if (bytes.length < 10240) {
+              debugPrint('⚠️ ADVERTENCIA: Imagen 2 muy pequeña (< 10 KB)');
+            }
+
             return;
           }
         } catch (e) {
@@ -183,9 +209,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
     final datosCompletos = Map<String, dynamic>.from(widget.datos);
 
-    // Preparar imagen 1
+    // Preparar imagen 1 con logging mejorado
     if (_imagePath != null && _imageBase64 != null) {
       final bytes = base64Decode(_imageBase64!);
+
+      debugPrint('📸 IMAGEN 1 PREPARADA:');
+      debugPrint('   Path: $_imagePath');
+      debugPrint('   Tamaño: ${bytes.length} bytes (${(bytes.length / 1024).toStringAsFixed(2)} KB)');
+
       datosCompletos['imagen_path'] = _imagePath;
       datosCompletos['imagen_base64'] = _imageBase64;
       datosCompletos['tiene_imagen'] = true;
@@ -197,9 +228,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
       datosCompletos['imagen_tamano'] = null;
     }
 
-    // Preparar imagen 2
+    // Preparar imagen 2 con logging mejorado
     if (_imagePath2 != null && _imageBase64_2 != null) {
       final bytes2 = base64Decode(_imageBase64_2!);
+
+      debugPrint('📸 IMAGEN 2 PREPARADA:');
+      debugPrint('   Path: $_imagePath2');
+      debugPrint('   Tamaño: ${bytes2.length} bytes (${(bytes2.length / 1024).toStringAsFixed(2)} KB)');
+
       datosCompletos['imagen_path2'] = _imagePath2;
       datosCompletos['imagen_base64_2'] = _imageBase64_2;
       datosCompletos['tiene_imagen2'] = true;
@@ -300,7 +336,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
   }
 
-  Future<void> _reintentarEnvioHistorial(int? estadoId) async {
+  // ✅ CORRECCIÓN: Cambiar int? a String?
+  Future<void> _reintentarEnvioHistorial(String? estadoId) async {
     if (estadoId == null) {
       _mostrarSnackBar('Error: ID de estado no disponible', AppColors.error);
       return;
@@ -378,7 +415,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   Widget _buildBody(Cliente cliente) {
     final esHistorial = widget.datos['es_historial'] == true;
-    final estadoId = widget.datos['id'] as int?;
+    // ✅ CORRECCIÓN: Cambiar int? a String?
+    final estadoId = widget.datos['id'] as String?;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -424,7 +462,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
     if (_imagePath2 != null || _imageBase64_2 != null) cantidadImagenes++;
 
     if (esHistorial) {
-      final estadoId = widget.datos['id'] as int?;
+      // ✅ CORRECCIÓN: Cambiar int? a String?
+      final estadoId = widget.datos['id'] as String?;
 
       return FutureBuilder<Map<String, dynamic>>(
         future: vm.obtenerInfoSincronizacion(estadoId),
@@ -507,7 +546,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
-  Widget _buildSyncStatusIndicator(int? estadoId) {
+  // ✅ CORRECCIÓN: Cambiar int? a String?
+  Widget _buildSyncStatusIndicator(String? estadoId) {
     if (widget.datos['es_historial'] != true || estadoId == null) {
       return const SizedBox.shrink();
     }
