@@ -52,7 +52,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     _usuarioActual = await _authService.getCurrentUser();
 
     if (_usuarioActual?.id != null) {
-      _logger.i('Usuario actual: ${_usuarioActual!.username} (ID: ${_usuarioActual!.id})');
       return _usuarioActual!.id!;
     }
 
@@ -113,17 +112,14 @@ class PreviewScreenViewModel extends ChangeNotifier {
       if (value is int) return value;
       if (value is String) return int.tryParse(value);
       if (value is double) return value.toInt();
-      _logger.w('Cannot cast $fieldName to int, type: ${value.runtimeType}, value: $value');
       return null;
     } catch (e) {
-      _logger.w('Error casting $fieldName to int: $e');
       return null;
     }
   }
 
   Future<Map<String, dynamic>> confirmarRegistro(Map<String, dynamic> datos) async {
     if (_isProcessing) {
-      _logger.w('Proceso ya en ejecución, ignorando nueva solicitud');
       return {
         'success': false,
         'error': 'Ya hay un proceso de confirmación en curso. Por favor espere.'
@@ -153,7 +149,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     String? estadoIdActual;
 
     try {
-      _logger.i('CONFIRMANDO REGISTRO - GUARDADO DEFINITIVO EN BD [Process: $processId]');
+      _logger.i('Confirmando registro [Process: $processId]');
 
       if (_currentProcessId != processId) {
         return {'success': false, 'error': 'Proceso cancelado'};
@@ -168,12 +164,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
       if (cliente.id == null) throw 'El cliente no tiene ID asignado';
 
       final usuarioId = await _getUsuarioId;
-      _logger.i('Usuario ID obtenido: $usuarioId');
 
       String equipoId;
       int clienteId = _convertirAInt(cliente.id, 'cliente_id');
 
-      // ✅ CASO 3: EQUIPO NUEVO - Crear en tabla equipos
+      // CASO 3: EQUIPO NUEVO - Crear en tabla equipos
       if (esNuevoEquipo) {
         _setStatusMessage('Registrando equipo nuevo en el sistema...');
 
@@ -190,7 +185,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
             logoId: _safeCastToInt(datos['logo_id'], 'logo_id') ?? 1,
           );
 
-          _logger.i('✅ Equipo nuevo creado con ID: $equipoId');
+          _logger.i('Equipo nuevo creado con ID: $equipoId');
 
           equipoCompleto = {
             'id': equipoId,
@@ -203,11 +198,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
             'logo_nombre': datos['logo'],
             'marca_nombre': datos['marca'] ?? 'Sin marca',
             'cliente_id': clienteId,
-            'nuevo_equipo': 1,
+            'app_insert': 1,
           };
 
         } catch (e) {
-          _logger.e('❌ Error creando equipo nuevo: $e');
+          _logger.e('Error creando equipo nuevo: $e');
           throw 'Error registrando equipo nuevo: $e';
         }
       } else {
@@ -229,7 +224,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       );
       _logger.i('Equipo $equipoId ya asignado: $yaAsignado');
 
-      // ✅ CASO 2 y CASO 3: Crear equipo_pendiente si NO está asignado
+      // CASO 2 y CASO 3: Crear equipo_pendiente si NO está asignado
       if (!yaAsignado) {
         _setStatusMessage('Registrando equipo pendiente de asignación...');
 
@@ -243,15 +238,15 @@ class PreviewScreenViewModel extends ChangeNotifier {
               equipoId: equipoId,
               clienteId: clienteId
           );
-          _logger.i('✅ Registro pendiente creado exitosamente');
+          _logger.i('Registro pendiente creado exitosamente');
         } catch (e) {
-          _logger.w('⚠️ Error registrando equipo pendiente: $e');
+          _logger.w('Error registrando equipo pendiente: $e');
         }
       } else {
-        _logger.i('ℹ️ Equipo ya asignado - no se crea registro pendiente');
+        _logger.i('Equipo ya asignado - no se crea registro pendiente');
       }
 
-      // ✅ CREAR ESTADO EN CENSO_ACTIVO
+      // CREAR ESTADO EN CENSO_ACTIVO
       _setStatusMessage('Registrando censo...');
 
       if (_currentProcessId != processId) {
@@ -280,21 +275,18 @@ class PreviewScreenViewModel extends ChangeNotifier {
         );
 
         if (estadoCreado.id != null) {
-          estadoIdActual = estadoCreado.id!;  // ✅ Ya es String
-          _logger.i('✅ Estado creado con UUID: $estadoIdActual');
+          estadoIdActual = estadoCreado.id!;
+          _logger.i('Estado creado con UUID: $estadoIdActual');
         } else {
-          _logger.w('⚠️ Estado creado pero sin ID asignado');
+          _logger.w('Estado creado pero sin ID asignado');
           estadoIdActual = null;
         }
       } catch (dbError) {
-        _logger.e('❌ Error al crear estado: $dbError');
+        _logger.e('Error al crear estado: $dbError');
         throw 'Error creando censo: $dbError';
       }
 
-      // ================================================================
-      // ✅ CAMBIO PRINCIPAL: Preparar datos y lanzar POST en background
-      // ================================================================
-
+      // Preparar datos y lanzar POST en background
       _setStatusMessage('Preparando sincronización...');
 
       if (estadoIdActual != null) {
@@ -341,13 +333,13 @@ class PreviewScreenViewModel extends ChangeNotifier {
           'en_local': true,
         };
 
-        // 🔥 Guardar registro local maestro
+        // Guardar registro local maestro
         await _guardarRegistroLocal(datosCompletos);
 
-        // 🔥 Lanzar sincronización en BACKGROUND (sin await)
+        // Lanzar sincronización en BACKGROUND (sin await)
         _sincronizarEnBackground(estadoIdActual, datosCompletos);
 
-        _logger.i('✅ Registro guardado localmente. Sincronización en segundo plano iniciada.');
+        _logger.i('Registro guardado localmente. Sincronización en segundo plano iniciada.');
 
         // Retornar éxito inmediatamente
         final mensajeFinal = esNuevoEquipo
@@ -366,27 +358,24 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
 
     } catch (e) {
-      _logger.e('❌ Error crítico en confirmación: $e');
+      _logger.e('Error crítico en confirmación: $e');
       return {'success': false, 'error': 'Error guardando registro: $e'};
     } finally {
       _setSaving(false);
     }
   }
 
-  // ================================================================
-  // ✅ NUEVO MÉTODO: Sincronización en segundo plano
-  // ================================================================
-
+  // NUEVO MÉTODO: Sincronización en segundo plano
   void _sincronizarEnBackground(String? estadoId, Map<String, dynamic> datos) async {
     if (estadoId == null) {
-      _logger.e('❌ No se puede sincronizar sin estadoId');
+      _logger.e('No se puede sincronizar sin estadoId');
       return;
     }
 
     // Ejecutar sin await para que no bloquee
     Future.delayed(Duration.zero, () async {
       try {
-        _logger.i('🔄 Iniciando sincronización en segundo plano para estado $estadoId');
+        _logger.i('Iniciando sincronización en segundo plano para estado $estadoId');
 
         final datosApi = await _prepararDatosParaApiEstados(datos);
         final respuestaServidor = await _enviarAApiEstadosConTimeout(datosApi, 10);
@@ -397,20 +386,19 @@ class PreviewScreenViewModel extends ChangeNotifier {
               servidorId: respuestaServidor['servidor_id']
           );
 
-          // ✅ CORRECCIÓN: id_local es String (UUID), no int
           final idLocal = datos['id_local'] as String?;
           if (idLocal != null) await _marcarComoSincronizado(idLocal);
 
-          _logger.i('✅ Sincronización en segundo plano exitosa para estado $estadoId');
+          _logger.i('Sincronización en segundo plano exitosa para estado $estadoId');
         } else {
           await _estadoEquipoRepository.marcarComoError(
               estadoId,
               'Error: ${respuestaServidor['detalle'] ?? respuestaServidor['motivo']}'
           );
-          _logger.w('⚠️ Error en sincronización de segundo plano: ${respuestaServidor['motivo']}');
+          _logger.w('Error en sincronización de segundo plano: ${respuestaServidor['motivo']}');
         }
       } catch (e) {
-        _logger.e('❌ Excepción en sincronización de segundo plano: $e');
+        _logger.e('Excepción en sincronización de segundo plano: $e');
         try {
           await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción: $e');
         } catch (_) {}
@@ -438,7 +426,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Future<Map<String, dynamic>> _intentarEnviarAlServidorConTimeout(Map<String, dynamic> datos, {int timeoutSegundos = 8}) async {
     try {
-      _logger.i('ENVÍO DIRECTO AL SERVIDOR');
       final datosApi = await _prepararDatosParaApiEstados(datos);
       final response = await _enviarAApiEstadosConTimeout(datosApi, timeoutSegundos);
 
@@ -458,52 +445,29 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final estadosEndpoint = '/censoActivo/insertCensoActivo';
       final fullUrl = '$baseUrl$estadosEndpoint';
 
-      // ============================================
-      // LOGGING DETALLADO - INICIO
-      // ============================================
-
       final timestamp = DateTime.now().toIso8601String();
       final jsonBody = json.encode(datos);
 
-      // 1️⃣ LOG EN CONSOLA (Logcat)
-      _logger.i('═══════════════════════════════════════════════════════');
-      _logger.i('🚀 POST NUEVO EQUIPO - ${timestamp}');
-      _logger.i('═══════════════════════════════════════════════════════');
-      _logger.i('📍 URL: $fullUrl');
-      _logger.i('⏱️ Timeout: $timeoutSegundos segundos');
-      _logger.i('📦 Headers:');
-      _logger.i('   Content-Type: application/json');
-      _logger.i('   Accept: application/json');
-      _logger.i('');
-      _logger.i('📄 REQUEST BODY (JSON):');
-      _logger.i('─────────────────────────────────────────────────────');
+      // Log simplificado
+      _logger.i('POST a $fullUrl - Timeout: $timeoutSegundos s');
+      _logger.i('Payload size: ${jsonBody.length} caracteres');
 
-      // Pretty print del JSON en el log
-      final prettyJson = JsonEncoder.withIndent('  ').convert(datos);
-      prettyJson.split('\n').forEach((line) => _logger.i(line));
-
-      _logger.i('─────────────────────────────────────────────────────');
-      _logger.i('📊 Tamaño del payload: ${jsonBody.length} caracteres');
-      _logger.i('');
-
-      // 2️⃣ GUARDAR EN ARCHIVO TXT (Carpeta Downloads)
-      try {
-        await _guardarLogEnArchivo(
-          url: fullUrl,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: datos,
-          timestamp: timestamp,
-        );
-      } catch (e) {
-        _logger.w('⚠️ No se pudo guardar el log en archivo: $e');
+      // 🔥 Guardar log en archivo SOLO en modo debug
+      if (const bool.fromEnvironment('dart.vm.product') == false) {
+        try {
+          await _guardarLogEnArchivo(
+            url: fullUrl,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: datos,
+            timestamp: timestamp,
+          );
+        } catch (e) {
+          _logger.w('Error guardando log en archivo (no crítico): $e');
+        }
       }
-
-      // ============================================
-      // ENVÍO REAL AL SERVIDOR
-      // ============================================
 
       final response = await http.post(
         Uri.parse(fullUrl),
@@ -514,34 +478,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
         body: jsonBody,
       ).timeout(Duration(seconds: timeoutSegundos));
 
-      // ============================================
-      // LOGGING DE RESPUESTA
-      // ============================================
+      _logger.i('Response: ${response.statusCode} - ${response.reasonPhrase}');
 
-      _logger.i('');
-      _logger.i('📥 RESPUESTA DEL SERVIDOR:');
-      _logger.i('─────────────────────────────────────────────────────');
-      _logger.i('📊 Status Code: ${response.statusCode}');
-      _logger.i('📊 Status Text: ${response.reasonPhrase}');
-      _logger.i('');
-      _logger.i('📄 Response Body:');
-
-      if (response.body.isNotEmpty) {
-        try {
-          final responseJson = json.decode(response.body);
-          final prettyResponse = JsonEncoder.withIndent('  ').convert(responseJson);
-          prettyResponse.split('\n').forEach((line) => _logger.i(line));
-        } catch (e) {
-          _logger.i(response.body);
-        }
-      } else {
-        _logger.i('(Body vacío)');
-      }
-
-      _logger.i('─────────────────────────────────────────────────────');
-      _logger.i('═══════════════════════════════════════════════════════');
-
-      // Procesar respuesta como antes
+      // Procesar respuesta
       if (response.statusCode >= 200 && response.statusCode < 300) {
         dynamic servidorId = _uuid.v4();
         String mensaje = 'Estado registrado correctamente';
@@ -573,7 +512,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
 
     } catch (e) {
-      _logger.e('❌ ERROR EN POST: $e');
+      _logger.e('ERROR EN POST: $e');
       return {
         'exito': false,
         'mensaje': 'Error de conexión: $e'
@@ -741,7 +680,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'cliente_id': datosLocales['cliente_id'] ?? 0,
       'usuario_id': usuarioId,
 
-      // ✅ SOLO formato con sufijo _1 y _2
+      // SOLO formato con sufijo _1 y _2
       'imageBase64_1': datosLocales['imagen_base64'],
       'imageBase64_2': datosLocales['imagen_base64_2'],
       'imagenPath': datosLocales['imagen_path'],
@@ -760,7 +699,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     };
   }
 
-  // ✅ CORRECCIÓN: Cambiar int? a String?
   Future<bool> verificarSincronizacionPendiente(String? estadoId) async {
     if (estadoId == null) return false;
 
@@ -781,8 +719,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final estaPendiente = (estadoCenso == 'creado' || estadoCenso == 'error') &&
           sincronizado == 0;
 
-      _logger.i('Estado $estadoId - Censo: $estadoCenso, Sincronizado: $sincronizado, Pendiente: $estaPendiente');
-
       return estaPendiente;
     } catch (e) {
       _logger.e('Error verificando sincronización: $e');
@@ -790,7 +726,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ✅ CORRECCIÓN: Cambiar int? a String?
   Future<Map<String, dynamic>> obtenerInfoSincronizacion(String? estadoId) async {
     if (estadoId == null) {
       return {
@@ -867,7 +802,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ✅ CORRECCIÓN: Cambiar int a String
   Future<Map<String, dynamic>> reintentarEnvio(String estadoId) async {
     try {
       _logger.i('Reintentando envío del estado ID: $estadoId');
@@ -923,7 +857,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       if (respuesta['exito'] == true) {
         await _estadoEquipoRepository.marcarComoMigrado(
-          estadoId,  // ✅ Ya es String, no necesita cast
+          estadoId,
           servidorId: respuesta['id'],
         );
 
@@ -935,7 +869,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         };
       } else {
         await _estadoEquipoRepository.marcarComoError(
-            estadoId,  // ✅ Ya es String, no necesita cast
+            estadoId,
             'Error del servidor: ${respuesta['mensaje']}'
         );
 
@@ -960,7 +894,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ✅ CORRECCIÓN: Cambiar int a String
   Future<void> _marcarComoSincronizado(String idLocal) async {
     try {
       _logger.i('Registro marcado como sincronizado: $idLocal');
@@ -974,20 +907,16 @@ class PreviewScreenViewModel extends ChangeNotifier {
     required String timestamp,
   }) async {
     try {
-      // Obtener directorio de descargas
       Directory? downloadsDir;
 
       if (Platform.isAndroid) {
-        // En Android, usar el directorio público de Downloads
         downloadsDir = Directory('/storage/emulated/0/Download');
 
-        // Si no existe, intentar con getExternalStorageDirectory
         if (!await downloadsDir.exists()) {
           final externalDir = await getExternalStorageDirectory();
           downloadsDir = Directory('${externalDir?.path}/Download');
         }
       } else if (Platform.isIOS) {
-        // En iOS, usar el directorio de documentos
         downloadsDir = await getApplicationDocumentsDirectory();
       }
 
@@ -996,81 +925,31 @@ class PreviewScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      // Crear directorio si no existe
       if (!await downloadsDir.exists()) {
         await downloadsDir.create(recursive: true);
       }
 
-      // Nombre del archivo con timestamp
       final fileName = 'post_nuevo_equipo_${_uuid.v4().substring(0, 13)}.txt';
       final file = File('${downloadsDir.path}/$fileName');
 
-      // Construir contenido del archivo
       final buffer = StringBuffer();
 
-      buffer.writeln('═══════════════════════════════════════════════════════════');
-      buffer.writeln('🚀 POST REQUEST - REGISTRO NUEVO EQUIPO');
-      buffer.writeln('═══════════════════════════════════════════════════════════');
-      buffer.writeln('');
-      buffer.writeln('📅 Timestamp: $timestamp');
-      buffer.writeln('📱 Dispositivo: ${Platform.operatingSystem}');
-      buffer.writeln('');
-      buffer.writeln('───────────────────────────────────────────────────────────');
-      buffer.writeln('📍 REQUEST INFO');
-      buffer.writeln('───────────────────────────────────────────────────────────');
-      buffer.writeln('');
-      buffer.writeln('Method: POST');
+      buffer.writeln('POST REQUEST - REGISTRO NUEVO EQUIPO');
+      buffer.writeln('Timestamp: $timestamp');
       buffer.writeln('URL: $url');
       buffer.writeln('');
-      buffer.writeln('Headers:');
-      headers.forEach((key, value) {
-        buffer.writeln('  $key: $value');
-      });
-      buffer.writeln('');
-      buffer.writeln('───────────────────────────────────────────────────────────');
-      buffer.writeln('📄 REQUEST BODY (JSON)');
-      buffer.writeln('───────────────────────────────────────────────────────────');
-      buffer.writeln('');
-
-      // Pretty print del JSON
+      buffer.writeln('REQUEST BODY:');
       final prettyJson = JsonEncoder.withIndent('  ').convert(body);
       buffer.writeln(prettyJson);
 
-      buffer.writeln('');
-      buffer.writeln('───────────────────────────────────────────────────────────');
-      buffer.writeln('📊 METADATA');
-      buffer.writeln('───────────────────────────────────────────────────────────');
-      buffer.writeln('');
-      buffer.writeln('Tamaño del payload: ${json.encode(body).length} caracteres');
-      buffer.writeln('Número de campos: ${body.keys.length}');
-      buffer.writeln('');
-      buffer.writeln('Campos clave para nuevo equipo:');
-      buffer.writeln('  ✓ esNuevoEquipo: ${body['esNuevoEquipo']}');
-      buffer.writeln('  ✓ es_censo: ${body['es_censo']}');
-      buffer.writeln('  ✓ estadoCenso: ${body['estadoCenso']}');
-      buffer.writeln('  ✓ tiene_imagen: ${body['tiene_imagen']}');
-      buffer.writeln('  ✓ equipo_id: ${body['equipo_id']}');
-      buffer.writeln('  ✓ cliente_id: ${body['cliente_id']}');
-      buffer.writeln('');
-      buffer.writeln('═══════════════════════════════════════════════════════════');
-      buffer.writeln('Archivo generado por: ADA App v${body['version_app']}');
-      buffer.writeln('═══════════════════════════════════════════════════════════');
-
-      // Escribir archivo
       await file.writeAsString(buffer.toString());
 
-      _logger.i('✅ Log guardado en: ${file.path}');
-      _logger.i('📁 Archivo: $fileName');
+      _logger.i('Log guardado en: ${file.path}');
 
-    } catch (e, stackTrace) {
-      _logger.e('❌ Error guardando log en archivo: $e');
-      _logger.e('StackTrace: $stackTrace');
+    } catch (e) {
+      _logger.e('Error guardando log en archivo: $e');
     }
   }
-
-  // ============================================
-  // MÉTODO AUXILIAR: Ver todos los archivos guardados
-  // ============================================
 
   Future<List<String>> obtenerLogsGuardados() async {
     try {
@@ -1097,9 +976,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
           .map((file) => file.path)
           .toList();
 
-      files.sort((a, b) => b.compareTo(a)); // Más reciente primero
+      files.sort((a, b) => b.compareTo(a));
 
-      _logger.i('📂 Encontrados ${files.length} logs guardados');
+      _logger.i('Encontrados ${files.length} logs guardados');
 
       return files;
     } catch (e) {
@@ -1107,4 +986,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       return [];
     }
   }
+
+
 }

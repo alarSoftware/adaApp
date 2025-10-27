@@ -393,7 +393,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
         'modelo_id': modeloId,
         'numero_serie': numeroSerie,
         'logo_id': logoId,
-        'nuevo_equipo': 1,
+        'app_insert': 1,
       };
 
       _logger.i('Datos a insertar: $equipoMap');
@@ -450,7 +450,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
       LEFT JOIN modelos mo ON e.modelo_id = mo.id
       LEFT JOIN logo l ON e.logo_id = l.id
       LEFT JOIN clientes c ON e.cliente_id = c.id
-      WHERE e.nuevo_equipo = 1
+      WHERE e.app_insert = 1
       ORDER BY e.id DESC
     ''';
 
@@ -492,7 +492,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
         COUNT(CASE WHEN e.cliente_id IS NOT NULL AND e.cliente_id != '' AND e.cliente_id != '0' THEN 1 END) as equipos_asignados,
         COUNT(CASE WHEN e.cliente_id IS NULL OR e.cliente_id = '' OR e.cliente_id = '0' THEN 1 END) as equipos_disponibles,
         COUNT(CASE WHEN e.sincronizado = 0 THEN 1 END) as pendientes_sincronizacion,
-        COUNT(CASE WHEN e.nuevo_equipo = 1 THEN 1 END) as equipos_nuevos,
+        COUNT(CASE WHEN e.app_insert = 1 THEN 1 END) as equipos_nuevos,
         COUNT(DISTINCT e.cliente_id) as clientes_con_equipos
       FROM equipos e
     ''';
@@ -513,7 +513,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
       COUNT(CASE WHEN e.cliente_id IS NOT NULL AND e.cliente_id != '' AND e.cliente_id != '0' THEN 1 END) as asignados,
       COUNT(CASE WHEN (e.cliente_id IS NULL OR e.cliente_id = '' OR e.cliente_id = '0') THEN 1 END) as disponibles,
       COUNT(CASE WHEN e.sincronizado = 0 THEN 1 END) as pendientes_sync,
-      COUNT(CASE WHEN e.nuevo_equipo = 1 THEN 1 END) as equipos_nuevos
+      COUNT(CASE WHEN e.app_insert = 1 THEN 1 END) as equipos_nuevos
     FROM equipos e
   ''';
 
