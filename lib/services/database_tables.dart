@@ -32,6 +32,7 @@ class DatabaseTables {
     await db.execute(_sqlEquiposPendientes());
     await db.execute(_sqlUsuarios());
     await db.execute(_sqlCensoActivo());
+    await db.execute(_sqlCensoActivoFoto());
 
     // Tablas de formularios dinámicos
     await db.execute(_sqlDynamicForm());
@@ -129,15 +130,21 @@ class DatabaseTables {
     fecha_actualizacion TEXT,
     sincronizado INTEGER DEFAULT 0,
     observaciones TEXT,
+    estado_censo TEXT DEFAULT 'creado'
+  )
+''';
+
+  String _sqlCensoActivoFoto() => '''
+  CREATE TABLE censo_activo_foto (
+    id TEXT PRIMARY KEY,
+    censo_activo_id TEXT NOT NULL,
     imagen_path TEXT,
     imagen_base64 TEXT,
-    tiene_imagen INTEGER DEFAULT 0,
     imagen_tamano INTEGER,
-    imagen_path2 TEXT,
-    imagen_base64_2 TEXT,
-    tiene_imagen2 INTEGER DEFAULT 0,
-    imagen_tamano2 INTEGER,
-    estado_censo TEXT DEFAULT 'creado'
+    orden INTEGER DEFAULT 1,
+    fecha_creacion TEXT,
+    sincronizado INTEGER DEFAULT 0,
+    FOREIGN KEY (censo_activo_id) REFERENCES censo_activo (id) ON DELETE CASCADE
   )
 ''';
 
@@ -229,6 +236,7 @@ class DatabaseTables {
     await _crearIndicesEquipos(db);
     await _crearIndicesEquiposPendientes(db);
     await _crearIndicesMaestras(db);
+    await _crearIndicesCensoActivo(db);
     await _crearIndicesDynamicForms(db);
   }
 
@@ -280,6 +288,25 @@ class DatabaseTables {
       'CREATE INDEX IF NOT EXISTS idx_marcas_nombre ON marcas (nombre)',
       'CREATE INDEX IF NOT EXISTS idx_modelos_nombre ON modelos (nombre)',
       'CREATE INDEX IF NOT EXISTS idx_logo_nombre ON logo (nombre)',
+    ];
+
+    for (final indice in indices) {
+      await db.execute(indice);
+    }
+  }
+
+  Future<void> _crearIndicesCensoActivo(Database db) async {
+    final indices = [
+      // Índices para censo_activo
+      'CREATE INDEX IF NOT EXISTS idx_censo_activo_equipo_id ON censo_activo (equipo_id)',
+      'CREATE INDEX IF NOT EXISTS idx_censo_activo_cliente_id ON censo_activo (cliente_id)',
+      'CREATE INDEX IF NOT EXISTS idx_censo_activo_estado_censo ON censo_activo (estado_censo)',
+      'CREATE INDEX IF NOT EXISTS idx_censo_activo_fecha_revision ON censo_activo (fecha_revision)',
+
+      // Índices para censo_activo_foto
+      'CREATE INDEX IF NOT EXISTS idx_censo_activo_foto_censo_id ON censo_activo_foto (censo_activo_id)',
+      'CREATE INDEX IF NOT EXISTS idx_censo_activo_foto_orden ON censo_activo_foto (orden)',
+      'CREATE INDEX IF NOT EXISTS idx_censo_activo_foto_sincronizado ON censo_activo_foto (sincronizado)',
     ];
 
     for (final indice in indices) {

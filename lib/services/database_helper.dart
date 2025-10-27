@@ -113,11 +113,85 @@ class DatabaseHelper {
     _validateValues(values);
     _addTimestamps(tableName, values);
 
+    // ✅ LOGS DE DEBUG PARA censo_activo_foto
+    if (tableName == 'censo_activo_foto') {
+      logger.i('🔍 DEBUG DatabaseHelper.insertar - censo_activo_foto');
+      logger.i('🔍   values.keys: ${values.keys.toList()}');
+      logger.i('🔍   values["imagen_base64"] != null: ${values['imagen_base64'] != null}');
+      logger.i('🔍   values["imagen_base64"] length: ${values['imagen_base64']?.toString().length ?? 0}');
+
+      // Ver todos los valores
+      values.forEach((key, value) {
+        if (key == 'imagen_base64') {
+          if (value != null) {
+            final preview = value.toString().substring(0, value.toString().length > 50 ? 50 : value.toString().length);
+            logger.i('🔍   $key: presente (${value.toString().length} chars) - preview: $preview...');
+          } else {
+            logger.i('🔍   $key: NULL ⚠️');
+          }
+        } else {
+          logger.i('🔍   $key: $value');
+        }
+      });
+    }
+
     final db = await database;
+
+    // ✅ LOG CRÍTICO JUSTO ANTES DEL INSERT
+    if (tableName == 'censo_activo_foto') {
+      logger.i('🔍 🔴 CRÍTICO - Justo antes de db.insert:');
+      logger.i('🔍   values["imagen_base64"] != null: ${values['imagen_base64'] != null}');
+      logger.i('🔍   values["imagen_base64"] is String: ${values['imagen_base64'] is String}');
+      logger.i('🔍   values["imagen_base64"].runtimeType: ${values['imagen_base64'].runtimeType}');
+
+      // Verificar que el SQL se ejecutará correctamente
+      try {
+        final testInsert = await db.rawQuery(
+          'SELECT ? as test',
+          [values['imagen_base64']],
+        );
+        final testResult = testInsert.first['test']?.toString() ?? '';
+        if (testResult.isNotEmpty) {
+          final preview = testResult.length > 50 ? testResult.substring(0, 50) : testResult;
+          logger.i('🔍   Test query exitoso: $preview...');
+        } else {
+          logger.w('🔍   ⚠️ Test query retornó vacío');
+        }
+      } catch (e) {
+        logger.e('🔍   ❌ Test query falló: $e');
+      }
+    }
+
     final id = await db.insert(tableName, values);
     logger.d('Insertado en $tableName: ID $id');
+
+    // ✅ VERIFICAR INMEDIATAMENTE DESPUÉS DEL INSERT
+    if (tableName == 'censo_activo_foto') {
+      logger.i('🔍 🔴 CRÍTICO - Verificando después del insert:');
+      final result = await db.query(
+        tableName,
+        where: 'id = ?',
+        whereArgs: [values['id']],
+      );
+      if (result.isNotEmpty) {
+        logger.i('🔍   Registro encontrado en DB');
+        logger.i('🔍   imagen_base64 en DB != null: ${result.first['imagen_base64'] != null}');
+        logger.i('🔍   imagen_base64 en DB length: ${result.first['imagen_base64']?.toString().length ?? 0}');
+        if (result.first['imagen_base64'] != null) {
+          final dbValue = result.first['imagen_base64'].toString();
+          final preview = dbValue.length > 50 ? dbValue.substring(0, 50) : dbValue;
+          logger.i('🔍   imagen_base64 en DB preview: $preview...');
+        } else {
+          logger.e('🔍   ❌❌❌ imagen_base64 es NULL en la base de datos después del insert!');
+        }
+      } else {
+        logger.e('🔍   ❌ Registro NO encontrado en DB después del insert');
+      }
+    }
+
     return id;
   }
+
 
   Future<int> actualizar(
       String tableName,
@@ -381,6 +455,7 @@ class DatabaseHelper {
       values['fecha_creacion'] = now;
     }
   }
+  //evitar campo fecha_actualizacion
   bool _requiresTimestamps(String tableName) {
     const tablesWithoutTimestamps = {
       'clientes',
@@ -390,6 +465,7 @@ class DatabaseHelper {
       'dynamic_form_response',
       'dynamic_form_response_detail',
       'dynamic_form_response_image',
+      'censo_activo_foto',
     };
     return !tablesWithoutTimestamps.contains(tableName);
   }

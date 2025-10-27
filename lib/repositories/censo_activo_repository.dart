@@ -2,11 +2,11 @@ import '../models/censo_activo.dart';
 import 'base_repository.dart';
 import 'package:logger/logger.dart';
 import 'dart:convert';
-import 'package:uuid/uuid.dart'; // ✅ AGREGADO
+import 'package:uuid/uuid.dart';
 
 class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   final Logger _logger = Logger();
-  final Uuid _uuid = Uuid(); // ✅ AGREGADO
+  final Uuid _uuid = Uuid();
 
   @override
   String get tableName => 'censo_activo';
@@ -44,20 +44,10 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     double? longitud,
     String? estadoCenso,
     String? observaciones,
-    // Primera imagen
-    String? imagenPath,
-    String? imagenBase64,
-    bool tieneImagen = false,
-    int? imagenTamano,
-    // Segunda imagen
-    String? imagenPath2,
-    String? imagenBase64_2,
-    bool tieneImagen2 = false,
-    int? imagenTamano2,
   }) async {
     try {
       final now = DateTime.now();
-      final uuidId = _uuid.v4(); // ✅ GENERAR UUID
+      final uuidId = _uuid.v4();
 
       _logger.i('📝 Creando nuevo estado en BD local');
       _logger.i('   UUID (id): $uuidId');
@@ -65,7 +55,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       _logger.i('   Cliente ID: $clienteId');
 
       final datosEstado = {
-        'id': uuidId, // ✅ USAR UUID COMO ID
+        'id': uuidId,
         'equipo_id': equipoId,
         'cliente_id': clienteId,
         'en_local': enLocal ? 1 : 0,
@@ -77,24 +67,14 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         'sincronizado': 0,
         'estado_censo': estadoCenso ?? EstadoEquipoCenso.creado.valor,
         'observaciones': observaciones,
-        // Primera imagen
-        'imagen_path': imagenPath,
-        'imagen_base64': imagenBase64,
-        'tiene_imagen': tieneImagen ? 1 : 0,
-        'imagen_tamano': imagenTamano,
-        // Segunda imagen
-        'imagen_path2': imagenPath2,
-        'imagen_base64_2': imagenBase64_2,
-        'tiene_imagen2': tieneImagen2 ? 1 : 0,
-        'imagen_tamano2': imagenTamano2,
       };
 
-      await dbHelper.insertar(tableName, datosEstado); // ✅ SIN CAPTURAR RETORNO
+      await dbHelper.insertar(tableName, datosEstado);
 
       _logger.i('✅ Estado insertado en BD con UUID: $uuidId');
 
       return EstadoEquipo(
-        id: uuidId, // ✅ PASAR UUID
+        id: uuidId,
         equipoId: equipoId,
         clienteId: clienteId,
         enLocal: enLocal,
@@ -106,19 +86,63 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         estaSincronizado: false,
         estadoCenso: estadoCenso ?? EstadoEquipoCenso.creado.valor,
         observaciones: observaciones,
-        // Primera imagen
-        imagenPath: imagenPath,
-        imagenBase64: imagenBase64,
-        tieneImagen: tieneImagen,
-        imagenTamano: imagenTamano,
-        // Segunda imagen
-        imagenPath2: imagenPath2,
-        imagenBase64_2: imagenBase64_2,
-        tieneImagen2: tieneImagen2,
-        imagenTamano2: imagenTamano2,
       );
     } catch (e) {
       _logger.e('❌ Error creando nuevo estado: $e');
+      rethrow;
+    }
+  }
+
+  /// Crear nuevo estado con imágenes - DEPRECADO: Usar crearNuevoEstado() + CensoActivoFotoRepository
+  @Deprecated('Usar crearNuevoEstado() y CensoActivoFotoRepository.guardarFoto() por separado')
+  Future<EstadoEquipo> crearNuevoEstadoConImagenes({
+    required String equipoId,
+    required int clienteId,
+    required bool enLocal,
+    required DateTime fechaRevision,
+    double? latitud,
+    double? longitud,
+    String? estadoCenso,
+    String? observaciones,
+    // Primera imagen - DEPRECADO
+    String? imagenPath,
+    String? imagenBase64,
+    bool tieneImagen = false,
+    int? imagenTamano,
+    // Segunda imagen - DEPRECADO
+    String? imagenPath2,
+    String? imagenBase64_2,
+    bool tieneImagen2 = false,
+    int? imagenTamano2,
+  }) async {
+    try {
+      _logger.w('⚠️ Método deprecado: crearNuevoEstadoConImagenes()');
+      _logger.w('   Usar crearNuevoEstado() + CensoActivoFotoRepository.guardarFoto()');
+
+      // Crear el estado sin imágenes
+      final estado = await crearNuevoEstado(
+        equipoId: equipoId,
+        clienteId: clienteId,
+        enLocal: enLocal,
+        fechaRevision: fechaRevision,
+        latitud: latitud,
+        longitud: longitud,
+        estadoCenso: estadoCenso,
+        observaciones: observaciones,
+      );
+
+      // Log de advertencia para migrar imágenes manualmente
+      if (tieneImagen || tieneImagen2) {
+        _logger.w('⚠️ IMÁGENES DETECTADAS - Se necesita migración manual:');
+        _logger.w('   Estado creado con ID: ${estado.id}');
+        _logger.w('   Usar CensoActivoFotoRepository.guardarFoto() para guardar las imágenes');
+        if (tieneImagen) _logger.w('   - Imagen 1: ${imagenTamano ?? 0} bytes');
+        if (tieneImagen2) _logger.w('   - Imagen 2: ${imagenTamano2 ?? 0} bytes');
+      }
+
+      return estado;
+    } catch (e) {
+      _logger.e('❌ Error creando nuevo estado con imágenes: $e');
       rethrow;
     }
   }
@@ -167,17 +191,17 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
             continue;
           }
 
-          // ✅ EXTRAER OBSERVACIONES DEL datosJson
+          // Extraer observaciones del datosJson
           String? observacionesExtraidas = _extraerObservacionesDeJson(censo);
 
           _logger.i('📝 Observaciones extraídas: $observacionesExtraidas');
 
-          // ✅ GENERAR UUID SI NO VIENE DEL SERVIDOR
+          // Generar UUID si no viene del servidor
           final idCenso = censo['id']?.toString() ?? _uuid.v4();
 
           // Mapear campos del servidor a estructura local
           final datosLocal = {
-            'id': idCenso, // ✅ USAR ID DEL SERVIDOR O GENERAR UUID
+            'id': idCenso,
             'equipo_id': equipoId,
             'cliente_id': clienteId,
             'en_local': (censo['enLocal'] == true || censo['enLocal'] == 1) ? 1 : 0,
@@ -189,17 +213,6 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
             'sincronizado': 1,
             'estado_censo': 'migrado',
             'observaciones': observacionesExtraidas,
-
-            // Imágenes
-            'imagen_path': censo['imagenPath'] ?? censo['imagen_path'],
-            'imagen_base64': censo['imageBase64_1'] ?? censo['imagenBase64'],
-            'tiene_imagen': _parsearBoolean(censo['tieneImagen'] ?? censo['tiene_imagen']),
-            'imagen_tamano': censo['imagenTamano'] ?? censo['imagen_tamano'],
-
-            'imagen_path2': censo['imagenPath2'] ?? censo['imagen_path2'],
-            'imagen_base64_2': censo['imageBase64_2'] ?? censo['imagenBase64_2'],
-            'tiene_imagen2': _parsearBoolean(censo['tieneImagen2'] ?? censo['tiene_imagen2']),
-            'imagen_tamano2': censo['imagenTamano2'] ?? censo['imagen_tamano2'],
           };
 
           await dbHelper.insertar(tableName, datosLocal);
@@ -220,7 +233,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-  // ✅ NUEVO MÉTODO HELPER
+  // Método helper para extraer observaciones
   String? _extraerObservacionesDeJson(Map<String, dynamic> censo) {
     try {
       // Intentar campo directo primero
@@ -238,7 +251,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
             return obs.toString();
           }
         } catch (e) {
-          _logger.w('Error parseando datosJson: $e');
+          _logger.w('Error decodificando datosJson: $e');
         }
       }
 
@@ -249,11 +262,11 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-  // 🔧 MÉTODO AUXILIAR para parsear booleanos
+  // Método helper para parsear booleanos
   int _parsearBoolean(dynamic valor) {
     if (valor == null) return 0;
     if (valor is bool) return valor ? 1 : 0;
-    if (valor is int) return valor == 1 ? 1 : 0;
+    if (valor is int) return valor;
     if (valor is String) {
       final lower = valor.toLowerCase();
       return (lower == 'true' || lower == '1') ? 1 : 0;
@@ -261,7 +274,9 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     return 0;
   }
 
-  /// Obtener historial completo por equipo_id y cliente_id
+  // ========== MÉTODOS DE CONSULTA ==========
+
+  /// Obtener historial completo por equipo y cliente
   Future<List<EstadoEquipo>> obtenerHistorialCompleto(String equipoId, int clienteId) async {
     try {
       final maps = await dbHelper.consultar(
@@ -270,174 +285,69 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         whereArgs: [equipoId, clienteId],
         orderBy: 'fecha_revision DESC',
       );
-
-      print('🔍 Datos raw de BD: ${maps.length} registros');
-      for (int i = 0; i < maps.length && i < 2; i++) {
-        print('Registro $i: ${maps[i]}');
-      }
-
-      List<EstadoEquipo> resultado = [];
-      for (int i = 0; i < maps.length; i++) {
-        try {
-          final estado = fromMap(maps[i]);
-          resultado.add(estado);
-          print('✅ Registro $i mapeado correctamente');
-        } catch (e) {
-          print('❌ Error mapeando registro $i: $e');
-          print('   Datos del registro: ${maps[i]}');
-        }
-      }
-
-      print('🔧 Después del mapeo: ${resultado.length} estados');
-      return resultado;
-
+      return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
       _logger.e('Error al obtener historial completo: $e');
       return [];
     }
   }
 
-  /// Obtener últimos N cambios por equipo_id y cliente_id
-  Future<List<EstadoEquipo>> obtenerUltimosCambios(String equipoId, int clienteId, {int limite = 5}) async {
-    try {
-      final maps = await dbHelper.consultar(
-        tableName,
-        where: 'equipo_id = ? AND cliente_id = ?',
-        whereArgs: [equipoId, clienteId],
-        orderBy: 'fecha_revision DESC',
-        limit: limite,
-      );
-      return maps.map((map) => fromMap(map)).toList();
-    } catch (e) {
-      _logger.e('Error al obtener últimos cambios: $e');
-      return [];
-    }
-  }
-
-  // ========== MÉTODOS PARA MANEJO DE ESTADOS DE CENSO ==========
-
-  /// Marcar estado como migrado exitosamente
-  Future<bool> marcarComoMigrado(String estadoId, {dynamic servidorId}) async { // ✅ CAMBIAR int a String
-    try {
-      final datosActualizacion = <String, dynamic>{
-        'estado_censo': EstadoEquipoCenso.migrado.valor,
-        'fecha_actualizacion': DateTime.now().toIso8601String(),
-        'sincronizado': 1,
-      };
-
-      final count = await dbHelper.actualizar(
-        tableName,
-        datosActualizacion,
-        where: 'id = ?',
-        whereArgs: [estadoId],
-      );
-
-      if (count > 0) {
-        _logger.i('Estado $estadoId marcado como MIGRADO');
-        return true;
-      } else {
-        _logger.w('No se encontró el estado $estadoId para marcar como migrado');
-        return false;
-      }
-    } catch (e) {
-      _logger.e('Error marcando como migrado: $e');
-      return false;
-    }
-  }
-
-  /// Marcar estado como error en migración
-  Future<bool> marcarComoError(String estadoId, String mensajeError) async { // ✅ CAMBIAR int a String
-    try {
-      final datosActualizacion = <String, dynamic>{
-        'estado_censo': EstadoEquipoCenso.error.valor,
-        'fecha_actualizacion': DateTime.now().toIso8601String(),
-        'sincronizado': 0,
-      };
-
-      final count = await dbHelper.actualizar(
-        tableName,
-        datosActualizacion,
-        where: 'id = ?',
-        whereArgs: [estadoId],
-      );
-
-      if (count > 0) {
-        _logger.e('Estado $estadoId marcado como ERROR: $mensajeError');
-        return true;
-      } else {
-        _logger.w('No se encontró el estado $estadoId para marcar como error');
-        return false;
-      }
-    } catch (e) {
-      _logger.e('Error marcando como error: $e');
-      return false;
-    }
-  }
-
-  /// Obtener registros por estado de censo
-  Future<List<EstadoEquipo>> obtenerPorEstadoCenso(EstadoEquipoCenso estadoCenso) async {
+  /// Obtener estados creados (pendientes)
+  Future<List<EstadoEquipo>> obtenerCreados() async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
         where: 'estado_censo = ?',
-        whereArgs: [estadoCenso.valor],
-        orderBy: 'fecha_revision DESC',
+        whereArgs: [EstadoEquipoCenso.creado.valor],
+        orderBy: getDefaultOrderBy(),
       );
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
-      _logger.e('Error al obtener por estado censo: $e');
+      _logger.e('Error al obtener estados creados: $e');
       return [];
     }
   }
 
-  /// Obtener registros creados (pendientes de migración)
-  Future<List<EstadoEquipo>> obtenerCreados() async {
-    return await obtenerPorEstadoCenso(EstadoEquipoCenso.creado);
-  }
-
-  /// Obtener registros migrados exitosamente
+  /// Obtener estados migrados
   Future<List<EstadoEquipo>> obtenerMigrados() async {
-    return await obtenerPorEstadoCenso(EstadoEquipoCenso.migrado);
-  }
-
-  /// Obtener registros con error
-  Future<List<EstadoEquipo>> obtenerConError() async {
-    return await obtenerPorEstadoCenso(EstadoEquipoCenso.error);
-  }
-
-  /// Reintentar migración de registros con error
-  Future<void> reintentarMigracion(String estadoId) async { // ✅ CAMBIAR int a String
     try {
-      final datosActualizacion = <String, dynamic>{
-        'estado_censo': EstadoEquipoCenso.creado.valor,
-        'fecha_actualizacion': DateTime.now().toIso8601String(),
-        'sincronizado': 0,
-      };
-
-      await dbHelper.actualizar(
+      final maps = await dbHelper.consultar(
         tableName,
-        datosActualizacion,
-        where: 'id = ?',
-        whereArgs: [estadoId],
+        where: 'estado_censo = ?',
+        whereArgs: [EstadoEquipoCenso.migrado.valor],
+        orderBy: getDefaultOrderBy(),
       );
-
-      _logger.i('Estado $estadoId preparado para reintento de migración');
+      return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
-      _logger.e('Error preparando reintento: $e');
-      rethrow;
+      _logger.e('Error al obtener estados migrados: $e');
+      return [];
     }
   }
 
-  // ========== MÉTODOS PARA SINCRONIZACIÓN ==========
+  /// Obtener estados con error
+  Future<List<EstadoEquipo>> obtenerConError() async {
+    try {
+      final maps = await dbHelper.consultar(
+        tableName,
+        where: 'estado_censo = ?',
+        whereArgs: [EstadoEquipoCenso.error.valor],
+        orderBy: getDefaultOrderBy(),
+      );
+      return maps.map((map) => fromMap(map)).toList();
+    } catch (e) {
+      _logger.e('Error al obtener estados con error: $e');
+      return [];
+    }
+  }
 
-  /// Obtener registros no sincronizados
+  /// Obtener no sincronizados
   Future<List<EstadoEquipo>> obtenerNoSincronizados() async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
         where: 'sincronizado = ?',
         whereArgs: [0],
-        orderBy: 'fecha_creacion ASC',
+        orderBy: getDefaultOrderBy(),
       );
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
@@ -446,18 +356,41 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
+  // ========== MÉTODOS DE ACTUALIZACIÓN ==========
+
+  /// Actualizar estado del censo
+  Future<void> actualizarEstadoCenso(String estadoId, EstadoEquipoCenso nuevoEstado) async {
+    try {
+      await dbHelper.actualizar(
+        tableName,
+        {
+          'estado_censo': nuevoEstado.valor,
+          'fecha_actualizacion': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [estadoId],
+      );
+      _logger.i('Estado $estadoId actualizado a ${nuevoEstado.valor}');
+    } catch (e) {
+      _logger.e('Error al actualizar estado del censo: $e');
+      rethrow;
+    }
+  }
+
   /// Marcar como sincronizado
-  Future<void> marcarComoSincronizado(String id) async { // ✅ CAMBIAR int a String
+  Future<void> marcarComoSincronizado(String estadoId) async {
     try {
       await dbHelper.actualizar(
         tableName,
         {
           'sincronizado': 1,
-          'fecha_actualizacion': DateTime.now().toIso8601String()
+          'estado_censo': EstadoEquipoCenso.migrado.valor,
+          'fecha_actualizacion': DateTime.now().toIso8601String(),
         },
         where: 'id = ?',
-        whereArgs: [id],
+        whereArgs: [estadoId],
       );
+      _logger.i('Estado $estadoId marcado como sincronizado');
     } catch (e) {
       _logger.e('Error al marcar como sincronizado: $e');
       rethrow;
@@ -465,18 +398,18 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   /// Marcar múltiples como sincronizados
-  Future<void> marcarMultiplesComoSincronizados(List<String> ids) async { // ✅ CAMBIAR List<int> a List<String>
-    if (ids.isEmpty) return;
-
+  Future<void> marcarMultiplesComoSincronizados(List<String> estadoIds) async {
     try {
-      final idsString = ids.map((id) => "'$id'").join(',');
+      final placeholders = estadoIds.map((_) => '?').join(',');
       await dbHelper.actualizar(
         tableName,
         {
           'sincronizado': 1,
-          'fecha_actualizacion': DateTime.now().toIso8601String()
+          'estado_censo': EstadoEquipoCenso.migrado.valor,
+          'fecha_actualizacion': DateTime.now().toIso8601String(),
         },
-        where: 'id IN ($idsString)',
+        where: 'id IN ($placeholders)',
+        whereArgs: estadoIds,
       );
     } catch (e) {
       _logger.e('Error al marcar múltiples como sincronizados: $e');
@@ -595,74 +528,6 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-  // ========== MÉTODOS PARA IMÁGENES ==========
-
-  /// Obtener estados con imágenes pendientes de sincronización
-  Future<List<EstadoEquipo>> obtenerEstadosConImagenesPendientes() async {
-    try {
-      final maps = await dbHelper.consultar(
-        tableName,
-        where: 'tiene_imagen = 1 AND sincronizado = 0 AND imagen_base64 IS NOT NULL',
-        orderBy: 'fecha_creacion ASC',
-      );
-
-      final estados = maps.map((map) => fromMap(map)).toList();
-      _logger.i('Encontrados ${estados.length} estados con imágenes pendientes');
-      return estados;
-    } catch (e) {
-      _logger.e('Error obteniendo estados con imágenes pendientes: $e');
-      return [];
-    }
-  }
-
-  /// Marcar imagen como sincronizada y limpiar Base64
-  Future<void> marcarImagenComoSincronizada(String estadoId, {dynamic servidorId}) async { // ✅ CAMBIAR int a String
-    try {
-      final datosActualizacion = <String, dynamic>{
-        'sincronizado': 1,
-        'estado_censo': EstadoEquipoCenso.migrado.valor,
-        'fecha_actualizacion': DateTime.now().toIso8601String(),
-        'imagen_base64': null,
-        'imagen_base64_2': null,
-      };
-
-      await dbHelper.actualizar(
-        tableName,
-        datosActualizacion,
-        where: 'id = ?',
-        whereArgs: [estadoId],
-      );
-
-      _logger.i('Estado $estadoId marcado como sincronizado y Base64 limpiado');
-    } catch (e) {
-      _logger.e('Error marcando imagen como sincronizada: $e');
-      rethrow;
-    }
-  }
-
-  /// Limpiar Base64 después de sincronización exitosa
-  Future<void> limpiarBase64DespuesDeSincronizacion(String estadoId) async { // ✅ CAMBIAR int a String
-    try {
-      final datosActualizacion = <String, dynamic>{
-        'imagen_base64': null,
-        'imagen_base64_2': null,
-        'fecha_actualizacion': DateTime.now().toIso8601String(),
-      };
-
-      await dbHelper.actualizar(
-        tableName,
-        datosActualizacion,
-        where: 'id = ? AND sincronizado = 1',
-        whereArgs: [estadoId],
-      );
-
-      _logger.i('Base64 limpiado para estado $estadoId (ya sincronizado)');
-    } catch (e) {
-      _logger.e('Error limpiando Base64: $e');
-      rethrow;
-    }
-  }
-
   // ========== MÉTODOS UTILITARIOS ==========
 
   /// Preparar datos para sincronización
@@ -712,6 +577,95 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     } catch (e) {
       _logger.e('Error obteniendo último estado para icono: $e');
       return null;
+    }
+  }
+
+  // ========== MÉTODOS PARA SYNC PANEL ==========
+
+  /// Marcar registro como migrado exitosamente
+  Future<void> marcarComoMigrado(String estadoId, {dynamic servidorId}) async {
+    try {
+      await dbHelper.actualizar(
+        tableName,
+        {
+          'sincronizado': 1,
+          'estado_censo': EstadoEquipoCenso.migrado.valor,
+          'fecha_actualizacion': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [estadoId],
+      );
+      _logger.i('Estado $estadoId marcado como migrado exitosamente');
+    } catch (e) {
+      _logger.e('Error al marcar como migrado: $e');
+      rethrow;
+    }
+  }
+
+  /// Marcar registro con error de sincronización
+  Future<void> marcarComoError(String estadoId, String mensajeError) async {
+    try {
+      await dbHelper.actualizar(
+        tableName,
+        {
+          'estado_censo': EstadoEquipoCenso.error.valor,
+          'fecha_actualizacion': DateTime.now().toIso8601String(),
+          // Nota: mensaje_error no está en la nueva estructura, se agrega a observaciones
+          'observaciones': 'ERROR: $mensajeError',
+        },
+        where: 'id = ?',
+        whereArgs: [estadoId],
+      );
+      _logger.i('Estado $estadoId marcado con error: $mensajeError');
+    } catch (e) {
+      _logger.e('Error al marcar como error: $e');
+      rethrow;
+    }
+  }
+
+  // ========== MÉTODOS DE COMPATIBILIDAD PARA IMÁGENES (DURANTE TRANSICIÓN) ==========
+
+  /// Obtener estados con imágenes pendientes - DEPRECADO: Usar CensoActivoFotoRepository
+  @Deprecated('Usar CensoActivoFotoRepository.obtenerFotosPendientes() en su lugar')
+  Future<List<EstadoEquipo>> obtenerEstadosConImagenesPendientes() async {
+    try {
+      _logger.w('⚠️ Método deprecado: obtenerEstadosConImagenesPendientes()');
+      _logger.w('   Usar CensoActivoFotoRepository.obtenerFotosPendientes() en su lugar');
+
+      // Por compatibilidad, retornar lista vacía
+      return [];
+    } catch (e) {
+      _logger.e('Error en método deprecado: $e');
+      return [];
+    }
+  }
+
+  /// Marcar imagen como sincronizada - DEPRECADO: Usar CensoActivoFotoRepository
+  @Deprecated('Usar CensoActivoFotoRepository.marcarComoSincronizada() en su lugar')
+  Future<void> marcarImagenComoSincronizada(String estadoId, {dynamic servidorId}) async {
+    try {
+      _logger.w('⚠️ Método deprecado: marcarImagenComoSincronizada()');
+      _logger.w('   Usar CensoActivoFotoRepository.marcarComoSincronizada() en su lugar');
+
+      // Solo marcar el censo como sincronizado, sin tocar imágenes
+      await marcarComoSincronizado(estadoId);
+    } catch (e) {
+      _logger.e('Error en método deprecado: $e');
+      rethrow;
+    }
+  }
+
+  /// Limpiar Base64 después de sincronización - DEPRECADO: Usar CensoActivoFotoRepository
+  @Deprecated('Usar CensoActivoFotoRepository.marcarComoSincronizada() en su lugar')
+  Future<void> limpiarBase64DespuesDeSincronizacion(String estadoId) async {
+    try {
+      _logger.w('⚠️ Método deprecado: limpiarBase64DespuesDeSincronizacion()');
+      _logger.w('   Usar CensoActivoFotoRepository.marcarComoSincronizada() en su lugar');
+
+      // No hacer nada, las imágenes están en otra tabla
+    } catch (e) {
+      _logger.e('Error en método deprecado: $e');
+      rethrow;
     }
   }
 }

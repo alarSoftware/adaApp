@@ -207,6 +207,17 @@ class _PreviewScreenState extends State<PreviewScreen> {
       return;
     }
 
+    // ✅ LOGS PARA DEBUGGING
+    debugPrint('🔍 === ESTADO ANTES DE PREPARAR DATOS ===');
+    debugPrint('🔍 _imagePath: $_imagePath');
+    debugPrint('🔍 _imageBase64 != null: ${_imageBase64 != null}');
+    debugPrint('🔍 _imageBase64 length: ${_imageBase64?.length ?? 0}');
+    debugPrint('🔍 _imagePath2: $_imagePath2');
+    debugPrint('🔍 _imageBase64_2 != null: ${_imageBase64_2 != null}');
+    debugPrint('🔍 _imageBase64_2 length: ${_imageBase64_2?.length ?? 0}');
+    debugPrint('🔍 widget.datos[imagen_path]: ${widget.datos['imagen_path']}');
+    debugPrint('🔍 widget.datos[imagen_base64] != null: ${widget.datos['imagen_base64'] != null}');
+
     final datosCompletos = Map<String, dynamic>.from(widget.datos);
 
     // Preparar imagen 1 con logging mejorado
@@ -221,7 +232,13 @@ class _PreviewScreenState extends State<PreviewScreen> {
       datosCompletos['imagen_base64'] = _imageBase64;
       datosCompletos['tiene_imagen'] = true;
       datosCompletos['imagen_tamano'] = bytes.length;
+
+      debugPrint('✅ datosCompletos actualizado con imagen 1');
     } else {
+      debugPrint('⚠️ IMAGEN 1 NO DISPONIBLE');
+      debugPrint('   _imagePath: $_imagePath');
+      debugPrint('   _imageBase64 != null: ${_imageBase64 != null}');
+
       datosCompletos['tiene_imagen'] = false;
       datosCompletos['imagen_path'] = null;
       datosCompletos['imagen_base64'] = null;
@@ -240,12 +257,23 @@ class _PreviewScreenState extends State<PreviewScreen> {
       datosCompletos['imagen_base64_2'] = _imageBase64_2;
       datosCompletos['tiene_imagen2'] = true;
       datosCompletos['imagen_tamano2'] = bytes2.length;
+
+      debugPrint('✅ datosCompletos actualizado con imagen 2');
     } else {
+      debugPrint('⚠️ IMAGEN 2 NO DISPONIBLE');
+      debugPrint('   _imagePath2: $_imagePath2');
+      debugPrint('   _imageBase64_2 != null: ${_imageBase64_2 != null}');
+
       datosCompletos['tiene_imagen2'] = false;
       datosCompletos['imagen_path2'] = null;
       datosCompletos['imagen_base64_2'] = null;
       datosCompletos['imagen_tamano2'] = null;
     }
+
+    debugPrint('🔍 === VERIFICACIÓN FINAL ===');
+    debugPrint('🔍 datosCompletos[tiene_imagen]: ${datosCompletos['tiene_imagen']}');
+    debugPrint('🔍 datosCompletos[imagen_base64] != null: ${datosCompletos['imagen_base64'] != null}');
+    debugPrint('🔍 datosCompletos[imagen_base64] length: ${datosCompletos['imagen_base64']?.toString().length ?? 0}');
 
     print('🔍 DEBUG: Iniciando confirmación de registro...');
     final resultado = await viewModel.confirmarRegistro(datosCompletos);

@@ -8,6 +8,7 @@ import '../../models/cliente.dart';
 import '../../models/usuario.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
+import 'package:ada_app/repositories/censo_activo_foto_repository.dart'; // ✅ NUEVO
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/services/auth_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
@@ -26,6 +27,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   final EquipoRepository _equipoRepository = EquipoRepository();
   final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
+  final CensoActivoFotoRepository _fotoRepository = CensoActivoFotoRepository(); // ✅ NUEVO
   final EquipoPendienteRepository _equipoPendienteRepository = EquipoPendienteRepository();
   final AuthService _authService = AuthService();
 
@@ -246,7 +248,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         _logger.i('Equipo ya asignado - no se crea registro pendiente');
       }
 
-      // CREAR ESTADO EN CENSO_ACTIVO
+      // ✅ CREAR ESTADO EN CENSO_ACTIVO (SIN IMÁGENES)
       _setStatusMessage('Registrando censo...');
 
       if (_currentProcessId != processId) {
@@ -256,6 +258,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       try {
         final now = DateTime.now().toLocal();
 
+        // ✅ CREAR CENSO SIN IMÁGENES
         final estadoCreado = await _estadoEquipoRepository.crearNuevoEstado(
           equipoId: equipoId,
           clienteId: clienteId,
@@ -264,19 +267,26 @@ class PreviewScreenViewModel extends ChangeNotifier {
           fechaRevision: now,
           enLocal: true,
           observaciones: datos['observaciones']?.toString(),
-          imagenPath: datos['imagen_path'],
-          imagenBase64: datos['imagen_base64'],
-          tieneImagen: datos['tiene_imagen'] ?? false,
-          imagenTamano: datos['imagen_tamano'],
-          imagenPath2: datos['imagen_path2'],
-          imagenBase64_2: datos['imagen_base64_2'],
-          tieneImagen2: datos['tiene_imagen2'] ?? false,
-          imagenTamano2: datos['imagen_tamano2'],
+          // ❌ NO PASAR IMÁGENES AQUÍ
         );
 
         if (estadoCreado.id != null) {
           estadoIdActual = estadoCreado.id!;
-          _logger.i('Estado creado con UUID: $estadoIdActual');
+          _logger.i('✅ Estado creado con UUID: $estadoIdActual');
+
+          // ✅ DEBUG: Verificar que los datos tienen imágenes
+          _logger.i('🔍 DEBUG - tiene_imagen: ${datos['tiene_imagen']}');
+          _logger.i('🔍 DEBUG - imagen_base64 != null: ${datos['imagen_base64'] != null}');
+          _logger.i('🔍 DEBUG - imagen_base64 length: ${datos['imagen_base64']?.toString().length ?? 0}');
+          _logger.i('🔍 DEBUG - tiene_imagen2: ${datos['tiene_imagen2']}');
+          _logger.i('🔍 DEBUG - imagen_base64_2 != null: ${datos['imagen_base64_2'] != null}');
+          _logger.i('🔍 DEBUG - imagen_base64_2 length: ${datos['imagen_base64_2']?.toString().length ?? 0}');
+
+          // ✅ GUARDAR FOTOS POR SEPARADO
+          _logger.i('📸 Llamando a _guardarFotosDelCenso...');
+          await _guardarFotosDelCenso(estadoIdActual, datos);
+          _logger.i('📸 _guardarFotosDelCenso completado');
+
         } else {
           _logger.w('Estado creado pero sin ID asignado');
           estadoIdActual = null;
@@ -365,6 +375,52 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
+  // ✅ NUEVO MÉTODO: Guardar fotos por separado en censo_activo_foto
+  Future<void> _guardarFotosDelCenso(String censoActivoId, Map<String, dynamic> datos) async {
+    try {
+      _logger.i('📸 Guardando fotos para censo $censoActivoId');
+
+      // Guardar primera imagen si existe
+      final tieneImagen = datos['tiene_imagen'] ?? false;
+      if (tieneImagen && datos['imagen_base64'] != null) {
+        try {
+          await _fotoRepository.guardarFoto(
+            censoActivoId: censoActivoId,
+            imagenPath: datos['imagen_path'] as String?,
+            imagenBase64: datos['imagen_base64'] as String?,
+            imagenTamano: datos['imagen_tamano'] as int?,
+            orden: 1,
+          );
+          _logger.i('✅ Primera foto guardada para censo $censoActivoId');
+        } catch (e) {
+          _logger.e('❌ Error guardando primera foto: $e');
+        }
+      }
+
+      // Guardar segunda imagen si existe
+      final tieneImagen2 = datos['tiene_imagen2'] ?? false;
+      if (tieneImagen2 && datos['imagen_base64_2'] != null) {
+        try {
+          await _fotoRepository.guardarFoto(
+            censoActivoId: censoActivoId,
+            imagenPath: datos['imagen_path2'] as String?,
+            imagenBase64: datos['imagen_base64_2'] as String?,
+            imagenTamano: datos['imagen_tamano2'] as int?,
+            orden: 2,
+          );
+          _logger.i('✅ Segunda foto guardada para censo $censoActivoId');
+        } catch (e) {
+          _logger.e('❌ Error guardando segunda foto: $e');
+        }
+      }
+
+      _logger.i('📸 Proceso de guardado de fotos completado');
+    } catch (e) {
+      _logger.e('❌ Error en _guardarFotosDelCenso: $e');
+      // No lanzar error para no interrumpir el flujo principal
+    }
+  }
+
   // NUEVO MÉTODO: Sincronización en segundo plano
   void _sincronizarEnBackground(String? estadoId, Map<String, dynamic> datos) async {
     if (estadoId == null) {
@@ -377,7 +433,19 @@ class PreviewScreenViewModel extends ChangeNotifier {
       try {
         _logger.i('Iniciando sincronización en segundo plano para estado $estadoId');
 
-        final datosApi = await _prepararDatosParaApiEstados(datos);
+        // ✅ OBTENER FOTOS DE LA NUEVA TABLA
+        final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
+
+        // Agregar fotos a los datos
+        final datosConFotos = Map<String, dynamic>.from(datos);
+        if (fotos.isNotEmpty) {
+          datosConFotos['imagen_base64'] = fotos.first.imagenBase64;
+        }
+        if (fotos.length > 1) {
+          datosConFotos['imagen_base64_2'] = fotos[1].imagenBase64;
+        }
+
+        final datosApi = await _prepararDatosParaApiEstados(datosConFotos);
         final respuestaServidor = await _enviarAApiEstadosConTimeout(datosApi, 10);
 
         if (respuestaServidor['exito'] == true) {
@@ -386,10 +454,17 @@ class PreviewScreenViewModel extends ChangeNotifier {
               servidorId: respuestaServidor['servidor_id']
           );
 
+          // ✅ MARCAR FOTOS COMO SINCRONIZADAS
+          for (final foto in fotos) {
+            if (foto.id != null) {
+              await _fotoRepository.marcarComoSincronizada(foto.id!);
+            }
+          }
+
           final idLocal = datos['id_local'] as String?;
           if (idLocal != null) await _marcarComoSincronizado(idLocal);
 
-          _logger.i('Sincronización en segundo plano exitosa para estado $estadoId');
+          _logger.i('✅ Sincronización en segundo plano exitosa para estado $estadoId con ${fotos.length} fotos');
         } else {
           await _estadoEquipoRepository.marcarComoError(
               estadoId,
@@ -548,6 +623,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       for (final registro in registrosPendientes) {
         try {
+          // ✅ OBTENER FOTOS DEL CENSO
+          final fotos = await _fotoRepository.obtenerFotosPorCenso(registro.id!);
+
           final datosParaApi = {
             'fecha_revision': _formatearFechaLocal(registro.fechaRevision),
             'equipo_id': (registro.equipoId ?? '').toString(),
@@ -563,6 +641,12 @@ class PreviewScreenViewModel extends ChangeNotifier {
             'funcionando': true,
             'cliente_id': registro.clienteId,
             'observaciones': registro.observaciones ?? 'Sincronización automática',
+
+            // ✅ INCLUIR FOTOS
+            'imageBase64_1': fotos.isNotEmpty ? fotos.first.imagenBase64 : null,
+            'imageBase64_2': fotos.length > 1 ? fotos[1].imagenBase64 : null,
+            'tiene_imagen': fotos.isNotEmpty,
+            'tiene_imagen2': fotos.length > 1,
           };
 
           final respuesta = await _enviarAApiEstadosConTimeout(datosParaApi, 5);
@@ -572,8 +656,16 @@ class PreviewScreenViewModel extends ChangeNotifier {
                 registro.id!,
                 servidorId: respuesta['id']
             );
+
+            // ✅ MARCAR FOTOS COMO SINCRONIZADAS
+            for (final foto in fotos) {
+              if (foto.id != null) {
+                await _fotoRepository.marcarComoSincronizada(foto.id!);
+              }
+            }
+
             exitosos++;
-            _logger.i('Registro ${registro.id} sincronizado exitosamente');
+            _logger.i('Registro ${registro.id} sincronizado exitosamente con ${fotos.length} fotos');
           } else {
             await _estadoEquipoRepository.marcarComoError(
                 registro.id!,
@@ -826,6 +918,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final now = DateTime.now().toLocal();
       final timestampId = _uuid.v4();
 
+      // ✅ OBTENER FOTOS DE LA NUEVA TABLA
+      final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
+
+      _logger.i('📸 Fotos encontradas para reintento: ${fotos.length}');
+
       final datosParaApi = {
         'id': timestampId.toString(),
         'edfVendedorSucursalId': edfVendedorId ?? '',
@@ -839,10 +936,13 @@ class PreviewScreenViewModel extends ChangeNotifier {
         'fechaDeRevision': estadoMap['fecha_revision'] ?? _formatearFechaLocal(now),
         'estadoCenso': 'pendiente',
         'observaciones': estadoMap['observaciones'] ?? '',
-        'imageBase64_1': estadoMap['imagen_base64'],
-        'imageBase64_2': estadoMap['imagen_base64_2'],
-        'tiene_imagen': estadoMap['tiene_imagen'] ?? 0,
-        'tiene_imagen2': estadoMap['tiene_imagen2'] ?? 0,
+
+        // ✅ USAR FOTOS DE LA NUEVA TABLA
+        'imageBase64_1': fotos.isNotEmpty ? fotos.first.imagenBase64 : null,
+        'imageBase64_2': fotos.length > 1 ? fotos[1].imagenBase64 : null,
+        'tiene_imagen': fotos.isNotEmpty,
+        'tiene_imagen2': fotos.length > 1,
+
         'equipo_codigo_barras': '',
         'equipo_numero_serie': '',
         'equipo_modelo': '',
@@ -861,7 +961,14 @@ class PreviewScreenViewModel extends ChangeNotifier {
           servidorId: respuesta['id'],
         );
 
-        _logger.i('Reenvío exitoso del estado $estadoId');
+        // ✅ MARCAR FOTOS COMO SINCRONIZADAS Y LIMPIAR BASE64
+        for (final foto in fotos) {
+          if (foto.id != null) {
+            await _fotoRepository.marcarComoSincronizada(foto.id!);
+          }
+        }
+
+        _logger.i('✅ Reenvío exitoso del estado $estadoId con ${fotos.length} fotos');
 
         return {
           'success': true,
@@ -986,6 +1093,4 @@ class PreviewScreenViewModel extends ChangeNotifier {
       return [];
     }
   }
-
-
 }
