@@ -7,6 +7,7 @@ import 'package:ada_app/ui/widgets/app_loading_more.dart';
 import 'package:ada_app/ui/widgets/app_empty_state.dart';
 import 'package:ada_app/ui/widgets/app_search_bar.dart';
 import 'package:ada_app/ui/screens/client_options_screen.dart';
+import 'package:ada_app/ui/widgets/client_status_icon.dart';
 import 'package:ada_app/services/sync/client_sync_service.dart';
 import 'package:logger/logger.dart';
 import 'dart:async';
@@ -46,21 +47,21 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
   void _setupEventListener() {
     _eventSubscription =
         _viewModel.uiEvents.listen((event) {
-      if (!mounted) return;
+          if (!mounted) return;
 
-      if (event is ShowErrorEvent) {
-        AppSnackbar.showError(context, event.message);
-      } else if (event is NavigateToDetailEvent) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ClientOptionsScreen(cliente: event.cliente),
-          ),
-        ).then((_) {
-          // Opcional: refrescar lista de clientes si es necesario
+          if (event is ShowErrorEvent) {
+            AppSnackbar.showError(context, event.message);
+          } else if (event is NavigateToDetailEvent) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ClientOptionsScreen(cliente: event.cliente),
+              ),
+            ).then((_) {
+              // Opcional: refrescar lista de clientes si es necesario
+            });
+          }
         });
-      }
-    });
   }
 
   void _setupSearchListener() {
@@ -238,6 +239,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
     );
   }
 
+  // ✅ Método mejorado con iconos de estado
   Widget _buildClienteCard(cliente) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -283,18 +285,31 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),
-              // RUC/CI
+              // RUC/CI y iconos de estado en la misma fila
               Padding(
                 padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  '${cliente.tipoDocumento}: ${cliente.rucCi}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textTertiary,
-                    fontFamily: 'monospace',
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
+                child: Row(
+                  children: [
+                    // RUC/CI existente (MANTENER IGUAL)
+                    Expanded(
+                      child: Text(
+                        '${cliente.tipoDocumento}: ${cliente.rucCi}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textTertiary,
+                          fontFamily: 'monospace',
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                    // ✅ AGREGAR ESTOS ICONOS DE ESTADO:
+                    ClientStatusIcons(
+                      tieneCensoHoy: cliente.tieneCensoHoy,
+                      tieneFormularioCompleto: cliente.tieneFormularioCompleto,
+                      iconSize: 14,
+                    ),
+                  ],
                 ),
               ),
             ],
