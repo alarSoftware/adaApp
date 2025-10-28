@@ -27,20 +27,18 @@ class ClienteRepository extends BaseRepository<Cliente> {
   @override
   String getEntityName() => 'Cliente';
 
-  // ✅ VERSIÓN SIMPLIFICADA - Excluye solo errores
+  // ✅ VERSIÓN CORREGIDA - Aparece con CUALQUIER estado en censo_activo
   @override
   Future<List<Cliente>> buscar(String query) async {
     try {
       String sql = '''
         SELECT 
           c.*,
-          -- ✅ Censo HOY (cualquier estado excepto error)
           CASE 
             WHEN EXISTS(
               SELECT 1 FROM censo_activo 
               WHERE cliente_id = c.id 
-              AND DATE(fecha_revision) = DATE('now', 'localtime')
-              AND estado_censo != 'error'
+              AND date(fecha_revision) = date('now', 'localtime')
             ) THEN 1 ELSE 0 
           END as tiene_censo_hoy,
           
@@ -49,7 +47,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
             WHEN EXISTS(
               SELECT 1 FROM dynamic_form_response 
               WHERE contacto_id = CAST(c.id AS TEXT)
-              AND DATE(creation_date) = DATE('now', 'localtime')
+              AND date(creation_date) = date('now', 'localtime')
               AND estado = 'completed'
             ) THEN 1 ELSE 0 
           END as tiene_formulario_completo
@@ -93,8 +91,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
             WHEN EXISTS(
               SELECT 1 FROM censo_activo 
               WHERE cliente_id = c.id 
-              AND DATE(fecha_revision) = DATE('now', 'localtime')
-              AND estado_censo != 'error'
+              AND date(fecha_revision) = date('now', 'localtime')
             ) THEN 1 ELSE 0 
           END as tiene_censo_hoy,
           
@@ -102,7 +99,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
             WHEN EXISTS(
               SELECT 1 FROM dynamic_form_response 
               WHERE contacto_id = CAST(c.id AS TEXT)
-              AND DATE(creation_date) = DATE('now', 'localtime')
+              AND date(creation_date) = date('now', 'localtime')
               AND estado = 'completed'
             ) THEN 1 ELSE 0 
           END as tiene_formulario_completo
@@ -134,7 +131,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
             WHEN EXISTS(
               SELECT 1 FROM dynamic_form_response 
               WHERE contacto_id = CAST(c.id AS TEXT)
-              AND DATE(creation_date) = DATE('now', 'localtime')
+              AND date(creation_date) = date('now', 'localtime')
               AND estado = 'completed'
             ) THEN 1 ELSE 0 
           END as tiene_formulario_completo
@@ -143,8 +140,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
         WHERE NOT EXISTS(
           SELECT 1 FROM censo_activo 
           WHERE cliente_id = c.id 
-          AND DATE(fecha_revision) = DATE('now', 'localtime')
-          AND estado_censo != 'error'
+          AND date(fecha_revision) = date('now', 'localtime')
         )
         ORDER BY ${getDefaultOrderBy()}
       ''';
@@ -167,8 +163,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
             WHEN EXISTS(
               SELECT 1 FROM censo_activo 
               WHERE cliente_id = c.id 
-              AND DATE(fecha_revision) = DATE('now', 'localtime')
-              AND estado_censo != 'error'
+              AND date(fecha_revision) = date('now', 'localtime')
             ) THEN 1 ELSE 0 
           END as tiene_censo_hoy,
           
@@ -178,7 +173,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
         WHERE NOT EXISTS(
           SELECT 1 FROM dynamic_form_response 
           WHERE contacto_id = CAST(c.id AS TEXT)
-          AND DATE(creation_date) = DATE('now', 'localtime')
+          AND date(creation_date) = date('now', 'localtime')
           AND estado = 'completed'
         )
         ORDER BY ${getDefaultOrderBy()}
@@ -205,13 +200,12 @@ class ClienteRepository extends BaseRepository<Cliente> {
         WHERE EXISTS(
           SELECT 1 FROM censo_activo 
           WHERE cliente_id = c.id 
-          AND DATE(fecha_revision) = DATE('now', 'localtime')
-          AND estado_censo != 'error'
+          AND date(fecha_revision) = date('now', 'localtime')
         )
         AND EXISTS(
           SELECT 1 FROM dynamic_form_response 
           WHERE contacto_id = CAST(c.id AS TEXT)
-          AND DATE(creation_date) = DATE('now', 'localtime')
+          AND date(creation_date) = date('now', 'localtime')
           AND estado = 'completed'
         )
         ORDER BY ${getDefaultOrderBy()}
@@ -239,8 +233,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
             WHEN EXISTS(
               SELECT 1 FROM censo_activo 
               WHERE cliente_id = clientes.id 
-              AND DATE(fecha_revision) = DATE('now', 'localtime')
-              AND estado_censo != 'error'
+              AND date(fecha_revision) = date('now', 'localtime')
             ) THEN 1 ELSE 0 
           END) as con_censo_hoy,
           
@@ -248,7 +241,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
             WHEN EXISTS(
               SELECT 1 FROM dynamic_form_response 
               WHERE contacto_id = CAST(clientes.id AS TEXT)
-              AND DATE(creation_date) = DATE('now', 'localtime')
+              AND date(creation_date) = date('now', 'localtime')
               AND estado = 'completed'
             ) THEN 1 ELSE 0 
           END) as con_formulario_hoy,
@@ -257,13 +250,12 @@ class ClienteRepository extends BaseRepository<Cliente> {
             WHEN EXISTS(
               SELECT 1 FROM censo_activo 
               WHERE cliente_id = clientes.id 
-              AND DATE(fecha_revision) = DATE('now', 'localtime')
-              AND estado_censo != 'error'
+              AND date(fecha_revision) = date('now', 'localtime')
             )
             AND EXISTS(
               SELECT 1 FROM dynamic_form_response 
               WHERE contacto_id = CAST(clientes.id AS TEXT)
-              AND DATE(creation_date) = DATE('now', 'localtime')
+              AND date(creation_date) = date('now', 'localtime')
               AND estado = 'completed'
             ) THEN 1 ELSE 0 
           END) as completados_hoy
