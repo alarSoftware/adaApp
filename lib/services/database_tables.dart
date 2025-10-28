@@ -101,6 +101,9 @@ class DatabaseTables {
     usuario_censo_id INTEGER,
     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion DATETIME,
+    sincronizado INTEGER DEFAULT 0,
+    fecha_sincronizacion DATETIME,        
+    UNIQUE(equipo_id, cliente_id),
     FOREIGN KEY (equipo_id) REFERENCES equipos (id),
     FOREIGN KEY (cliente_id) REFERENCES clientes (id)
   )

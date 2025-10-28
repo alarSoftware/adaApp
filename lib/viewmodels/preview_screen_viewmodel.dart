@@ -149,6 +149,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     _setSaving(true);
     _setStatusMessage(null);
     String? estadoIdActual;
+    String? imagenId1, imagenId2;
 
     try {
       _logger.i('Confirmando registro [Process: $processId]');
@@ -287,6 +288,19 @@ class PreviewScreenViewModel extends ChangeNotifier {
           await _guardarFotosDelCenso(estadoIdActual, datos);
           _logger.i('📸 _guardarFotosDelCenso completado');
 
+          try {
+            final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoIdActual);
+            if (fotos.isNotEmpty) {
+              imagenId1 = fotos[0].id; // Primera foto
+              if (fotos.length > 1) {
+                imagenId2 = fotos[1].id; // Segunda foto
+              }
+            }
+            _logger.i('📷 IDs obtenidos - Foto 1: $imagenId1, Foto 2: $imagenId2');
+          } catch (e) {
+            _logger.w('Error obteniendo IDs de fotos: $e');
+          }
+
         } else {
           _logger.w('Estado creado pero sin ID asignado');
           estadoIdActual = null;
@@ -313,16 +327,16 @@ class PreviewScreenViewModel extends ChangeNotifier {
           'usuario_id': usuarioId,
           'funcionando': true,
           'estado_general': 'Equipo registrado desde APP móvil - ${datos['observaciones'] ?? 'Censo registrado'}',
-          'temperatura_actual': null,
-          'temperatura_freezer': null,
           'latitud': datos['latitud'],
           'longitud': datos['longitud'],
           'imagen_path': datos['imagen_path'],
           'imagen_base64': datos['imagen_base64'],
+          'imagen_id_1': imagenId1, // ← NUEVO
           'tiene_imagen': datos['tiene_imagen'] ?? false,
           'imagen_tamano': datos['imagen_tamano'],
           'imagen_path2': datos['imagen_path2'],
           'imagen_base64_2': datos['imagen_base64_2'],
+          'imagen_id_2': imagenId2, // ← NUEVO
           'tiene_imagen2': datos['tiene_imagen2'] ?? false,
           'imagen_tamano2': datos['imagen_tamano2'],
           'codigo_barras': equipoCompleto!['cod_barras'] ?? datos['codigo_barras'],
@@ -527,21 +541,19 @@ class PreviewScreenViewModel extends ChangeNotifier {
       _logger.i('POST a $fullUrl - Timeout: $timeoutSegundos s');
       _logger.i('Payload size: ${jsonBody.length} caracteres');
 
-      // 🔥 Guardar log en archivo SOLO en modo debug
-      if (const bool.fromEnvironment('dart.vm.product') == false) {
-        try {
-          await _guardarLogEnArchivo(
-            url: fullUrl,
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: datos,
-            timestamp: timestamp,
-          );
-        } catch (e) {
-          _logger.w('Error guardando log en archivo (no crítico): $e');
-        }
+      // ✅ CAMBIO: SIEMPRE guardar log en archivo (no solo en debug)
+      try {
+        await _guardarLogEnArchivo(
+          url: fullUrl,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: datos,
+          timestamp: timestamp,
+        );
+      } catch (e) {
+        _logger.w('Error guardando log en archivo (no crítico): $e');
       }
 
       final response = await http.post(
@@ -748,6 +760,29 @@ class PreviewScreenViewModel extends ChangeNotifier {
     final edfVendedorId = await _getEdfVendedorId;
     final now = DateTime.now().toLocal();
 
+    // ✅ NUEVO: Array de fotos con IDs
+    final fotos = <Map<String, dynamic>>[];
+
+    // Agregar primera imagen si existe
+    if (datosLocales['tiene_imagen'] == true && datosLocales['imagen_base64'] != null) {
+      fotos.add({
+        'id': datosLocales['imagen_id_1'], // ← ID de la imagen
+        'base64': datosLocales['imagen_base64'],
+        'path': datosLocales['imagen_path'],
+        'tamano': datosLocales['imagen_tamano'],
+      });
+    }
+
+    // Agregar segunda imagen si existe
+    if (datosLocales['tiene_imagen2'] == true && datosLocales['imagen_base64_2'] != null) {
+      fotos.add({
+        'id': datosLocales['imagen_id_2'], // ← ID de la imagen
+        'base64': datosLocales['imagen_base64_2'],
+        'path': datosLocales['imagen_path2'],
+        'tamano': datosLocales['imagen_tamano2'],
+      });
+    }
+
     return {
       'id': datosLocales['timestamp_id']?.toString() ?? _uuid.v4(),
       'edfVendedorSucursalId': '$edfVendedorId',
@@ -761,33 +796,27 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'fechaDeRevision': datosLocales['fecha_revision'] ?? _formatearFechaLocal(now),
       'estadoCenso': datosLocales['ya_asignado'] == true ? 'asignado' : 'pendiente',
       'esNuevoEquipo': datosLocales['es_nuevo_equipo'] ?? false,
+
+      // ✅ NUEVO: Array de fotos con IDs
+      'fotos': fotos,
+      'total_imagenes': fotos.length,
+
+      // Resto de campos del censo
+      'observaciones': datosLocales['observaciones'] ?? '',
+      'estado_general': datosLocales['estado_general'] ?? '',
+      'usuario_id': usuarioId,
+      'cliente_id': datosLocales['cliente_id'] ?? 0,
+      'equipo_id': (datosLocales['equipo_id'] ?? '').toString(),
       'equipo_codigo_barras': datosLocales['codigo_barras'] ?? '',
       'equipo_numero_serie': datosLocales['numero_serie'] ?? '',
       'equipo_modelo': datosLocales['modelo'] ?? '',
       'equipo_marca': datosLocales['marca_nombre'] ?? '',
       'equipo_logo': datosLocales['logo'] ?? '',
-      'equipo_id': (datosLocales['equipo_id'] ?? '').toString(),
       'cliente_nombre': datosLocales['cliente_nombre'] ?? '',
-      'observaciones': datosLocales['observaciones'] ?? '',
-      'cliente_id': datosLocales['cliente_id'] ?? 0,
-      'usuario_id': usuarioId,
-
-      // SOLO formato con sufijo _1 y _2
-      'imageBase64_1': datosLocales['imagen_base64'],
-      'imageBase64_2': datosLocales['imagen_base64_2'],
-      'imagenPath': datosLocales['imagen_path'],
-      'imageSize': datosLocales['imagen_tamano']?.toString(),
-
-      // Flags de control
-      'tiene_imagen': datosLocales['tiene_imagen'] ?? false,
-      'tiene_imagen2': datosLocales['tiene_imagen2'] ?? false,
-
-      // Metadata
       'en_local': datosLocales['en_local'] ?? true,
       'dispositivo': datosLocales['dispositivo'] ?? 'android',
       'es_censo': datosLocales['es_censo'] ?? true,
       'version_app': datosLocales['version_app'] ?? '1.0.0',
-      'estado_general': datosLocales['estado_general'] ?? '',
     };
   }
 
@@ -1012,6 +1041,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     required Map<String, String> headers,
     required Map<String, dynamic> body,
     required String timestamp,
+    String? censoActivoId,
   }) async {
     try {
       Directory? downloadsDir;
@@ -1036,22 +1066,111 @@ class PreviewScreenViewModel extends ChangeNotifier {
         await downloadsDir.create(recursive: true);
       }
 
-      final fileName = 'post_nuevo_equipo_${_uuid.v4().substring(0, 13)}.txt';
+      final now = DateTime.now();
+      final fechaFormateada =
+          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_' +
+              '${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}_' +
+              '${now.second.toString().padLeft(2, '0')}';
+
+      final fileName = 'censo_activo_post_${fechaFormateada}.txt';
       final file = File('${downloadsDir.path}/$fileName');
 
       final buffer = StringBuffer();
 
-      buffer.writeln('POST REQUEST - REGISTRO NUEVO EQUIPO');
+      final separadorLargo = '=' * 80;
+      final separadorCorto = '-' * 40;
+
+      buffer.writeln(separadorLargo);
+      buffer.writeln('CENSO ACTIVO - POST REQUEST LOG');
+      buffer.writeln(separadorLargo);
       buffer.writeln('Timestamp: $timestamp');
       buffer.writeln('URL: $url');
+      buffer.writeln('Archivo: ${file.path}');
       buffer.writeln('');
-      buffer.writeln('REQUEST BODY:');
-      final prettyJson = JsonEncoder.withIndent('  ').convert(body);
+
+      // Headers
+      buffer.writeln(separadorCorto);
+      buffer.writeln('HEADERS:');
+      buffer.writeln(separadorCorto);
+      headers.forEach((key, value) {
+        buffer.writeln('$key: $value');
+      });
+      buffer.writeln('');
+
+      // Resumen del censo
+      buffer.writeln(separadorCorto);
+      buffer.writeln('RESUMEN DEL CENSO:');
+      buffer.writeln(separadorCorto);
+      buffer.writeln('Equipo ID: ${body['edfEquipoId'] ?? body['equipo_id'] ?? 'N/A'}');
+      buffer.writeln('Cliente ID: ${body['edfClienteId'] ?? body['cliente_id'] ?? 'N/A'}');
+      buffer.writeln('Usuario ID: ${body['usuarioId'] ?? body['usuario_id'] ?? 'N/A'}');
+      buffer.writeln('Latitud: ${body['latitud'] ?? 'N/A'}');
+      buffer.writeln('Longitud: ${body['longitud'] ?? 'N/A'}');
+      buffer.writeln('Es nuevo equipo: ${body['esNuevoEquipo'] ?? false}');
+      buffer.writeln('Tiene imagen 1: ${body['tiene_imagen'] ?? false}');
+      buffer.writeln('Tiene imagen 2: ${body['tiene_imagen2'] ?? false}');
+
+      // Tamaños de imágenes si existen
+      if (body['imageBase64_1'] != null) {
+        final tamano1 = body['imageBase64_1'].toString().length;
+        buffer.writeln('Tamaño imagen 1: $tamano1 caracteres (${(tamano1 / 1024).toStringAsFixed(1)} KB)');
+      }
+      if (body['imageBase64_2'] != null) {
+        final tamano2 = body['imageBase64_2'].toString().length;
+        buffer.writeln('Tamaño imagen 2: $tamano2 caracteres (${(tamano2 / 1024).toStringAsFixed(1)} KB)');
+      }
+
+      buffer.writeln('Observaciones: ${body['observaciones'] ?? 'N/A'}');
+      buffer.writeln('Estado censo: ${body['estadoCenso'] ?? 'N/A'}');
+      buffer.writeln('Fecha revision: ${body['fecha_revision'] ?? 'N/A'}');
+      buffer.writeln('En local: ${body['enLocal'] ?? body['en_local'] ?? 'N/A'}');
+      buffer.writeln('');
+
+      // JSON simplificado CON UUIDs de fotos incluidos
+      buffer.writeln(separadorCorto);
+      buffer.writeln('REQUEST BODY COMPLETO (JSON):');
+      buffer.writeln(separadorCorto);
+
+      // Crear versión simplificada del body
+      final bodySimplificado = <String, dynamic>{};
+      body.forEach((key, value) {
+        // Excluir estructuras anidadas complejas
+        if (key != 'equipo' && key != 'cliente' && key != 'imagenes' && key != 'metadata') {
+          bodySimplificado[key] = value;
+        }
+      });
+
+      if (censoActivoId != null) {
+        try {
+          final fotos = await _fotoRepository.obtenerFotosPorCenso(censoActivoId);
+          if (fotos.isNotEmpty) {
+            final fotosInfo = <Map<String, dynamic>>[];
+            for (final foto in fotos) {
+              fotosInfo.add({
+                'uuid': foto.id ?? 'N/A',
+                'path': foto.imagenPath ?? '',
+                'tamano': foto.imagenTamano ?? 0,
+              });
+            }
+            bodySimplificado['fotos_censo_activo_foto'] = fotosInfo;
+          }
+        } catch (e) {
+          _logger.w('No se pudieron obtener fotos para el log: $e');
+        }
+      }
+
+      final prettyJson = JsonEncoder.withIndent('  ').convert(bodySimplificado);
       buffer.writeln(prettyJson);
+      buffer.writeln('');
+
+      buffer.writeln(separadorLargo);
+      buffer.writeln('FIN DEL LOG - ${DateTime.now().toLocal()}');
+      buffer.writeln(separadorLargo);
 
       await file.writeAsString(buffer.toString());
 
-      _logger.i('Log guardado en: ${file.path}');
+      _logger.i('📁 Log guardado en Downloads: $fileName');
+      _logger.i('📍 Ruta completa: ${file.path}');
 
     } catch (e) {
       _logger.e('Error guardando log en archivo: $e');
@@ -1076,16 +1195,48 @@ class PreviewScreenViewModel extends ChangeNotifier {
         return [];
       }
 
+      // ✅ MEJORADO: Buscar tanto archivos antiguos como nuevos
       final files = downloadsDir
           .listSync()
           .whereType<File>()
-          .where((file) => file.path.contains('post_nuevo_equipo_'))
+          .where((file) =>
+      file.path.contains('post_nuevo_equipo_') ||
+          file.path.contains('censo_activo_post_'))
           .map((file) => file.path)
           .toList();
 
-      files.sort((a, b) => b.compareTo(a));
+      // ✅ MEJORADO: Ordenar por fecha de modificación (más reciente primero)
+      files.sort((a, b) {
+        final fileA = File(a);
+        final fileB = File(b);
+        try {
+          final statA = fileA.statSync();
+          final statB = fileB.statSync();
+          return statB.modified.compareTo(statA.modified);
+        } catch (e) {
+          // Fallback al nombre del archivo si falla el stat
+          return b.compareTo(a);
+        }
+      });
 
-      _logger.i('Encontrados ${files.length} logs guardados');
+      _logger.i('📁 Encontrados ${files.length} logs guardados');
+
+      // ✅ NUEVO: Log detallado de los archivos encontrados
+      for (int i = 0; i < files.length && i < 5; i++) {
+        final file = File(files[i]);
+        try {
+          final stat = file.statSync();
+          final tamanoKB = (stat.size / 1024).toStringAsFixed(1);
+          final fechaMod = stat.modified.toLocal();
+          _logger.i('📄 ${i + 1}. ${file.uri.pathSegments.last} (${tamanoKB} KB, ${fechaMod})');
+        } catch (e) {
+          _logger.i('📄 ${i + 1}. ${file.uri.pathSegments.last}');
+        }
+      }
+
+      if (files.length > 5) {
+        _logger.i('📄 ... y ${files.length - 5} archivos más');
+      }
 
       return files;
     } catch (e) {

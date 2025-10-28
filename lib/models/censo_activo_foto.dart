@@ -52,6 +52,7 @@ class CensoActivoFoto {
       'id': id,
       'censo_activo_id': censoActivoId,
       'imagen_path': imagenPath,
+      'imagen_base64': imagenBase64,  // ✅ CORREGIDO: Campo agregado
       'imagen_tamano': imagenTamano,
       'orden': orden,
       'fecha_creacion': fechaCreacion.toIso8601String(),

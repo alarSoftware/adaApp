@@ -202,7 +202,6 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
         tableName,
         {
           'sincronizado': 1,
-          'imagen_base64': null, // Limpiar Base64 después de sincronizar
         },
         where: 'id = ?',
         whereArgs: [fotoId],
