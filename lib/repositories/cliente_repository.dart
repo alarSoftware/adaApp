@@ -27,25 +27,24 @@ class ClienteRepository extends BaseRepository<Cliente> {
   @override
   String getEntityName() => 'Cliente';
 
-  // ✅ SOBRESCRIBIR EL MÉTODO BUSCAR PARA INCLUIR ESTADOS REALES
+  // ✅ VERSIÓN SIMPLIFICADA - Excluye solo errores
   @override
   Future<List<Cliente>> buscar(String query) async {
     try {
-      // Query con las tablas reales y estados 'completed'
       String sql = '''
         SELECT 
           c.*,
-          -- ✅ Censo completado HOY (censo_activo)
+          -- ✅ Censo HOY (cualquier estado excepto error)
           CASE 
             WHEN EXISTS(
               SELECT 1 FROM censo_activo 
               WHERE cliente_id = c.id 
               AND DATE(fecha_revision) = DATE('now', 'localtime')
-              AND estado_censo = 'completed'
+              AND estado_censo != 'error'
             ) THEN 1 ELSE 0 
           END as tiene_censo_hoy,
           
-          -- ✅ Formulario completado HOY (dynamic_form_response)
+          -- ✅ Formulario completado HOY
           CASE 
             WHEN EXISTS(
               SELECT 1 FROM dynamic_form_response 
@@ -61,7 +60,6 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
       final List<dynamic> params = [];
 
-      // Agregar filtros de búsqueda si hay query
       if (query.trim().isNotEmpty) {
         sql += ' AND (${getBuscarWhere()})';
         params.addAll(getBuscarArgs(query));
@@ -80,13 +78,11 @@ class ClienteRepository extends BaseRepository<Cliente> {
     }
   }
 
-  // ✅ MÉTODO PARA OBTENER TODOS LOS CLIENTES CON ESTADOS
   @override
   Future<List<Cliente>> obtenerTodos() async {
-    return await buscar(''); // Reutiliza buscar() con query vacío
+    return await buscar('');
   }
 
-  // ✅ MÉTODO PARA OBTENER UN CLIENTE POR ID CON ESTADOS ACTUALIZADOS
   @override
   Future<Cliente?> obtenerPorId(dynamic id) async {
     try {
@@ -98,7 +94,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
               SELECT 1 FROM censo_activo 
               WHERE cliente_id = c.id 
               AND DATE(fecha_revision) = DATE('now', 'localtime')
-              AND estado_censo = 'completed'
+              AND estado_censo != 'error'
             ) THEN 1 ELSE 0 
           END as tiene_censo_hoy,
           
@@ -128,15 +124,12 @@ class ClienteRepository extends BaseRepository<Cliente> {
     }
   }
 
-  // ✅ MÉTODOS ESPECÍFICOS PARA ESTADOS (CON TABLAS REALES)
-
-  /// Obtiene clientes que NO han recibido censo hoy
   Future<List<Cliente>> obtenerConCensoPendiente() async {
     try {
       final sql = '''
         SELECT 
           c.*,
-          0 as tiene_censo_hoy,  -- Por definición, no tienen censo hoy
+          0 as tiene_censo_hoy,
           CASE 
             WHEN EXISTS(
               SELECT 1 FROM dynamic_form_response 
@@ -151,7 +144,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
           SELECT 1 FROM censo_activo 
           WHERE cliente_id = c.id 
           AND DATE(fecha_revision) = DATE('now', 'localtime')
-          AND estado_censo = 'completed'
+          AND estado_censo != 'error'
         )
         ORDER BY ${getDefaultOrderBy()}
       ''';
@@ -165,7 +158,6 @@ class ClienteRepository extends BaseRepository<Cliente> {
     }
   }
 
-  /// Obtiene clientes que NO han completado formulario hoy
   Future<List<Cliente>> obtenerConFormularioPendiente() async {
     try {
       final sql = '''
@@ -176,11 +168,11 @@ class ClienteRepository extends BaseRepository<Cliente> {
               SELECT 1 FROM censo_activo 
               WHERE cliente_id = c.id 
               AND DATE(fecha_revision) = DATE('now', 'localtime')
-              AND estado_censo = 'completed'
+              AND estado_censo != 'error'
             ) THEN 1 ELSE 0 
           END as tiene_censo_hoy,
           
-          0 as tiene_formulario_completo  -- Por definición, no tienen formulario hoy
+          0 as tiene_formulario_completo
            
         FROM $tableName c
         WHERE NOT EXISTS(
@@ -201,7 +193,6 @@ class ClienteRepository extends BaseRepository<Cliente> {
     }
   }
 
-  /// Obtiene clientes completamente atendidos HOY (censo + formulario)
   Future<List<Cliente>> obtenerCompletados() async {
     try {
       final sql = '''
@@ -215,7 +206,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
           SELECT 1 FROM censo_activo 
           WHERE cliente_id = c.id 
           AND DATE(fecha_revision) = DATE('now', 'localtime')
-          AND estado_censo = 'completed'
+          AND estado_censo != 'error'
         )
         AND EXISTS(
           SELECT 1 FROM dynamic_form_response 
@@ -235,29 +226,24 @@ class ClienteRepository extends BaseRepository<Cliente> {
     }
   }
 
-  /// Obtiene estadísticas de estado de todos los clientes HOY
   @override
   Future<Map<String, dynamic>> obtenerEstadisticas() async {
     try {
-      // Obtener estadísticas básicas del BaseRepository
       final statsBase = await super.obtenerEstadisticas();
 
-      // Agregar estadísticas específicas de estado HOY
       final sql = '''
         SELECT 
           COUNT(*) as total_clientes,
           
-          -- Censos completados hoy
           SUM(CASE 
             WHEN EXISTS(
               SELECT 1 FROM censo_activo 
               WHERE cliente_id = clientes.id 
               AND DATE(fecha_revision) = DATE('now', 'localtime')
-              AND estado_censo = 'completed'
+              AND estado_censo != 'error'
             ) THEN 1 ELSE 0 
           END) as con_censo_hoy,
           
-          -- Formularios completados hoy
           SUM(CASE 
             WHEN EXISTS(
               SELECT 1 FROM dynamic_form_response 
@@ -267,13 +253,12 @@ class ClienteRepository extends BaseRepository<Cliente> {
             ) THEN 1 ELSE 0 
           END) as con_formulario_hoy,
           
-          -- Clientes completamente atendidos hoy (ambos)
           SUM(CASE 
             WHEN EXISTS(
               SELECT 1 FROM censo_activo 
               WHERE cliente_id = clientes.id 
               AND DATE(fecha_revision) = DATE('now', 'localtime')
-              AND estado_censo = 'completed'
+              AND estado_censo != 'error'
             )
             AND EXISTS(
               SELECT 1 FROM dynamic_form_response 
@@ -289,7 +274,6 @@ class ClienteRepository extends BaseRepository<Cliente> {
       final result = await consultarPersonalizada(sql);
       final row = result.first;
 
-      // Combinar estadísticas
       return {
         ...statsBase,
         'conCensoHoy': row['con_censo_hoy'] as int,
@@ -304,42 +288,33 @@ class ClienteRepository extends BaseRepository<Cliente> {
     }
   }
 
-  // ========== MÉTODOS ESPECÍFICOS ORIGINALES ==========
-
-  /// Busca cliente por RUC/CI específico
   Future<Cliente?> obtenerPorRucCi(String rucCi) async {
     final clientes = await buscar(rucCi);
     return clientes.isNotEmpty ? clientes.first : null;
   }
 
-  /// Verifica si existe un cliente con el RUC/CI dado
   Future<bool> existeRucCi(String rucCi) async {
     final clientes = await buscar(rucCi);
     return clientes.isNotEmpty;
   }
 
-  /// Obtiene clientes por código específico
   Future<List<Cliente>> obtenerPorCodigo(int codigo) async {
     return await buscar(codigo.toString());
   }
 
-  /// Verifica si existe un cliente con el código dado
   Future<bool> existeCodigo(int codigo) async {
     final clientes = await obtenerPorCodigo(codigo);
     return clientes.isNotEmpty;
   }
 
-  // ✅ MÉTODO ÚTIL PARA DEBUG - VERIFICAR SI LAS TABLAS REALES EXISTEN
   Future<bool> verificarTablasEstado() async {
     try {
       final db = await dbHelper.database;
 
-      // Verificar tabla censo_activo
       final censoActivo = await db.rawQuery(
           "SELECT name FROM sqlite_master WHERE type='table' AND name='censo_activo'"
       );
 
-      // Verificar tabla dynamic_form_response
       final dynamicFormResponse = await db.rawQuery(
           "SELECT name FROM sqlite_master WHERE type='table' AND name='dynamic_form_response'"
       );
@@ -357,9 +332,8 @@ class ClienteRepository extends BaseRepository<Cliente> {
     }
   }
 
-  // ✅ MÉTODO PARA VERIFICAR ESQUEMA COMPLETO
   Future<void> verificarEsquemaCompleto() async {
-    await debugEsquemaTabla(); // Del BaseRepository
+    await debugEsquemaTabla();
 
     try {
       final tieneTablasEstado = await verificarTablasEstado();
