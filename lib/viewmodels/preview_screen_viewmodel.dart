@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'dart:io';
+import 'dart:async';
 import 'package:uuid/uuid.dart';
 import '../../models/cliente.dart';
 import '../../models/usuario.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
+import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
-import 'package:ada_app/repositories/censo_activo_foto_repository.dart'; // ✅ NUEVO
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/services/auth_service.dart';
-import 'package:ada_app/services/sync/base_sync_service.dart';
-import 'dart:async';
-import 'package:path_provider/path_provider.dart';
+import 'package:ada_app/services/censo/censo_log_service.dart';
+import 'package:ada_app/services/censo/censo_upload_service.dart';
+import 'package:ada_app/services/censo/censo_api_mapper.dart';
+import 'package:ada_app/services/censo/censo_foto_service.dart';
 
 final _logger = Logger();
 final Uuid _uuid = const Uuid();
@@ -23,40 +22,44 @@ class PreviewScreenViewModel extends ChangeNotifier {
   String? _statusMessage;
   bool _isProcessing = false;
   String? _currentProcessId;
-  String _ultimoCodigoBuscado = '';
 
   final EquipoRepository _equipoRepository = EquipoRepository();
   final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
-  final CensoActivoFotoRepository _fotoRepository = CensoActivoFotoRepository(); // ✅ NUEVO
+  final CensoActivoFotoRepository _fotoRepository = CensoActivoFotoRepository();
   final EquipoPendienteRepository _equipoPendienteRepository = EquipoPendienteRepository();
+
   final AuthService _authService = AuthService();
+
+  // Nuevos servicios
+  late final CensoLogService _logService;
+  late final CensoUploadService _uploadService;
+
+  late final CensoFotoService _fotoService;
 
   Usuario? _usuarioActual;
 
-  static const String _baseUrl = 'http://200.85.60.250:28080/adaControl';
-  static const String _estadosEndpoint = '/censoActivo/insertCensoActivo';
+  PreviewScreenViewModel() {
+    _logService = CensoLogService();
+    _fotoService = CensoFotoService();
+    _uploadService = CensoUploadService(
+      estadoEquipoRepository: _estadoEquipoRepository,
+      fotoRepository: _fotoRepository,
+      logService: _logService,
+    );
+  }
 
   bool get isSaving => _isSaving;
   String? get statusMessage => _statusMessage;
   bool get canConfirm => !_isProcessing && !_isSaving;
 
-  // HELPER para formatear fechas en zona horaria local (sin UTC)
-  String _formatearFechaLocal(DateTime fecha) {
-    final local = fecha.toLocal();
-    return local.toIso8601String().replaceAll('Z', '');
-  }
-
   Future<int> get _getUsuarioId async {
     if (_usuarioActual != null && _usuarioActual!.id != null) {
       return _usuarioActual!.id!;
     }
-
     _usuarioActual = await _authService.getCurrentUser();
-
     if (_usuarioActual?.id != null) {
       return _usuarioActual!.id!;
     }
-
     _logger.w('No se pudo obtener usuario, usando ID 1 como fallback');
     return 1;
   }
@@ -65,7 +68,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     if (_usuarioActual != null) {
       return _usuarioActual!.edfVendedorId;
     }
-
     _usuarioActual = await _authService.getCurrentUser();
     return _usuarioActual?.edfVendedorId;
   }
@@ -95,31 +97,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  int _convertirAInt(dynamic valor, String nombreCampo) {
-    if (valor == null) throw 'El campo $nombreCampo es null';
-    if (valor is int) return valor;
-    if (valor is String) {
-      if (valor.isEmpty) throw 'El campo $nombreCampo está vacío';
-      final int? parsed = int.tryParse(valor);
-      if (parsed != null) return parsed;
-      throw 'El campo $nombreCampo ("$valor") no es un número válido';
-    }
-    if (valor is double) return valor.toInt();
-    throw 'El campo $nombreCampo tiene un tipo no soportado: ${valor.runtimeType}';
-  }
-
-  int? _safeCastToInt(dynamic value, String fieldName) {
-    try {
-      if (value == null) return null;
-      if (value is int) return value;
-      if (value is String) return int.tryParse(value);
-      if (value is double) return value.toInt();
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-
   Future<Map<String, dynamic>> confirmarRegistro(Map<String, dynamic> datos) async {
     if (_isProcessing) {
       return {
@@ -144,15 +121,14 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Future<Map<String, dynamic>> _ejecutarConfirmacion(
       Map<String, dynamic> datos,
-      String processId
+      String processId,
       ) async {
     _setSaving(true);
     _setStatusMessage(null);
     String? estadoIdActual;
-    String? imagenId1, imagenId2;
 
     try {
-      _logger.i('Confirmando registro [Process: $processId]');
+      _logger.i('🔄 Confirmando registro [Process: $processId]');
 
       if (_currentProcessId != processId) {
         return {'success': false, 'error': 'Proceso cancelado'};
@@ -163,665 +139,227 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final esNuevoEquipo = datos['es_nuevo_equipo'] as bool? ?? false;
       var equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
 
-      if (cliente == null) throw 'Cliente no encontrado en los datos';
-      if (cliente.id == null) throw 'El cliente no tiene ID asignado';
+      if (cliente == null) throw 'Cliente no encontrado';
+      if (cliente.id == null) throw 'El cliente no tiene ID';
 
       final usuarioId = await _getUsuarioId;
+      final clienteId = _convertirAInt(cliente.id, 'cliente_id');
 
+      // CREAR EQUIPO NUEVO SI CORRESPONDE
       String equipoId;
-      int clienteId = _convertirAInt(cliente.id, 'cliente_id');
-
-      // CASO 3: EQUIPO NUEVO - Crear en tabla equipos
       if (esNuevoEquipo) {
-        _setStatusMessage('Registrando equipo nuevo en el sistema...');
-
-        if (_currentProcessId != processId) {
-          return {'success': false, 'error': 'Proceso cancelado'};
-        }
-
-        try {
-          equipoId = await _equipoRepository.crearEquipoNuevo(
-            codigoBarras: datos['codigo_barras']?.toString() ?? '',
-            marcaId: _safeCastToInt(datos['marca_id'], 'marca_id') ?? 1,
-            modeloId: _safeCastToInt(datos['modelo_id'], 'modelo_id') ?? 1,
-            numeroSerie: datos['numero_serie']?.toString(),
-            logoId: _safeCastToInt(datos['logo_id'], 'logo_id') ?? 1,
-          );
-
-          _logger.i('Equipo nuevo creado con ID: $equipoId');
-
-          equipoCompleto = {
-            'id': equipoId,
-            'cod_barras': datos['codigo_barras'],
-            'marca_id': datos['marca_id'],
-            'modelo_id': datos['modelo_id'],
-            'modelo_nombre': datos['modelo'],
-            'numero_serie': datos['numero_serie'],
-            'logo_id': datos['logo_id'],
-            'logo_nombre': datos['logo'],
-            'marca_nombre': datos['marca'] ?? 'Sin marca',
-            'cliente_id': clienteId,
-            'app_insert': 1,
-          };
-
-        } catch (e) {
-          _logger.e('Error creando equipo nuevo: $e');
-          throw 'Error registrando equipo nuevo: $e';
-        }
+        equipoId = await _crearEquipoNuevo(datos, clienteId, processId);
+        equipoCompleto = _construirEquipoCompleto(datos, equipoId, clienteId);
       } else {
         if (equipoCompleto == null) throw 'No se encontró información del equipo';
-        if (equipoCompleto['id'] == null) throw 'El equipo no tiene ID asignado';
+        if (equipoCompleto['id'] == null) throw 'El equipo no tiene ID';
         equipoId = equipoCompleto['id'].toString();
       }
 
-      _setStatusMessage('Verificando estado del equipo...');
-
-      if (_currentProcessId != processId) {
-        return {'success': false, 'error': 'Proceso cancelado'};
-      }
-
-      // Verificar asignación
-      final yaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(
-          equipoId,
-          clienteId
+      // VERIFICAR Y REGISTRAR ASIGNACIÓN
+      final yaAsignado = await _verificarYRegistrarAsignacion(
+        equipoId,
+        clienteId,
+        processId,
       );
-      _logger.i('Equipo $equipoId ya asignado: $yaAsignado');
 
-      // CASO 2 y CASO 3: Crear equipo_pendiente si NO está asignado
-      if (!yaAsignado) {
-        _setStatusMessage('Registrando equipo pendiente de asignación...');
+      // CREAR CENSO EN BD LOCAL
+      estadoIdActual = await _crearCensoLocal(
+        equipoId: equipoId,
+        clienteId: clienteId,
+        datos: datos,
+        processId: processId,
+      );
 
-        if (_currentProcessId != processId) {
-          return {'success': false, 'error': 'Proceso cancelado'};
-        }
-
-        try {
-          _logger.i('Crear registro pendiente - Equipo NO asignado a este cliente');
-          await _equipoPendienteRepository.procesarEscaneoCenso(
-              equipoId: equipoId,
-              clienteId: clienteId
-          );
-          _logger.i('Registro pendiente creado exitosamente');
-        } catch (e) {
-          _logger.w('Error registrando equipo pendiente: $e');
-        }
-      } else {
-        _logger.i('Equipo ya asignado - no se crea registro pendiente');
-      }
-
-      // ✅ CREAR ESTADO EN CENSO_ACTIVO (SIN IMÁGENES)
-      _setStatusMessage('Registrando censo...');
-
-      if (_currentProcessId != processId) {
-        return {'success': false, 'error': 'Proceso cancelado'};
-      }
-
-      try {
-        final now = DateTime.now().toLocal();
-
-        // ✅ CREAR CENSO SIN IMÁGENES
-        final estadoCreado = await _estadoEquipoRepository.crearNuevoEstado(
-          equipoId: equipoId,
-          clienteId: clienteId,
-          latitud: datos['latitud'],
-          longitud: datos['longitud'],
-          fechaRevision: now,
-          enLocal: true,
-          observaciones: datos['observaciones']?.toString(),
-          // ❌ NO PASAR IMÁGENES AQUÍ
-        );
-
-        if (estadoCreado.id != null) {
-          estadoIdActual = estadoCreado.id!;
-          _logger.i('✅ Estado creado con UUID: $estadoIdActual');
-
-          // ✅ DEBUG: Verificar que los datos tienen imágenes
-          _logger.i('🔍 DEBUG - tiene_imagen: ${datos['tiene_imagen']}');
-          _logger.i('🔍 DEBUG - imagen_base64 != null: ${datos['imagen_base64'] != null}');
-          _logger.i('🔍 DEBUG - imagen_base64 length: ${datos['imagen_base64']?.toString().length ?? 0}');
-          _logger.i('🔍 DEBUG - tiene_imagen2: ${datos['tiene_imagen2']}');
-          _logger.i('🔍 DEBUG - imagen_base64_2 != null: ${datos['imagen_base64_2'] != null}');
-          _logger.i('🔍 DEBUG - imagen_base64_2 length: ${datos['imagen_base64_2']?.toString().length ?? 0}');
-
-          // ✅ GUARDAR FOTOS POR SEPARADO
-          _logger.i('📸 Llamando a _guardarFotosDelCenso...');
-          await _guardarFotosDelCenso(estadoIdActual, datos);
-          _logger.i('📸 _guardarFotosDelCenso completado');
-
-          try {
-            final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoIdActual);
-            if (fotos.isNotEmpty) {
-              imagenId1 = fotos[0].id; // Primera foto
-              if (fotos.length > 1) {
-                imagenId2 = fotos[1].id; // Segunda foto
-              }
-            }
-            _logger.i('📷 IDs obtenidos - Foto 1: $imagenId1, Foto 2: $imagenId2');
-          } catch (e) {
-            _logger.w('Error obteniendo IDs de fotos: $e');
-          }
-
-        } else {
-          _logger.w('Estado creado pero sin ID asignado');
-          estadoIdActual = null;
-        }
-      } catch (dbError) {
-        _logger.e('Error al crear estado: $dbError');
-        throw 'Error creando censo: $dbError';
-      }
-
-      // Preparar datos y lanzar POST en background
-      _setStatusMessage('Preparando sincronización...');
-
-      if (estadoIdActual != null) {
-        final now = DateTime.now().toLocal();
-        final timestampId = _uuid.v4();
-
-        final datosCompletos = {
-          'id_local': estadoIdActual,
-          'timestamp_id': timestampId,
-          'estado_sincronizacion': 'pendiente',
-          'fecha_creacion_local': _formatearFechaLocal(now),
-          'equipo_id': equipoId,
-          'cliente_id': clienteId,
-          'usuario_id': usuarioId,
-          'funcionando': true,
-          'estado_general': 'Equipo registrado desde APP móvil - ${datos['observaciones'] ?? 'Censo registrado'}',
-          'latitud': datos['latitud'],
-          'longitud': datos['longitud'],
-          'imagen_path': datos['imagen_path'],
-          'imagen_base64': datos['imagen_base64'],
-          'imagen_id_1': imagenId1, // ← NUEVO
-          'tiene_imagen': datos['tiene_imagen'] ?? false,
-          'imagen_tamano': datos['imagen_tamano'],
-          'imagen_path2': datos['imagen_path2'],
-          'imagen_base64_2': datos['imagen_base64_2'],
-          'imagen_id_2': imagenId2, // ← NUEVO
-          'tiene_imagen2': datos['tiene_imagen2'] ?? false,
-          'imagen_tamano2': datos['imagen_tamano2'],
-          'codigo_barras': equipoCompleto!['cod_barras'] ?? datos['codigo_barras'],
-          'numero_serie': equipoCompleto['numero_serie'] ?? datos['numero_serie'],
-          'modelo': equipoCompleto['modelo_nombre'] ?? datos['modelo'],
-          'logo': equipoCompleto['logo_nombre'] ?? datos['logo'],
-          'marca_nombre': equipoCompleto['marca_nombre'] ?? 'Sin marca',
-          'cliente_nombre': cliente.nombre,
-          'observaciones': datos['observaciones'],
-          'fecha_registro': datos['fecha_registro'],
-          'timestamp_gps': datos['timestamp_gps'],
-          'es_censo': esCenso,
-          'es_nuevo_equipo': esNuevoEquipo,
-          'ya_asignado': yaAsignado,
-          'version_app': '1.0.0',
-          'dispositivo': Platform.operatingSystem,
-          'fecha_revision': _formatearFechaLocal(now),
-          'en_local': true,
-        };
-
-        // Guardar registro local maestro
-        await _guardarRegistroLocal(datosCompletos);
-
-        // Lanzar sincronización en BACKGROUND (sin await)
-        _sincronizarEnBackground(estadoIdActual, datosCompletos);
-
-        _logger.i('Registro guardado localmente. Sincronización en segundo plano iniciada.');
-
-        // Retornar éxito inmediatamente
-        final mensajeFinal = esNuevoEquipo
-            ? 'Equipo nuevo registrado. Sincronizando en segundo plano...'
-            : 'Censo registrado. Sincronizando en segundo plano...';
-
-        return {
-          'success': true,
-          'message': mensajeFinal,
-          'migrado_inmediatamente': false,
-          'estado_id': estadoIdActual,
-          'equipo_completo': equipoCompleto,
-        };
-      } else {
+      if (estadoIdActual == null) {
         throw 'No se pudo crear el estado en la base de datos';
       }
 
+      // GUARDAR FOTOS Y OBTENER IDs
+      final idsImagenes = await _fotoService.guardarFotosDelCenso(estadoIdActual, datos);
+
+      // PREPARAR DATOS COMPLETOS
+      final datosCompletos = CensoApiMapper.prepararDatosCompletos(
+        estadoId: estadoIdActual,
+        equipoId: equipoId,
+        cliente: cliente,
+        usuarioId: usuarioId,
+        datosOriginales: datos,
+        equipoCompleto: equipoCompleto,
+        esCenso: esCenso,
+        esNuevoEquipo: esNuevoEquipo,
+        yaAsignado: yaAsignado,
+        imagenId1: idsImagenes['imagen_id_1'],
+        imagenId2: idsImagenes['imagen_id_2'],
+      );
+
+      // GUARDAR REGISTRO LOCAL
+      await _guardarRegistroLocal(datosCompletos);
+
+      // SINCRONIZAR EN BACKGROUND
+      _uploadService.sincronizarCensoEnBackground(estadoIdActual, datosCompletos);
+
+      _logger.i('✅ Registro guardado. Sincronización en segundo plano iniciada');
+
+      final mensajeFinal = esNuevoEquipo
+          ? 'Equipo nuevo registrado. Sincronizando en segundo plano...'
+          : 'Censo registrado. Sincronizando en segundo plano...';
+
+      return {
+        'success': true,
+        'message': mensajeFinal,
+        'migrado_inmediatamente': false,
+        'estado_id': estadoIdActual,
+        'equipo_completo': equipoCompleto,
+      };
     } catch (e) {
-      _logger.e('Error crítico en confirmación: $e');
+      _logger.e('❌ Error crítico en confirmación: $e');
       return {'success': false, 'error': 'Error guardando registro: $e'};
     } finally {
       _setSaving(false);
     }
   }
 
-  // ✅ NUEVO MÉTODO: Guardar fotos por separado en censo_activo_foto
-  Future<void> _guardarFotosDelCenso(String censoActivoId, Map<String, dynamic> datos) async {
+  // ==================== MÉTODOS AUXILIARES ====================
+
+  Future<String> _crearEquipoNuevo(
+      Map<String, dynamic> datos,
+      int clienteId,
+      String processId,
+      ) async {
+    _setStatusMessage('Registrando equipo nuevo...');
+
+    if (_currentProcessId != processId) {
+      throw 'Proceso cancelado';
+    }
+
     try {
-      _logger.i('📸 Guardando fotos para censo $censoActivoId');
+      final equipoId = await _equipoRepository.crearEquipoNuevo(
+        codigoBarras: datos['codigo_barras']?.toString() ?? '',
+        marcaId: _safeCastToInt(datos['marca_id'], 'marca_id') ?? 1,
+        modeloId: _safeCastToInt(datos['modelo_id'], 'modelo_id') ?? 1,
+        numeroSerie: datos['numero_serie']?.toString(),
+        logoId: _safeCastToInt(datos['logo_id'], 'logo_id') ?? 1,
+      );
 
-      // Guardar primera imagen si existe
-      final tieneImagen = datos['tiene_imagen'] ?? false;
-      if (tieneImagen && datos['imagen_base64'] != null) {
-        try {
-          await _fotoRepository.guardarFoto(
-            censoActivoId: censoActivoId,
-            imagenPath: datos['imagen_path'] as String?,
-            imagenBase64: datos['imagen_base64'] as String?,
-            imagenTamano: datos['imagen_tamano'] as int?,
-            orden: 1,
-          );
-          _logger.i('✅ Primera foto guardada para censo $censoActivoId');
-        } catch (e) {
-          _logger.e('❌ Error guardando primera foto: $e');
-        }
-      }
-
-      // Guardar segunda imagen si existe
-      final tieneImagen2 = datos['tiene_imagen2'] ?? false;
-      if (tieneImagen2 && datos['imagen_base64_2'] != null) {
-        try {
-          await _fotoRepository.guardarFoto(
-            censoActivoId: censoActivoId,
-            imagenPath: datos['imagen_path2'] as String?,
-            imagenBase64: datos['imagen_base64_2'] as String?,
-            imagenTamano: datos['imagen_tamano2'] as int?,
-            orden: 2,
-          );
-          _logger.i('✅ Segunda foto guardada para censo $censoActivoId');
-        } catch (e) {
-          _logger.e('❌ Error guardando segunda foto: $e');
-        }
-      }
-
-      _logger.i('📸 Proceso de guardado de fotos completado');
+      _logger.i('✅ Equipo nuevo creado: $equipoId');
+      return equipoId;
     } catch (e) {
-      _logger.e('❌ Error en _guardarFotosDelCenso: $e');
-      // No lanzar error para no interrumpir el flujo principal
+      _logger.e('❌ Error creando equipo: $e');
+      throw 'Error registrando equipo nuevo: $e';
     }
   }
 
-  // NUEVO MÉTODO: Sincronización en segundo plano
-  void _sincronizarEnBackground(String? estadoId, Map<String, dynamic> datos) async {
-    if (estadoId == null) {
-      _logger.e('No se puede sincronizar sin estadoId');
-      return;
-    }
-
-    // Ejecutar sin await para que no bloquee
-    Future.delayed(Duration.zero, () async {
-      try {
-        _logger.i('Iniciando sincronización en segundo plano para estado $estadoId');
-
-        // ✅ OBTENER FOTOS DE LA NUEVA TABLA
-        final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
-
-        // Agregar fotos a los datos
-        final datosConFotos = Map<String, dynamic>.from(datos);
-        if (fotos.isNotEmpty) {
-          datosConFotos['imagen_base64'] = fotos.first.imagenBase64;
-        }
-        if (fotos.length > 1) {
-          datosConFotos['imagen_base64_2'] = fotos[1].imagenBase64;
-        }
-
-        final datosApi = await _prepararDatosParaApiEstados(datosConFotos);
-        final respuestaServidor = await _enviarAApiEstadosConTimeout(datosApi, 10);
-
-        if (respuestaServidor['exito'] == true) {
-          await _estadoEquipoRepository.marcarComoMigrado(
-              estadoId,
-              servidorId: respuestaServidor['servidor_id']
-          );
-
-          // ✅ MARCAR FOTOS COMO SINCRONIZADAS
-          for (final foto in fotos) {
-            if (foto.id != null) {
-              await _fotoRepository.marcarComoSincronizada(foto.id!);
-            }
-          }
-
-          final idLocal = datos['id_local'] as String?;
-          if (idLocal != null) await _marcarComoSincronizado(idLocal);
-
-          _logger.i('✅ Sincronización en segundo plano exitosa para estado $estadoId con ${fotos.length} fotos');
-        } else {
-          await _estadoEquipoRepository.marcarComoError(
-              estadoId,
-              'Error: ${respuestaServidor['detalle'] ?? respuestaServidor['motivo']}'
-          );
-          _logger.w('Error en sincronización de segundo plano: ${respuestaServidor['motivo']}');
-        }
-      } catch (e) {
-        _logger.e('Excepción en sincronización de segundo plano: $e');
-        try {
-          await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción: $e');
-        } catch (_) {}
-      }
-
-      _programarSincronizacionBackground();
-    });
-  }
-
-  void cancelarProcesoActual() {
-    if (_isProcessing) {
-      _logger.i('Cancelando proceso actual: $_currentProcessId');
-      _currentProcessId = null;
-      _isProcessing = false;
-      _setSaving(false);
-      _setStatusMessage(null);
-    }
-  }
-
-  @override
-  void dispose() {
-    cancelarProcesoActual();
-    super.dispose();
-  }
-
-  Future<Map<String, dynamic>> _intentarEnviarAlServidorConTimeout(Map<String, dynamic> datos, {int timeoutSegundos = 8}) async {
-    try {
-      final datosApi = await _prepararDatosParaApiEstados(datos);
-      final response = await _enviarAApiEstadosConTimeout(datosApi, timeoutSegundos);
-
-      if (response['exito'] == true) {
-        return {'exito': true, 'servidor_id': response['id'], 'mensaje': response['mensaje']};
-      } else {
-        return {'exito': false, 'motivo': 'error_servidor', 'detalle': response['mensaje']};
-      }
-    } catch (e) {
-      return {'exito': false, 'motivo': 'timeout_o_error', 'detalle': e.toString()};
-    }
-  }
-
-  Future<Map<String, dynamic>> _enviarAApiEstadosConTimeout(Map<String, dynamic> datos, int timeoutSegundos) async {
-    try {
-      final baseUrl = await BaseSyncService.getBaseUrl();
-      final estadosEndpoint = '/censoActivo/insertCensoActivo';
-      final fullUrl = '$baseUrl$estadosEndpoint';
-
-      final timestamp = DateTime.now().toIso8601String();
-      final jsonBody = json.encode(datos);
-
-      // Log simplificado
-      _logger.i('POST a $fullUrl - Timeout: $timeoutSegundos s');
-      _logger.i('Payload size: ${jsonBody.length} caracteres');
-
-      // ✅ CAMBIO: SIEMPRE guardar log en archivo (no solo en debug)
-      try {
-        await _guardarLogEnArchivo(
-          url: fullUrl,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: datos,
-          timestamp: timestamp,
-        );
-      } catch (e) {
-        _logger.w('Error guardando log en archivo (no crítico): $e');
-      }
-
-      final response = await http.post(
-        Uri.parse(fullUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: jsonBody,
-      ).timeout(Duration(seconds: timeoutSegundos));
-
-      _logger.i('Response: ${response.statusCode} - ${response.reasonPhrase}');
-
-      // Procesar respuesta
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        dynamic servidorId = _uuid.v4();
-        String mensaje = 'Estado registrado correctamente';
-
-        try {
-          final responseBody = json.decode(response.body);
-          servidorId = responseBody['estado']?['id'] ??
-              responseBody['id'] ??
-              responseBody['insertId'] ??
-              servidorId;
-
-          if (responseBody['message'] != null) {
-            mensaje = responseBody['message'].toString();
-          }
-        } catch (e) {
-          _logger.w('No se pudo parsear response body: $e');
-        }
-
-        return {
-          'exito': true,
-          'id': servidorId,
-          'mensaje': mensaje
-        };
-      } else {
-        return {
-          'exito': false,
-          'mensaje': 'Error del servidor: ${response.statusCode}'
-        };
-      }
-
-    } catch (e) {
-      _logger.e('ERROR EN POST: $e');
-      return {
-        'exito': false,
-        'mensaje': 'Error de conexión: $e'
-      };
-    }
-  }
-
-  void _programarSincronizacionBackground() {
-    Timer(Duration(seconds: 5), () async {
-      try {
-        await _sincronizarRegistrosPendientesEnBackground();
-      } catch (e) {}
-    });
-  }
-
-  Future<void> _sincronizarRegistrosPendientesEnBackground() async {
-    try {
-      _logger.i('Iniciando sincronización automática de registros pendientes...');
-
-      final registrosPendientes = await _estadoEquipoRepository.obtenerCreados();
-
-      if (registrosPendientes.isEmpty) {
-        _logger.i('No hay registros pendientes de sincronización');
-        return;
-      }
-
-      _logger.i('Encontrados ${registrosPendientes.length} registros pendientes');
-
-      final usuarioId = await _getUsuarioId;
-
-      int exitosos = 0;
-      int fallidos = 0;
-
-      for (final registro in registrosPendientes) {
-        try {
-          // ✅ OBTENER FOTOS DEL CENSO
-          final fotos = await _fotoRepository.obtenerFotosPorCenso(registro.id!);
-
-          final datosParaApi = {
-            'fecha_revision': _formatearFechaLocal(registro.fechaRevision),
-            'equipo_id': (registro.equipoId ?? '').toString(),
-            'latitud': registro.latitud ?? 0.0,
-            'longitud': registro.longitud ?? 0.0,
-            'equipo_codigo_barras': '',
-            'equipo_numero_serie': '',
-            'equipo_modelo': '',
-            'equipo_marca': '',
-            'equipo_logo': '',
-            'cliente_nombre': '',
-            'usuario_id': usuarioId,
-            'funcionando': true,
-            'cliente_id': registro.clienteId,
-            'observaciones': registro.observaciones ?? 'Sincronización automática',
-
-            // ✅ INCLUIR FOTOS
-            'imageBase64_1': fotos.isNotEmpty ? fotos.first.imagenBase64 : null,
-            'imageBase64_2': fotos.length > 1 ? fotos[1].imagenBase64 : null,
-            'tiene_imagen': fotos.isNotEmpty,
-            'tiene_imagen2': fotos.length > 1,
-          };
-
-          final respuesta = await _enviarAApiEstadosConTimeout(datosParaApi, 5);
-
-          if (respuesta['exito'] == true) {
-            await _estadoEquipoRepository.marcarComoMigrado(
-                registro.id!,
-                servidorId: respuesta['id']
-            );
-
-            // ✅ MARCAR FOTOS COMO SINCRONIZADAS
-            for (final foto in fotos) {
-              if (foto.id != null) {
-                await _fotoRepository.marcarComoSincronizada(foto.id!);
-              }
-            }
-
-            exitosos++;
-            _logger.i('Registro ${registro.id} sincronizado exitosamente con ${fotos.length} fotos');
-          } else {
-            await _estadoEquipoRepository.marcarComoError(
-                registro.id!,
-                'Error del servidor: ${respuesta['mensaje']}'
-            );
-            fallidos++;
-            _logger.w('Error sincronizando registro ${registro.id}: ${respuesta['mensaje']}');
-          }
-
-        } catch (e) {
-          fallidos++;
-          _logger.e('Error procesando registro ${registro.id}: $e');
-
-          if (registro.id != null) {
-            await _estadoEquipoRepository.marcarComoError(
-                registro.id!,
-                'Excepción: $e'
-            );
-          }
-        }
-      }
-
-      _logger.i('Sincronización finalizada - Exitosos: $exitosos, Fallidos: $fallidos');
-
-    } catch (e) {
-      _logger.e('Error en sincronización automática: $e');
-    }
-  }
-
-  Future<Map<String, dynamic>> _prepararDatosParaEnvio(Map<String, dynamic> datos) async {
-    final cliente = datos['cliente'] as Cliente;
-    final equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
-    final idLocal = _uuid.v4();
-    final usuarioId = await _getUsuarioId;
-    final now = DateTime.now().toLocal();
-
+  Map<String, dynamic> _construirEquipoCompleto(
+      Map<String, dynamic> datos,
+      String equipoId,
+      int clienteId,
+      ) {
     return {
-      'id_local': idLocal,
-      'timestamp_id': idLocal,
-      'estado_sincronizacion': 'pendiente',
-      'fecha_creacion_local': _formatearFechaLocal(now),
-      'equipo_id': equipoCompleto?['id'],
-      'cliente_id': cliente.id,
-      'usuario_id': usuarioId,
-      'funcionando': true,
-      'estado_general': 'Equipo registrado desde APP móvil - ${datos['observaciones'] ?? 'Sin observaciones'}',
-      'observaciones': datos['observaciones'],
-      'latitud': datos['latitud'],
-      'longitud': datos['longitud'],
-      'codigo_barras': datos['codigo_barras'],
-      'modelo': datos['modelo'],
-      'logo': datos['logo'],
+      'id': equipoId,
+      'cod_barras': datos['codigo_barras'],
+      'marca_id': datos['marca_id'],
+      'modelo_id': datos['modelo_id'],
+      'modelo_nombre': datos['modelo'],
       'numero_serie': datos['numero_serie'],
-      'imagen_path': datos['imagen_path'],
-      'imagen_base64': datos['imagen_base64'],
-      'tiene_imagen': datos['tiene_imagen'] ?? false,
-      'imagen_tamano': datos['imagen_tamano'],
-      'imagen_path2': datos['imagen_path2'],
-      'imagen_base64_2': datos['imagen_base64_2'],
-      'tiene_imagen2': datos['tiene_imagen2'] ?? false,
-      'imagen_tamano2': datos['imagen_tamano2'],
-      'version_app': '1.0.0',
-      'dispositivo': Platform.operatingSystem,
+      'logo_id': datos['logo_id'],
+      'logo_nombre': datos['logo'],
+      'marca_nombre': datos['marca'] ?? 'Sin marca',
+      'cliente_id': clienteId,
+      'app_insert': 1,
     };
+  }
+
+  Future<bool> _verificarYRegistrarAsignacion(
+      String equipoId,
+      int clienteId,
+      String processId,
+      ) async {
+    _setStatusMessage('Verificando estado del equipo...');
+
+    if (_currentProcessId != processId) {
+      throw 'Proceso cancelado';
+    }
+
+    final yaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(
+      equipoId,
+      clienteId,
+    );
+
+    _logger.i('Equipo $equipoId ya asignado: $yaAsignado');
+
+    if (!yaAsignado) {
+      _setStatusMessage('Registrando equipo pendiente...');
+
+      if (_currentProcessId != processId) {
+        throw 'Proceso cancelado';
+      }
+
+      try {
+        await _equipoPendienteRepository.procesarEscaneoCenso(
+          equipoId: equipoId,
+          clienteId: clienteId,
+        );
+        _logger.i('✅ Registro pendiente creado');
+      } catch (e) {
+        _logger.w('⚠️ Error registrando pendiente: $e');
+      }
+    }
+
+    return yaAsignado;
+  }
+
+  Future<String?> _crearCensoLocal({
+    required String equipoId,
+    required int clienteId,
+    required Map<String, dynamic> datos,
+    required String processId,
+  }) async {
+    _setStatusMessage('Registrando censo...');
+
+    if (_currentProcessId != processId) {
+      throw 'Proceso cancelado';
+    }
+
+    try {
+      final now = DateTime.now().toLocal();
+
+      final estadoCreado = await _estadoEquipoRepository.crearNuevoEstado(
+        equipoId: equipoId,
+        clienteId: clienteId,
+        latitud: datos['latitud'],
+        longitud: datos['longitud'],
+        fechaRevision: now,
+        enLocal: true,
+        observaciones: datos['observaciones']?.toString(),
+      );
+
+      if (estadoCreado.id != null) {
+        _logger.i('✅ Estado creado: ${estadoCreado.id}');
+        return estadoCreado.id!;
+      } else {
+        _logger.w('⚠️ Estado creado sin ID');
+        return null;
+      }
+    } catch (e) {
+      _logger.e('❌ Error creando estado: $e');
+      throw 'Error creando censo: $e';
+    }
   }
 
   Future<void> _guardarRegistroLocal(Map<String, dynamic> datos) async {
     try {
-      _logger.i('Guardando registro maestro localmente con ID: ${datos['id_local']}');
+      _logger.i('💾 Guardando registro local: ${datos['id_local']}');
       await Future.delayed(const Duration(milliseconds: 500));
     } catch (e) {
       throw 'Error guardando datos localmente';
     }
   }
 
-  Future<Map<String, dynamic>> _prepararDatosParaApiEstados(
-      Map<String, dynamic> datosLocales
-      ) async {
-    final usuarioId = await _getUsuarioId;
-    final edfVendedorId = await _getEdfVendedorId;
-    final now = DateTime.now().toLocal();
+  // ==================== MÉTODOS PÚBLICOS DE SINCRONIZACIÓN ====================
 
-    // ✅ NUEVO: Array de fotos con IDs
-    final fotos = <Map<String, dynamic>>[];
-
-    // Agregar primera imagen si existe
-    if (datosLocales['tiene_imagen'] == true && datosLocales['imagen_base64'] != null) {
-      fotos.add({
-        'id': datosLocales['imagen_id_1'], // ← ID de la imagen
-        'base64': datosLocales['imagen_base64'],
-        'path': datosLocales['imagen_path'],
-        'tamano': datosLocales['imagen_tamano'],
-      });
-    }
-
-    // Agregar segunda imagen si existe
-    if (datosLocales['tiene_imagen2'] == true && datosLocales['imagen_base64_2'] != null) {
-      fotos.add({
-        'id': datosLocales['imagen_id_2'], // ← ID de la imagen
-        'base64': datosLocales['imagen_base64_2'],
-        'path': datosLocales['imagen_path2'],
-        'tamano': datosLocales['imagen_tamano2'],
-      });
-    }
-
-    return {
-      'id': datosLocales['timestamp_id']?.toString() ?? _uuid.v4(),
-      'edfVendedorSucursalId': '$edfVendedorId',
-      'edfEquipoId': (datosLocales['equipo_id'] ?? '').toString(),
-      'usuarioId': usuarioId,
-      'edfClienteId': datosLocales['cliente_id'] ?? 0,
-      'fecha_revision': datosLocales['fecha_revision'] ?? _formatearFechaLocal(now),
-      'latitud': datosLocales['latitud'] ?? 0.0,
-      'longitud': datosLocales['longitud'] ?? 0.0,
-      'enLocal': datosLocales['en_local'] ?? true,
-      'fechaDeRevision': datosLocales['fecha_revision'] ?? _formatearFechaLocal(now),
-      'estadoCenso': datosLocales['ya_asignado'] == true ? 'asignado' : 'pendiente',
-      'esNuevoEquipo': datosLocales['es_nuevo_equipo'] ?? false,
-
-      // ✅ NUEVO: Array de fotos con IDs
-      'fotos': fotos,
-      'total_imagenes': fotos.length,
-
-      // Resto de campos del censo
-      'observaciones': datosLocales['observaciones'] ?? '',
-      'estado_general': datosLocales['estado_general'] ?? '',
-      'usuario_id': usuarioId,
-      'cliente_id': datosLocales['cliente_id'] ?? 0,
-      'equipo_id': (datosLocales['equipo_id'] ?? '').toString(),
-      'equipo_codigo_barras': datosLocales['codigo_barras'] ?? '',
-      'equipo_numero_serie': datosLocales['numero_serie'] ?? '',
-      'equipo_modelo': datosLocales['modelo'] ?? '',
-      'equipo_marca': datosLocales['marca_nombre'] ?? '',
-      'equipo_logo': datosLocales['logo'] ?? '',
-      'cliente_nombre': datosLocales['cliente_nombre'] ?? '',
-      'en_local': datosLocales['en_local'] ?? true,
-      'dispositivo': datosLocales['dispositivo'] ?? 'android',
-      'es_censo': datosLocales['es_censo'] ?? true,
-      'version_app': datosLocales['version_app'] ?? '1.0.0',
-    };
-  }
-
-  Future<bool> verificarSincronizacionPendiente(String? estadoId) async {
-    if (estadoId == null) return false;
+  Future<Map<String, dynamic>> verificarSincronizacionPendiente(String? estadoId) async {
+    if (estadoId == null) return {'pendiente': false};
 
     try {
       final maps = await _estadoEquipoRepository.dbHelper.consultar(
@@ -831,19 +369,18 @@ class PreviewScreenViewModel extends ChangeNotifier {
         limit: 1,
       );
 
-      if (maps.isEmpty) return false;
+      if (maps.isEmpty) return {'pendiente': false};
 
       final estado = maps.first;
       final estadoCenso = estado['estado_censo'] as String?;
       final sincronizado = estado['sincronizado'] as int?;
 
-      final estaPendiente = (estadoCenso == 'creado' || estadoCenso == 'error') &&
-          sincronizado == 0;
-
-      return estaPendiente;
+      return {
+        'pendiente': (estadoCenso == 'creado' || estadoCenso == 'error') && sincronizado == 0,
+      };
     } catch (e) {
-      _logger.e('Error verificando sincronización: $e');
-      return false;
+      _logger.e('❌ Error verificando sincronización: $e');
+      return {'pendiente': false};
     }
   }
 
@@ -870,7 +407,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         return {
           'pendiente': false,
           'estado': 'no_encontrado',
-          'mensaje': 'Estado no encontrado en base de datos',
+          'mensaje': 'Estado no encontrado',
           'icono': Icons.error_outline,
           'color': Colors.grey,
         };
@@ -912,7 +449,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         'observaciones': estado['observaciones'],
       };
     } catch (e) {
-      _logger.e('Error obteniendo info de sincronización: $e');
+      _logger.e('❌ Error obteniendo info: $e');
       return {
         'pendiente': false,
         'estado': 'error',
@@ -924,324 +461,62 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> reintentarEnvio(String estadoId) async {
-    try {
-      _logger.i('Reintentando envío del estado ID: $estadoId');
+    final usuarioId = await _getUsuarioId;
+    final edfVendedorId = await _getEdfVendedorId;
 
-      final maps = await _estadoEquipoRepository.dbHelper.consultar(
-        'censo_activo',
-        where: 'id = ?',
-        whereArgs: [estadoId],
-        limit: 1,
-      );
-
-      if (maps.isEmpty) {
-        return {
-          'success': false,
-          'error': 'No se encontró el registro en la base de datos'
-        };
-      }
-
-      final estadoMap = maps.first;
-      final usuarioId = await _getUsuarioId;
-      final edfVendedorId = await _getEdfVendedorId;
-      final now = DateTime.now().toLocal();
-      final timestampId = _uuid.v4();
-
-      // ✅ OBTENER FOTOS DE LA NUEVA TABLA
-      final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
-
-      _logger.i('📸 Fotos encontradas para reintento: ${fotos.length}');
-
-      final datosParaApi = {
-        'id': timestampId.toString(),
-        'edfVendedorSucursalId': edfVendedorId ?? '',
-        'edfEquipoId': estadoMap['equipo_id']?.toString() ?? '',
-        'usuarioId': usuarioId,
-        'edfClienteId': estadoMap['cliente_id'] ?? 0,
-        'fecha_revision': estadoMap['fecha_revision'] ?? _formatearFechaLocal(now),
-        'latitud': estadoMap['latitud'] ?? 0.0,
-        'longitud': estadoMap['longitud'] ?? 0.0,
-        'enLocal': true,
-        'fechaDeRevision': estadoMap['fecha_revision'] ?? _formatearFechaLocal(now),
-        'estadoCenso': 'pendiente',
-        'observaciones': estadoMap['observaciones'] ?? '',
-
-        // ✅ USAR FOTOS DE LA NUEVA TABLA
-        'imageBase64_1': fotos.isNotEmpty ? fotos.first.imagenBase64 : null,
-        'imageBase64_2': fotos.length > 1 ? fotos[1].imagenBase64 : null,
-        'tiene_imagen': fotos.isNotEmpty,
-        'tiene_imagen2': fotos.length > 1,
-
-        'equipo_codigo_barras': '',
-        'equipo_numero_serie': '',
-        'equipo_modelo': '',
-        'equipo_marca': '',
-        'equipo_logo': '',
-        'cliente_nombre': '',
-        'usuario_id': usuarioId,
-        'cliente_id': estadoMap['cliente_id'] ?? 0,
-      };
-
-      final respuesta = await _enviarAApiEstadosConTimeout(datosParaApi, 8);
-
-      if (respuesta['exito'] == true) {
-        await _estadoEquipoRepository.marcarComoMigrado(
-          estadoId,
-          servidorId: respuesta['id'],
-        );
-
-        // ✅ MARCAR FOTOS COMO SINCRONIZADAS Y LIMPIAR BASE64
-        for (final foto in fotos) {
-          if (foto.id != null) {
-            await _fotoRepository.marcarComoSincronizada(foto.id!);
-          }
-        }
-
-        _logger.i('✅ Reenvío exitoso del estado $estadoId con ${fotos.length} fotos');
-
-        return {
-          'success': true,
-          'message': 'Registro sincronizado correctamente'
-        };
-      } else {
-        await _estadoEquipoRepository.marcarComoError(
-            estadoId,
-            'Error del servidor: ${respuesta['mensaje']}'
-        );
-
-        _logger.w('Fallo en reenvío: ${respuesta['mensaje']}');
-
-        return {
-          'success': false,
-          'error': 'Error del servidor: ${respuesta['mensaje']}'
-        };
-      }
-    } catch (e) {
-      _logger.e('Error en reintento de envío: $e');
-
-      try {
-        await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción: $e');
-      } catch (_) {}
-
-      return {
-        'success': false,
-        'error': 'Error al reintentar: $e'
-      };
-    }
+    return await _uploadService.reintentarEnvioCenso(
+      estadoId,
+      usuarioId,
+      edfVendedorId,
+    );
   }
 
-  Future<void> _marcarComoSincronizado(String idLocal) async {
-    try {
-      _logger.i('Registro marcado como sincronizado: $idLocal');
-    } catch (e) {}
-  }
-
-  Future<void> _guardarLogEnArchivo({
-    required String url,
-    required Map<String, String> headers,
-    required Map<String, dynamic> body,
-    required String timestamp,
-    String? censoActivoId,
-  }) async {
-    try {
-      Directory? downloadsDir;
-
-      if (Platform.isAndroid) {
-        downloadsDir = Directory('/storage/emulated/0/Download');
-
-        if (!await downloadsDir.exists()) {
-          final externalDir = await getExternalStorageDirectory();
-          downloadsDir = Directory('${externalDir?.path}/Download');
-        }
-      } else if (Platform.isIOS) {
-        downloadsDir = await getApplicationDocumentsDirectory();
-      }
-
-      if (downloadsDir == null) {
-        _logger.w('No se pudo obtener directorio de descargas');
-        return;
-      }
-
-      if (!await downloadsDir.exists()) {
-        await downloadsDir.create(recursive: true);
-      }
-
-      final now = DateTime.now();
-      final fechaFormateada =
-          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_' +
-              '${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}_' +
-              '${now.second.toString().padLeft(2, '0')}';
-
-      final fileName = 'censo_activo_post_${fechaFormateada}.txt';
-      final file = File('${downloadsDir.path}/$fileName');
-
-      final buffer = StringBuffer();
-
-      final separadorLargo = '=' * 80;
-      final separadorCorto = '-' * 40;
-
-      buffer.writeln(separadorLargo);
-      buffer.writeln('CENSO ACTIVO - POST REQUEST LOG');
-      buffer.writeln(separadorLargo);
-      buffer.writeln('Timestamp: $timestamp');
-      buffer.writeln('URL: $url');
-      buffer.writeln('Archivo: ${file.path}');
-      buffer.writeln('');
-
-      // Headers
-      buffer.writeln(separadorCorto);
-      buffer.writeln('HEADERS:');
-      buffer.writeln(separadorCorto);
-      headers.forEach((key, value) {
-        buffer.writeln('$key: $value');
-      });
-      buffer.writeln('');
-
-      // Resumen del censo
-      buffer.writeln(separadorCorto);
-      buffer.writeln('RESUMEN DEL CENSO:');
-      buffer.writeln(separadorCorto);
-      buffer.writeln('Equipo ID: ${body['edfEquipoId'] ?? body['equipo_id'] ?? 'N/A'}');
-      buffer.writeln('Cliente ID: ${body['edfClienteId'] ?? body['cliente_id'] ?? 'N/A'}');
-      buffer.writeln('Usuario ID: ${body['usuarioId'] ?? body['usuario_id'] ?? 'N/A'}');
-      buffer.writeln('Latitud: ${body['latitud'] ?? 'N/A'}');
-      buffer.writeln('Longitud: ${body['longitud'] ?? 'N/A'}');
-      buffer.writeln('Es nuevo equipo: ${body['esNuevoEquipo'] ?? false}');
-      buffer.writeln('Tiene imagen 1: ${body['tiene_imagen'] ?? false}');
-      buffer.writeln('Tiene imagen 2: ${body['tiene_imagen2'] ?? false}');
-
-      // Tamaños de imágenes si existen
-      if (body['imageBase64_1'] != null) {
-        final tamano1 = body['imageBase64_1'].toString().length;
-        buffer.writeln('Tamaño imagen 1: $tamano1 caracteres (${(tamano1 / 1024).toStringAsFixed(1)} KB)');
-      }
-      if (body['imageBase64_2'] != null) {
-        final tamano2 = body['imageBase64_2'].toString().length;
-        buffer.writeln('Tamaño imagen 2: $tamano2 caracteres (${(tamano2 / 1024).toStringAsFixed(1)} KB)');
-      }
-
-      buffer.writeln('Observaciones: ${body['observaciones'] ?? 'N/A'}');
-      buffer.writeln('Estado censo: ${body['estadoCenso'] ?? 'N/A'}');
-      buffer.writeln('Fecha revision: ${body['fecha_revision'] ?? 'N/A'}');
-      buffer.writeln('En local: ${body['enLocal'] ?? body['en_local'] ?? 'N/A'}');
-      buffer.writeln('');
-
-      // JSON simplificado CON UUIDs de fotos incluidos
-      buffer.writeln(separadorCorto);
-      buffer.writeln('REQUEST BODY COMPLETO (JSON):');
-      buffer.writeln(separadorCorto);
-
-      // Crear versión simplificada del body
-      final bodySimplificado = <String, dynamic>{};
-      body.forEach((key, value) {
-        // Excluir estructuras anidadas complejas
-        if (key != 'equipo' && key != 'cliente' && key != 'imagenes' && key != 'metadata') {
-          bodySimplificado[key] = value;
-        }
-      });
-
-      if (censoActivoId != null) {
-        try {
-          final fotos = await _fotoRepository.obtenerFotosPorCenso(censoActivoId);
-          if (fotos.isNotEmpty) {
-            final fotosInfo = <Map<String, dynamic>>[];
-            for (final foto in fotos) {
-              fotosInfo.add({
-                'uuid': foto.id ?? 'N/A',
-                'path': foto.imagenPath ?? '',
-                'tamano': foto.imagenTamano ?? 0,
-              });
-            }
-            bodySimplificado['fotos_censo_activo_foto'] = fotosInfo;
-          }
-        } catch (e) {
-          _logger.w('No se pudieron obtener fotos para el log: $e');
-        }
-      }
-
-      final prettyJson = JsonEncoder.withIndent('  ').convert(bodySimplificado);
-      buffer.writeln(prettyJson);
-      buffer.writeln('');
-
-      buffer.writeln(separadorLargo);
-      buffer.writeln('FIN DEL LOG - ${DateTime.now().toLocal()}');
-      buffer.writeln(separadorLargo);
-
-      await file.writeAsString(buffer.toString());
-
-      _logger.i('📁 Log guardado en Downloads: $fileName');
-      _logger.i('📍 Ruta completa: ${file.path}');
-
-    } catch (e) {
-      _logger.e('Error guardando log en archivo: $e');
-    }
-  }
+  // ==================== LOGS ====================
 
   Future<List<String>> obtenerLogsGuardados() async {
-    try {
-      Directory? downloadsDir;
+    return await _logService.obtenerLogsGuardados();
+  }
 
-      if (Platform.isAndroid) {
-        downloadsDir = Directory('/storage/emulated/0/Download');
-        if (!await downloadsDir.exists()) {
-          final externalDir = await getExternalStorageDirectory();
-          downloadsDir = Directory('${externalDir?.path}/Download');
-        }
-      } else if (Platform.isIOS) {
-        downloadsDir = await getApplicationDocumentsDirectory();
-      }
+  // ==================== HELPERS ====================
 
-      if (downloadsDir == null || !await downloadsDir.exists()) {
-        return [];
-      }
-
-      // ✅ MEJORADO: Buscar tanto archivos antiguos como nuevos
-      final files = downloadsDir
-          .listSync()
-          .whereType<File>()
-          .where((file) =>
-      file.path.contains('post_nuevo_equipo_') ||
-          file.path.contains('censo_activo_post_'))
-          .map((file) => file.path)
-          .toList();
-
-      // ✅ MEJORADO: Ordenar por fecha de modificación (más reciente primero)
-      files.sort((a, b) {
-        final fileA = File(a);
-        final fileB = File(b);
-        try {
-          final statA = fileA.statSync();
-          final statB = fileB.statSync();
-          return statB.modified.compareTo(statA.modified);
-        } catch (e) {
-          // Fallback al nombre del archivo si falla el stat
-          return b.compareTo(a);
-        }
-      });
-
-      _logger.i('📁 Encontrados ${files.length} logs guardados');
-
-      // ✅ NUEVO: Log detallado de los archivos encontrados
-      for (int i = 0; i < files.length && i < 5; i++) {
-        final file = File(files[i]);
-        try {
-          final stat = file.statSync();
-          final tamanoKB = (stat.size / 1024).toStringAsFixed(1);
-          final fechaMod = stat.modified.toLocal();
-          _logger.i('📄 ${i + 1}. ${file.uri.pathSegments.last} (${tamanoKB} KB, ${fechaMod})');
-        } catch (e) {
-          _logger.i('📄 ${i + 1}. ${file.uri.pathSegments.last}');
-        }
-      }
-
-      if (files.length > 5) {
-        _logger.i('📄 ... y ${files.length - 5} archivos más');
-      }
-
-      return files;
-    } catch (e) {
-      _logger.e('Error listando logs: $e');
-      return [];
+  int _convertirAInt(dynamic valor, String nombreCampo) {
+    if (valor == null) throw 'El campo $nombreCampo es null';
+    if (valor is int) return valor;
+    if (valor is String) {
+      if (valor.isEmpty) throw 'El campo $nombreCampo está vacío';
+      final int? parsed = int.tryParse(valor);
+      if (parsed != null) return parsed;
+      throw 'El campo $nombreCampo ("$valor") no es un número válido';
     }
+    if (valor is double) return valor.toInt();
+    throw 'El campo $nombreCampo tiene un tipo no soportado: ${valor.runtimeType}';
+  }
+
+  int? _safeCastToInt(dynamic value, String fieldName) {
+    try {
+      if (value == null) return null;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value);
+      if (value is double) return value.toInt();
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  void cancelarProcesoActual() {
+    if (_isProcessing) {
+      _logger.i('⚠️ Cancelando proceso: $_currentProcessId');
+      _currentProcessId = null;
+      _isProcessing = false;
+      _setSaving(false);
+      _setStatusMessage(null);
+    }
+  }
+
+  @override
+  void dispose() {
+    cancelarProcesoActual();
+    super.dispose();
   }
 }

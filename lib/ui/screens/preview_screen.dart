@@ -219,6 +219,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     debugPrint('🔍 widget.datos[imagen_base64] != null: ${widget.datos['imagen_base64'] != null}');
 
     final datosCompletos = Map<String, dynamic>.from(widget.datos);
+    print("QUIERO VER datosCompletos: $datosCompletos ");
 
     // Preparar imagen 1 con logging mejorado
     if (_imagePath != null && _imageBase64 != null) {
