@@ -93,6 +93,104 @@ class CensoUploadService {
     }
   }
 
+  /// Prepara datos directamente desde la BD sin transformaciones restrictivas
+  Future<Map<String, dynamic>> _prepararPayloadDirectoDesdeBD(
+      String estadoId,
+      List<dynamic> fotos,
+      ) async {
+    try {
+      _logger.i('📦 Preparando payload directo desde BD para: $estadoId');
+
+      // Obtener TODOS los datos de la tabla censo_activo
+      final maps = await _estadoEquipoRepository.dbHelper.consultar(
+        'censo_activo',
+        where: 'id = ?',
+        whereArgs: [estadoId],
+        limit: 1,
+      );
+
+      if (maps.isEmpty) {
+        throw Exception('No se encontró el censo: $estadoId');
+      }
+
+      // Clonar TODO el mapa (sin restricciones)
+      final payload = Map<String, dynamic>.from(maps.first);
+
+      // 🔄 CONVERTIR usuario_id → edfvendedorid para el servidor
+      final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(payload['usuario_id']);
+      if (edfVendedorId != null) {
+        payload['edfvendedorid'] = edfVendedorId;
+        _logger.i('👤 Resuelto: usuario_id=${payload['usuario_id']} → edfvendedorid=$edfVendedorId');
+      } else {
+        payload['edfvendedorid'] = null;
+        _logger.w('⚠️ No se pudo resolver edfvendedorid para usuario_id: ${payload['usuario_id']}');
+      }
+
+      // Solo agregar las imágenes base64 que no están en la tabla
+      if (fotos.isNotEmpty) {
+        payload['imagen_base64'] = fotos.first.imagenBase64;
+        payload['imageBase64_1'] = fotos.first.imagenBase64;
+        payload['tiene_imagen'] = true;
+      }
+
+      if (fotos.length > 1) {
+        payload['imagen_base64_2'] = fotos[1].imagenBase64;
+        payload['imageBase64_2'] = fotos[1].imagenBase64;
+        payload['tiene_imagen2'] = true;
+      }
+
+      // Agregar array de fotos para el backend
+      payload['fotos_censo_activo_foto'] = fotos.map((foto) => {
+        'orden': foto.orden,
+        'uuid': foto.id ?? 'N/A',
+        'path': foto.imagenPath ?? '',
+        'tamano': foto.imagenTamano ?? 0,
+      }).toList();
+
+      payload['total_imagenes'] = fotos.length;
+
+      _logger.i('✅ Payload preparado con ${payload.keys.length} campos y ${fotos.length} fotos');
+
+      return payload;
+    } catch (e) {
+      _logger.e('❌ Error preparando payload directo: $e');
+      rethrow;
+    }
+  }
+
+  /// Método helper para obtener edfvendedorid desde usuario_id
+  Future<String?> _obtenerEdfVendedorIdDesdeUsuarioId(int? usuarioId) async {
+    try {
+      if (usuarioId == null) {
+        _logger.i('👤 usuario_id es null - edfvendedorid será null');
+        return null;
+      }
+
+      _logger.i('🔍 Buscando edfvendedorid para usuario_id: $usuarioId');
+
+      // Consultar tabla Users para obtener el edf_vendedor_id
+      final usuarioEncontrado = await _estadoEquipoRepository.dbHelper.consultar(
+        'Users',
+        where: 'id = ?',
+        whereArgs: [usuarioId],
+        limit: 1,
+      );
+
+      if (usuarioEncontrado.isNotEmpty) {
+        final edfVendedorId = usuarioEncontrado.first['edf_vendedor_id'] as String?;
+        _logger.i('✅ edfvendedorid encontrado: usuario_id=$usuarioId → edfvendedorid=$edfVendedorId');
+        return edfVendedorId;
+      } else {
+        _logger.w('⚠️ No se encontró usuario con id: $usuarioId');
+        return null;
+      }
+
+    } catch (e) {
+      _logger.e('❌ Error resolviendo edfvendedorid desde usuario_id: $e');
+      return null;
+    }
+  }
+
   /// Sincroniza un censo específico en segundo plano con sistema de backoff
   Future<void> sincronizarCensoEnBackground(
       String estadoId,
@@ -102,7 +200,7 @@ class CensoUploadService {
       try {
         _logger.i('🔄 Sincronización background para: $estadoId');
 
-        // Obtener datos DIRECTOS de la tabla censo_activo
+        // Verificar que el registro existe
         final maps = await _estadoEquipoRepository.dbHelper.consultar(
           'censo_activo',
           where: 'id = ?',
@@ -115,39 +213,28 @@ class CensoUploadService {
           return;
         }
 
-        // ✅ USAR DIRECTAMENTE LOS DATOS DE LA TABLA
-        final datosDeTabla = Map<String, dynamic>.from(maps.first);
-
         // Obtener fotos asociadas
         final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
         _logger.i('📸 Fotos encontradas: ${fotos.length}');
 
-        // Solo agregar las imágenes base64 a los datos existentes
-        if (fotos.isNotEmpty) {
-          datosDeTabla['imagen_base64'] = fotos.first.imagenBase64;
-          datosDeTabla['imageBase64_1'] = fotos.first.imagenBase64; // Por compatibilidad
-        }
-        if (fotos.length > 1) {
-          datosDeTabla['imagen_base64_2'] = fotos[1].imagenBase64;
-          datosDeTabla['imageBase64_2'] = fotos[1].imagenBase64; // Por compatibilidad
-        }
+        // ✅ USAR MÉTODO DIRECTO SIN RESTRICCIONES
+        final datosDeTabla = await _prepararPayloadDirectoDesdeBD(estadoId, fotos);
 
-        // 🔍 LOG TEMPORAL PARA VER QUÉ SE ENVÍA:
-        final jsonParaEnviar = Map<String, dynamic>.from(datosDeTabla);
-        // Remover base64 del log para que no sea gigante
-        if (jsonParaEnviar.containsKey('imagen_base64')) {
-          jsonParaEnviar['imagen_base64'] = '[BASE64_REMOVIDO_DEL_LOG]';
+        // 🔍 LOG TEMPORAL PARA VER QUÉ SE ENVÍA (sin base64)
+        final jsonParaLog = Map<String, dynamic>.from(datosDeTabla);
+        if (jsonParaLog.containsKey('imagen_base64')) {
+          jsonParaLog['imagen_base64'] = '[BASE64_REMOVIDO_DEL_LOG]';
         }
-        if (jsonParaEnviar.containsKey('imagen_base64_2')) {
-          jsonParaEnviar['imagen_base64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
+        if (jsonParaLog.containsKey('imagen_base64_2')) {
+          jsonParaLog['imagen_base64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
         }
-        if (jsonParaEnviar.containsKey('imageBase64_1')) {
-          jsonParaEnviar['imageBase64_1'] = '[BASE64_REMOVIDO_DEL_LOG]';
+        if (jsonParaLog.containsKey('imageBase64_1')) {
+          jsonParaLog['imageBase64_1'] = '[BASE64_REMOVIDO_DEL_LOG]';
         }
-        if (jsonParaEnviar.containsKey('imageBase64_2')) {
-          jsonParaEnviar['imageBase64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
+        if (jsonParaLog.containsKey('imageBase64_2')) {
+          jsonParaLog['imageBase64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
         }
-        _logger.i('🔍 JSON DIRECTO DE TABLA: ${json.encode(jsonParaEnviar)}');
+        _logger.i('🔍 JSON DIRECTO DE TABLA (${datosDeTabla.keys.length} campos): ${json.encode(jsonParaLog)}');
 
         // Registrar intento (primer intento = 1)
         await _actualizarUltimoIntento(estadoId, 1);
@@ -258,7 +345,7 @@ class CensoUploadService {
     try {
       _logger.i('🔁 Reintentando envío: $estadoId');
 
-      // Obtener datos del registro
+      // Verificar que el registro existe
       final maps = await _estadoEquipoRepository.dbHelper.consultar(
         'censo_activo',
         where: 'id = ?',
@@ -273,35 +360,33 @@ class CensoUploadService {
         };
       }
 
-      final estadoMap = maps.first;
-
       // Obtener fotos
       final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
       _logger.i('📸 Fotos para reintento: ${fotos.length}');
 
-      // Preparar datos
-      final datosParaApi = _prepararDatosParaReintento(
-        estadoMap,
-        fotos,
-        usuarioId,
-        edfVendedorId,
-      );
+      // ✅ USAR MÉTODO DIRECTO SIN RESTRICCIONES
+      final datosParaApi = await _prepararPayloadDirectoDesdeBD(estadoId, fotos);
 
-      // 🔍 LOG TEMPORAL PARA COMPARAR JSONs:
-      final jsonParaEnviar = Map<String, dynamic>.from(datosParaApi);
-      // Remover base64 del log para que no sea gigante
-      if (jsonParaEnviar.containsKey('imageBase64_1')) {
-        jsonParaEnviar['imageBase64_1'] = '[BASE64_REMOVIDO_DEL_LOG]';
+      // 🔍 LOG TEMPORAL PARA COMPARAR (sin imágenes base64 para que no sea gigante)
+      final jsonParaLog = Map<String, dynamic>.from(datosParaApi);
+      if (jsonParaLog.containsKey('imageBase64_1')) {
+        jsonParaLog['imageBase64_1'] = '[BASE64_REMOVIDO_DEL_LOG]';
       }
-      if (jsonParaEnviar.containsKey('imageBase64_2')) {
-        jsonParaEnviar['imageBase64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
+      if (jsonParaLog.containsKey('imageBase64_2')) {
+        jsonParaLog['imageBase64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
       }
-      _logger.i('🔍 JSON REINTENTO: ${json.encode(jsonParaEnviar)}');
+      if (jsonParaLog.containsKey('imagen_base64')) {
+        jsonParaLog['imagen_base64'] = '[BASE64_REMOVIDO_DEL_LOG]';
+      }
+      if (jsonParaLog.containsKey('imagen_base64_2')) {
+        jsonParaLog['imagen_base64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
+      }
+      _logger.i('🔍 JSON REINTENTO (${datosParaApi.keys.length} campos): ${json.encode(jsonParaLog)}');
 
       // Enviar con timeout más alto
       final respuesta = await enviarCensoAlServidor(
         datosParaApi,
-        timeoutSegundos: 45, // Aumentado de 8 a 45 segundos
+        timeoutSegundos: 45,
       );
 
       // Procesar resultado
@@ -364,7 +449,7 @@ class CensoUploadService {
       await _ejecutarSincronizacionAutomatica();
     });
 
-    // También ejecutar una vez al iniciar (después de 15 segundos para que la app esté lisa)
+    // También ejecutar una vez al iniciar (después de 15 segundos para que la app esté lista)
     Timer(Duration(seconds: 15), () async {
       await _ejecutarSincronizacionAutomatica();
     });
@@ -460,22 +545,10 @@ class CensoUploadService {
     final intentosPrevios = await _obtenerNumeroIntentos(registro.id!);
     final numeroIntento = intentosPrevios + 1;
 
-    _logger.i('🔄 Sincronizando ${registro.id} (intento #$numeroIntento)');
+    _logger.i('🔄 Sincronizando ${registro.id} (intento #$numeroIntento, ${fotos.length} fotos)');
 
-    final datosParaApi = {
-      'fecha_revision': _formatearFechaLocal(registro.fechaRevision),
-      'equipo_id': (registro.equipoId ?? '').toString(),
-      'latitud': registro.latitud ?? 0.0,
-      'longitud': registro.longitud ?? 0.0,
-      'usuario_id': usuarioId,
-      'funcionando': true,
-      'cliente_id': registro.clienteId,
-      'observaciones': registro.observaciones ?? 'Sincronización automática',
-      'imageBase64_1': fotos.isNotEmpty ? fotos.first.imagenBase64 : null,
-      'imageBase64_2': fotos.length > 1 ? fotos[1].imagenBase64 : null,
-      'tiene_imagen': fotos.isNotEmpty,
-      'tiene_imagen2': fotos.length > 1,
-    };
+    // ✅ USAR MÉTODO DIRECTO SIN RESTRICCIONES
+    final datosParaApi = await _prepararPayloadDirectoDesdeBD(registro.id!, fotos);
 
     // Actualizar timestamp del último intento
     await _actualizarUltimoIntento(registro.id!, numeroIntento);
@@ -531,10 +604,10 @@ class CensoUploadService {
 
         if (ahora.isAfter(tiempoProximoIntento)) {
           registrosListos.add(registro);
-          _logger.i('📅 ${registro.id} listo para reintento (${intentos} intentos previos, espera de ${minutosEspera}min completada)');
+          _logger.i('📅 ${registro.id} listo para reintento ($intentos intentos previos, espera de ${minutosEspera}min completada)');
         } else {
           final minutosRestantes = tiempoProximoIntento.difference(ahora).inMinutes;
-          _logger.d('⏰ ${registro.id} debe esperar ${minutosRestantes} minutos más');
+          _logger.d('⏰ ${registro.id} debe esperar $minutosRestantes minutos más');
         }
       } catch (e) {
         _logger.w('⚠️ Error verificando reintento para ${registro.id}: $e');
@@ -629,45 +702,4 @@ class CensoUploadService {
     }
   }
 
-  Map<String, dynamic> _prepararDatosParaReintento(
-      Map<String, dynamic> estadoMap,
-      List<dynamic> fotos,
-      int usuarioId,
-      String? edfVendedorId,
-      ) {
-    final now = DateTime.now().toLocal();
-    final timestampId = _uuid.v4();
-
-    return {
-      'id': timestampId.toString(),
-      'edfVendedorSucursalId': edfVendedorId ?? '',
-      'edfEquipoId': estadoMap['equipo_id']?.toString() ?? '',
-      'usuarioId': usuarioId,
-      'edfClienteId': estadoMap['cliente_id'] ?? 0,
-      'fecha_revision': estadoMap['fecha_revision'] ?? _formatearFechaLocal(now),
-      'latitud': estadoMap['latitud'] ?? 0.0,
-      'longitud': estadoMap['longitud'] ?? 0.0,
-      'enLocal': true,
-      'fechaDeRevision': estadoMap['fecha_revision'] ?? _formatearFechaLocal(now),
-      'estadoCenso': 'pendiente',
-      'observaciones': estadoMap['observaciones'] ?? '',
-      'imageBase64_1': fotos.isNotEmpty ? fotos.first.imagenBase64 : null,
-      'imageBase64_2': fotos.length > 1 ? fotos[1].imagenBase64 : null,
-      'tiene_imagen': fotos.isNotEmpty,
-      'tiene_imagen2': fotos.length > 1,
-      'equipo_codigo_barras': '',
-      'equipo_numero_serie': '',
-      'equipo_modelo': '',
-      'equipo_marca': '',
-      'equipo_logo': '',
-      'cliente_nombre': '',
-      'usuario_id': usuarioId,
-      'cliente_id': estadoMap['cliente_id'] ?? 0,
-    };
-  }
-
-  String _formatearFechaLocal(DateTime fecha) {
-    final local = fecha.toLocal();
-    return local.toIso8601String().replaceAll('Z', '');
-  }
 }

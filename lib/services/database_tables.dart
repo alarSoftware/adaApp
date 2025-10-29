@@ -124,7 +124,8 @@ class DatabaseTables {
   CREATE TABLE censo_activo (
     id TEXT,
     equipo_id TEXT NOT NULL,
-    cliente_id INTEGER NOT NULL,   
+    cliente_id INTEGER NOT NULL,
+    usuario_id INTEGER,
     en_local INTEGER DEFAULT 0,
     latitud REAL,
     longitud REAL,

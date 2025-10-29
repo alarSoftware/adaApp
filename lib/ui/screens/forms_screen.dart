@@ -615,7 +615,7 @@ class _FormsScreenState extends State<FormsScreen> {
 
           return DropdownItem<int>(
             value: marcaId!,
-            label: '${marca['nombre']}',
+            label: '${marca['nombre']}'.trim(),
           );
         }).toList();
 
@@ -657,7 +657,7 @@ class _FormsScreenState extends State<FormsScreen> {
 
           return DropdownItem<int>(
             value: modeloId!,
-            label: '${modelo['nombre']}',
+            label: '${modelo['nombre']}'.trim(),
           );
         }).toList();
 
@@ -771,7 +771,7 @@ class _FormsScreenState extends State<FormsScreen> {
 
           return DropdownItem<int>(
             value: logoId!,
-            label: '${logo['nombre']} ',
+            label: '${logo['nombre']}'.trim(),
           );
         }).toList();
 

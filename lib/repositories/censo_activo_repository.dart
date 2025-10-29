@@ -38,6 +38,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   Future<EstadoEquipo> crearNuevoEstado({
     required String equipoId,
     required int clienteId,
+    int? usuarioId,  // ← Nuevo parámetro agregado
     required bool enLocal,
     required DateTime fechaRevision,
     double? latitud,
@@ -53,11 +54,13 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       _logger.i('   UUID (id): $uuidId');
       _logger.i('   Equipo ID: $equipoId');
       _logger.i('   Cliente ID: $clienteId');
+      _logger.i('   Usuario ID: $usuarioId');  // ← Nuevo log
 
       final datosEstado = {
         'id': uuidId,
         'equipo_id': equipoId,
         'cliente_id': clienteId,
+        'usuario_id': usuarioId,  // ← Nuevo campo agregado
         'en_local': enLocal ? 1 : 0,
         'latitud': latitud,
         'longitud': longitud,
@@ -77,6 +80,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         id: uuidId,
         equipoId: equipoId,
         clienteId: clienteId,
+        usuarioId: usuarioId,  // ← Nuevo campo agregado
         enLocal: enLocal,
         latitud: latitud,
         longitud: longitud,
@@ -98,6 +102,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   Future<EstadoEquipo> crearNuevoEstadoConImagenes({
     required String equipoId,
     required int clienteId,
+    int? usuarioId,  // ← Nuevo parámetro agregado
     required bool enLocal,
     required DateTime fechaRevision,
     double? latitud,
@@ -123,6 +128,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       final estado = await crearNuevoEstado(
         equipoId: equipoId,
         clienteId: clienteId,
+        usuarioId: usuarioId,  // ← Nuevo parámetro pasado
         enLocal: enLocal,
         fechaRevision: fechaRevision,
         latitud: latitud,
@@ -176,6 +182,10 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
           // Extraer identificadores
           final equipoId = censo['equipoId']?.toString() ?? censo['edfEquipoId']?.toString() ?? '';
           final clienteId = censo['clienteId'] ?? censo['edfClienteId'] ?? 0;
+
+          // Obtener usuario_id de manera flexible
+          final usuarioId = await _obtenerUsuarioIdFlexible(censo);
+
           final fechaRevision = censo['fechaRevision'] ?? censo['fechaDeRevision'];
 
           // Verificar si ya existe
@@ -195,6 +205,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
           String? observacionesExtraidas = _extraerObservacionesDeJson(censo);
 
           _logger.i('📝 Observaciones extraídas: $observacionesExtraidas');
+          _logger.i('👤 Usuario ID resuelto: $usuarioId');
 
           // Generar UUID si no viene del servidor
           final idCenso = censo['id']?.toString() ?? _uuid.v4();
@@ -204,6 +215,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
             'id': idCenso,
             'equipo_id': equipoId,
             'cliente_id': clienteId,
+            'usuario_id': usuarioId,
             'en_local': (censo['enLocal'] == true || censo['enLocal'] == 1) ? 1 : 0,
             'latitud': censo['latitud'],
             'longitud': censo['longitud'],
@@ -230,6 +242,42 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     } catch (e) {
       _logger.e('❌ Error guardando censos: $e');
       return guardados;
+    }
+  }
+
+  /// Método helper para obtener usuario_id desde edfvendedorid
+  Future<int?> _obtenerUsuarioIdFlexible(Map<String, dynamic> censo) async {
+    try {
+      // Obtener edfvendedorid que siempre viene del POST (o null)
+      final edfVendedorId = censo['edfvendedorid']?.toString();
+
+      if (edfVendedorId == null || edfVendedorId.isEmpty) {
+        _logger.i('👤 No se envió edfvendedorid - usuario_id será null');
+        return null;
+      }
+
+      _logger.i('🔍 Buscando usuario por edfvendedorid: $edfVendedorId');
+
+      // Consultar tabla Users para obtener el usuario_id
+      final usuarioEncontrado = await dbHelper.consultar(
+        'Users',
+        where: 'edf_vendedor_id = ?',
+        whereArgs: [edfVendedorId],
+        limit: 1,
+      );
+
+      if (usuarioEncontrado.isNotEmpty) {
+        final usuarioId = usuarioEncontrado.first['id'] as int?;
+        _logger.i('✅ Usuario encontrado: edfvendedorid=$edfVendedorId → usuario_id=$usuarioId');
+        return usuarioId;
+      } else {
+        _logger.w('⚠️ No se encontró usuario con edfvendedorid: $edfVendedorId');
+        return null;
+      }
+
+    } catch (e) {
+      _logger.e('❌ Error resolviendo usuario_id desde edfvendedorid: $e');
+      return null;
     }
   }
 
@@ -288,6 +336,22 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
       _logger.e('Error al obtener historial completo: $e');
+      return [];
+    }
+  }
+
+  /// Obtener estados por usuario - NUEVO MÉTODO
+  Future<List<EstadoEquipo>> obtenerPorUsuario(int usuarioId) async {
+    try {
+      final maps = await dbHelper.consultar(
+        tableName,
+        where: 'usuario_id = ?',
+        whereArgs: [usuarioId],
+        orderBy: getDefaultOrderBy(),
+      );
+      return maps.map((map) => fromMap(map)).toList();
+    } catch (e) {
+      _logger.e('Error al obtener estados por usuario: $e');
       return [];
     }
   }
@@ -377,6 +441,25 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
+  /// Actualizar usuario de un estado - NUEVO MÉTODO
+  Future<void> actualizarUsuario(String estadoId, int? usuarioId) async {
+    try {
+      await dbHelper.actualizar(
+        tableName,
+        {
+          'usuario_id': usuarioId,
+          'fecha_actualizacion': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [estadoId],
+      );
+      _logger.i('Usuario actualizado en estado $estadoId: $usuarioId');
+    } catch (e) {
+      _logger.e('Error al actualizar usuario del estado: $e');
+      rethrow;
+    }
+  }
+
   /// Marcar como sincronizado
   Future<void> marcarComoSincronizado(String estadoId) async {
     try {
@@ -434,6 +517,37 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       };
     } catch (e) {
       _logger.e('Error contando por estado: $e');
+      return {
+        'creados': 0,
+        'migrados': 0,
+        'error': 0,
+        'total': 0,
+      };
+    }
+  }
+
+  /// Contar registros por usuario - NUEVO MÉTODO
+  Future<Map<String, int>> contarPorUsuario(int usuarioId) async {
+    try {
+      final maps = await dbHelper.consultar(
+        tableName,
+        where: 'usuario_id = ?',
+        whereArgs: [usuarioId],
+      );
+
+      final estados = maps.map((map) => fromMap(map)).toList();
+      final creados = estados.where((e) => e.estaCreado).length;
+      final migrados = estados.where((e) => e.estaMigrado).length;
+      final conError = estados.where((e) => e.tieneError).length;
+
+      return {
+        'creados': creados,
+        'migrados': migrados,
+        'error': conError,
+        'total': estados.length,
+      };
+    } catch (e) {
+      _logger.e('Error contando por usuario: $e');
       return {
         'creados': 0,
         'migrados': 0,

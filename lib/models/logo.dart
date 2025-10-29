@@ -10,14 +10,14 @@ class Logo {
   factory Logo.fromMap(Map<String, dynamic> map) {
     return Logo(
       id: map['id']?.toInt(),
-      nombre: map['nombre'] ?? '',
+      nombre: (map['nombre'] ?? '').toString().trim(),
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id,
-      'nombre': nombre,
+      'nombre': nombre.trim(),
     };
   }
 

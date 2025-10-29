@@ -36,6 +36,7 @@ class EstadoEquipo {
   final String? id;
   final String equipoId;
   final int clienteId;
+  final int? usuarioId;  // ← Nuevo campo agregado
   final bool enLocal;
   final double? latitud;
   final double? longitud;
@@ -50,6 +51,7 @@ class EstadoEquipo {
     this.id,
     required this.equipoId,
     required this.clienteId,
+    this.usuarioId,  // ← Agregado al constructor
     required this.enLocal,
     this.latitud,
     this.longitud,
@@ -66,6 +68,7 @@ class EstadoEquipo {
       id: map['id'] as String?,
       equipoId: map['equipo_id'] as String? ?? '0',
       clienteId: map['cliente_id'] as int? ?? 0,
+      usuarioId: map['usuario_id'] as int?,  // ← Agregado al fromMap
       enLocal: (map['en_local'] as int?) == 1,
       latitud: map['latitud'] as double?,
       longitud: map['longitud'] as double?,
@@ -89,6 +92,7 @@ class EstadoEquipo {
       'id': id,
       'equipo_id': equipoId,
       'cliente_id': clienteId,
+      'usuario_id': usuarioId,  // ← Agregado al toMap
       'en_local': enLocal ? 1 : 0,
       'latitud': latitud,
       'longitud': longitud,
@@ -111,6 +115,7 @@ class EstadoEquipo {
       'id': id,
       'equipo_id': equipoId,
       'cliente_id': clienteId,
+      'usuario_id': usuarioId,  // ← Agregado al toJson
       'en_local': enLocal,
       'latitud': latitud,
       'longitud': longitud,
@@ -127,6 +132,7 @@ class EstadoEquipo {
     String? id,
     String? equipoId,
     int? clienteId,
+    int? usuarioId,  // ← Agregado al copyWith
     bool? enLocal,
     double? latitud,
     double? longitud,
@@ -141,6 +147,7 @@ class EstadoEquipo {
       id: id ?? this.id,
       equipoId: equipoId ?? this.equipoId,
       clienteId: clienteId ?? this.clienteId,
+      usuarioId: usuarioId ?? this.usuarioId,  // ← Agregado al copyWith
       enLocal: enLocal ?? this.enLocal,
       latitud: latitud ?? this.latitud,
       longitud: longitud ?? this.longitud,

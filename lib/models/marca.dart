@@ -10,14 +10,14 @@ class Marca {
   factory Marca.fromMap(Map<String, dynamic> map) {
     return Marca(
       id: map['id']?.toInt(),
-      nombre: map['nombre'] ?? '',
+      nombre: (map['nombre'] ?? '').toString().trim(),
     );
   }
 
   // Método para crear desde la API
   factory Marca.fromAPI(Map<String, dynamic> apiData) {
     return Marca(
-      id: apiData['id']?.toInt(),
+      id: apiData['id']?.toInt().tri,
       nombre: (apiData['nombre'] ?? '').toString().trim(),
     );
   }
@@ -26,7 +26,7 @@ class Marca {
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id,
-      'nombre': nombre,
+      'nombre': nombre.trim(),
     };
   }
 
