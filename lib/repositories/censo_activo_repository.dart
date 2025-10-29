@@ -610,7 +610,6 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         {
           'estado_censo': EstadoEquipoCenso.error.valor,
           'fecha_actualizacion': DateTime.now().toIso8601String(),
-          // Nota: mensaje_error no está en la nueva estructura, se agrega a observaciones
           'observaciones': 'ERROR: $mensajeError',
         },
         where: 'id = ?',

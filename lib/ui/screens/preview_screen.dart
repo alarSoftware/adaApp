@@ -177,7 +177,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
       return; // Ignorar silenciosamente
     }
 
-    // ✅ CRÍTICO: Marcar como confirmado INMEDIATAMENTE, antes de cualquier otra cosa
+    // CRÍTICO: Marcar como confirmado INMEDIATAMENTE, antes de cualquier otra cosa
     setState(() {
       _yaConfirmado = true;
     });
@@ -189,7 +189,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
     final bool? confirmado = await PreviewDialogs.mostrarConfirmacion(context);
 
-    // ✅ Si cancela el diálogo, rehabilitar el botón
+    // Si cancela el diálogo, rehabilitar el botón
     if (confirmado != true) {
       setState(() {
         _yaConfirmado = false;
@@ -207,17 +207,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
       return;
     }
 
-    // ✅ LOGS PARA DEBUGGING
-    debugPrint('🔍 === ESTADO ANTES DE PREPARAR DATOS ===');
-    debugPrint('🔍 _imagePath: $_imagePath');
-    debugPrint('🔍 _imageBase64 != null: ${_imageBase64 != null}');
-    debugPrint('🔍 _imageBase64 length: ${_imageBase64?.length ?? 0}');
-    debugPrint('🔍 _imagePath2: $_imagePath2');
-    debugPrint('🔍 _imageBase64_2 != null: ${_imageBase64_2 != null}');
-    debugPrint('🔍 _imageBase64_2 length: ${_imageBase64_2?.length ?? 0}');
-    debugPrint('🔍 widget.datos[imagen_path]: ${widget.datos['imagen_path']}');
-    debugPrint('🔍 widget.datos[imagen_base64] != null: ${widget.datos['imagen_base64'] != null}');
-
     final datosCompletos = Map<String, dynamic>.from(widget.datos);
     print("QUIERO VER datosCompletos: $datosCompletos ");
 
@@ -234,7 +223,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
       datosCompletos['tiene_imagen'] = true;
       datosCompletos['imagen_tamano'] = bytes.length;
 
-      debugPrint('✅ datosCompletos actualizado con imagen 1');
+      debugPrint(' datosCompletos actualizado con imagen 1');
     } else {
       debugPrint('⚠️ IMAGEN 1 NO DISPONIBLE');
       debugPrint('   _imagePath: $_imagePath');
@@ -250,51 +239,30 @@ class _PreviewScreenState extends State<PreviewScreen> {
     if (_imagePath2 != null && _imageBase64_2 != null) {
       final bytes2 = base64Decode(_imageBase64_2!);
 
-      debugPrint('📸 IMAGEN 2 PREPARADA:');
-      debugPrint('   Path: $_imagePath2');
-      debugPrint('   Tamaño: ${bytes2.length} bytes (${(bytes2.length / 1024).toStringAsFixed(2)} KB)');
-
       datosCompletos['imagen_path2'] = _imagePath2;
       datosCompletos['imagen_base64_2'] = _imageBase64_2;
       datosCompletos['tiene_imagen2'] = true;
       datosCompletos['imagen_tamano2'] = bytes2.length;
 
-      debugPrint('✅ datosCompletos actualizado con imagen 2');
+      debugPrint(' datosCompletos actualizado con imagen 2');
     } else {
-      debugPrint('⚠️ IMAGEN 2 NO DISPONIBLE');
-      debugPrint('   _imagePath2: $_imagePath2');
-      debugPrint('   _imageBase64_2 != null: ${_imageBase64_2 != null}');
-
       datosCompletos['tiene_imagen2'] = false;
       datosCompletos['imagen_path2'] = null;
       datosCompletos['imagen_base64_2'] = null;
       datosCompletos['imagen_tamano2'] = null;
     }
 
-    debugPrint('🔍 === VERIFICACIÓN FINAL ===');
-    debugPrint('🔍 datosCompletos[tiene_imagen]: ${datosCompletos['tiene_imagen']}');
-    debugPrint('🔍 datosCompletos[imagen_base64] != null: ${datosCompletos['imagen_base64'] != null}');
-    debugPrint('🔍 datosCompletos[imagen_base64] length: ${datosCompletos['imagen_base64']?.toString().length ?? 0}');
-
-    print('🔍 DEBUG: Iniciando confirmación de registro...');
     final resultado = await viewModel.confirmarRegistro(datosCompletos);
-    print('🔍 DEBUG: Resultado recibido: $resultado');
 
     if (mounted) {
-      print('🔍 DEBUG: Widget mounted = true');
 
       if (resultado['success']) {
-        print('✅ DEBUG: Resultado success = true');
 
-        // ✅ Navegar INMEDIATAMENTE sin delays
+        // Navegar INMEDIATAMENTE sin delays
         if (mounted) {
-          print('✅ DEBUG: Navegando a detalle del equipo...');
           await _navegarAEquipoClienteDetail();
-          print('✅ DEBUG: Navegación completada');
         }
       } else {
-        print('❌ DEBUG: Resultado success = false, error: ${resultado['error']}');
-
         // Si hay error, desbloquear para permitir reintentar
         setState(() {
           _yaConfirmado = false;
@@ -306,15 +274,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
           _confirmarRegistro,
         );
       }
-    } else {
-      print('❌ DEBUG: Widget NO mounted inmediatamente después del resultado');
     }
   }
 
   Future<void> _navegarAEquipoClienteDetail() async {
     try {
-      print('=== NAVEGANDO A EQUIPO DETAIL DESPUÉS DE CENSO ===');
-
       final cliente = widget.datos['cliente'] as Cliente;
       final equipoCompleto = widget.datos['equipo_completo'];
 
@@ -340,11 +304,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
         'tipo_estado': widget.datos['ya_asignado'] == true ? 'asignado' : 'pendiente',
       };
 
-      print('Navegando con datos del censo:');
-      print('  cliente_id: ${cliente.id}');
-      print('  tipo_estado: ${equipoCliente['tipo_estado']}');
-
-      // ✅ CAMBIO: Solo hacer pop 2 veces para cerrar PreviewScreen y FormsScreen
       // Esto te deja en ClienteDetailScreen
       Navigator.of(context).pop(); // Cierra PreviewScreen
       Navigator.of(context).pop(); // Cierra FormsScreen
@@ -359,13 +318,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
         ),
       );
     } catch (e, stackTrace) {
-      debugPrint('Error navegando: $e');
-      debugPrint('StackTrace: $stackTrace');
       Navigator.of(context).pop(true);
     }
   }
 
-  // ✅ CORRECCIÓN: Cambiar int? a String?
+  //CORRECCIÓN: Cambiar int? a String?
   Future<void> _reintentarEnvioHistorial(String? estadoId) async {
     if (estadoId == null) {
       _mostrarSnackBar('Error: ID de estado no disponible', AppColors.error);
@@ -444,7 +401,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   Widget _buildBody(Cliente cliente) {
     final esHistorial = widget.datos['es_historial'] == true;
-    // ✅ CORRECCIÓN: Cambiar int? a String?
+    //CORRECCIÓN: Cambiar int? a String?
     final estadoId = widget.datos['id'] as String?;
 
     return SingleChildScrollView(
@@ -491,14 +448,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
     if (_imagePath2 != null || _imageBase64_2 != null) cantidadImagenes++;
 
     if (esHistorial) {
-      // ✅ CORRECCIÓN: Cambiar int? a String?
+      // CORRECCIÓN: Cambiar int? a String?
       final estadoId = widget.datos['id'] as String?;
 
       return FutureBuilder<Map<String, dynamic>>(
         future: vm.obtenerInfoSincronizacion(estadoId),
         builder: (context, snapshot) {
           final info = snapshot.data;
-          // ✅ SOLO mostrar reintentar si el estado es 'error' (no 'creado' o 'pendiente')
+          // SOLO mostrar reintentar si el estado es 'error' (no 'creado' o 'pendiente')
           final envioFallido = info?['estado'] == 'error';
 
           return PreviewBottomBar(
@@ -575,7 +532,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
-  // ✅ CORRECCIÓN: Cambiar int? a String?
+  // CORRECCIÓN: Cambiar int? a String?
   Widget _buildSyncStatusIndicator(String? estadoId) {
     if (widget.datos['es_historial'] != true || estadoId == null) {
       return const SizedBox.shrink();

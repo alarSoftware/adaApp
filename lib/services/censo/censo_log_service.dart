@@ -1,5 +1,3 @@
-// lib/services/censo/censo_log_service.dart
-
 import 'dart:io';
 import 'dart:convert';
 import 'package:logger/logger.dart';
