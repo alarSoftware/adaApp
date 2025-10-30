@@ -1,3 +1,5 @@
+// lib/services/censo/censo_log_service.dart
+
 import 'dart:io';
 import 'dart:convert';
 import 'package:logger/logger.dart';
@@ -196,7 +198,7 @@ class CensoLogService {
 
     // Si no se detectaron fotos de la BD, intentar del array del body
     if (!fotosDetectadas) {
-      final fotosArray = body['fotos_censo_activo_foto'] as List<dynamic>?;
+      final fotosArray = body['fotos'] as List<dynamic>?;
       if (fotosArray != null && fotosArray.isNotEmpty) {
         for (var foto in fotosArray) {
           if (foto is Map<String, dynamic>) {
@@ -249,8 +251,8 @@ class CensoLogService {
         final fotos = await _fotoRepository.obtenerFotosPorCenso(censoActivoId);
         if (fotos.isNotEmpty) {
           // ✅ FORMATO CORRECTO CON ORDEN
-          bodySimplificado['fotos_censo_activo_foto'] = fotos.map((foto) => {
-            'orden': foto.orden,              // ✅ Campo orden agregado
+          bodySimplificado['fotos'] = fotos.map((foto) => {
+            'orden': foto.orden,
             'uuid': foto.id ?? 'N/A',
             'path': foto.imagenPath ?? '',
             'tamano': foto.imagenTamano ?? 0,
@@ -260,14 +262,14 @@ class CensoLogService {
         _logger.w('No se pudieron obtener fotos para el log: $e');
 
         // ✅ FALLBACK: Si no se pueden obtener de BD, mantener las que vengan en el body
-        if (body.containsKey('fotos_censo_activo_foto')) {
-          bodySimplificado['fotos_censo_activo_foto'] = body['fotos_censo_activo_foto'];
+        if (body.containsKey('fotos')) {
+          bodySimplificado['fotos'] = body['fotos'];
         }
       }
     } else {
       // ✅ Si no hay censoActivoId pero el body tiene fotos, mantenerlas
-      if (body.containsKey('fotos_censo_activo_foto')) {
-        bodySimplificado['fotos_censo_activo_foto'] = body['fotos_censo_activo_foto'];
+      if (body.containsKey('fotos')) {
+        bodySimplificado['fotos'] = body['fotos'];
       }
     }
 

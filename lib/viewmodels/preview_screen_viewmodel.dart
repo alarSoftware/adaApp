@@ -349,10 +349,29 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Future<void> _guardarRegistroLocal(Map<String, dynamic> datos) async {
     try {
-      _logger.i('💾 Guardando registro local: ${datos['id_local']}');
-      await Future.delayed(const Duration(milliseconds: 500));
+      final estadoId = datos['id'];
+
+      if (estadoId == null) {
+        throw 'No se pudo obtener el ID del estado';
+      }
+
+      _logger.i('💾 Actualizando registro local con datos completos: $estadoId');
+
+      // Actualizar el registro existente con el usuario_id
+      await _estadoEquipoRepository.dbHelper.actualizar(
+        'censo_activo',
+        {
+          'usuario_id': datos['usuario_id'],
+          'fecha_actualizacion': datos['fecha_creacion'],
+        },
+        where: 'id = ?',
+        whereArgs: [estadoId],
+      );
+
+      _logger.i('✅ Registro actualizado con usuario_id: ${datos['usuario_id']}');
     } catch (e) {
-      throw 'Error guardando datos localmente';
+      _logger.e('❌ Error guardando datos localmente: $e');
+      throw 'Error guardando datos localmente: $e';
     }
   }
 

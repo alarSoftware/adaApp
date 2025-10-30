@@ -11,7 +11,7 @@ class CensoApiMapper {
     required String estadoId,
     required String equipoId,
     required Cliente cliente,
-    required int usuarioId,
+    required int usuarioId,  // ← Lo recibimos
     required Map<String, dynamic> datosOriginales,
     required Map<String, dynamic> equipoCompleto,
     required bool esCenso,
@@ -24,13 +24,13 @@ class CensoApiMapper {
     final timestampId = _uuid.v4();
 
     return {
-      'id_local': estadoId,
+      'id': estadoId,  // ✅ CAMBIO: usar 'id' en lugar de 'id_local'
       'timestamp_id': timestampId,
       'estado_sincronizacion': 'pendiente',
-      'fecha_creacion_local': _formatearFechaLocal(now),
+      'fecha_creacion': _formatearFechaLocal(now),  // ✅ CAMBIO: coincidir con tabla
       'equipo_id': equipoId,
       'cliente_id': cliente.id,
-      'usuario_id': usuarioId,
+      'usuario_id': usuarioId,  // ✅ ESTO AHORA SE GUARDARÁ CORRECTAMENTE
       'funcionando': true,
       'estado_general': 'Equipo registrado desde APP móvil - ${datosOriginales['observaciones'] ?? 'Censo registrado'}',
 
@@ -38,19 +38,12 @@ class CensoApiMapper {
       'latitud': datosOriginales['latitud'],
       'longitud': datosOriginales['longitud'],
 
-      // Primera imagen
-      'imagen_path': datosOriginales['imagen_path'],
-      'imagen_base64': datosOriginales['imagen_base64'],
-      'imagen_id_1': imagenId1,
+      // Primera imagen - YA NO SE GUARDAN EN CENSO_ACTIVO
+      // Se guardan en censo_activo_foto
       'tiene_imagen': datosOriginales['tiene_imagen'] ?? false,
-      'imagen_tamano': datosOriginales['imagen_tamano'],
 
-      // Segunda imagen
-      'imagen_path2': datosOriginales['imagen_path2'],
-      'imagen_base64_2': datosOriginales['imagen_base64_2'],
-      'imagen_id_2': imagenId2,
+      // Segunda imagen - YA NO SE GUARDAN EN CENSO_ACTIVO
       'tiene_imagen2': datosOriginales['tiene_imagen2'] ?? false,
-      'imagen_tamano2': datosOriginales['imagen_tamano2'],
 
       // Información del equipo
       'codigo_barras': equipoCompleto['cod_barras'] ?? datosOriginales['codigo_barras'],
@@ -77,6 +70,8 @@ class CensoApiMapper {
       'dispositivo': datosOriginales['dispositivo'] ?? 'android',
       'fecha_revision': _formatearFechaLocal(now),
       'en_local': true,
+      'sincronizado': 0,  // ✅ AGREGADO
+      'estado_censo': 'creado',  // ✅ AGREGADO
     };
   }
 
