@@ -177,6 +177,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       // GUARDAR FOTOS Y OBTENER IDs
       final idsImagenes = await _fotoService.guardarFotosDelCenso(estadoIdActual, datos);
+      _logger.i('🔍 FOTO SERVICE: Fotos guardadas para censo: $estadoIdActual');
+
+      await Future.delayed(Duration(milliseconds: 500));
 
       // PREPARAR DATOS COMPLETOS
       final datosCompletos = CensoApiMapper.prepararDatosCompletos(
@@ -193,10 +196,13 @@ class PreviewScreenViewModel extends ChangeNotifier {
         imagenId2: idsImagenes['imagen_id_2'],
       );
 
+      _logger.i('🔍 DATOS COMPLETOS: ID en datosCompletos: ${datosCompletos['id']}');
+
       // GUARDAR REGISTRO LOCAL
       await _guardarRegistroLocal(datosCompletos);
 
       // SINCRONIZAR EN BACKGROUND
+      _logger.i('🔍 SYNC: Pasando estadoId: $estadoIdActual');
       _uploadService.sincronizarCensoEnBackground(estadoIdActual, datosCompletos);
 
       _logger.i('✅ Registro guardado. Sincronización en segundo plano iniciada');

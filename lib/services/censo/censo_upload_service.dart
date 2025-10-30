@@ -7,7 +7,9 @@ import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
+import 'package:ada_app/repositories/equipo_repository.dart'; // ✅ AGREGADO
 import 'package:ada_app/services/sync/base_sync_service.dart';
+import 'package:ada_app/services/censo/censo_api_mapper.dart'; // ✅ AGREGADO: Importar el mapper
 import 'censo_log_service.dart';
 
 class CensoUploadService {
@@ -57,7 +59,7 @@ class CensoUploadService {
           },
           body: datos,
           timestamp: timestamp,
-          censoActivoId: datos['id_local'],
+          censoActivoId: datos['id'] ?? datos['id_local'], // ✅ CORREGIDO: manejar ambos campos
         );
       }
 
@@ -93,15 +95,21 @@ class CensoUploadService {
     }
   }
 
-  /// Prepara datos directamente desde la BD sin transformaciones restrictivas
-  Future<Map<String, dynamic>> _prepararPayloadDirectoDesdeBD(
+  /// ✅ MÉTODO CORREGIDO: Prepara datos usando el mapper correctamente
+  Future<Map<String, dynamic>> _prepararPayloadConMapper(
       String estadoId,
       List<dynamic> fotos,
       ) async {
     try {
-      _logger.i('📦 Preparando payload directo desde BD para: $estadoId');
+      _logger.i('📦 Preparando payload con mapper para: $estadoId');
 
-      // Obtener TODOS los datos de la tabla censo_activo
+      // 🔍 LOG DETALLADO #1: PARÁMETROS DE ENTRADA
+      _logger.i('🔍 DEBUG _prepararPayloadConMapper - Parámetros de entrada:');
+      _logger.i('🔍   estadoId: $estadoId');
+      _logger.i('🔍   fotos.length: ${fotos.length}');
+      _logger.i('🔍   fotos.runtimeType: ${fotos.runtimeType}');
+
+      // Obtener datos de la tabla censo_activo
       final maps = await _estadoEquipoRepository.dbHelper.consultar(
         'censo_activo',
         where: 'id = ?',
@@ -113,49 +121,121 @@ class CensoUploadService {
         throw Exception('No se encontró el censo: $estadoId');
       }
 
-      // Clonar TODO el mapa (sin restricciones)
-      final payload = Map<String, dynamic>.from(maps.first);
+      final datosLocales = maps.first;
+      final usuarioId = datosLocales['usuario_id'] as int?;
 
-      // 🔄 CONVERTIR usuario_id → edfvendedorid para el servidor
-      final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(payload['usuario_id']);
-      if (edfVendedorId != null) {
-        payload['edfvendedorid'] = edfVendedorId;
-        _logger.i('👤 Resuelto: usuario_id=${payload['usuario_id']} → edfvendedorid=$edfVendedorId');
+      if (usuarioId == null) {
+        throw Exception('usuario_id es requerido para el censo: $estadoId');
+      }
+
+      // 🔄 Resolver edfVendedorId desde usuario_id
+      final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(usuarioId);
+      if (edfVendedorId == null) {
+        throw Exception('No se pudo resolver edfVendedorId para usuario_id: $usuarioId');
+      }
+
+      // 🔍 LOG DETALLADO #2: FOTOS RECIBIDAS
+      _logger.i('🔍 DEBUG: Fotos recibidas en _prepararPayloadConMapper:');
+      _logger.i('🔍   Número de fotos: ${fotos.length}');
+      for (int i = 0; i < fotos.length; i++) {
+        final foto = fotos[i];
+        _logger.i('🔍   Foto $i:');
+        _logger.i('🔍     - ID: ${foto.id}');
+        _logger.i('🔍     - censo_activo_id: ${foto.censoActivoId}');
+        _logger.i('🔍     - orden: ${foto.orden}');
+        _logger.i('🔍     - tiene imagen_base64: ${foto.imagenBase64 != null}');
+        _logger.i('🔍     - tamaño imagen: ${foto.imagenTamano ?? 0}');
+        _logger.i('🔍     - path: ${foto.imagenPath ?? "N/A"}');
+        if (foto.imagenBase64 != null && foto.imagenBase64.toString().isNotEmpty) {
+          final preview = foto.imagenBase64.toString().length > 50
+              ? foto.imagenBase64.toString().substring(0, 50)
+              : foto.imagenBase64.toString();
+          _logger.i('🔍     - imagen_base64 preview: $preview...');
+        }
+      }
+
+      // 🔍 VERIFICAR SI EL EQUIPO YA ESTÁ ASIGNADO
+      final estaAsignado = await _verificarEquipoAsignado(
+        datosLocales['equipo_id']?.toString(),
+        datosLocales['cliente_id'],
+      );
+
+
+
+      final datosLocalesMutable = Map<String, dynamic>.from(datosLocales);
+      datosLocalesMutable['ya_asignado'] = estaAsignado;
+
+
+      _logger.i('🔍 Equipo ${datosLocales['equipo_id']} para cliente ${datosLocales['cliente_id']}: ${estaAsignado ? "ASIGNADO" : "PENDIENTE"}');
+
+      // ✅ USAR EL MAPPER PARA FORMATEAR CORRECTAMENTE CON FOTOS QUE TIENEN BASE64
+      final payload = CensoApiMapper.prepararDatosParaApi(
+        datosLocales: datosLocalesMutable, // ← USAR COPIA MUTABLE
+        usuarioId: usuarioId,
+        edfVendedorId: edfVendedorId,
+        fotosConBase64: fotos,
+      );
+
+      _logger.i('✅ Payload preparado con mapper: ${payload.keys.length} campos y ${fotos.length} fotos');
+
+      // 🔍 LOG DETALLADO #4: ARRAY DE FOTOS EN PAYLOAD FINAL
+      _logger.i('🔍 DEBUG: Array "fotos" en payload final:');
+      final fotosArray = payload['fotos'] as List?;
+      if (fotosArray != null) {
+        _logger.i('🔍   - Número de fotos en array: ${fotosArray.length}');
+        for (int i = 0; i < fotosArray.length; i++) {
+          final foto = fotosArray[i];
+          _logger.i('🔍   - Foto $i en payload: $foto');
+        }
       } else {
-        payload['edfvendedorid'] = null;
-        _logger.w('⚠️ No se pudo resolver edfvendedorid para usuario_id: ${payload['usuario_id']}');
+        _logger.w('🔍   - Array "fotos" es NULL en payload');
       }
 
-      // Solo agregar las imágenes base64 que no están en la tabla
-      if (fotos.isNotEmpty) {
-        payload['imagen_base64'] = fotos.first.imagenBase64;
-        payload['imageBase64_1'] = fotos.first.imagenBase64;
-        payload['tiene_imagen'] = true;
-      }
-
-      if (fotos.length > 1) {
-        payload['imagen_base64_2'] = fotos[1].imagenBase64;
-        payload['imageBase64_2'] = fotos[1].imagenBase64;
-        payload['tiene_imagen2'] = true;
-      }
-
-      // Agregar array de fotos para el backend
-      payload['fotos_censo_activo_foto'] = fotos.map((foto) => {
-        'orden': foto.orden,
-        'uuid': foto.id ?? 'N/A',
-        'path': foto.imagenPath ?? '',
-        'tamano': foto.imagenTamano ?? 0,
-      }).toList();
-
-      payload['total_imagenes'] = fotos.length;
-
-      _logger.i('✅ Payload preparado con ${payload.keys.length} campos y ${fotos.length} fotos');
+      // 🔍 LOG PARA DEPURACIÓN (sin base64 para que no sea gigante)
+      final jsonParaLog = Map<String, dynamic>.from(payload);
+      _removerBase64DelLog(jsonParaLog);
+      _logger.i('🔍 JSON CON MAPPER: ${json.encode(jsonParaLog)}');
 
       return payload;
     } catch (e) {
-      _logger.e('❌ Error preparando payload directo: $e');
+      _logger.e('❌ Error preparando payload con mapper: $e');
       rethrow;
     }
+  }
+
+  /// ✅ ACTUALIZADO: Verifica si un equipo ya está asignado a un cliente usando el mismo método que el ViewModel
+  Future<bool> _verificarEquipoAsignado(String? equipoId, dynamic clienteId) async {
+    try {
+      if (equipoId == null || clienteId == null) {
+        _logger.i('🔍 Equipo o cliente nulo - considerando PENDIENTE');
+        return false;
+      }
+
+      _logger.i('🔍 Verificando asignación: equipo=$equipoId, cliente=$clienteId');
+
+      // Usar el mismo método que usa el ViewModel para consistencia
+      final equipoRepository = EquipoRepository();
+      final estaAsignado = await equipoRepository.verificarAsignacionEquipoCliente(
+        equipoId,
+        _convertirAInt(clienteId),
+      );
+
+      _logger.i('🔍 Resultado: ${estaAsignado ? "ASIGNADO" : "PENDIENTE"}');
+
+      return estaAsignado;
+    } catch (e) {
+      _logger.w('⚠️ Error verificando asignación equipo-cliente: $e - Asumiendo PENDIENTE');
+      return false;
+    }
+  }
+
+  /// Helper para convertir a int
+  int _convertirAInt(dynamic valor) {
+    if (valor == null) return 0;
+    if (valor is int) return valor;
+    if (valor is String) return int.tryParse(valor) ?? 0;
+    if (valor is double) return valor.toInt();
+    return 0;
   }
 
   /// Método helper para obtener edfvendedorid desde usuario_id
@@ -217,31 +297,30 @@ class CensoUploadService {
         final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
         _logger.i('📸 Fotos encontradas: ${fotos.length}');
 
-        // ✅ USAR MÉTODO DIRECTO SIN RESTRICCIONES
-        final datosDeTabla = await _prepararPayloadDirectoDesdeBD(estadoId, fotos);
+        // 🔍 LOG DETALLADO DE FOTOS OBTENIDAS
+        _logger.i('🔍 DEBUG sincronizarCensoEnBackground - Fotos obtenidas de BD:');
+        for (int i = 0; i < fotos.length; i++) {
+          final foto = fotos[i];
+          _logger.i('🔍   Foto $i: ID=${foto.id}, censo_activo_id=${foto.censoActivoId}, orden=${foto.orden}');
+          _logger.i('🔍     - tiene imagen_base64: ${foto.imagenBase64 != null}');
+          _logger.i('🔍     - tamaño: ${foto.imagenTamano ?? 0} bytes');
+          if (foto.imagenBase64 != null && foto.imagenBase64!.isNotEmpty) {
+            final preview = foto.imagenBase64!.length > 50
+                ? foto.imagenBase64!.substring(0, 50)
+                : foto.imagenBase64!;
+            _logger.i('🔍     - imagen_base64 preview: $preview...');
+          }
+        }
 
-        // 🔍 LOG TEMPORAL PARA VER QUÉ SE ENVÍA (sin base64)
-        final jsonParaLog = Map<String, dynamic>.from(datosDeTabla);
-        if (jsonParaLog.containsKey('imagen_base64')) {
-          jsonParaLog['imagen_base64'] = '[BASE64_REMOVIDO_DEL_LOG]';
-        }
-        if (jsonParaLog.containsKey('imagen_base64_2')) {
-          jsonParaLog['imagen_base64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
-        }
-        if (jsonParaLog.containsKey('imageBase64_1')) {
-          jsonParaLog['imageBase64_1'] = '[BASE64_REMOVIDO_DEL_LOG]';
-        }
-        if (jsonParaLog.containsKey('imageBase64_2')) {
-          jsonParaLog['imageBase64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
-        }
-        _logger.i('🔍 JSON DIRECTO DE TABLA (${datosDeTabla.keys.length} campos): ${json.encode(jsonParaLog)}');
+        // ✅ USAR MÉTODO CORREGIDO CON MAPPER
+        final datosParaApi = await _prepararPayloadConMapper(estadoId, fotos);
 
         // Registrar intento (primer intento = 1)
         await _actualizarUltimoIntento(estadoId, 1);
 
-        // Enviar los datos tal como están en la tabla + imágenes
+        // Enviar los datos formateados correctamente
         final respuesta = await enviarCensoAlServidor(
-          datosDeTabla,
+          datosParaApi,
           timeoutSegundos: 45,
         );
 
@@ -364,24 +443,17 @@ class CensoUploadService {
       final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
       _logger.i('📸 Fotos para reintento: ${fotos.length}');
 
-      // ✅ USAR MÉTODO DIRECTO SIN RESTRICCIONES
-      final datosParaApi = await _prepararPayloadDirectoDesdeBD(estadoId, fotos);
+      // 🔍 LOG DETALLADO DE FOTOS PARA REINTENTO
+      _logger.i('🔍 DEBUG reintentarEnvioCenso - Fotos obtenidas:');
+      for (int i = 0; i < fotos.length; i++) {
+        final foto = fotos[i];
+        _logger.i('🔍   Foto $i: ID=${foto.id}, censo_activo_id=${foto.censoActivoId}');
+        _logger.i('🔍     - tiene imagen_base64: ${foto.imagenBase64 != null}');
+        _logger.i('🔍     - tamaño: ${foto.imagenTamano ?? 0} bytes');
+      }
 
-      // 🔍 LOG TEMPORAL PARA COMPARAR (sin imágenes base64 para que no sea gigante)
-      final jsonParaLog = Map<String, dynamic>.from(datosParaApi);
-      if (jsonParaLog.containsKey('imageBase64_1')) {
-        jsonParaLog['imageBase64_1'] = '[BASE64_REMOVIDO_DEL_LOG]';
-      }
-      if (jsonParaLog.containsKey('imageBase64_2')) {
-        jsonParaLog['imageBase64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
-      }
-      if (jsonParaLog.containsKey('imagen_base64')) {
-        jsonParaLog['imagen_base64'] = '[BASE64_REMOVIDO_DEL_LOG]';
-      }
-      if (jsonParaLog.containsKey('imagen_base64_2')) {
-        jsonParaLog['imagen_base64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
-      }
-      _logger.i('🔍 JSON REINTENTO (${datosParaApi.keys.length} campos): ${json.encode(jsonParaLog)}');
+      // ✅ USAR MÉTODO CORREGIDO CON MAPPER
+      final datosParaApi = await _prepararPayloadConMapper(estadoId, fotos);
 
       // Enviar con timeout más alto
       final respuesta = await enviarCensoAlServidor(
@@ -547,8 +619,8 @@ class CensoUploadService {
 
     _logger.i('🔄 Sincronizando ${registro.id} (intento #$numeroIntento, ${fotos.length} fotos)');
 
-    // ✅ USAR MÉTODO DIRECTO SIN RESTRICCIONES
-    final datosParaApi = await _prepararPayloadDirectoDesdeBD(registro.id!, fotos);
+    // ✅ USAR MÉTODO CORREGIDO CON MAPPER
+    final datosParaApi = await _prepararPayloadConMapper(registro.id!, fotos);
 
     // Actualizar timestamp del último intento
     await _actualizarUltimoIntento(registro.id!, numeroIntento);
@@ -702,4 +774,29 @@ class CensoUploadService {
     }
   }
 
+  /// ✅ HELPER: Remover base64 de logs para evitar logs gigantes
+  void _removerBase64DelLog(Map<String, dynamic> datos) {
+    if (datos.containsKey('imagen_base64')) {
+      datos['imagen_base64'] = '[BASE64_REMOVIDO_DEL_LOG]';
+    }
+    if (datos.containsKey('imagen_base64_2')) {
+      datos['imagen_base64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
+    }
+    if (datos.containsKey('imageBase64_1')) {
+      datos['imageBase64_1'] = '[BASE64_REMOVIDO_DEL_LOG]';
+    }
+    if (datos.containsKey('imageBase64_2')) {
+      datos['imageBase64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
+    }
+
+    // Remover base64 del array de fotos también
+    if (datos.containsKey('fotos') && datos['fotos'] is List) {
+      final fotos = datos['fotos'] as List;
+      for (final foto in fotos) {
+        if (foto is Map<String, dynamic> && foto.containsKey('base64')) {
+          foto['base64'] = '[BASE64_REMOVIDO_DEL_LOG]';
+        }
+      }
+    }
+  }
 }
