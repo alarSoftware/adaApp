@@ -193,7 +193,7 @@ class CensoUploadService {
 
       // 🔍 LOG PARA DEPURACIÓN (sin base64 para que no sea gigante)
       final jsonParaLog = Map<String, dynamic>.from(payload);
-      _removerBase64DelLog(jsonParaLog);
+      // _removerBase64DelLog(jsonParaLog);
       _logger.i('🔍 JSON CON MAPPER: ${json.encode(jsonParaLog)}');
 
       return payload;
@@ -775,28 +775,28 @@ class CensoUploadService {
   }
 
   /// ✅ HELPER: Remover base64 de logs para evitar logs gigantes
-  void _removerBase64DelLog(Map<String, dynamic> datos) {
-    if (datos.containsKey('imagen_base64')) {
-      datos['imagen_base64'] = '[BASE64_REMOVIDO_DEL_LOG]';
-    }
-    if (datos.containsKey('imagen_base64_2')) {
-      datos['imagen_base64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
-    }
-    if (datos.containsKey('imageBase64_1')) {
-      datos['imageBase64_1'] = '[BASE64_REMOVIDO_DEL_LOG]';
-    }
-    if (datos.containsKey('imageBase64_2')) {
-      datos['imageBase64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
-    }
-
-    // Remover base64 del array de fotos también
-    if (datos.containsKey('fotos') && datos['fotos'] is List) {
-      final fotos = datos['fotos'] as List;
-      for (final foto in fotos) {
-        if (foto is Map<String, dynamic> && foto.containsKey('base64')) {
-          foto['base64'] = '[BASE64_REMOVIDO_DEL_LOG]';
-        }
-      }
-    }
-  }
+  // void _removerBase64DelLog(Map<String, dynamic> datos) {
+  //   if (datos.containsKey('imagen_base64')) {
+  //     datos['imagen_base64'] = '[BASE64_REMOVIDO_DEL_LOG]';
+  //   }
+  //   if (datos.containsKey('imagen_base64_2')) {
+  //     datos['imagen_base64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
+  //   }
+  //   if (datos.containsKey('imageBase64_1')) {
+  //     datos['imageBase64_1'] = '[BASE64_REMOVIDO_DEL_LOG]';
+  //   }
+  //   if (datos.containsKey('imageBase64_2')) {
+  //     datos['imageBase64_2'] = '[BASE64_REMOVIDO_DEL_LOG]';
+  //   }
+  //
+  //   // Remover base64 del array de fotos también
+  //   if (datos.containsKey('fotos') && datos['fotos'] is List) {
+  //     final fotos = datos['fotos'] as List;
+  //     for (final foto in fotos) {
+  //       if (foto is Map<String, dynamic> && foto.containsKey('base64')) {
+  //         foto['base64'] = '[BASE64_REMOVIDO_DEL_LOG]';
+  //       }
+  //     }
+  //   }
+  // }
 }

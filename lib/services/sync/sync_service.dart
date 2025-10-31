@@ -3,10 +3,11 @@ import 'package:ada_app/services/sync/user_sync_service.dart';
 import 'package:ada_app/services/sync/client_sync_service.dart';
 import 'package:ada_app/services/sync/equipment_sync_service.dart';
 import 'package:ada_app/repositories/cliente_repository.dart';
-import 'package:ada_app/services/sync/census_sync_service.dart';
+import 'package:ada_app/services/sync/censo_sync_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ada_app/services/sync/equipos_pendientes_sync_service.dart';
 import 'package:ada_app/services/sync/dynamic_form_sync_service.dart';
+import 'package:ada_app/services/sync/censo_image_sync_service.dart'; // 🆕 NUEVO IMPORT
 import '../database_helper.dart';
 import 'package:logger/logger.dart';
 
@@ -72,12 +73,13 @@ class SyncService {
       // CHECKPOINT: Verificar que llegamos hasta aquí
       BaseSyncService.logger.i('🎯 CHECKPOINT: A punto de sincronizar censos...');
 
-      // Sincronizar censos activos con edf_vendedor_id
+      // 🔥 MANTENER LA LLAMADA ORIGINAL DE CENSOS EXACTAMENTE COMO ESTABA ANTES
       BaseSyncService.logger.i('📊 Iniciando sincronización de censos...');
 
       try {
+        // ⚠️ IMPORTANTE: Usar la llamada ORIGINAL sin cambios
         final resultadoCensos = await CensusSyncService.obtenerCensosActivos(
-          edfVendedorId: edfVendedorId,
+          edfVendedorId: edfVendedorId,  // 🔥 AGREGAR ESTO
         );
         resultado.censosSincronizados = resultadoCensos.itemsSincronizados;
         resultado.censosExito = resultadoCensos.exito;
@@ -88,6 +90,29 @@ class SyncService {
         resultado.censosExito = false;
         resultado.erroresCensos = 'Error al sincronizar censos: $e';
         resultado.censosSincronizados = 0;
+      }
+
+      // 🆕 NUEVA SECCIÓN: SINCRONIZAR IMÁGENES DE CENSOS (SOLO SI HAY CENSOS)
+      if (resultado.censosExito && resultado.censosSincronizados > 0) {
+        BaseSyncService.logger.i('🖼️ Iniciando sincronización de imágenes de censos...');
+
+        try {
+          final resultadoImagenes = await CensusImageSyncService.sincronizarImagenesPorVendedor(edfVendedorId);
+          resultado.imagenesCensosSincronizadas = resultadoImagenes.itemsSincronizados;
+          resultado.imagenesCensosExito = resultadoImagenes.exito;
+          if (!resultadoImagenes.exito) resultado.erroresImagenesCensos = resultadoImagenes.mensaje;
+          BaseSyncService.logger.i('✅ Imágenes de censos sincronizadas: ${resultadoImagenes.itemsSincronizados} (Éxito: ${resultadoImagenes.exito})');
+        } catch (e) {
+          BaseSyncService.logger.e('❌ ERROR EN IMÁGENES DE CENSOS: $e');
+          resultado.imagenesCensosExito = false;
+          resultado.erroresImagenesCensos = 'Error al sincronizar imágenes de censos: $e';
+          resultado.imagenesCensosSincronizadas = 0;
+        }
+      } else {
+        BaseSyncService.logger.w('⚠️ No se sincronizarán imágenes porque no hay censos exitosos');
+        resultado.imagenesCensosExito = true; // No es un error, simplemente no hay censos
+        resultado.imagenesCensosSincronizadas = 0;
+        resultado.erroresImagenesCensos = null;
       }
 
       BaseSyncService.logger.i('📋 Iniciando sincronización de equipos pendientes...');
@@ -132,22 +157,7 @@ class SyncService {
       resultado.detallesFormulariosSincronizados = 0; // Los detalles están incluidos en formularios
       resultado.detallesFormulariosExito = true;
 
-      /* ELIMINADO PARA EVITAR DUPLICADO:
-      try {
-        final resultadoDetalles = await DynamicFormSyncService.sincronizarTodosLosDetalles();
-        resultado.detallesFormulariosSincronizados = resultadoDetalles.itemsSincronizados;
-        resultado.detallesFormulariosExito = resultadoDetalles.exito;
-        if (!resultadoDetalles.exito) resultado.erroresDetallesFormularios = resultadoDetalles.mensaje;
-        BaseSyncService.logger.i('✅ Detalles sincronizados: ${resultadoDetalles.itemsSincronizados} (Éxito: ${resultadoDetalles.exito})');
-      } catch (e) {
-        BaseSyncService.logger.e('❌ ERROR EN DETALLES DE FORMULARIOS: $e');
-        resultado.detallesFormulariosExito = false;
-        resultado.erroresDetallesFormularios = 'Error al sincronizar detalles: $e';
-        resultado.detallesFormulariosSincronizados = 0;
-      }
-      */
-
-      // ========== 🆕 NUEVA SECCIÓN: SINCRONIZAR RESPUESTAS ==========
+      // ========== SINCRONIZAR RESPUESTAS ==========
       BaseSyncService.logger.i('📝 Sincronizando respuestas de formularios...');
 
       try {
@@ -166,34 +176,37 @@ class SyncService {
 
       BaseSyncService.logger.i('🏁 EVALUANDO RESULTADO GENERAL...');
 
-      // Evaluar resultado general (ACTUALIZADO: ahora incluye respuestas)
+      // Evaluar resultado general (MANTENER LA LÓGICA ORIGINAL + IMÁGENES OPCIONALES)
       final exitosos = [
         resultado.clientesExito,
         resultado.equiposExito,
         resultado.censosExito,
+        resultado.imagenesCensosExito, // 🆕 Añadido pero no crítico
         resultado.equiposPendientesExito,
         resultado.formulariosExito,
         resultado.detallesFormulariosExito,
-        resultado.respuestasFormulariosExito, // 🆕 Añadido
+        resultado.respuestasFormulariosExito,
         resultado.asignacionesExito
       ];
       final totalExitosos = exitosos.where((e) => e).length;
 
-      BaseSyncService.logger.i('📊 Resultados: Clientes(${resultado.clientesExito}), Equipos(${resultado.equiposExito}), Censos(${resultado.censosExito}), EquiposPendientes(${resultado.equiposPendientesExito}), Formularios(${resultado.formulariosExito}), Detalles(${resultado.detallesFormulariosExito}), Respuestas(${resultado.respuestasFormulariosExito}), Total exitosos: $totalExitosos');
+      BaseSyncService.logger.i('📊 Resultados: Clientes(${resultado.clientesExito}), Equipos(${resultado.equiposExito}), Censos(${resultado.censosExito}), ImagenesCensos(${resultado.imagenesCensosExito}), EquiposPendientes(${resultado.equiposPendientesExito}), Formularios(${resultado.formulariosExito}), Detalles(${resultado.detallesFormulariosExito}), Respuestas(${resultado.respuestasFormulariosExito}), Total exitosos: $totalExitosos');
 
-      if (totalExitosos >= 6) { // Cambiado de 5 a 6
+      // 🔥 CAMBIO CRÍTICO: Reducir el umbral para que no requiera imágenes obligatoriamente
+      if (totalExitosos >= 6) { // Mantener 6 en lugar de 7, las imágenes son opcionales
         resultado.exito = true;
-        resultado.mensaje = 'Sincronización completa: ${resultado.clientesSincronizados} clientes, ${resultado.equiposSincronizados} equipos, ${resultado.censosSincronizados} censos, ${resultado.equiposPendientesSincronizados} equipos pendientes, ${resultado.formulariosSincronizados} formularios, ${resultado.detallesFormulariosSincronizados} detalles, ${resultado.respuestasFormulariosSincronizadas} respuestas y ${resultado.asignacionesSincronizadas} asignaciones';
+        resultado.mensaje = 'Sincronización completa: ${resultado.clientesSincronizados} clientes, ${resultado.equiposSincronizados} equipos, ${resultado.censosSincronizados} censos, ${resultado.imagenesCensosSincronizadas} imágenes, ${resultado.equiposPendientesSincronizados} equipos pendientes, ${resultado.formulariosSincronizados} formularios, ${resultado.detallesFormulariosSincronizados} detalles, ${resultado.respuestasFormulariosSincronizadas} respuestas y ${resultado.asignacionesSincronizadas} asignaciones';
       } else if (totalExitosos > 0) {
         resultado.exito = true;
         final partes = <String>[];
         if (resultado.clientesExito) partes.add('${resultado.clientesSincronizados} clientes');
         if (resultado.equiposExito) partes.add('${resultado.equiposSincronizados} equipos');
         if (resultado.censosExito) partes.add('${resultado.censosSincronizados} censos');
+        if (resultado.imagenesCensosExito && resultado.imagenesCensosSincronizadas > 0) partes.add('${resultado.imagenesCensosSincronizadas} imágenes'); // Solo mostrar si hay imágenes
         if (resultado.equiposPendientesExito) partes.add('${resultado.equiposPendientesSincronizados} equipos pendientes');
         if (resultado.formulariosExito) partes.add('${resultado.formulariosSincronizados} formularios');
         if (resultado.detallesFormulariosExito) partes.add('${resultado.detallesFormulariosSincronizados} detalles');
-        if (resultado.respuestasFormulariosExito) partes.add('${resultado.respuestasFormulariosSincronizadas} respuestas'); // 🆕 Añadido
+        if (resultado.respuestasFormulariosExito) partes.add('${resultado.respuestasFormulariosSincronizadas} respuestas');
         if (resultado.asignacionesExito) partes.add('${resultado.asignacionesSincronizadas} asignaciones');
         resultado.mensaje = 'Sincronización parcial: ${partes.join(', ')}';
       } else {
@@ -227,6 +240,10 @@ class SyncService {
   static Future<SyncResult> sincronizarEquiposPendientes({String? edfVendedorId}) =>
       EquiposPendientesSyncService.obtenerEquiposPendientes(edfVendedorId: edfVendedorId);
 
+  // 🆕 NUEVO: Método para sincronizar imágenes de censos
+  static Future<SyncResult> sincronizarImagenesCensos({String? edfVendedorId}) =>
+      CensusImageSyncService.sincronizarImagenesPorVendedor(edfVendedorId ?? '');
+
   // Métodos de formularios dinámicos
   static Future<SyncResult> sincronizarFormulariosDinamicos() =>
       DynamicFormSyncService.obtenerFormulariosDinamicos();
@@ -240,9 +257,58 @@ class SyncService {
   static Future<SyncResult> sincronizarDetallesFormularios() =>
       DynamicFormSyncService.sincronizarTodosLosDetalles();
 
-  // 🆕 Método para sincronizar respuestas de formularios
+  // Método para sincronizar respuestas de formularios
   static Future<SyncResult> sincronizarRespuestasFormularios({String? edfVendedorId}) =>
       DynamicFormSyncService.obtenerRespuestasFormularios(edfvendedorId: edfVendedorId);
+
+  // 🆕 NUEVOS MÉTODOS PARA IMÁGENES DE CENSOS
+  static Future<SyncResult> obtenerFotosCensos({
+    String? edfVendedorId,
+    int? censoActivoId,
+    String? uuid,
+    int? limit,
+    int? offset,
+    bool incluirBase64 = true,
+  }) => CensusImageSyncService.obtenerFotosCensos(
+    edfVendedorId: edfVendedorId,
+    censoActivoId: censoActivoId,
+    uuid: uuid,
+    limit: limit,
+    offset: offset,
+    incluirBase64: incluirBase64,
+  );
+
+  static Future<SyncResult> obtenerFotosDeCenso(
+      int censoActivoId, {
+        String? edfVendedorId,
+        bool incluirBase64 = true,
+      }) => CensusImageSyncService.obtenerFotosDeCenso(
+    censoActivoId,
+    edfVendedorId: edfVendedorId,
+    incluirBase64: incluirBase64,
+  );
+
+  static Future<SyncResult> obtenerFotoPorUuid(
+      String uuid, {
+        String? edfVendedorId,
+        bool incluirBase64 = true,
+      }) => CensusImageSyncService.obtenerFotoPorUuid(
+    uuid,
+    edfVendedorId: edfVendedorId,
+    incluirBase64: incluirBase64,
+  );
+
+  static Future<SyncResult> obtenerMetadatosFotos({
+    String? edfVendedorId,
+    int? censoActivoId,
+    int? limit,
+    int? offset,
+  }) => CensusImageSyncService.obtenerMetadatosFotos(
+    edfVendedorId: edfVendedorId,
+    censoActivoId: censoActivoId,
+    limit: limit,
+    offset: offset,
+  );
 
   // Métodos de envío
   static Future<SyncResult> enviarClientesPendientes() => ClientSyncService.enviarClientesPendientes();
@@ -289,7 +355,7 @@ class SyncService {
     dispositivo: dispositivo,
   );
 
-  // ========== MÉTODOS DE CENSO ==========
+  // ========== MÉTODOS DE CENSO (MANTENER ORIGINALES) ==========
 
   static Future<SyncResult> obtenerCensosActivos({
     int? clienteId,
@@ -389,7 +455,7 @@ class SyncService {
   }
 }
 
-// Clase de resultado unificado - ACTUALIZADA CON RESPUESTAS
+// Clase de resultado unificado - ACTUALIZADA CON IMÁGENES DE CENSOS PERO SIN ROMPER COMPATIBILIDAD
 class SyncResultUnificado {
   bool exito = false;
   String mensaje = '';
@@ -409,6 +475,11 @@ class SyncResultUnificado {
   int censosSincronizados = 0;
   String? erroresCensos;
 
+  // 🆕 NUEVOS CAMPOS PARA IMÁGENES DE CENSOS (OPCIONALES)
+  bool imagenesCensosExito = false;
+  int imagenesCensosSincronizadas = 0;
+  String? erroresImagenesCensos;
+
   bool equiposPendientesExito = false;
   int equiposPendientesSincronizados = 0;
   String? erroresEquiposPendientes;
@@ -421,7 +492,6 @@ class SyncResultUnificado {
   int detallesFormulariosSincronizados = 0;
   String? erroresDetallesFormularios;
 
-  // 🆕 NUEVOS CAMPOS PARA RESPUESTAS
   bool respuestasFormulariosExito = false;
   int respuestasFormulariosSincronizadas = 0;
   String? erroresRespuestasFormularios;
@@ -432,6 +502,6 @@ class SyncResultUnificado {
 
   @override
   String toString() {
-    return 'SyncResultUnificado(exito: $exito, clientes: $clientesSincronizados, equipos: $equiposSincronizados, censos: $censosSincronizados, equiposPendientes: $equiposPendientesSincronizados, formularios: $formulariosSincronizados, detalles: $detallesFormulariosSincronizados, respuestas: $respuestasFormulariosSincronizadas, asignaciones: $asignacionesSincronizadas, mensaje: $mensaje)';
+    return 'SyncResultUnificado(exito: $exito, clientes: $clientesSincronizados, equipos: $equiposSincronizados, censos: $censosSincronizados, imagenes: $imagenesCensosSincronizadas, equiposPendientes: $equiposPendientesSincronizados, formularios: $formulariosSincronizados, detalles: $detallesFormulariosSincronizados, respuestas: $respuestasFormulariosSincronizadas, asignaciones: $asignacionesSincronizadas, mensaje: $mensaje)';
   }
 }

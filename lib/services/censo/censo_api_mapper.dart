@@ -102,7 +102,7 @@ class CensoApiMapper {
 
         final fotoMap = {
           'id': foto.id,
-          'base64': foto.imagenBase64, // ← AQUÍ ESTÁ EL BASE64
+          'base64': foto.imagenBase64,
           'path': foto.imagenPath,
           'tamano': foto.imagenTamano,
           'orden': foto.orden ?? (i + 1),

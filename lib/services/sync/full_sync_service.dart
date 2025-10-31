@@ -57,7 +57,7 @@ class FullSyncService {
       );
       await Future.delayed(const Duration(milliseconds: 200));
 
-      // 3. Sincronizar todos los datos (15% -> 82%)
+      // 3. Sincronizar todos los datos (15% -> 80%)
       onProgress(
         progress: 0.2,
         currentStep: 'Descargando datos...',
@@ -73,10 +73,10 @@ class FullSyncService {
       // Reportar progreso por cada tipo de dato
       double currentProgress = 0.25;
 
-      // Clientes (25% -> 35%)
+      // Clientes (25% -> 32%)
       if (syncResult.clientesSincronizados > 0) {
         completedSteps.add('${syncResult.clientesSincronizados} clientes');
-        currentProgress = 0.35;
+        currentProgress = 0.32;
         onProgress(
           progress: currentProgress,
           currentStep: 'Clientes descargados',
@@ -85,10 +85,10 @@ class FullSyncService {
         await Future.delayed(const Duration(milliseconds: 200));
       }
 
-      // Equipos (35% -> 45%)
+      // Equipos (32% -> 40%)
       if (syncResult.equiposSincronizados > 0) {
         completedSteps.add('${syncResult.equiposSincronizados} equipos');
-        currentProgress = 0.45;
+        currentProgress = 0.40;
         onProgress(
           progress: currentProgress,
           currentStep: 'Equipos descargados',
@@ -97,10 +97,10 @@ class FullSyncService {
         await Future.delayed(const Duration(milliseconds: 200));
       }
 
-      // Censos (45% -> 55%)
+      // Censos (40% -> 50%)
       if (syncResult.censosSincronizados > 0) {
         completedSteps.add('${syncResult.censosSincronizados} censos');
-        currentProgress = 0.55;
+        currentProgress = 0.50;
         onProgress(
           progress: currentProgress,
           currentStep: 'Censos descargados',
@@ -109,10 +109,32 @@ class FullSyncService {
         await Future.delayed(const Duration(milliseconds: 200));
       }
 
-      // Equipos Pendientes (55% -> 65%)
+      // 🆕 Imágenes de censos (50% -> 55%) - SOLO SI HAY IMÁGENES
+      if (syncResult.imagenesCensosSincronizadas > 0) {
+        completedSteps.add('${syncResult.imagenesCensosSincronizadas} imágenes de censos');
+        currentProgress = 0.55;
+        onProgress(
+          progress: currentProgress,
+          currentStep: 'Imágenes de censos descargadas',
+          completedSteps: completedSteps,
+        );
+        await Future.delayed(const Duration(milliseconds: 200));
+      } else if (syncResult.censosSincronizados > 0) {
+        // Si hay censos pero no imágenes, mostrar mensaje informativo
+        completedSteps.add('Imágenes: no disponibles');
+        currentProgress = 0.55;
+        onProgress(
+          progress: currentProgress,
+          currentStep: 'Imágenes: no disponibles',
+          completedSteps: completedSteps,
+        );
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+
+      // Equipos Pendientes (55% -> 62%)
       if (syncResult.equiposPendientesSincronizados > 0) {
         completedSteps.add('${syncResult.equiposPendientesSincronizados} equipos pendientes');
-        currentProgress = 0.65;
+        currentProgress = 0.62;
         onProgress(
           progress: currentProgress,
           currentStep: 'Equipos pendientes descargados',
@@ -121,10 +143,10 @@ class FullSyncService {
         await Future.delayed(const Duration(milliseconds: 200));
       }
 
-      // Formularios (65% -> 75%)
+      // Formularios (62% -> 70%)
       if (syncResult.formulariosSincronizados > 0) {
         completedSteps.add('${syncResult.formulariosSincronizados} formularios');
-        currentProgress = 0.75;
+        currentProgress = 0.70;
         onProgress(
           progress: currentProgress,
           currentStep: 'Formularios descargados',
@@ -133,10 +155,10 @@ class FullSyncService {
         await Future.delayed(const Duration(milliseconds: 200));
       }
 
-      // Detalles de formularios (75% -> 82%)
+      // Detalles de formularios (70% -> 80%)
       if (syncResult.detallesFormulariosSincronizados > 0) {
         completedSteps.add('${syncResult.detallesFormulariosSincronizados} detalles');
-        currentProgress = 0.82;
+        currentProgress = 0.80;
         onProgress(
           progress: currentProgress,
           currentStep: 'Detalles de formularios descargados',
@@ -145,9 +167,9 @@ class FullSyncService {
         await Future.delayed(const Duration(milliseconds: 200));
       }
 
-      // 4. Sincronizar respuestas de formularios (82% -> 90%)
+      // 4. Sincronizar respuestas de formularios (80% -> 90%)
       onProgress(
-        progress: 0.82,
+        progress: 0.80,
         currentStep: 'Descargando respuestas de formularios...',
         completedSteps: completedSteps,
       );
@@ -158,7 +180,7 @@ class FullSyncService {
         if (responsesResult.exito && responsesResult.itemsSincronizados > 0) {
           completedSteps.add('${responsesResult.itemsSincronizados} respuestas');
           onProgress(
-            progress: 0.9,
+            progress: 0.90,
             currentStep: 'Respuestas descargadas',
             completedSteps: completedSteps,
           );
@@ -166,7 +188,7 @@ class FullSyncService {
           debugPrint('⚠️ Error descargando respuestas: ${responsesResult.mensaje}');
           completedSteps.add('Respuestas: error (continuando)');
           onProgress(
-            progress: 0.9,
+            progress: 0.90,
             currentStep: 'Respuestas: error (continuando)',
             completedSteps: completedSteps,
           );
@@ -175,7 +197,7 @@ class FullSyncService {
         debugPrint('⚠️ Excepción al descargar respuestas: $e');
         completedSteps.add('Respuestas: error (continuando)');
         onProgress(
-          progress: 0.9,
+          progress: 0.90,
           currentStep: 'Respuestas: error (continuando)',
           completedSteps: completedSteps,
         );
@@ -209,7 +231,8 @@ class FullSyncService {
         mensaje: 'Sincronización completada exitosamente',
         itemsSincronizados: syncResult.clientesSincronizados +
             syncResult.equiposSincronizados +
-            syncResult.censosSincronizados,
+            syncResult.censosSincronizados +
+            syncResult.imagenesCensosSincronizadas, // 🆕 Incluir imágenes si las hay
       );
 
     } catch (e) {

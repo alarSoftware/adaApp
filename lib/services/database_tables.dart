@@ -122,7 +122,7 @@ class DatabaseTables {
 
   String _sqlCensoActivo() => '''
   CREATE TABLE censo_activo (
-    id TEXT,
+    id TEXT PRIMARY KEY,
     equipo_id TEXT NOT NULL,
     cliente_id INTEGER NOT NULL,
     usuario_id INTEGER,

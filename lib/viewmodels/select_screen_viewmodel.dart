@@ -8,7 +8,7 @@ import 'package:logger/logger.dart';
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ada_app/services/sync/full_sync_service.dart'; // ✅ Ya importado
+import 'package:ada_app/services/sync/full_sync_service.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/models/usuario.dart';
 
@@ -60,7 +60,7 @@ class SyncCompletedEvent extends UIEvent {
 
 class RedirectToLoginEvent extends UIEvent {}
 
-// 🆕 NUEVO: Evento para actualizar progreso de sincronización
+// Evento para actualizar progreso de sincronización
 class SyncProgressEvent extends UIEvent {
   final double progress;
   final String currentStep;
@@ -77,11 +77,13 @@ class SyncProgressEvent extends UIEvent {
 class SyncInfo {
   final int estimatedClients;
   final int estimatedEquipments;
+  final int estimatedImages; // 🆕 NUEVO
   final String serverUrl;
 
   SyncInfo({
     required this.estimatedClients,
     required this.estimatedEquipments,
+    required this.estimatedImages, // 🆕 NUEVO
     required this.serverUrl,
   });
 }
@@ -90,12 +92,14 @@ class SyncResult {
   final bool success;
   final int clientsSynced;
   final int equipmentsSynced;
+  final int imagesSynced; // 🆕 NUEVO
   final String message;
 
   SyncResult({
     required this.success,
     required this.clientsSynced,
     required this.equipmentsSynced,
+    required this.imagesSynced, // 🆕 NUEVO
     required this.message,
   });
 }
@@ -143,7 +147,7 @@ class SelectScreenViewModel extends ChangeNotifier {
     type: ConnectionType.noInternet,
   );
 
-  // 🆕 NUEVO: Estado de progreso de sincronización
+  // Estado de progreso de sincronización
   double _syncProgress = 0.0;
   String _syncCurrentStep = '';
   List<String> _syncCompletedSteps = [];
@@ -171,7 +175,7 @@ class SelectScreenViewModel extends ChangeNotifier {
   ConnectionStatus get connectionStatus => _connectionStatus;
   bool get isConnected => _connectionStatus.hasInternet && _connectionStatus.hasApiConnection;
 
-  // 🆕 NUEVO: Getters de progreso
+  // Getters de progreso
   double get syncProgress => _syncProgress;
   String get syncCurrentStep => _syncCurrentStep;
   List<String> get syncCompletedSteps => List.from(_syncCompletedSteps);
@@ -482,10 +486,11 @@ class SelectScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      // Obtener información para mostrar en el diálogo
+      // Obtener información para mostrar en el diálogo (🆕 INCLUYE IMÁGENES)
       final syncInfo = SyncInfo(
         estimatedClients: await _getEstimatedClients(),
         estimatedEquipments: await _getEstimatedEquipments(),
+        estimatedImages: await _getEstimatedImages(), // 🆕 NUEVO
         serverUrl: conexion.mensaje,
       );
 
@@ -506,7 +511,7 @@ class SelectScreenViewModel extends ChangeNotifier {
     _resetSyncProgress();
 
     try {
-      // 🔥 USAR EL SERVICIO UNIFICADO
+      // USAR EL SERVICIO UNIFICADO
       final result = await FullSyncService.syncAllDataWithProgress(
         edfVendedorId: edfVendedorId,
         previousVendedorId: previousVendedorId,
@@ -535,11 +540,12 @@ class SelectScreenViewModel extends ChangeNotifier {
         throw Exception(result.mensaje);
       }
 
-      // Sincronización exitosa
+      // Sincronización exitosa (🆕 INCLUYE IMÁGENES)
       final syncResult = SyncResult(
         success: true,
         clientsSynced: result.itemsSincronizados,
         equipmentsSynced: 0, // FullSyncService no devuelve este dato separado
+        imagesSynced: 0, // 🆕 NUEVO: incluido en itemsSincronizados
         message: result.mensaje,
       );
 
@@ -557,7 +563,7 @@ class SelectScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// NUEVO: Ejecuta sincronización obligatoria usando el método unificado
+  /// Ejecuta sincronización obligatoria usando el método unificado
   Future<void> executeMandatorySync() async {
     if (_currentUser == null) {
       _eventController.add(ShowErrorEvent('No hay usuario válido'));
@@ -572,7 +578,7 @@ class SelectScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      // 🔥 USAR MÉTODO UNIFICADO
+      // USAR MÉTODO UNIFICADO
       await _executeUnifiedSync(
         edfVendedorId: _currentUser!.edfVendedorId ?? '',
         previousVendedorId: _syncValidationResult?.vendedorAnterior,
@@ -595,7 +601,7 @@ class SelectScreenViewModel extends ChangeNotifier {
       return;
     }
 
-    // 🔥 USAR MÉTODO UNIFICADO
+    // USAR MÉTODO UNIFICADO
     await _executeUnifiedSync(
       edfVendedorId: _currentUser!.edfVendedorId ?? '',
       previousVendedorId: null, // No hay cambio de vendedor en sync opcional
@@ -655,6 +661,9 @@ class SelectScreenViewModel extends ChangeNotifier {
       await _dbHelper.eliminar('dynamic_form_detail');
       await _dbHelper.eliminar('dynamic_form_response');
 
+      // 🆕 NUEVO: Borrar imágenes de censos usando la tabla correcta
+      await _dbHelper.eliminar('censo_activo_foto');
+
       // Limpiar datos de sincronización
       await _clearSyncData();
 
@@ -687,12 +696,12 @@ class SelectScreenViewModel extends ChangeNotifier {
     await _loadCurrentUserAndValidateSync();
   }
 
-  /// NUEVO: Fuerza revalidación de sincronización
+  /// Fuerza revalidación de sincronización
   Future<void> revalidateSync() async {
     await _loadCurrentUserAndValidateSync();
   }
 
-  /// NUEVO: Permite al usuario cancelar y volver al login
+  /// Permite al usuario cancelar y volver al login
   Future<void> cancelAndLogout() async {
     try {
       await _authService.logout();
@@ -736,6 +745,21 @@ class SelectScreenViewModel extends ChangeNotifier {
       final equipoRepo = EquipoRepository();
       return await equipoRepo.contar();
     } catch (e) {
+      return 0;
+    }
+  }
+
+  // 🆕 NUEVO: Método para estimar imágenes
+  Future<int> _getEstimatedImages() async {
+    try {
+      // Usar la tabla correcta: censo_activo_foto
+      final resultado = await _dbHelper.consultarPersonalizada(
+        'SELECT COUNT(*) as total FROM censo_activo_foto',
+        [],
+      );
+      return resultado.isNotEmpty ? (resultado.first['total'] as int? ?? 0) : 0;
+    } catch (e) {
+      // Si no existe la tabla o hay error, retornar 0
       return 0;
     }
   }
