@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:logger/logger.dart';
@@ -137,6 +138,24 @@ class DatabaseHelper {
     return insertar(tableName, values, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  Future<int> vaciarEInsertar(String tableName, List<Map<String, dynamic>> nuevosRegistros) async {
+    final db = await database;
+
+    return await db.transaction<int>((txn) async {
+      // 1. Vaciar
+      await txn.delete(tableName);
+
+      // 2. Insertar
+      for (final record in nuevosRegistros) {
+        _validateValues(record);
+        _addTimestamps(tableName, record);
+        await txn.insert(tableName, record);
+      }
+
+      return nuevosRegistros.length;
+    });
+  }
+
   Future<int> actualizar(
       String tableName,
       Map<String, dynamic> values, {
@@ -162,6 +181,8 @@ class DatabaseHelper {
   Future<int> eliminarPorId(String tableName, int id) async {
     return await eliminar(tableName, where: 'id = ?', whereArgs: [id]);
   }
+
+
 
   // ================================================================
   // MÉTODOS DE SINCRONIZACIÓN (DELEGADOS)
