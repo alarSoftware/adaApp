@@ -113,8 +113,19 @@ class DynamicFormViewModel extends ChangeNotifier {
   void _loadExistingResponse(DynamicFormResponse response) {
     _currentResponse = response;
     _fieldValues = Map<String, dynamic>.from(response.answers);
+
     _logger.i('✅ Formulario cargado para editar: ${response.id}');
     _logger.i('📝 Valores cargados: ${_fieldValues.length} campos');
+
+    // ✨ NUEVO: Log detallado de los valores cargados
+    _logger.i('📋 Contenido de campos:');
+    _fieldValues.forEach((key, value) {
+      if (value is String && (value.contains('.jpg') || value.contains('.png') || value.contains('.jpeg'))) {
+        _logger.i('  📸 $key: $value (posible imagen)');
+      } else {
+        _logger.i('  📝 $key: $value');
+      }
+    });
   }
 
   void _createNewResponse(
@@ -217,6 +228,75 @@ class DynamicFormViewModel extends ChangeNotifier {
     }
   }
 
+  // ==================== MANEJO DE IMÁGENES ====================
+
+  /// Guarda una imagen inmediatamente cuando el usuario la selecciona
+  Future<bool> saveImageForField(String fieldId, String imagePath) async {
+    try {
+      if (_currentResponse == null) {
+        _errorMessage = 'No hay formulario activo';
+        _logger.e('❌ No hay formulario activo para guardar imagen');
+        return false;
+      }
+
+      _logger.i('📸 Procesando imagen para campo: $fieldId');
+
+      // Guardar imagen inmediatamente en la BD
+      final imageId = await _responseRepo.saveImageImmediately(
+        responseId: _currentResponse!.id,
+        fieldId: fieldId,
+        imagePath: imagePath,
+      );
+
+      if (imageId != null) {
+        // Actualizar el valor del campo con el path de la imagen
+        updateFieldValue(fieldId, imagePath);
+        _logger.i('✅ Imagen guardada exitosamente: $imageId');
+        return true;
+      }
+
+      _errorMessage = 'Error guardando la imagen';
+      _logger.e('❌ No se pudo guardar la imagen');
+      return false;
+    } catch (e) {
+      _errorMessage = 'Error guardando imagen: $e';
+      _logger.e('❌ Error en saveImageForField: $e');
+      return false;
+    }
+  }
+
+  /// Elimina una imagen de un campo
+  Future<bool> deleteImageForField(String fieldId) async {
+    try {
+      if (_currentResponse == null) {
+        _logger.e('❌ No hay formulario activo para eliminar imagen');
+        return false;
+      }
+
+      _logger.i('🗑️ Eliminando imagen del campo: $fieldId');
+
+      // Buscar el detalle asociado
+      final details = await _responseRepo.getDetails(_currentResponse!.id);
+      final detail = details.where((d) => d.dynamicFormDetailId == fieldId).firstOrNull;
+
+      if (detail != null) {
+        // Obtener y eliminar imágenes
+        final images = await _responseRepo.getImagesForDetail(detail.id);
+        for (var image in images) {
+          await _responseRepo.deleteImageFile(image);
+        }
+      }
+
+      // Limpiar el valor del campo
+      updateFieldValue(fieldId, null);
+      _logger.i('✅ Imagen eliminada');
+      return true;
+    } catch (e) {
+      _logger.e('❌ Error eliminando imagen: $e');
+      return false;
+    }
+  }
+
   // ==================== VALIDATION ====================
 
   bool _validateAllFields() {
@@ -308,7 +388,7 @@ class DynamicFormViewModel extends ChangeNotifier {
         return false;
       }
 
-      _logger.i('✅ Formulario completado (imágenes convertidas a Base64)');
+      _logger.i('✅ Formulario completado (imágenes ya guardadas en BD)');
 
       // Sincronizar
       await _syncResponse(completedResponse.id);

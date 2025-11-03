@@ -15,6 +15,10 @@ class DynamicFormFieldWidget extends StatelessWidget {
   final int depth;
   final bool isReadOnly;
 
+  // 🆕 NUEVO: Callbacks para guardar imágenes
+  final Future<bool> Function(String fieldId, String imagePath)? onImageSelected;
+  final Future<bool> Function(String fieldId)? onImageDeleted;
+
   const DynamicFormFieldWidget({
     super.key,
     required this.field,
@@ -25,6 +29,8 @@ class DynamicFormFieldWidget extends StatelessWidget {
     this.onNestedFieldChanged,
     this.depth = 0,
     this.isReadOnly = false,
+    this.onImageSelected,
+    this.onImageDeleted,
   });
 
   @override
@@ -401,7 +407,11 @@ class DynamicFormFieldWidget extends StatelessWidget {
         if (!isReadOnly) ...[
           _buildImageButtons(context, isNested: true, fieldId: field.id),
           if (hasImage)
-            _buildDeleteButton(() => onNestedFieldChanged?.call(field.id, null), isCompact: true),
+            _buildDeleteButton(
+              fieldId: field.id,
+              onLocalDelete: () => onNestedFieldChanged?.call(field.id, null),
+              isCompact: true,
+            ),
         ],
       ],
     );
@@ -484,7 +494,7 @@ class DynamicFormFieldWidget extends StatelessWidget {
           ],
           if (!isReadOnly) ...[
             _buildImageButtons(context),
-            if (hasImage) _buildDeleteButton(() => onChanged(null)),
+            if (hasImage) _buildDeleteButton(fieldId: field.id, onLocalDelete: () => onChanged(null)),
           ],
         ],
       ),
@@ -551,11 +561,26 @@ class DynamicFormFieldWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildDeleteButton(VoidCallback onDelete, {bool isCompact = false}) {
+  Widget _buildDeleteButton({
+    required String fieldId,
+    required VoidCallback onLocalDelete,
+    bool isCompact = false,
+  }) {
     return SizedBox(
       width: double.infinity,
       child: TextButton.icon(
-        onPressed: onDelete,
+        onPressed: () async {
+          // 🎯 Si hay callback de eliminación de imagen, usarlo
+          if (onImageDeleted != null) {
+            final success = await onImageDeleted!(fieldId);
+            if (success) {
+              onLocalDelete();
+            }
+          } else {
+            // Fallback: solo limpiar el valor local
+            onLocalDelete();
+          }
+        },
         style: TextButton.styleFrom(
           foregroundColor: AppColors.error,
           padding: EdgeInsets.symmetric(vertical: isCompact ? 4 : 8),
@@ -568,14 +593,81 @@ class DynamicFormFieldWidget extends StatelessWidget {
 
   Future<void> _pickImage(BuildContext context, ImageSource source, {bool isNested = false, String? fieldId}) async {
     try {
-      final image = await ImagePicker().pickImage(source: source, maxWidth: 1920, maxHeight: 1920, imageQuality: 85);
-      if (image != null) {
-        isNested && fieldId != null ? onNestedFieldChanged?.call(fieldId, image.path) : onChanged(image.path);
+      final image = await ImagePicker().pickImage(
+          source: source,
+          maxWidth: 1920,
+          maxHeight: 1920,
+          imageQuality: 85
+      );
+
+      if (image == null) return;
+
+      // 🔄 Mostrar indicador de carga
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text('Guardando imagen...'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+            backgroundColor: AppColors.info,
+          ),
+        );
+      }
+
+      // 🎯 GUARDAR IMAGEN EN LA BD
+      final targetFieldId = isNested && fieldId != null ? fieldId : field.id;
+
+      if (onImageSelected != null) {
+        final success = await onImageSelected!(targetFieldId, image.path);
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('✅ Imagen guardada'),
+                backgroundColor: AppColors.success,
+                duration: Duration(seconds: 1),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('❌ Error guardando imagen'),
+                backgroundColor: AppColors.error,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        }
+      } else {
+        // Fallback: solo actualizar el valor (comportamiento anterior)
+        if (isNested && fieldId != null) {
+          onNestedFieldChanged?.call(fieldId, image.path);
+        } else {
+          onChanged(image.path);
+        }
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al seleccionar imagen: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+              content: Text('Error al seleccionar imagen: $e'),
+              backgroundColor: AppColors.error
+          ),
         );
       }
     }

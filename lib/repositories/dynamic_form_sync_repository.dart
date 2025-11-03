@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 import '../services/database_helper.dart';
 import '../services/sync/base_sync_service.dart';
+import 'package:ada_app/services/dynamic_form/dynamic_form_log_service.dart..dart';
 import 'dynamic_form_response_repository.dart';
 
 class DynamicFormSyncRepository {
@@ -163,13 +164,51 @@ class DynamicFormSyncRepository {
         return false;
       }
 
-      // Obtener detalles (incluyendo imágenes en Base64)
-      final details = await _responseRepository.getDetails(responseId);
+      // Obtener TODOS los detalles
+      final allDetails = await _responseRepository.getDetails(responseId);
+
+      // 🎯 FILTRAR: Solo detalles que NO sean imágenes
+      final detailsToSend = allDetails
+          .where((d) => d.response != '[IMAGE]')
+          .toList();
 
       // Obtener imágenes de la tabla separada
       final images = await _responseRepository.getImagesForResponse(responseId);
 
-      // 🎯 CONSTRUIR EL PAYLOAD PARA EL BACKEND
+      // 🎯 FILTRAR: Solo imágenes con Base64 válido
+      final imagesToSend = images.where((img) =>
+      img.imagenBase64 != null &&
+          img.imagenBase64!.isNotEmpty &&
+          img.dynamicFormResponseDetailId != null
+      ).toList();
+
+      if (imagesToSend.length < images.length) {
+        _logger.w('⚠️ Algunas imágenes sin Base64: ${images.length - imagesToSend.length}');
+      }
+
+      _logger.d('📦 Detalles a enviar: ${detailsToSend.length} (${allDetails.length - detailsToSend.length} marcadores de imagen excluidos)');
+      _logger.d('📦 Imágenes a enviar: ${imagesToSend.length}');
+
+      // 🎯 AGRUPAR IMÁGENES POR DETAIL ID
+      final Map<String, List<dynamic>> imagesByDetailId = {};
+      for (final img in imagesToSend) {
+        final detailId = img.dynamicFormResponseDetailId!;
+        if (!imagesByDetailId.containsKey(detailId)) {
+          imagesByDetailId[detailId] = [];
+        }
+        imagesByDetailId[detailId]!.add({
+          'id': img.id,
+          'imageBase64': img.imagenBase64,
+          'imageTamano': img.imagenTamano,
+          'mimeType': img.mimeType,
+          'orden': img.orden,
+          'createdAt': img.createdAt,
+          'url': null,
+          'imagePath': img.imagenPath ?? '',
+        });
+      }
+
+      // 🎯 CONSTRUIR EL PAYLOAD CON EL FORMATO CORRECTO
       final payload = {
         'id': formResponse.id,
         'dynamicFormId': formResponse.formTemplateId,
@@ -178,48 +217,73 @@ class DynamicFormSyncRepository {
         'usuarioId': formResponse.userId != null ? int.tryParse(formResponse.userId!) : null,
         'estado': formResponse.status,
         'creationDate': formResponse.createdAt.toIso8601String(),
-        'completedDate': formResponse.completedAt?.toIso8601String(), // ✅ Siempre incluir, aunque sea null
-        'lastUpdateDate': formResponse.completedAt?.toIso8601String() ?? formResponse.createdAt.toIso8601String(), // ✅ Fallback a creationDate
-        'details': details.map((d) => {
-          'id': d.id,
-          'dynamicFormDetailId': d.dynamicFormDetailId,
-          'response': d.response,
-          'syncStatus': d.syncStatus,
-        }).toList(),
-        'imagenes': images.map((img) => {
-          'id': img.id,
-          'dynamicFormResponseDetailId': img.dynamicFormResponseDetailId,
-          'imagenBase64': img.imagenBase64,
-          'imagenTamano': img.imagenTamano,
-          'mimeType': img.mimeType,
-          'orden': img.orden,
-          'createdAt': img.createdAt,
-        }).toList(),
+        'completedDate': formResponse.completedAt?.toIso8601String(),
+        'lastUpdateDate': formResponse.completedAt?.toIso8601String() ?? formResponse.createdAt.toIso8601String(),
+        'details': [
+          // 📝 Incluir detalles NO de imagen con fotos vacías
+          ...detailsToSend.map((d) => {
+            'id': d.id,
+            'dynamicFormDetailId': d.dynamicFormDetailId,
+            'response': d.response,
+            'syncStatus': d.syncStatus,
+            'fotos': [], // Siempre incluir fotos aunque esté vacío
+          }),
+          // 🖼️ Incluir detalles de imagen con sus fotos correspondientes
+          ...allDetails
+              .where((d) => d.response == '[IMAGE]')
+              .map((d) => {
+            'id': d.id,
+            'dynamicFormDetailId': d.dynamicFormDetailId,
+            'response': d.response,
+            'syncStatus': d.syncStatus,
+            'fotos': imagesByDetailId[d.id] ?? [], // Fotos correspondientes a este detail
+          }),
+        ],
       };
 
-      _logger.d('📦 Payload construido: ${details.length} detalles, ${images.length} imágenes');
+      // 🎯 LOG DETALLADO DEL TAMAÑO
+      final jsonString = jsonEncode(payload);
+      final sizeInBytes = jsonString.length;
+      final sizeInKB = (sizeInBytes / 1024).toStringAsFixed(2);
+      final sizeInMB = (sizeInBytes / (1024 * 1024)).toStringAsFixed(2);
 
-      // 🔍 LOG DEL PAYLOAD (sin imágenes completas para no saturar logs)
-      final payloadParaLog = {
-        ...payload,
-        'imagenes': images.map((img) => {
-          'id': img.id,
-          'dynamicFormResponseDetailId': img.dynamicFormResponseDetailId,
-          'imagenBase64': img.imagenBase64 != null ? '${img.imagenBase64!.substring(0, img.imagenBase64!.length > 50 ? 50 : img.imagenBase64!.length)}...' : null,
-          'imagenTamano': img.imagenTamano,
-          'mimeType': img.mimeType,
-          'orden': img.orden,
-          'createdAt': img.createdAt,
-        }).toList(),
-      };
+      _logger.i('📊 Tamaño del payload: $sizeInKB KB ($sizeInMB MB)');
+      _logger.d('📋 Details con imágenes: ${imagesByDetailId.keys.length}');
 
-      _logger.d('🔍 JSON a enviar (resumido): ${jsonEncode(payloadParaLog)}');
+      // ⚠️ ADVERTENCIA si es muy grande
+      if (sizeInBytes > 10 * 1024 * 1024) { // > 10MB
+        _logger.w('⚠️ ADVERTENCIA: Payload muy grande (${sizeInMB}MB), puede fallar');
+      }
 
       // Obtener la URL dinámica
       final baseUrl = await BaseSyncService.getBaseUrl();
       final url = '$baseUrl/dynamicFormResponse/insertDynamicFormResponse';
 
       _logger.i('🌐 URL: $url');
+
+      // 🎯 AUMENTAR TIMEOUT PARA IMÁGENES GRANDES
+      final timeoutDuration = sizeInBytes > 5 * 1024 * 1024
+          ? Duration(seconds: 120)  // 2 minutos para payloads grandes
+          : Duration(seconds: 60);   // 1 minuto normal
+
+      _logger.d('⏱️ Timeout configurado: ${timeoutDuration.inSeconds}s');
+
+      // 📁 GUARDAR LOG DEL JSON ANTES DE ENVIAR
+      try {
+        final logService = DynamicFormLogService();
+        await logService.guardarLogPost(
+          url: url,
+          headers: {
+            ...BaseSyncService.headers,
+            'Content-Type': 'application/json',
+          },
+          body: payload,
+          timestamp: DateTime.now().toIso8601String(),
+          responseId: responseId,
+        );
+      } catch (e) {
+        _logger.w('⚠️ No se pudo guardar el log: $e');
+      }
 
       // Realizar el POST
       final httpResponse = await http.post(
@@ -228,10 +292,23 @@ class DynamicFormSyncRepository {
           ...BaseSyncService.headers,
           'Content-Type': 'application/json',
         },
-        body: jsonEncode(payload),
-      ).timeout(const Duration(seconds: 60));
+        body: jsonString,
+      ).timeout(timeoutDuration);
 
       _logger.i('📡 Respuesta del servidor: ${httpResponse.statusCode}');
+
+      // 🔍 LOG DEL BODY DE RESPUESTA (para debug)
+      if (httpResponse.statusCode >= 400) {
+        final bodyText = httpResponse.body;
+        if (bodyText.isNotEmpty) {
+          final truncatedBody = bodyText.length > 500
+              ? bodyText.substring(0, 500)
+              : bodyText;
+          _logger.e('📄 Body de error: $truncatedBody');
+        } else {
+          _logger.e('📄 Body de error: (vacío)');
+        }
+      }
 
       if (httpResponse.statusCode >= 200 && httpResponse.statusCode < 300) {
         // ✅ ÉXITO

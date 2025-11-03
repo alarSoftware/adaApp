@@ -10,6 +10,7 @@ class DynamicFormSyncService extends BaseSyncService {
   static const String _getDynamicFormEndpoint = '/api/getDynamicForm';
   static const String _getDynamicFormDetailEndpoint = '/api/getDynamicFormDetail';
   static const String _getDynamicFormResponseEndpoint = '/api/getDynamicFormResponse';
+  static const String _getDynamicFormResponseImageEndpoint = '/api/getDynamicFormResponseImage';
 
   // ==================== FORMULARIOS Y DETALLES ====================
 
@@ -331,9 +332,108 @@ class DynamicFormSyncService extends BaseSyncService {
     }
   }
 
+  /// Obtener imágenes de respuestas de formularios dinámicos desde el servidor
+  static Future<SyncResult> obtenerImagenesRespuestasFormularios({
+    String? edfvendedorId,
+    String? contactoId,
+    String? dynamicFormId,
+    String? dynamicFormResponseId,
+  }) async {
+    try {
+      BaseSyncService.logger.i('🖼️ Obteniendo imágenes de respuestas de formularios desde el servidor...');
+
+      final queryParams = _buildQueryParams(
+        edfvendedorId: edfvendedorId,
+        contactoId: contactoId,
+        dynamicFormId: dynamicFormId,
+        dynamicFormResponseId: dynamicFormResponseId,
+      );
+
+      final baseUrl = await BaseSyncService.getBaseUrl();
+      final uri = Uri.parse('$baseUrl$_getDynamicFormResponseImageEndpoint')
+          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      BaseSyncService.logger.i('📡 Llamando a: ${uri.toString()}');
+
+      final response = await http.get(
+        uri,
+        headers: BaseSyncService.headers,
+      ).timeout(BaseSyncService.timeout);
+
+      BaseSyncService.logger.i('📥 Respuesta getDynamicFormResponseImage: ${response.statusCode}');
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final imagenesData = _parseListResponse(response.body);
+
+        for (final f in imagenesData! ) {
+          var foto = f["id"];
+          print ('ID DE LA FOTO $foto');
+        }
+
+        if (imagenesData == null) {
+          return SyncResult(
+            exito: false,
+            mensaje: 'Error parseando respuesta del servidor',
+            itemsSincronizados: 0,
+          );
+        }
+
+        BaseSyncService.logger.i('✅ Imágenes parseadas: ${imagenesData.length}');
+
+        if (imagenesData.isEmpty) {
+          BaseSyncService.logger.w('⚠️ No se encontraron imágenes en la respuesta');
+          return SyncResult(
+            exito: true,
+            mensaje: 'No hay imágenes disponibles',
+            itemsSincronizados: 0,
+          );
+        }
+
+        // Guardar usando nueva API del repositorio
+        final repo = DynamicFormRepository();
+        final guardados = await repo.responses.saveResponseImagesFromServer(imagenesData);
+        BaseSyncService.logger.i('💾 Imágenes guardadas en BD local: $guardados');
+
+        return SyncResult(
+          exito: true,
+          mensaje: 'Imágenes descargadas correctamente',
+          itemsSincronizados: guardados,
+          totalEnAPI: imagenesData.length,
+        );
+      } else {
+        final mensaje = BaseSyncService.extractErrorMessage(response);
+        BaseSyncService.logger.e('❌ Error del servidor: $mensaje');
+        return SyncResult(
+          exito: false,
+          mensaje: 'Error del servidor: $mensaje',
+          itemsSincronizados: 0,
+        );
+      }
+    } catch (e) {
+      BaseSyncService.logger.e('💥 Error obteniendo imágenes: $e');
+      return SyncResult(
+        exito: false,
+        mensaje: BaseSyncService.getErrorMessage(e),
+        itemsSincronizados: 0,
+      );
+    }
+  }
+
   /// Método de conveniencia para obtener respuestas por vendedor
   static Future<SyncResult> obtenerRespuestasPorVendedor(String edfvendedorId) {
     return obtenerRespuestasFormularios(edfvendedorId: edfvendedorId);
+  }
+
+  /// Método de conveniencia para obtener imágenes por vendedor
+  static Future<SyncResult> obtenerImagenesPorVendedor(String edfvendedorId) {
+    return obtenerImagenesRespuestasFormularios(edfvendedorId: edfvendedorId);
+  }
+
+  /// 🆕 MÉTODO FALTANTE: Obtener imágenes de formularios por vendedor
+  static Future<SyncResult> obtenerImagenesFormularios({
+    String? edfVendedorId,
+  }) {
+    return obtenerImagenesRespuestasFormularios(edfvendedorId: edfVendedorId);
   }
 
   /// Obtener todas las respuestas completadas
@@ -447,6 +547,8 @@ class DynamicFormSyncService extends BaseSyncService {
           return dataValue.cast<Map<String, dynamic>>();
         }
       }
+      //Imprimir un log para ver la id
+
 
       BaseSyncService.logger.w('⚠️ Formato de respuesta no reconocido');
       return null;
@@ -460,6 +562,7 @@ class DynamicFormSyncService extends BaseSyncService {
   static Map<String, String> _buildQueryParams({
     String? contactoId,
     String? dynamicFormId,
+    String? dynamicFormResponseId,
     String? estado,
     String? edfvendedorId,
     String? limit,
@@ -469,6 +572,7 @@ class DynamicFormSyncService extends BaseSyncService {
 
     if (contactoId != null) params['contactoId'] = contactoId;
     if (dynamicFormId != null) params['dynamicFormId'] = dynamicFormId;
+    if (dynamicFormResponseId != null) params['dynamicFormResponseId'] = dynamicFormResponseId;
     if (estado != null) params['estado'] = estado;
     if (edfvendedorId != null) params['edfvendedorId'] = edfvendedorId;
     if (limit != null) params['limit'] = limit;
