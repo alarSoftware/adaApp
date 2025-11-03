@@ -235,13 +235,10 @@ class DynamicFormViewModel extends ChangeNotifier {
     try {
       if (_currentResponse == null) {
         _errorMessage = 'No hay formulario activo';
-        _logger.e('❌ No hay formulario activo para guardar imagen');
         return false;
       }
 
-      _logger.i('📸 Procesando imagen para campo: $fieldId');
-
-      // Guardar imagen inmediatamente en la BD
+      // 1. Guardar imagen en dynamic_form_response_image
       final imageId = await _responseRepo.saveImageImmediately(
         responseId: _currentResponse!.id,
         fieldId: fieldId,
@@ -249,14 +246,12 @@ class DynamicFormViewModel extends ChangeNotifier {
       );
 
       if (imageId != null) {
-        // Actualizar el valor del campo con el path de la imagen
         updateFieldValue(fieldId, imagePath);
-        _logger.i('✅ Imagen guardada exitosamente: $imageId');
+
+        _logger.i('✅ Imagen y detalle guardados exitosamente');
         return true;
       }
 
-      _errorMessage = 'Error guardando la imagen';
-      _logger.e('❌ No se pudo guardar la imagen');
       return false;
     } catch (e) {
       _errorMessage = 'Error guardando imagen: $e';

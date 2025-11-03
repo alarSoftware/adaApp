@@ -420,7 +420,7 @@ class CensusSyncService extends BaseSyncService {
   static Future<void> _saveCensusToDatabase(Map<String, dynamic> censo) async {
     try {
       final dbHelper = DatabaseHelper();
-      await dbHelper.insertarOReemplazar('censo_activo', censo);
+      await dbHelper.vaciarEInsertar('censo_activo', [censo]); // 👈 [censo] en lista
     } catch (e) {
       BaseSyncService.logger.e('Error guardando censo ID ${censo['id']} en BD: $e');
       rethrow;

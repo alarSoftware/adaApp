@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../models/dynamic_form/dynamic_form_response.dart';
 import '../models/dynamic_form/dynamic_form_response_detail.dart';
 import '../models/dynamic_form/dynamic_form_response_image.dart';
+import 'package:path_provider/path_provider.dart';
 import '../services/database_helper.dart';
 
 class DynamicFormResponseRepository {
@@ -417,28 +418,41 @@ class DynamicFormResponseRepository {
 
     for (var imageData in images) {
       try {
-        // Construir los datos para la base de datos local
+        String? localPath;
+        int? imageSize;
+
+        // 👇 DECODIFICAR BASE64 Y GUARDAR LOCALMENTE
+        if (imageData['imageBase64'] != null && imageData['imageBase64'].toString().isNotEmpty) {
+          final base64String = imageData['imageBase64'].toString();
+          final bytes = base64Decode(base64String);
+
+          // Crear archivo local
+          final directory = await getApplicationDocumentsDirectory();
+          final fileName = '${_uuid.v4()}.jpg';
+          final file = File('${directory.path}/$fileName');
+
+          await file.writeAsBytes(bytes);
+          localPath = file.path;
+          imageSize = bytes.length;
+
+          _logger.d('💾 Imagen reconstruida localmente: $localPath');
+        }
+
         final imageForDB = {
           'id': imageData['id']?.toString() ?? _uuid.v4(),
           'dynamic_form_response_detail_id': imageData['dynamicFormResponseDetail']?['id']?.toString() ?? '',
-          'imagen_path': imageData['imagePath']?.toString(),
+          'imagen_path': localPath ?? imageData['imagePath']?.toString(), // 👈 USA PATH LOCAL
           'imagen_base64': imageData['imageBase64']?.toString(),
-          'imagen_tamano': imageData['imageBase64'] != null
-              ? (imageData['imageBase64'] as String).length
-              : null,
+          'imagen_tamano': imageSize,
           'mime_type': imageData['mimeType']?.toString() ?? 'image/jpeg',
-          'orden': imageData['orden'] != null
-              ? int.tryParse(imageData['orden'].toString()) ?? 1
-              : 1,
+          'orden': imageData['orden'] != null ? int.tryParse(imageData['orden'].toString()) ?? 1 : 1,
           'created_at': imageData['creationDate']?.toString() ?? DateTime.now().toIso8601String(),
           'sync_status': 'synced',
         };
 
-        // Usar upsert para evitar duplicados
         await _upsertImage(imageForDB['id']!.toString(), imageForDB);
         count++;
 
-        _logger.d('✅ Imagen desde servidor: ${imageForDB['id']} (${imageForDB['imagen_tamano']} bytes)');
       } catch (e, stackTrace) {
         _logger.e('❌ Error guardando imagen desde servidor: $e\n$stackTrace');
       }
@@ -523,8 +537,8 @@ class DynamicFormResponseRepository {
   }
 
   Future<void> _saveResponseDetails(DynamicFormResponse response) async {
-    // NO eliminar todos los detalles, solo actualizar/crear los necesarios
     _logger.d('📝 Guardando ${response.answers.length} respuestas detalle');
+    _logger.d('🔍 Respuestas: ${response.answers}');
 
     for (var entry in response.answers.entries) {
       if (entry.key.isEmpty) {
