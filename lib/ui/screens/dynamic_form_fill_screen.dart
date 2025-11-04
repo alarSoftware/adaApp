@@ -239,7 +239,7 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
           children: [
             ...template.fields.map((field) {
               return DynamicFormFieldWidget(
-                key: ValueKey('${field.id}_${currentAnswers[field.id]}'),
+                key: ValueKey(field.id),
                 field: field,
                 value: widget.viewModel.getFieldValue(field.id),
                 onChanged: widget.isReadOnly || _isSaving
