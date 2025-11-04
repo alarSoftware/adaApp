@@ -1,13 +1,18 @@
 import 'package:ada_app/ui/screens/sync_panel_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:ada_app/ui/theme/colors.dart';
+import 'package:ada_app/services/app_services.dart';
 import 'package:ada_app/ui/screens/equipos_screen.dart';
 import 'package:ada_app/ui/screens/modelos_screen.dart';
 import 'package:ada_app/ui/screens/logo_screen.dart';
 import 'package:ada_app/ui/screens/marca_screen.dart';
-import 'package:ada_app/ui/theme/colors.dart';
+import 'package:ada_app/ui/screens/device_log_screen.dart';
 import 'package:ada_app/viewmodels/select_screen_viewmodel.dart';
 import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
 import 'package:ada_app/services/database_validation_service.dart';
+import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/repositories/device_log_repository.dart';
+import 'package:ada_app/services/device_log/device_log_service.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -52,7 +57,6 @@ class _SelectScreenState extends State<SelectScreen> {
       } else if (event is RequestDeleteConfirmationEvent) {
         _handleDeleteConfirmation();
       } else if (event is RequestDeleteWithValidationEvent) {
-        // 🆕 NUEVO: Manejar validación con detalles
         _handleDeleteValidationFailed(event.validationResult);
       } else if (event is SyncCompletedEvent) {
         _mostrarExito(event.result.message);
@@ -166,7 +170,6 @@ class _SelectScreenState extends State<SelectScreen> {
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();
-                // Abrir panel de sincronización o ejecutar sync
                 _viewModel.requestSync();
               },
               icon: Icon(Icons.sync),
@@ -411,7 +414,6 @@ class _SelectScreenState extends State<SelectScreen> {
     );
   }
 
-  // 🔥 NUEVO: Overlay mejorado con progreso detallado
   Widget _buildSyncOverlay() {
     return Container(
       color: Colors.black54,
@@ -440,7 +442,6 @@ class _SelectScreenState extends State<SelectScreen> {
                   ),
                 ),
                 SizedBox(height: 16),
-                // ✅ Reutilizar el mismo widget que usa el login
                 SyncProgressWidget(
                   progress: _viewModel.syncProgress,
                   currentStep: _viewModel.syncCurrentStep,
@@ -695,6 +696,30 @@ class _SelectScreenState extends State<SelectScreen> {
                           color: AppColors.primary,
                           page: const MarcaScreen(),
                         ),
+                        SizedBox(height: 12),
+                        _buildMenuCard(
+                          label: 'Registro de Dispositivo',
+                          description: 'Ver datos del dispositivo registrados',
+                          icon: Icons.phone_android,
+                          color: AppColors.info,
+                          onTap: () async {
+                            try {
+                              final database = await DatabaseHelper().database;
+                              final repository = DeviceLogRepository(database);
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => DeviceLogScreen(
+                                    repository: repository,
+                                  ),
+                                ),
+                              );
+                            } catch (e) {
+                              _mostrarError('Error al abrir registro: $e');
+                            }
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -718,7 +743,7 @@ class _SelectScreenState extends State<SelectScreen> {
             ),
           ),
 
-          // 🔥 Overlay de sincronización mejorado con progreso
+          // Overlay de sincronización mejorado con progreso
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {

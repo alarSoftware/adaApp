@@ -33,6 +33,7 @@ class DatabaseTables {
     await db.execute(_sqlUsuarios());
     await db.execute(_sqlCensoActivo());
     await db.execute(_sqlCensoActivoFoto());
+    await db.execute(_sqlDeviceLog());
 
     // Tablas de formularios dinámicos
     await db.execute(_sqlDynamicForm());
@@ -233,6 +234,19 @@ class DatabaseTables {
   )
 ''';
 
+  String _sqlDeviceLog() => '''
+  CREATE TABLE device_log (
+    id TEXT PRIMARY KEY,
+    edf_vendedor_id TEXT,
+    latitud_longitud TEXT,
+    bateria INTEGER,
+    modelo TEXT,
+    fecha_registro TEXT NOT NULL,
+    sincronizado INTEGER DEFAULT 0,
+    FOREIGN KEY (edf_vendedor_id) REFERENCES Users (edf_vendedor_id)
+  )
+''';
+
   // ==================== ÍNDICES ====================
 
   Future<void> _crearIndices(Database db) async {
@@ -242,6 +256,7 @@ class DatabaseTables {
     await _crearIndicesMaestras(db);
     await _crearIndicesCensoActivo(db);
     await _crearIndicesDynamicForms(db);
+    await _crearIndicesDeviceLog(db);
   }
 
   Future<void> _crearIndicesClientes(Database db) async {
@@ -349,5 +364,9 @@ class DatabaseTables {
     for (final indice in indices) {
       await db.execute(indice);
     }
+  }
+
+  Future<void> _crearIndicesDeviceLog(Database db) async {
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_device_log_fecha ON device_log (fecha_registro)');
   }
 }
