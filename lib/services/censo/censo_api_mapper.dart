@@ -32,7 +32,7 @@ class CensoApiMapper {
       'cliente_id': cliente.id,
       'usuario_id': usuarioId,  // ✅ ESTO AHORA SE GUARDARÁ CORRECTAMENTE
       'funcionando': true,
-      'estado_general': 'Equipo registrado desde APP móvil - ${datosOriginales['observaciones'] ?? 'Censo registrado'}',
+      'estado_general': 'Equipo registrado desde APP móvil',
 
       // Ubicación
       'latitud': datosOriginales['latitud'],
@@ -208,7 +208,7 @@ class CensoApiMapper {
       'equipo_id': equipoCompleto?['id'],
       'cliente_id': cliente.id,
       'funcionando': true,
-      'estado_general': 'Equipo registrado desde APP móvil - ${datos['observaciones'] ?? 'Sin observaciones'}',
+      'estado_general': 'Equipo registrado desde APP móvil',
       'observaciones': datos['observaciones'],
       'latitud': datos['latitud'],
       'longitud': datos['longitud'],
