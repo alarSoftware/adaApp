@@ -724,7 +724,6 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         {
           'estado_censo': EstadoEquipoCenso.error.valor,
           'fecha_actualizacion': DateTime.now().toIso8601String(),
-          'observaciones': 'ERROR: $mensajeError',
         },
         where: 'id = ?',
         whereArgs: [estadoId],

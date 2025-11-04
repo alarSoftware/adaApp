@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ada_app/services/sync/full_sync_service.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/models/usuario.dart';
+import 'package:ada_app/services/database_validation_service.dart'; // 🆕 NUEVO
 
 // ========== CLASES DE VALIDACIÓN ==========
 class SyncValidationResult {
@@ -53,6 +54,12 @@ class RequiredSyncEvent extends UIEvent {
 
 class RequestDeleteConfirmationEvent extends UIEvent {}
 
+// 🆕 NUEVO: Evento con validación de eliminación
+class RequestDeleteWithValidationEvent extends UIEvent {
+  final DatabaseValidationResult validationResult;
+  RequestDeleteWithValidationEvent(this.validationResult);
+}
+
 class SyncCompletedEvent extends UIEvent {
   final SyncResult result;
   SyncCompletedEvent(this.result);
@@ -77,13 +84,13 @@ class SyncProgressEvent extends UIEvent {
 class SyncInfo {
   final int estimatedClients;
   final int estimatedEquipments;
-  final int estimatedImages; // 🆕 NUEVO
+  final int estimatedImages;
   final String serverUrl;
 
   SyncInfo({
     required this.estimatedClients,
     required this.estimatedEquipments,
-    required this.estimatedImages, // 🆕 NUEVO
+    required this.estimatedImages,
     required this.serverUrl,
   });
 }
@@ -92,14 +99,14 @@ class SyncResult {
   final bool success;
   final int clientsSynced;
   final int equipmentsSynced;
-  final int imagesSynced; // 🆕 NUEVO
+  final int imagesSynced;
   final String message;
 
   SyncResult({
     required this.success,
     required this.clientsSynced,
     required this.equipmentsSynced,
-    required this.imagesSynced, // 🆕 NUEVO
+    required this.imagesSynced,
     required this.message,
   });
 }
@@ -486,11 +493,11 @@ class SelectScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      // Obtener información para mostrar en el diálogo (🆕 INCLUYE IMÁGENES)
+      // Obtener información para mostrar en el diálogo
       final syncInfo = SyncInfo(
         estimatedClients: await _getEstimatedClients(),
         estimatedEquipments: await _getEstimatedEquipments(),
-        estimatedImages: await _getEstimatedImages(), // 🆕 NUEVO
+        estimatedImages: await _getEstimatedImages(),
         serverUrl: conexion.mensaje,
       );
 
@@ -540,12 +547,12 @@ class SelectScreenViewModel extends ChangeNotifier {
         throw Exception(result.mensaje);
       }
 
-      // Sincronización exitosa (🆕 INCLUYE IMÁGENES)
+      // Sincronización exitosa
       final syncResult = SyncResult(
         success: true,
         clientsSynced: result.itemsSincronizados,
-        equipmentsSynced: 0, // FullSyncService no devuelve este dato separado
-        imagesSynced: 0, // 🆕 NUEVO: incluido en itemsSincronizados
+        equipmentsSynced: 0,
+        imagesSynced: 0,
         message: result.mensaje,
       );
 
@@ -604,7 +611,7 @@ class SelectScreenViewModel extends ChangeNotifier {
     // USAR MÉTODO UNIFICADO
     await _executeUnifiedSync(
       edfVendedorId: _currentUser!.edfVendedorId ?? '',
-      previousVendedorId: null, // No hay cambio de vendedor en sync opcional
+      previousVendedorId: null,
     );
   }
 
@@ -637,9 +644,35 @@ class SelectScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// Solicita borrar la base de datos
+  // 🔒 VALIDACIÓN ANTES DE ELIMINAR BASE DE DATOS
+  /// Solicita borrar la base de datos CON VALIDACIÓN
   Future<void> requestDeleteDatabase() async {
-    _eventController.add(RequestDeleteConfirmationEvent());
+    try {
+      _logger.i('🔍 Validando si se puede eliminar la base de datos...');
+
+      // Obtener la base de datos
+      final db = await _dbHelper.database;
+
+      // Crear servicio de validación
+      final validationService = DatabaseValidationService(db);
+
+      // Verificar si se puede eliminar
+      final validationResult = await validationService.canDeleteDatabase();
+
+      if (validationResult.canDelete) {
+        _logger.i('✅ Base de datos puede ser eliminada de forma segura');
+        // Enviar evento de confirmación normal
+        _eventController.add(RequestDeleteConfirmationEvent());
+      } else {
+        _logger.w('⚠️ Hay registros pendientes de sincronizar');
+        // Enviar evento con la validación para mostrar detalles
+        _eventController.add(RequestDeleteWithValidationEvent(validationResult));
+      }
+
+    } catch (e) {
+      _logger.e('❌ Error validando base de datos: $e');
+      _eventController.add(ShowErrorEvent('Error al validar la base de datos: $e'));
+    }
   }
 
   /// Ejecuta el borrado de la base de datos (excepto usuarios)
@@ -660,8 +693,10 @@ class SelectScreenViewModel extends ChangeNotifier {
       await _dbHelper.eliminar('dynamic_form');
       await _dbHelper.eliminar('dynamic_form_detail');
       await _dbHelper.eliminar('dynamic_form_response');
+      await _dbHelper.eliminar('dynamic_form_response_detail');
+      await _dbHelper.eliminar('dynamic_form_response_image');
 
-      // 🆕 NUEVO: Borrar imágenes de censos usando la tabla correcta
+      // Borrar imágenes de censos
       await _dbHelper.eliminar('censo_activo_foto');
 
       // Limpiar datos de sincronización
@@ -749,17 +784,14 @@ class SelectScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // 🆕 NUEVO: Método para estimar imágenes
   Future<int> _getEstimatedImages() async {
     try {
-      // Usar la tabla correcta: censo_activo_foto
       final resultado = await _dbHelper.consultarPersonalizada(
         'SELECT COUNT(*) as total FROM censo_activo_foto',
         [],
       );
       return resultado.isNotEmpty ? (resultado.first['total'] as int? ?? 0) : 0;
     } catch (e) {
-      // Si no existe la tabla o hay error, retornar 0
       return 0;
     }
   }

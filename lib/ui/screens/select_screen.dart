@@ -7,6 +7,7 @@ import 'package:ada_app/ui/screens/marca_screen.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/select_screen_viewmodel.dart';
 import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
+import 'package:ada_app/services/database_validation_service.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -50,12 +51,135 @@ class _SelectScreenState extends State<SelectScreen> {
         _redirectToLogin();
       } else if (event is RequestDeleteConfirmationEvent) {
         _handleDeleteConfirmation();
+      } else if (event is RequestDeleteWithValidationEvent) {
+        // 🆕 NUEVO: Manejar validación con detalles
+        _handleDeleteValidationFailed(event.validationResult);
       } else if (event is SyncCompletedEvent) {
         _mostrarExito(event.result.message);
       }
-      // 🆕 No necesitamos manejar SyncProgressEvent aquí porque
-      // el overlay se actualiza automáticamente con notifyListeners()
     });
+  }
+
+  Future<void> _handleDeleteValidationFailed(DatabaseValidationResult validation) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 28),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '⚠️ No se puede eliminar',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hay datos pendientes de sincronizar:',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                SizedBox(height: 16),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: validation.pendingItems.map((item) {
+                      return Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Icon(Icons.circle, size: 8, color: AppColors.warning),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${item.displayName}: ${item.count} registro(s)',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Por favor, sincroniza estos datos antes de eliminar la base de datos.',
+                          style: TextStyle(
+                            color: AppColors.info,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Entendido',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Abrir panel de sincronización o ejecutar sync
+                _viewModel.requestSync();
+              },
+              icon: Icon(Icons.sync),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.info,
+                foregroundColor: AppColors.onPrimary,
+              ),
+              label: Text('Sincronizar Ahora'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _handleSyncConfirmation() async {
