@@ -1,3 +1,5 @@
+import 'package:ada_app/utils/parsing_helpers.dart';
+
 class Marca {
   final int? id;
   final String nombre;
@@ -7,28 +9,30 @@ class Marca {
     required this.nombre,
   });
 
+  // ========== FACTORY CONSTRUCTORS ==========
+
   factory Marca.fromMap(Map<String, dynamic> map) {
     return Marca(
-      id: map['id']?.toInt(),
-      nombre: (map['nombre'] ?? '').toString().trim(),
+      id: ParsingHelpers.parseInt(map['id']),
+      nombre: ParsingHelpers.parseString(map['nombre']) ?? '',
     );
   }
 
-  // Método para crear desde la API
-  factory Marca.fromAPI(Map<String, dynamic> apiData) {
-    return Marca(
-      id: apiData['id']?.toInt().tri,
-      nombre: (apiData['nombre'] ?? '').toString().trim(),
-    );
-  }
+  /// Alias de fromMap para consistencia con API
+  factory Marca.fromJson(Map<String, dynamic> json) => Marca.fromMap(json);
 
-  // toMap() solo incluye campos que existen en la tabla
+  // ========== SERIALIZATION ==========
+
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id,
       'nombre': nombre.trim(),
     };
   }
+
+  Map<String, dynamic> toJson() => toMap();
+
+  // ========== UTILITIES ==========
 
   Marca copyWith({
     int? id,
@@ -44,12 +48,12 @@ class Marca {
   String toString() => 'Marca(id: $id, nombre: $nombre)';
 
   @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is Marca &&
-        other.id == id &&
-        other.nombre == nombre;
-  }
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+          other is Marca &&
+              runtimeType == other.runtimeType &&
+              id == other.id &&
+              nombre == other.nombre;
 
   @override
   int get hashCode => id.hashCode ^ nombre.hashCode;

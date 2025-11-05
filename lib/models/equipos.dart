@@ -1,4 +1,9 @@
 import 'dart:convert';
+import 'package:ada_app/utils/parsing_helpers.dart';
+
+// ============================================================================
+// CLASE PRINCIPAL: EQUIPO
+// ============================================================================
 
 class Equipo {
   final String? id;
@@ -18,7 +23,7 @@ class Equipo {
   final String? modeloNombre;
   final String? logoNombre;
 
-  Equipo({
+  const Equipo({
     this.id,
     this.clienteId,
     required this.codBarras,
@@ -27,109 +32,77 @@ class Equipo {
     this.numeroSerie,
     required this.logoId,
     this.nuevoEquipo = false,
-    DateTime? fechaCreacion,
+    required this.fechaCreacion,
     this.fechaActualizacion,
     this.sincronizado = 0,
     this.marcaNombre,
     this.modeloNombre,
     this.logoNombre,
-  }) : fechaCreacion = fechaCreacion ?? DateTime.now();
+  });
 
+  // ==========================================================================
+  // FACTORY CONSTRUCTORS
+  // ==========================================================================
+
+  /// Constructor desde Map (base de datos local)
   factory Equipo.fromMap(Map<String, dynamic> map) {
     return Equipo(
-      id: map['id'],
-      clienteId: map['cliente_id']?.toString(),
-      codBarras: map['cod_barras'] ?? '',
-      marcaId: map['marca_id'] ?? 1,
-      modeloId: map['modelo_id'] ?? 1,
-      numeroSerie: map['numero_serie'],
-      logoId: map['logo_id'] ?? 1,
-      nuevoEquipo: map['app_insert'] == 1,  // ✅ CAMBIO: usar 'app_insert'
-      fechaCreacion: DateTime.now(),
-      fechaActualizacion: null,
-      sincronizado: 0,
-      marcaNombre: map['marca_nombre'],
-      modeloNombre: map['modelo_nombre'],
-      logoNombre: map['logo_nombre'],
+      id: ParsingHelpers.parseString(map['id']),
+      clienteId: ParsingHelpers.parseString(map['cliente_id']),
+      codBarras: ParsingHelpers.parseString(map['cod_barras']) ?? '',
+      marcaId: ParsingHelpers.parseInt(map['marca_id'], defaultValue: 1),
+      modeloId: ParsingHelpers.parseInt(map['modelo_id'], defaultValue: 1),
+      numeroSerie: ParsingHelpers.parseString(map['numero_serie']),
+      logoId: ParsingHelpers.parseInt(map['logo_id'], defaultValue: 1),
+      nuevoEquipo: ParsingHelpers.intToBool(map['app_insert']),
+      fechaCreacion: ParsingHelpers.parseDateTimeWithDefault(
+        map['fecha_creacion'],
+      ),
+      fechaActualizacion: ParsingHelpers.parseDateTime(
+        map['fecha_actualizacion'],
+      ),
+      sincronizado: ParsingHelpers.parseInt(map['sincronizado']),
+      marcaNombre: ParsingHelpers.parseString(map['marca_nombre']),
+      modeloNombre: ParsingHelpers.parseString(map['modelo_nombre']),
+      logoNombre: ParsingHelpers.parseString(map['logo_nombre']),
     );
   }
 
+  /// Constructor desde JSON (API externa)
   factory Equipo.fromJson(Map<String, dynamic> json) {
-    // Función auxiliar para convertir a int de forma segura
-    int _safeParseInt(dynamic value, {int defaultValue = 1}) {
-      if (value == null) return defaultValue;
-      if (value is int) return value;
-      if (value is String) {
-        final parsed = int.tryParse(value);
-        return parsed ?? defaultValue;
-      }
-      return defaultValue;
-    }
-
-    // Función auxiliar para limpiar strings
-    String? _safeParseString(dynamic value) {
-      if (value == null) return null;
-      final stringValue = value.toString().trim();
-      return stringValue.isEmpty ? null : stringValue;
-    }
-
-    // Función auxiliar para parsear booleano
-    bool _safeParseBool(dynamic value, {bool defaultValue = false}) {
-      if (value == null) return defaultValue;
-      if (value is bool) return value;
-      if (value is int) return value == 1;
-      if (value is String) {
-        final lower = value.toLowerCase();
-        if (lower == 'true' || lower == '1') return true;
-        if (lower == 'false' || lower == '0') return false;
-      }
-      return defaultValue;
-    }
-
-    DateTime fecha;
-    DateTime? fechaAct;
-
-    try {
-      fecha = DateTime.parse(
-          json['fecha_creacion'] ??
-              json['fechaCreacion'] ??
-              json['fecha'] ??
-              DateTime.now().toIso8601String()
-      );
-    } catch (_) {
-      fecha = DateTime.now();
-    }
-
-    try {
-      if (json['fecha_actualizacion'] != null || json['fechaActualizacion'] != null) {
-        fechaAct = DateTime.parse(
-            json['fecha_actualizacion'] ?? json['fechaActualizacion']
-        );
-      }
-    } catch (_) {
-      fechaAct = null;
-    }
-
-    final clienteId = _safeParseString(json['clienteId']);
+    // Procesar nombre del modelo (eliminar saltos de línea)
+    final modeloNombre = ParsingHelpers.parseString(json['equipo']);
+    final modeloNombreLimpio = modeloNombre?.replaceAll('\n', ' ');
 
     return Equipo(
-      id: _safeParseString(json['id']) ?? '',
-      codBarras: _safeParseString(json['equipoId']) ?? '',
-      marcaId: _safeParseInt(json['marcaId']),
-      modeloId: _safeParseInt(json['edfModeloId']),
-      numeroSerie: _safeParseString(json['numSerie']),
-      logoId: _safeParseInt(json['edfLogoId']),
-      nuevoEquipo: _safeParseBool(json['appInsert'] ?? json['app_insert']),  // ✅ CAMBIO: buscar 'appInsert' o 'app_insert'
-      clienteId: clienteId,
-      fechaCreacion: fecha,
-      fechaActualizacion: fechaAct,
+      id: ParsingHelpers.parseString(json['id']) ?? '',
+      clienteId: ParsingHelpers.parseString(json['clienteId']),
+      codBarras: ParsingHelpers.parseString(json['equipoId']) ?? '',
+      marcaId: ParsingHelpers.parseInt(json['marcaId'], defaultValue: 1),
+      modeloId: ParsingHelpers.parseInt(json['edfModeloId'], defaultValue: 1),
+      numeroSerie: ParsingHelpers.parseString(json['numSerie']),
+      logoId: ParsingHelpers.parseInt(json['edfLogoId'], defaultValue: 1),
+      nuevoEquipo: ParsingHelpers.parseBool(
+        json['appInsert'] ?? json['app_insert'],
+      ),
+      fechaCreacion: ParsingHelpers.parseDateTimeWithDefault(
+        json['fecha_creacion'] ?? json['fechaCreacion'] ?? json['fecha'],
+      ),
+      fechaActualizacion: ParsingHelpers.parseDateTime(
+        json['fecha_actualizacion'] ?? json['fechaActualizacion'],
+      ),
       sincronizado: 0, // Siempre 0 para datos que vienen de API
       marcaNombre: null, // Se llenará con JOIN posteriormente
-      modeloNombre: _safeParseString(json['equipo'])?.replaceAll('\n', ' '),
+      modeloNombre: modeloNombreLimpio,
       logoNombre: null, // Se llenará con JOIN posteriormente
     );
   }
 
+  // ==========================================================================
+  // SERIALIZATION
+  // ==========================================================================
+
+  /// Convertir a Map para base de datos local
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -139,37 +112,62 @@ class Equipo {
       'modelo_id': modeloId,
       'numero_serie': numeroSerie,
       'logo_id': logoId,
-      'app_insert': nuevoEquipo ? 1 : 0,  // ✅ CAMBIO: usar 'app_insert'
+      'app_insert': ParsingHelpers.boolToInt(nuevoEquipo),
     };
   }
 
+  /// Convertir a JSON para API externa
   Map<String, dynamic> toJson() {
     return {
+      // IDs
       'id': id,
       'clienteId': clienteId,
+
+      // Código de barras (snake_case y camelCase para compatibilidad)
       'cod_barras': codBarras,
       'codBarras': codBarras,
+
+      // Marca (snake_case y camelCase)
       'marca_id': marcaId,
       'marcaId': marcaId,
+
+      // Modelo (snake_case y camelCase)
       'modelo_id': modeloId,
       'modeloId': modeloId,
+
+      // Número de serie (snake_case y camelCase)
       'numero_serie': numeroSerie,
       'numeroSerie': numeroSerie,
+
+      // Logo (snake_case y camelCase)
       'logo_id': logoId,
       'logoId': logoId,
-      'app_insert': nuevoEquipo ? 1 : 0,  // ✅ CAMBIO: usar 'app_insert' (como int para API)
-      'appInsert': nuevoEquipo,            // ✅ CAMBIO: camelCase como bool para compatibilidad
+
+      // Nuevo equipo (múltiples formatos para compatibilidad)
+      'app_insert': ParsingHelpers.boolToInt(nuevoEquipo), // int para BD
+      'appInsert': nuevoEquipo, // bool para API
+
+      // Fechas (snake_case y camelCase)
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fechaCreacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
       'fechaActualizacion': fechaActualizacion?.toIso8601String(),
+
+      // Estado de sincronización
       'sincronizado': sincronizado,
+
+      // Nombres de relaciones (para JOINs)
       'marca_nombre': marcaNombre,
       'modelo_nombre': modeloNombre,
       'logo_nombre': logoNombre,
     };
   }
 
+  // ==========================================================================
+  // UTILITIES
+  // ==========================================================================
+
+  /// Crear copia con campos modificados
   Equipo copyWith({
     String? id,
     String? clienteId,
@@ -204,226 +202,286 @@ class Equipo {
     );
   }
 
-  // Métodos de utilidad
+  // ==========================================================================
+  // GETTERS
+  // ==========================================================================
+
+  /// Verificar si el equipo está sincronizado
   bool get estaSincronizado => sincronizado == 1;
-  String get nombreCompleto => '$marcaNombre $modeloNombre';
+
+  /// Obtener nombre completo (marca + modelo)
+  String get nombreCompleto {
+    if (marcaNombre != null && modeloNombre != null) {
+      return '$marcaNombre $modeloNombre';
+    }
+    return nombreCompletoFallback;
+  }
+
+  /// Nombre fallback cuando no hay JOINs
   String get nombreCompletoFallback => 'MarcaID:$marcaId ModeloID:$modeloId';
+
+  /// Verificar si el equipo es nuevo (creado desde la app)
+  bool get esNuevo => nuevoEquipo;
+
+  /// Verificar si el equipo está asignado a un cliente
+  bool get estaAsignado => clienteId != null && clienteId!.isNotEmpty;
+
+  /// Verificar si el equipo está disponible (sin cliente)
+  bool get estaDisponible => !estaAsignado;
+
+  // ==========================================================================
+  // OBJECT OVERRIDES
+  // ==========================================================================
 
   @override
   String toString() {
-    return 'Equipo{id: $id, clienteId: $clienteId, codBarras: $codBarras, marcaId: $marcaId, modeloId: $modeloId, '
-        'numeroSerie: $numeroSerie, logoId: $logoId, nuevoEquipo: $nuevoEquipo, '
-        'sincronizado: $sincronizado, marcaNombre: $marcaNombre, '
-        'modeloNombre: $modeloNombre, logoNombre: $logoNombre}';
+    return 'Equipo{id: $id, codBarras: $codBarras, clienteId: $clienteId, '
+        'marca: $marcaId/$marcaNombre, modelo: $modeloId/$modeloNombre, '
+        'logo: $logoId/$logoNombre, nuevo: $nuevoEquipo, sync: $sincronizado}';
   }
-
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is Equipo &&
-        other.id == id &&
-        other.codBarras == codBarras;
+        runtimeType == other.runtimeType &&
+        id == other.id &&
+        codBarras == other.codBarras;
   }
 
   @override
   int get hashCode => id.hashCode ^ codBarras.hashCode;
 }
 
-// ========================================
-// FUNCIONES PARA PARSEAR LA RESPUESTA API
-// ========================================
+// ============================================================================
+// FUNCIONES DE PARSING DE RESPUESTA API
+// ============================================================================
 
-/// Parsea la respuesta completa del API que viene con estructura: {"data": "[{...}]"}
+/// Parsear respuesta API con estructura: {"data": "[{...}]"}
 List<Equipo> parseEquiposFromApiResponse(String jsonResponse) {
   try {
-    // 1. Primer parsing: obtener el objeto principal
+    // 1. Decodificar JSON principal
     final Map<String, dynamic> mainJson = json.decode(jsonResponse);
 
-    // 2. Verificar que existe el campo "data"
+    // 2. Verificar campo "data"
     if (!mainJson.containsKey('data') || mainJson['data'] == null) {
-      print('No se encontró campo "data" en la respuesta');
+      print('⚠️ No se encontró campo "data" en la respuesta');
       return [];
     }
 
-    // 3. Segundo parsing: el campo "data" es un string que contiene JSON
+    // 3. Decodificar el string JSON interno
     final String dataString = mainJson['data'].toString();
     final List<dynamic> equiposJson = json.decode(dataString);
 
     // 4. Convertir cada item a Equipo
-    return equiposJson.map((item) {
-      if (item is Map<String, dynamic>) {
-        return Equipo.fromJson(item);
-      } else {
-        print('Item inválido en la lista: $item');
-        return null;
-      }
-    }).where((equipo) => equipo != null).cast<Equipo>().toList();
+    return equiposJson
+        .whereType<Map<String, dynamic>>()
+        .map((item) => Equipo.fromJson(item))
+        .toList();
 
   } catch (e, stackTrace) {
-    print('Error parseando respuesta de API: $e');
+    print('❌ Error parseando respuesta de API: $e');
     print('StackTrace: $stackTrace');
     return [];
   }
 }
 
-/// Si ya tienes el Map parseado (por ejemplo, de un HTTP response)
+/// Parsear desde Map ya decodificado
 List<Equipo> parseEquiposFromMap(Map<String, dynamic> responseMap) {
   try {
-    // 1. Verificar que existe el campo "data"
+    // 1. Verificar campo "data"
     if (!responseMap.containsKey('data') || responseMap['data'] == null) {
-      print('No se encontró campo "data" en el Map');
+      print('⚠️ No se encontró campo "data" en el Map');
       return [];
     }
 
-    // 2. El campo "data" es un string que contiene JSON
+    // 2. Decodificar el string JSON interno
     final String dataString = responseMap['data'].toString();
     final List<dynamic> equiposJson = json.decode(dataString);
 
     // 3. Convertir cada item a Equipo
-    return equiposJson.map((item) {
-      if (item is Map<String, dynamic>) {
-        return Equipo.fromJson(item);
-      } else {
-        print('Item inválido en la lista: $item');
-        return null;
-      }
-    }).where((equipo) => equipo != null).cast<Equipo>().toList();
+    return equiposJson
+        .whereType<Map<String, dynamic>>()
+        .map((item) => Equipo.fromJson(item))
+        .toList();
 
   } catch (e, stackTrace) {
-    print('Error parseando Map: $e');
+    print('❌ Error parseando Map: $e');
     print('StackTrace: $stackTrace');
     return [];
   }
 }
 
-/// Para casos donde el array viene directamente (sin el wrapper "data")
+/// Parsear desde array directo (sin wrapper "data")
 List<Equipo> parseEquiposFromDirectArray(List<dynamic> equiposJson) {
   try {
-    return equiposJson.map((item) {
-      if (item is Map<String, dynamic>) {
-        return Equipo.fromJson(item);
-      } else {
-        print('Item inválido en la lista: $item');
-        return null;
-      }
-    }).where((equipo) => equipo != null).cast<Equipo>().toList();
+    return equiposJson
+        .whereType<Map<String, dynamic>>()
+        .map((item) => Equipo.fromJson(item))
+        .toList();
 
   } catch (e, stackTrace) {
-    print('Error parseando array directo: $e');
+    print('❌ Error parseando array directo: $e');
     print('StackTrace: $stackTrace');
     return [];
   }
 }
 
-// ========================================
-// EJEMPLOS DE USO
-// ========================================
+// ============================================================================
+// EJEMPLO DE USO
+// ============================================================================
 
-/// Ejemplo de uso básico
 void ejemploDeUso() {
-  // Tu JSON de ejemplo
-  String jsonResponse = '{"data":"[{\\"id\\":\\"09-00419\\",\\"equipoId\\":\\"09-00419\\",\\"fecVencGarantia\\":null,\\"clienteId\\":\\"193339\\",\\"marcaId\\":\\"101\\",\\"esAplicaCenso\\":false,\\"fechaBaja\\":null,\\"tipEquipoId\\":\\"100\\",\\"fecCompra\\":null,\\"edfLogoId\\":20,\\"facNumero\\":\\"2323\\",\\"costo\\":870.0,\\"esActivo\\":true,\\"esDisponible\\":true,\\"condicionId\\":\\"1\\",\\"monedaId\\":9,\\"fecFactura\\":null,\\"equipo\\":\\"BRIKET M5000 - PULP\\",\\"fecha\\":null,\\"observacion\\":null,\\"numSerie\\":\\"304271\\",\\"edfModeloId\\":102,\\"proveedorId\\":\\"101\\",\\"ubicacionInterna\\":\\"EN CLIENTE\\",\\"ubicacionId\\":\\"24\\"}]"}';
+  // JSON de ejemplo de la API
+  const String jsonResponse = '{"data":"[{\\"id\\":\\"09-00419\\",\\"equipoId\\":\\"09-00419\\",\\"fecVencGarantia\\":null,\\"clienteId\\":\\"193339\\",\\"marcaId\\":\\"101\\",\\"esAplicaCenso\\":false,\\"fechaBaja\\":null,\\"tipEquipoId\\":\\"100\\",\\"fecCompra\\":null,\\"edfLogoId\\":20,\\"facNumero\\":\\"2323\\",\\"costo\\":870.0,\\"esActivo\\":true,\\"esDisponible\\":true,\\"condicionId\\":\\"1\\",\\"monedaId\\":9,\\"fecFactura\\":null,\\"equipo\\":\\"BRIKET M5000 - PULP\\",\\"fecha\\":null,\\"observacion\\":null,\\"numSerie\\":\\"304271\\",\\"edfModeloId\\":102,\\"proveedorId\\":\\"101\\",\\"ubicacionInterna\\":\\"EN CLIENTE\\",\\"ubicacionId\\":\\"24\\"}]"}';
 
   // Parsear los equipos
-  List<Equipo> equipos = parseEquiposFromApiResponse(jsonResponse);
+  final List<Equipo> equipos = parseEquiposFromApiResponse(jsonResponse);
 
   print('Equipos encontrados: ${equipos.length}');
+
   if (equipos.isNotEmpty) {
+    final equipo = equipos.first;
     print('Primer equipo:');
-    print('- ID: ${equipos.first.id}');
-    print('- Cliente ID: ${equipos.first.clienteId}');
-    print('- Código de barras: ${equipos.first.codBarras}');
-    print('- Marca ID: ${equipos.first.marcaId}');
-    print('- Modelo ID: ${equipos.first.modeloId}');
-    print('- Número serie: ${equipos.first.numeroSerie}');
+    print('- ID: ${equipo.id}');
+    print('- Cliente ID: ${equipo.clienteId}');
+    print('- Código de barras: ${equipo.codBarras}');
+    print('- Marca ID: ${equipo.marcaId}');
+    print('- Modelo ID: ${equipo.modeloId}');
+    print('- Modelo nombre: ${equipo.modeloNombre}');
+    print('- Número serie: ${equipo.numeroSerie}');
+    print('- Logo ID: ${equipo.logoId}');
+    print('- Está asignado: ${equipo.estaAsignado}');
+    print('- Está disponible: ${equipo.estaDisponible}');
   }
 }
 
-// ========================================
-// MODELOS AUXILIARES CORREGIDOS
-// ========================================
+// ============================================================================
+// MODELOS AUXILIARES (Marca, Modelo, Logo)
+// ============================================================================
 
 class Marca {
   final int? id;
   final String nombre;
 
-  Marca({
+  const Marca({
     this.id,
     required this.nombre,
   });
 
   factory Marca.fromMap(Map<String, dynamic> map) {
     return Marca(
-      id: map['id'],
-      nombre: map['nombre'] ?? '',
+      id: ParsingHelpers.parseInt(map['id']),
+      nombre: ParsingHelpers.parseString(map['nombre']) ?? '',
     );
   }
 
+  factory Marca.fromJson(Map<String, dynamic> json) => Marca.fromMap(json);
+
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
-      'nombre': nombre,
+      if (id != null) 'id': id,
+      'nombre': nombre.trim(),
     };
   }
 
-  Map<String, dynamic> toJson() {
-    return toMap();
-  }
+  Map<String, dynamic> toJson() => toMap();
+
+  @override
+  String toString() => 'Marca(id: $id, nombre: $nombre)';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+          other is Marca &&
+              runtimeType == other.runtimeType &&
+              id == other.id &&
+              nombre == other.nombre;
+
+  @override
+  int get hashCode => id.hashCode ^ nombre.hashCode;
 }
 
 class Modelo {
   final int? id;
   final String nombre;
 
-  Modelo({
+  const Modelo({
     this.id,
     required this.nombre,
   });
 
   factory Modelo.fromMap(Map<String, dynamic> map) {
     return Modelo(
-      id: map['id'],
-      nombre: map['nombre'] ?? '',
+      id: ParsingHelpers.parseInt(map['id']),
+      nombre: ParsingHelpers.parseString(map['nombre']) ?? '',
     );
   }
 
+  factory Modelo.fromJson(Map<String, dynamic> json) => Modelo.fromMap(json);
+
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
-      'nombre': nombre,
+      if (id != null) 'id': id,
+      'nombre': nombre.trim(),
     };
   }
 
-  Map<String, dynamic> toJson() {
-    return toMap();
-  }
+  Map<String, dynamic> toJson() => toMap();
+
+  @override
+  String toString() => 'Modelo(id: $id, nombre: $nombre)';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+          other is Modelo &&
+              runtimeType == other.runtimeType &&
+              id == other.id &&
+              nombre == other.nombre;
+
+  @override
+  int get hashCode => id.hashCode ^ nombre.hashCode;
 }
 
 class Logo {
   final int? id;
   final String nombre;
 
-  Logo({
+  const Logo({
     this.id,
     required this.nombre,
   });
 
   factory Logo.fromMap(Map<String, dynamic> map) {
     return Logo(
-      id: map['id'],
-      nombre: map['nombre'] ?? '',
+      id: ParsingHelpers.parseInt(map['id']),
+      nombre: ParsingHelpers.parseString(map['nombre']) ?? '',
     );
   }
 
+  factory Logo.fromJson(Map<String, dynamic> json) => Logo.fromMap(json);
+
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
-      'nombre': nombre,
+      if (id != null) 'id': id,
+      'nombre': nombre.trim(),
     };
   }
 
-  Map<String, dynamic> toJson() {
-    return toMap();
-  }
+  Map<String, dynamic> toJson() => toMap();
+
+  @override
+  String toString() => 'Logo(id: $id, nombre: $nombre)';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+          other is Logo &&
+              runtimeType == other.runtimeType &&
+              id == other.id &&
+              nombre == other.nombre;
+
+  @override
+  int get hashCode => id.hashCode ^ nombre.hashCode;
 }

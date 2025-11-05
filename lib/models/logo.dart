@@ -1,3 +1,5 @@
+import 'package:ada_app/utils/parsing_helpers.dart';
+
 class Logo {
   final int? id;
   final String nombre;
@@ -7,12 +9,18 @@ class Logo {
     required this.nombre,
   });
 
+  // ========== FACTORY CONSTRUCTORS ==========
+
   factory Logo.fromMap(Map<String, dynamic> map) {
     return Logo(
-      id: map['id']?.toInt(),
-      nombre: (map['nombre'] ?? '').toString().trim(),
+      id: ParsingHelpers.parseInt(map['id']),
+      nombre: ParsingHelpers.parseString(map['nombre']) ?? '',
     );
   }
+
+  factory Logo.fromJson(Map<String, dynamic> json) => Logo.fromMap(json);
+
+  // ========== SERIALIZATION ==========
 
   Map<String, dynamic> toMap() {
     return {
@@ -21,9 +29,13 @@ class Logo {
     };
   }
 
+  Map<String, dynamic> toJson() => toMap();
+
+  // ========== UTILITIES ==========
+
   Logo copyWith({
     int? id,
-    String? maca,
+    String? nombre,  // ✅ CORREGIDO: era 'maca'
   }) {
     return Logo(
       id: id ?? this.id,
@@ -32,15 +44,15 @@ class Logo {
   }
 
   @override
-  String toString() => 'Logo(id: $id, modelo $nombre)';
+  String toString() => 'Logo(id: $id, nombre: $nombre)';  // ✅ CORREGIDO: era "modelo"
 
   @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is Logo &&
-        other.id == id &&
-        other.nombre == nombre;
-  }
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+          other is Logo &&
+              runtimeType == other.runtimeType &&
+              id == other.id &&
+              nombre == other.nombre;
 
   @override
   int get hashCode => id.hashCode ^ nombre.hashCode;
