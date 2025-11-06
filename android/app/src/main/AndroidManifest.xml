@@ -9,12 +9,14 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.CAMERA"/>
 
-    <!-- 🆕 PERMISOS PARA DEVICE LOG BACKGROUND -->
+    <!-- 🆕 NUEVOS PERMISOS PARA DEVICE LOG -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- 🆕 AGREGAMOS ESTOS 2 PERMISOS ADICIONALES PARA WORKMANAGER -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Features existentes -->
     <uses-feature
@@ -30,7 +32,7 @@
         android:name="android.hardware.biometrics"
         android:required="false" />
 
-    <!-- 🆕 FEATURE PARA UBICACIÓN -->
+    <!-- 🆕 NUEVA FEATURE PARA UBICACIÓN -->
     <uses-feature
         android:name="android.hardware.location.gps"
         android:required="false" />
@@ -39,7 +41,6 @@
         android:label="AdaApp"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
-
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -58,21 +59,18 @@
             </intent-filter>
         </activity>
 
-        <!-- 🆕 SERVICIO DE BACKGROUND -->
-        <service
-            android:name="id.flutter.flutter_background_service.BackgroundService"
+        <!-- 🆕 CONFIGURACIÓN MÍNIMA PARA WORKMANAGER -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
             android:exported="false"
-            android:foregroundServiceType="location" />
-
-        <!-- 🆕 RECEPTOR PARA AUTO-INICIO -->
-        <receiver
-            android:name="id.flutter.flutter_background_service.BackgroundServiceBroadcastReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </receiver>
+            tools:node="merge"
+            xmlns:tools="http://schemas.android.com/tools">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
         <meta-data
             android:name="flutterEmbedding"

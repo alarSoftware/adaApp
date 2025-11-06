@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/sync/dynamic_form_sync_service.dart';
+import 'package:ada_app/services/app_services.dart';
 import 'package:ada_app/models/usuario.dart';
 
 var logger = Logger();
@@ -385,6 +386,17 @@ class AuthService {
 
       await _saveLoginSuccess(usuarioAuth);
 
+      // 🆕 ÚNICA SECCIÓN NUEVA: INICIAR LOGGING
+      try {
+        logger.i('🔐 Login exitoso - Iniciando logging persistente');
+        await AppServices().inicializarEnLogin();
+        logger.i('✅ Logging iniciado para: $username');
+      } catch (e) {
+        logger.e('💥 Error iniciando logging: $e');
+        // No fallar el login por error en logging
+      }
+      // 🆕 FIN SECCIÓN NUEVA
+
       logger.i('Login exitoso para: $username');
       return AuthResult(
         exitoso: true,
@@ -483,7 +495,7 @@ class AuthService {
     }
   }
 
-  // Logout
+  // Logout - SIN CAMBIOS (no detiene logging)
   Future<void> logout() async {
     try {
       final prefs = await SharedPreferences.getInstance();
