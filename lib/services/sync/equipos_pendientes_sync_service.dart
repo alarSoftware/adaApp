@@ -61,18 +61,20 @@ class EquiposPendientesSyncService extends BaseSyncService {
         }
 
         BaseSyncService.logger.i('✅ Equipos pendientes parseados: ${equiposData.length}');
+// ✅ CAMBIAR ESTO:
+        try {
+          BaseSyncService.logger.i('🔍 Datos que se van a guardar: ${equiposData.length} equipos');
 
-        if (equiposData.isNotEmpty) {
-          try {
-            final repo = EquipoPendienteRepository();
-            final equiposComoMap = equiposData.map((e) => e as Map<String, dynamic>).toList();
-            final guardados = await repo.guardarEquiposPendientesDesdeServidor(equiposComoMap);
-            BaseSyncService.logger.i('💾 Equipos pendientes guardados: $guardados');
-          } catch (e) {
-            BaseSyncService.logger.e('❌ Error guardando en BD: $e');
+          if (equiposData.isNotEmpty) {
+            BaseSyncService.logger.i('🔍 Primer equipo ejemplo: ${equiposData.first}');
           }
-        } else {
-          BaseSyncService.logger.w('⚠️ No se encontraron equipos pendientes');
+
+          final repo = EquipoPendienteRepository();
+          final equiposComoMap = equiposData.map((e) => e as Map<String, dynamic>).toList();
+          final guardados = await repo.guardarEquiposPendientesDesdeServidor(equiposComoMap);
+          BaseSyncService.logger.i('💾 Equipos pendientes guardados: $guardados');
+        } catch (e) {
+          BaseSyncService.logger.e('❌ Error guardando en BD: $e');
         }
 
         return SyncResult(

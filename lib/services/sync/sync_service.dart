@@ -113,6 +113,7 @@ class SyncService {
 
       // Sincronizar equipos pendientes
       BaseSyncService.logger.i('📋 Iniciando sincronización de equipos pendientes...');
+      BaseSyncService.logger.i('🔍 edfVendedorId que se pasará: "$edfVendedorId"');
       try {
         final resultadoPendientes = await EquiposPendientesSyncService.obtenerEquiposPendientes(
           edfVendedorId: edfVendedorId,

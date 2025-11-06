@@ -383,7 +383,7 @@ class CensusSyncService extends BaseSyncService {
       'fecha_actualizacion': DateTime.now().toIso8601String(),
       'sincronizado': 1,
       'observaciones': apiCensus['observaciones']?.toString(),
-      'estado_censo': apiCensus['estadoCenso'] ?? 'pendiente',
+      'estado_censo':  'migrado',
     };
   }
 

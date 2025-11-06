@@ -115,7 +115,6 @@ class DatabaseValidationService {
   /// Verifica tablas que usan el campo 'sincronizado' (0 o 1)
   Future<void> _checkSincronizadoTables(List<PendingSyncInfo> pendingItems) async {
     final tables = {
-      'equipos_pendientes': 'Equipos Pendientes',
       'censo_activo': 'Censos Activos',
       'censo_activo_foto': 'Fotos de Censo',
     };

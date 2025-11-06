@@ -37,7 +37,7 @@ class DeviceLog {
       bateria: map['bateria'],
       modelo: map['modelo'],
       fechaRegistro: map['fecha_registro'],
-      sincronizado: map['sincronizado'] ?? 0,
+      sincronizado: map['sincronizado'] ?? 1,
     );
   }
 }

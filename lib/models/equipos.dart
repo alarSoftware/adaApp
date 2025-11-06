@@ -328,35 +328,6 @@ List<Equipo> parseEquiposFromDirectArray(List<dynamic> equiposJson) {
 }
 
 // ============================================================================
-// EJEMPLO DE USO
-// ============================================================================
-
-void ejemploDeUso() {
-  // JSON de ejemplo de la API
-  const String jsonResponse = '{"data":"[{\\"id\\":\\"09-00419\\",\\"equipoId\\":\\"09-00419\\",\\"fecVencGarantia\\":null,\\"clienteId\\":\\"193339\\",\\"marcaId\\":\\"101\\",\\"esAplicaCenso\\":false,\\"fechaBaja\\":null,\\"tipEquipoId\\":\\"100\\",\\"fecCompra\\":null,\\"edfLogoId\\":20,\\"facNumero\\":\\"2323\\",\\"costo\\":870.0,\\"esActivo\\":true,\\"esDisponible\\":true,\\"condicionId\\":\\"1\\",\\"monedaId\\":9,\\"fecFactura\\":null,\\"equipo\\":\\"BRIKET M5000 - PULP\\",\\"fecha\\":null,\\"observacion\\":null,\\"numSerie\\":\\"304271\\",\\"edfModeloId\\":102,\\"proveedorId\\":\\"101\\",\\"ubicacionInterna\\":\\"EN CLIENTE\\",\\"ubicacionId\\":\\"24\\"}]"}';
-
-  // Parsear los equipos
-  final List<Equipo> equipos = parseEquiposFromApiResponse(jsonResponse);
-
-  print('Equipos encontrados: ${equipos.length}');
-
-  if (equipos.isNotEmpty) {
-    final equipo = equipos.first;
-    print('Primer equipo:');
-    print('- ID: ${equipo.id}');
-    print('- Cliente ID: ${equipo.clienteId}');
-    print('- Código de barras: ${equipo.codBarras}');
-    print('- Marca ID: ${equipo.marcaId}');
-    print('- Modelo ID: ${equipo.modeloId}');
-    print('- Modelo nombre: ${equipo.modeloNombre}');
-    print('- Número serie: ${equipo.numeroSerie}');
-    print('- Logo ID: ${equipo.logoId}');
-    print('- Está asignado: ${equipo.estaAsignado}');
-    print('- Está disponible: ${equipo.estaDisponible}');
-  }
-}
-
-// ============================================================================
 // MODELOS AUXILIARES (Marca, Modelo, Logo)
 // ============================================================================
 

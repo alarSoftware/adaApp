@@ -36,7 +36,7 @@ class CensoUploadService {
   Future<Map<String, dynamic>> enviarCensoAlServidor(
       Map<String, dynamic> datos, {
         int timeoutSegundos = 60,
-        bool guardarLog = true,
+        bool guardarLog = false,
       }) async {
     try {
       final baseUrl = await BaseSyncService.getBaseUrl();
@@ -269,6 +269,9 @@ class CensoUploadService {
             servidorId: respuesta['servidor_id'],
           );
 
+          // ✅ AGREGAR ESTA LÍNEA:
+          await _estadoEquipoRepository.marcarComoSincronizado(estadoId);
+
           // Marcar fotos como sincronizadas
           for (final foto in fotos) {
             if (foto.id != null) {
@@ -396,6 +399,9 @@ class CensoUploadService {
           estadoId,
           servidorId: respuesta['id'],
         );
+
+        // ✅ AGREGAR ESTA LÍNEA:
+        await _estadoEquipoRepository.marcarComoSincronizado(estadoId);
 
         // Marcar fotos como sincronizadas
         for (final foto in fotos) {
@@ -565,6 +571,9 @@ class CensoUploadService {
         registro.id!,
         servidorId: respuesta['id'],
       );
+
+      // ✅ AGREGAR ESTA LÍNEA:
+      await _estadoEquipoRepository.marcarComoSincronizado(registro.id!);
 
       for (final foto in fotos) {
         if (foto.id != null) {

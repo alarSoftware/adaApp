@@ -147,7 +147,7 @@ class EstadoEquipo {
       id: id ?? this.id,
       equipoId: equipoId ?? this.equipoId,
       clienteId: clienteId ?? this.clienteId,
-      usuarioId: usuarioId ?? this.usuarioId,  // ← Agregado al copyWith
+      usuarioId: usuarioId ?? this.usuarioId,
       enLocal: enLocal ?? this.enLocal,
       latitud: latitud ?? this.latitud,
       longitud: longitud ?? this.longitud,

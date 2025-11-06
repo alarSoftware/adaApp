@@ -171,6 +171,27 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
     }
   }
 
+  /// Marcar equipos pendientes como sincronizados cuando su censo se migra
+  Future<int> marcarSincronizadosPorCenso(String equipoId, int clienteId) async {
+    try {
+      final actualizados = await dbHelper.actualizar(
+        tableName,
+        {
+          'sincronizado': 1,
+          'fecha_actualizacion': DateTime.now().toIso8601String(),
+        },
+        where: 'equipo_id = ? AND cliente_id = ? AND sincronizado = 0',
+        whereArgs: [equipoId, clienteId],
+      );
+
+      _logger.i('✅ Equipos pendientes marcados como sincronizados: $actualizados');
+      return actualizados;
+    } catch (e) {
+      _logger.e('❌ Error marcando equipos pendientes como sincronizados: $e');
+      return 0;
+    }
+  }
+
   /// Crear nuevo registro de equipo pendiente
   Future<int> crear(Map<String, dynamic> datos) async {
     try {
@@ -356,6 +377,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
         try {
           // MAPEO SIMPLIFICADO: Solo los campos que existen en la tabla
           final equipoLocal = {
+            'id': equipoAPI['id'],
             'equipo_id': equipoAPI['edfEquipoId'],
             'cliente_id': equipoAPI['edfClienteId'],
             'fecha_creacion': equipoAPI['creationDate'],

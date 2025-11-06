@@ -54,7 +54,7 @@ class CensusImageSyncService extends BaseSyncService {
 
   // ========== MÉTODOS PRIVADOS ==========
 
-  /// Construir parámetros de consulta
+  /// Construir parámetros de consulta<
   static Map<String, String> _buildQueryParams({
     String? edfVendedorId,
     int? censoActivoId,

@@ -1,7 +1,6 @@
 import '../models/censo_activo.dart';
 import 'base_repository.dart';
 import 'package:logger/logger.dart';
-import 'dart:convert';
 import 'package:uuid/uuid.dart';
 
 class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
@@ -170,158 +169,6 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-  /// Guardar censos desde el servidor en la base de datos local
-  Future<int> guardarCensosDesdeServidor(List<Map<String, dynamic>> censosServidor) async {
-    int guardados = 0;
-
-    try {
-      for (final censo in censosServidor) {
-        try {
-          _logger.i('📦 Procesando censo: ${censo['id']}');
-
-          // Extraer identificadores
-          final equipoId = censo['equipoId']?.toString() ?? censo['edfEquipoId']?.toString() ?? '';
-          final clienteId = censo['clienteId'] ?? censo['edfClienteId'] ?? 0;
-
-          // Obtener usuario_id de manera flexible
-          final usuarioId = await _obtenerUsuarioIdFlexible(censo);
-
-          final fechaRevision = censo['fechaRevision'] ?? censo['fechaDeRevision'];
-
-          // Verificar si ya existe
-          final existente = await dbHelper.consultar(
-            tableName,
-            where: 'equipo_id = ? AND cliente_id = ? AND fecha_revision = ?',
-            whereArgs: [equipoId, clienteId, fechaRevision],
-            limit: 1,
-          );
-
-          if (existente.isNotEmpty) {
-            _logger.i('⏭️ Censo ya existe - Omitiendo');
-            continue;
-          }
-
-          // Extraer observaciones del datosJson
-          String? observacionesExtraidas = _extraerObservacionesDeJson(censo);
-
-          _logger.i('📝 Observaciones extraídas: $observacionesExtraidas');
-          _logger.i('👤 Usuario ID resuelto: $usuarioId');
-
-          // Generar UUID si no viene del servidor
-          final idCenso = censo['id']?.toString() ?? _uuid.v4();
-
-          // Mapear campos del servidor a estructura local
-          final datosLocal = {
-            'id': idCenso,
-            'equipo_id': equipoId,
-            'cliente_id': clienteId,
-            'usuario_id': usuarioId,
-            'en_local': (censo['enLocal'] == true || censo['enLocal'] == 1) ? 1 : 0,
-            'latitud': censo['latitud'],
-            'longitud': censo['longitud'],
-            'fecha_revision': fechaRevision ?? DateTime.now().toIso8601String(),
-            'fecha_creacion': DateTime.now().toIso8601String(),
-            'fecha_actualizacion': DateTime.now().toIso8601String(),
-            'sincronizado': 1,
-            'estado_censo': 'migrado',
-            'observaciones': observacionesExtraidas,
-          };
-
-          await dbHelper.insertar(tableName, datosLocal);
-          guardados++;
-          _logger.i('✅ Censo insertado con UUID: $idCenso');
-
-        } catch (e) {
-          _logger.w('Error guardando censo individual: $e');
-        }
-      }
-
-      _logger.i('✅ Censos guardados: $guardados de ${censosServidor.length}');
-      return guardados;
-
-    } catch (e) {
-      _logger.e('❌ Error guardando censos: $e');
-      return guardados;
-    }
-  }
-
-  /// Método helper para obtener usuario_id desde edfvendedorid
-  Future<int?> _obtenerUsuarioIdFlexible(Map<String, dynamic> censo) async {
-    try {
-      // Obtener edfvendedorid que siempre viene del POST (o null)
-      final edfVendedorId = censo['edfvendedorid']?.toString();
-
-      if (edfVendedorId == null || edfVendedorId.isEmpty) {
-        _logger.i('👤 No se envió edfvendedorid - usuario_id será null');
-        return null;
-      }
-
-      _logger.i('🔍 Buscando usuario por edfvendedorid: $edfVendedorId');
-
-      // Consultar tabla Users para obtener el usuario_id
-      final usuarioEncontrado = await dbHelper.consultar(
-        'Users',
-        where: 'edf_vendedor_id = ?',
-        whereArgs: [edfVendedorId],
-        limit: 1,
-      );
-
-      if (usuarioEncontrado.isNotEmpty) {
-        final usuarioId = usuarioEncontrado.first['id'] as int?;
-        _logger.i('✅ Usuario encontrado: edfvendedorid=$edfVendedorId → usuario_id=$usuarioId');
-        return usuarioId;
-      } else {
-        _logger.w('⚠️ No se encontró usuario con edfvendedorid: $edfVendedorId');
-        return null;
-      }
-
-    } catch (e) {
-      _logger.e('❌ Error resolviendo usuario_id desde edfvendedorid: $e');
-      return null;
-    }
-  }
-
-  // Método helper para extraer observaciones
-  String? _extraerObservacionesDeJson(Map<String, dynamic> censo) {
-    try {
-      // Intentar campo directo primero
-      if (censo['observaciones'] != null && censo['observaciones'].toString().isNotEmpty) {
-        return censo['observaciones'].toString();
-      }
-
-      // Extraer de datosJson
-      final datosJson = censo['datosJson'] ?? censo['datos_json'];
-      if (datosJson != null && datosJson is String && datosJson.isNotEmpty) {
-        try {
-          final decoded = jsonDecode(datosJson);
-          final obs = decoded['observaciones'];
-          if (obs != null && obs.toString().isNotEmpty) {
-            return obs.toString();
-          }
-        } catch (e) {
-          _logger.w('Error decodificando datosJson: $e');
-        }
-      }
-
-      return null;
-    } catch (e) {
-      _logger.w('Error extrayendo observaciones: $e');
-      return null;
-    }
-  }
-
-  // Método helper para parsear booleanos
-  int _parsearBoolean(dynamic valor) {
-    if (valor == null) return 0;
-    if (valor is bool) return valor ? 1 : 0;
-    if (valor is int) return valor;
-    if (valor is String) {
-      final lower = valor.toLowerCase();
-      return (lower == 'true' || lower == '1') ? 1 : 0;
-    }
-    return 0;
-  }
-
   // ========== MÉTODOS DE CONSULTA ==========
 
   /// Obtener historial completo por equipo y cliente
@@ -463,6 +310,24 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   /// Marcar como sincronizado
   Future<void> marcarComoSincronizado(String estadoId) async {
     try {
+      // 1. Obtener datos del censo antes de actualizarlo
+      final censoMaps = await dbHelper.consultar(
+        tableName,
+        where: 'id = ?',
+        whereArgs: [estadoId],
+        limit: 1,
+      );
+
+      if (censoMaps.isEmpty) {
+        _logger.w('Censo $estadoId no encontrado');
+        return;
+      }
+
+      final censo = censoMaps.first;
+      final equipoId = censo['equipo_id'];
+      final clienteId = censo['cliente_id'];
+
+      // 2. Marcar censo como sincronizado
       await dbHelper.actualizar(
         tableName,
         {
@@ -473,9 +338,24 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         where: 'id = ?',
         whereArgs: [estadoId],
       );
-      _logger.i('Estado $estadoId marcado como sincronizado');
+
+      // 3. ✅ NUEVO: Marcar equipos pendientes relacionados como sincronizados
+      final equiposPendientesActualizados = await dbHelper.actualizar(
+        'equipos_pendientes',
+        {
+          'sincronizado': 1,
+          'fecha_actualizacion': DateTime.now().toIso8601String(),
+        },
+        // ✅ CASTING EXPLÍCITO para manejar diferencia de tipos
+        where: 'CAST(equipo_id AS TEXT) = ? AND CAST(cliente_id AS TEXT) = ?',
+        whereArgs: [equipoId.toString(), clienteId.toString()],
+      );
+
+      _logger.i('✅ Estado $estadoId marcado como sincronizado');
+      _logger.i('📈 Equipos pendientes actualizados: $equiposPendientesActualizados');
+
     } catch (e) {
-      _logger.e('Error al marcar como sincronizado: $e');
+      _logger.e('❌ Error al marcar como sincronizado: $e');
       rethrow;
     }
   }
