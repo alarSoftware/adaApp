@@ -115,8 +115,10 @@ class DatabaseValidationService {
   /// Verifica tablas que usan el campo 'sincronizado' (0 o 1)
   Future<void> _checkSincronizadoTables(List<PendingSyncInfo> pendingItems) async {
     final tables = {
+      'equipos_pendientes': 'Equipos Pendientes',
       'censo_activo': 'Censos Activos',
       'censo_activo_foto': 'Fotos de Censo',
+      'device_log': 'Logs de Dispositivo',
     };
 
     for (var entry in tables.entries) {
@@ -146,11 +148,11 @@ class DatabaseValidationService {
   /// Verifica tablas con estados específicos que no deben eliminarse
   Future<void> _checkEstadoTables(List<PendingSyncInfo> pendingItems) async {
     // Verificar censo_activo con estados pendientes o en error
-    // Estados válidos: 'creado', 'error', etc. - solo permitir eliminar si está 'sincronizado' o 'completado'
+    // Estados válidos: 'creado', 'error', etc. - solo permitir eliminar si está 'migrado' o 'completado'
     try {
       final result = await db.rawQuery(
         'SELECT COUNT(*) as count FROM censo_activo WHERE estado_censo NOT IN (?, ?)',
-        ['sincronizado', 'completado'],
+        ['migrado', 'completado'],
       );
 
       final count = Sqflite.firstIntValue(result) ?? 0;

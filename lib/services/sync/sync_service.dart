@@ -8,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ada_app/services/sync/equipos_pendientes_sync_service.dart';
 import 'package:ada_app/services/sync/dynamic_form_sync_service.dart';
 import 'package:ada_app/services/sync/censo_image_sync_service.dart';
+import 'package:ada_app/services/database_validation_service.dart';
+import 'package:sqflite/sqflite.dart';
 import '../database_helper.dart';
 import 'package:logger/logger.dart';
 
@@ -15,6 +17,138 @@ final logger = Logger();
 
 class SyncService {
   static final _clienteRepo = ClienteRepository();
+
+  // Método para sincronizar y limpiar datos de forma segura
+  static Future<SyncResultUnificado> sincronizarYLimpiarDatos() async {
+    final dbHelper = DatabaseHelper();
+    final db = await dbHelper.database;
+    final validationService = DatabaseValidationService(db);
+
+    try {
+      // 1. Primero hacer la sincronización normal
+      BaseSyncService.logger.i('🔄 Iniciando sincronización antes de limpiar...');
+      final syncResult = await sincronizarTodosLosDatos();
+
+      if (!syncResult.exito) {
+        BaseSyncService.logger.w('⚠️ Sincronización falló, no se limpiará la base de datos');
+        return syncResult;
+      }
+
+      // 2. Verificar qué datos están pendientes después de la sincronización
+      BaseSyncService.logger.i('🔍 Verificando datos pendientes de sincronización...');
+      final validation = await validationService.canDeleteDatabase();
+
+      if (validation.canDelete) {
+        BaseSyncService.logger.i('✅ Todos los datos están sincronizados, procediendo a limpiar...');
+        await _limpiarDatosSincronizados(db);
+        syncResult.mensaje += '\n\n✅ Base de datos limpiada exitosamente';
+      } else {
+        BaseSyncService.logger.w('⚠️ Aún hay datos pendientes, no se limpiará la base de datos');
+        syncResult.mensaje += '\n\n⚠️ Advertencia: ${validation.message}';
+
+        // Opcional: mostrar detalles de qué quedó pendiente
+        for (final item in validation.pendingItems) {
+          BaseSyncService.logger.w('  - ${item.displayName}: ${item.count} registros pendientes');
+        }
+      }
+
+      return syncResult;
+
+    } catch (e) {
+      BaseSyncService.logger.e('💥 Error en sincronización y limpieza: $e');
+      final errorResult = SyncResultUnificado();
+      errorResult.exito = false;
+      errorResult.mensaje = 'Error durante sincronización y limpieza: $e';
+      return errorResult;
+    }
+  }
+
+  // Método para verificar estado de sincronización sin hacer sync
+  static Future<Map<String, dynamic>> verificarEstadoSincronizacion() async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final db = await dbHelper.database;
+      final validationService = DatabaseValidationService(db);
+
+      return await validationService.getPendingSyncSummary();
+    } catch (e) {
+      BaseSyncService.logger.e('❌ Error verificando estado: $e');
+      return {
+        'can_delete': false,
+        'total_pending': -1,
+        'pending_by_table': [],
+        'message': 'Error verificando estado: $e',
+        'error': true,
+      };
+    }
+  }
+
+  // Método privado para limpiar datos ya sincronizados
+  static Future<void> _limpiarDatosSincronizados(Database db) async {
+    await db.transaction((txn) async {
+      BaseSyncService.logger.i('🧹 Limpiando tablas con sync_status = "synced"...');
+
+      // Limpiar formularios dinámicos con sync_status = 'synced'
+      final deletedResponses = await txn.delete(
+          'dynamic_form_response',
+          where: 'sync_status = ?',
+          whereArgs: ['synced']
+      );
+
+      final deletedDetails = await txn.delete(
+          'dynamic_form_response_detail',
+          where: 'sync_status = ?',
+          whereArgs: ['synced']
+      );
+
+      final deletedImages = await txn.delete(
+          'dynamic_form_response_image',
+          where: 'sync_status = ?',
+          whereArgs: ['synced']
+      );
+
+      BaseSyncService.logger.i('🧹 Limpiando tablas con sincronizado = 1...');
+
+      // Limpiar equipos pendientes sincronizados
+      final deletedEquiposPendientes = await txn.delete(
+          'equipos_pendientes',
+          where: 'sincronizado = ?',
+          whereArgs: [1]
+      );
+
+      // Limpiar censos sincronizados y con estado correcto
+      final deletedCensos = await txn.delete(
+          'censo_activo',
+          where: 'sincronizado = ? AND estado_censo IN (?, ?)',
+          whereArgs: [1, 'migrado', 'completado']
+      );
+
+      // Limpiar fotos de censos sincronizadas
+      final deletedFotos = await txn.delete(
+          'censo_activo_foto',
+          where: 'sincronizado = ?',
+          whereArgs: [1]
+      );
+
+      // Limpiar device logs sincronizados
+      final deletedLogs = await txn.delete(
+          'device_log',
+          where: 'sincronizado = ?',
+          whereArgs: [1]
+      );
+
+      BaseSyncService.logger.i(
+          '✅ Limpieza completada: '
+              'Respuestas: $deletedResponses, '
+              'Detalles: $deletedDetails, '
+              'Imágenes: $deletedImages, '
+              'Eq. Pendientes: $deletedEquiposPendientes, '
+              'Censos: $deletedCensos, '
+              'Fotos: $deletedFotos, '
+              'Logs: $deletedLogs'
+      );
+    });
+  }
 
   static Future<SyncResultUnificado> sincronizarTodosLosDatos() async {
     final resultado = SyncResultUnificado();

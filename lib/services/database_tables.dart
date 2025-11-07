@@ -34,6 +34,7 @@ class DatabaseTables {
     await db.execute(_sqlCensoActivo());
     await db.execute(_sqlCensoActivoFoto());
     await db.execute(_sqlDeviceLog());
+    await db.execute(_sqlErrorLog()); // 🆕 NUEVA TABLA
 
     // Tablas de formularios dinámicos
     await db.execute(_sqlDynamicForm());
@@ -153,6 +154,35 @@ class DatabaseTables {
   )
 ''';
 
+  String _sqlDeviceLog() => '''
+  CREATE TABLE device_log (
+    id TEXT PRIMARY KEY,
+    edf_vendedor_id TEXT,
+    latitud_longitud TEXT,
+    bateria INTEGER,
+    modelo TEXT,
+    fecha_registro TEXT NOT NULL,
+    sincronizado INTEGER DEFAULT 0,
+    FOREIGN KEY (edf_vendedor_id) REFERENCES Users (edf_vendedor_id)
+  )
+''';
+
+  String _sqlErrorLog() => '''
+    CREATE TABLE error_log (
+      id TEXT PRIMARY KEY,
+      timestamp TEXT NOT NULL,
+      table_name TEXT NOT NULL,
+      operation TEXT NOT NULL,
+      registro_fail_id TEXT,
+      error_code TEXT,
+      error_message TEXT NOT NULL,
+      error_type TEXT,
+      sync_attempt INTEGER DEFAULT 1,
+      user_id TEXT,
+      endpoint TEXT
+    )
+  ''';
+
   // ==================== TABLAS DE FORMULARIOS DINÁMICOS ====================
 
   String _sqlDynamicForm() => '''
@@ -234,19 +264,6 @@ class DatabaseTables {
   )
 ''';
 
-  String _sqlDeviceLog() => '''
-  CREATE TABLE device_log (
-    id TEXT PRIMARY KEY,
-    edf_vendedor_id TEXT,
-    latitud_longitud TEXT,
-    bateria INTEGER,
-    modelo TEXT,
-    fecha_registro TEXT NOT NULL,
-    sincronizado INTEGER DEFAULT 0,
-    FOREIGN KEY (edf_vendedor_id) REFERENCES Users (edf_vendedor_id)
-  )
-''';
-
   // ==================== ÍNDICES ====================
 
   Future<void> _crearIndices(Database db) async {
@@ -257,6 +274,7 @@ class DatabaseTables {
     await _crearIndicesCensoActivo(db);
     await _crearIndicesDynamicForms(db);
     await _crearIndicesDeviceLog(db);
+    await _crearIndicesErrorLog(db);
   }
 
   Future<void> _crearIndicesClientes(Database db) async {
@@ -368,5 +386,18 @@ class DatabaseTables {
 
   Future<void> _crearIndicesDeviceLog(Database db) async {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_device_log_fecha ON device_log (fecha_registro)');
+  }
+
+  // 🆕 ÍNDICES PARA ERROR_LOG
+  Future<void> _crearIndicesErrorLog(Database db) async {
+    final indices = [
+      'CREATE INDEX IF NOT EXISTS idx_error_log_timestamp ON error_log (timestamp)',
+      'CREATE INDEX IF NOT EXISTS idx_error_log_table_name ON error_log (table_name)',
+      'CREATE INDEX IF NOT EXISTS idx_error_log_error_type ON error_log (error_type)',
+    ];
+
+    for (final indice in indices) {
+      await db.execute(indice);
+    }
   }
 }

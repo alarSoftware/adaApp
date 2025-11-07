@@ -384,6 +384,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
             'fecha_actualizacion': DateTime.now().toIso8601String(),
             'fecha_censo': equipoAPI['creationDate'],
             'usuario_censo_id': 1,
+            'sincronizado': 1,
           };
 
           _logger.i('Insertando: equipo_id=${equipoLocal['equipo_id']}, cliente_id=${equipoLocal['cliente_id']}');

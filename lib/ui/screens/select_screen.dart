@@ -1,7 +1,9 @@
 import 'package:ada_app/ui/screens/sync_panel_screen.dart';
+import 'package:ada_app/ui/screens/pending_data_screen.dart'; // 🆕 NUEVO
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/services/app_services.dart';
+import 'package:ada_app/ui/widgets/app_connection_indicator.dart';
 import 'package:ada_app/ui/screens/equipos_screen.dart';
 import 'package:ada_app/ui/screens/modelos_screen.dart';
 import 'package:ada_app/ui/screens/logo_screen.dart';
@@ -26,18 +28,107 @@ class _SelectScreenState extends State<SelectScreen> {
   late SelectScreenViewModel _viewModel;
   late StreamSubscription<UIEvent> _eventSubscription;
 
+  // 🆕 NUEVO: Estado para datos pendientes
+  int _pendingDataCount = 0;
+  Timer? _pendingDataTimer;
+
   @override
   void initState() {
     super.initState();
     _viewModel = SelectScreenViewModel();
     _setupEventListener();
+    _startPendingDataMonitoring(); // 🆕 NUEVO
   }
 
   @override
   void dispose() {
     _eventSubscription.cancel();
+    _pendingDataTimer?.cancel(); // 🆕 NUEVO
     _viewModel.dispose();
     super.dispose();
+  }
+
+  // 🆕 NUEVO: Monitoreo de datos pendientes
+  void _startPendingDataMonitoring() {
+    _pendingDataTimer = Timer.periodic(
+      Duration(minutes: 2),
+          (_) => _checkPendingData(),
+    );
+    _checkPendingData(); // Verificar inmediatamente
+  }
+
+  // 🆕 NUEVO: Verificar datos pendientes
+  Future<void> _checkPendingData() async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final db = await dbHelper.database;
+      final validationService = DatabaseValidationService(db);
+      final status = await validationService.getPendingSyncSummary();
+
+      if (mounted) {
+        setState(() {
+          _pendingDataCount = status['total_pending'] ?? 0;
+        });
+      }
+    } catch (e) {
+      // Silently ignore errors for background check
+    }
+  }
+
+  // 🆕 NUEVO: Botón de campanita con badge
+  Widget _buildPendingDataButton() {
+    return Stack(
+      children: [
+        IconButton(
+          onPressed: () async {
+            // Navegar a la pantalla de datos pendientes
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PendingDataScreen(),
+              ),
+            );
+            // Refrescar contador después de volver
+            _checkPendingData();
+          },
+          icon: Icon(Icons.notifications, color: AppColors.onPrimary),
+          tooltip: 'Datos pendientes de envío',
+        ),
+        // Badge con contador
+        if (_pendingDataCount > 0)
+          Positioned(
+            right: 6,
+            top: 6,
+            child: Container(
+              padding: EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: AppColors.error,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 2,
+                    offset: Offset(0, 1),
+                  ),
+                ],
+              ),
+              constraints: BoxConstraints(
+                minWidth: 16,
+                minHeight: 16,
+              ),
+              child: Text(
+                _pendingDataCount > 99 ? '99+' : _pendingDataCount.toString(),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   void _setupEventListener() {
@@ -48,6 +139,8 @@ class _SelectScreenState extends State<SelectScreen> {
         _mostrarError(event.message);
       } else if (event is ShowSuccessEvent) {
         _mostrarExito(event.message);
+        // 🆕 NUEVO: Refrescar contador después de sync exitoso
+        _checkPendingData();
       } else if (event is RequestSyncConfirmationEvent) {
         _handleSyncConfirmation();
       } else if (event is RequiredSyncEvent) {
@@ -60,6 +153,8 @@ class _SelectScreenState extends State<SelectScreen> {
         _handleDeleteValidationFailed(event.validationResult);
       } else if (event is SyncCompletedEvent) {
         _mostrarExito(event.result.message);
+        // 🆕 NUEVO: Refrescar contador después de sync
+        _checkPendingData();
       }
     });
   }
@@ -165,6 +260,21 @@ class _SelectScreenState extends State<SelectScreen> {
               child: Text(
                 'Entendido',
                 style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+            // 🆕 NUEVO: Botón para ir a datos pendientes
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => PendingDataScreen()),
+                );
+                _checkPendingData();
+              },
+              child: Text(
+                'Ver Detalles',
+                style: TextStyle(color: AppColors.primary),
               ),
             ),
             ElevatedButton.icon(
@@ -470,33 +580,9 @@ class _SelectScreenState extends State<SelectScreen> {
       listenable: _viewModel,
       builder: (context, child) {
         final status = _viewModel.connectionStatus;
-        IconData icon;
-        Color color;
-        String text;
-
-        if (!status.hasInternet) {
-          icon = Icons.wifi_off;
-          color = AppColors.error;
-          text = 'Sin Internet';
-        } else if (!status.hasApiConnection) {
-          icon = Icons.cloud_off;
-          color = AppColors.warning;
-          text = 'API Desconectada';
-        } else {
-          icon = Icons.cloud_done;
-          color = AppColors.success;
-          text = 'Conectado';
-        }
-
-        return Container(
-          margin: EdgeInsets.only(right: 8),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 20),
-              SizedBox(width: 4),
-              Text(text, style: TextStyle(fontSize: 12, color: AppColors.appBarForeground)),
-            ],
-          ),
+        return AppConnectionIndicator(
+          hasInternet: status.hasInternet,
+          hasApiConnection: status.hasApiConnection,
         );
       },
     );
@@ -510,6 +596,7 @@ class _SelectScreenState extends State<SelectScreen> {
         backgroundColor: AppColors.appBarBackground,
         foregroundColor: AppColors.appBarForeground,
         actions: [
+          // Botón de sincronización
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {
@@ -529,7 +616,11 @@ class _SelectScreenState extends State<SelectScreen> {
               );
             },
           ),
+          // 🆕 NUEVO: Botón de campanita para datos pendientes
+          _buildPendingDataButton(),
+          // Indicador de conexión
           _buildConnectionStatus(),
+          // Menú de opciones
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {

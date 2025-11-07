@@ -493,7 +493,21 @@ class SelectScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      // Obtener información para mostrar en el diálogo
+      // 🆕 VALIDAR Y USAR EL MISMO POPUP QUE BORRAR BD
+      _logger.i('🔍 Validando datos antes de sincronizar...');
+
+      final db = await _dbHelper.database;
+      final validationService = DatabaseValidationService(db);
+      final validationResult = await validationService.canDeleteDatabase();
+
+      if (!validationResult.canDelete) {
+        _logger.w('⚠️ Hay registros pendientes de sincronizar');
+        // USAR EL MISMO EVENTO QUE EL BOTÓN DE BORRAR
+        _eventController.add(RequestDeleteWithValidationEvent(validationResult));
+        return;
+      }
+
+      // Si todo está sincronizado, proceder normal
       final syncInfo = SyncInfo(
         estimatedClients: await _getEstimatedClients(),
         estimatedEquipments: await _getEstimatedEquipments(),
@@ -501,8 +515,8 @@ class SelectScreenViewModel extends ChangeNotifier {
         serverUrl: conexion.mensaje,
       );
 
-      // Solicitar confirmación a la UI
       _eventController.add(RequestSyncConfirmationEvent(syncInfo));
+
     } catch (e) {
       _eventController.add(ShowErrorEvent('Error inesperado: $e'));
     }

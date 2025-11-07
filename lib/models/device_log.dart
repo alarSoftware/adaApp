@@ -14,7 +14,7 @@ class DeviceLog {
     required this.bateria,
     required this.modelo,
     required this.fechaRegistro,
-    this.sincronizado = 0,
+    this.sincronizado = 1,
   });
 
   Map<String, dynamic> toMap() {
