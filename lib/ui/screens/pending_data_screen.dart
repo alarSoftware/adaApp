@@ -27,12 +27,12 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
       if (!mounted) return;
 
       switch (event.runtimeType) {
-        case ShowErrorEvent:
+        case ShowErrorEvent _:
           final errorEvent = event as ShowErrorEvent;
           _showErrorSnackBar(errorEvent.message);
           break;
 
-        case ShowSuccessEvent:
+        case ShowSuccessEvent _:
           final successEvent = event as ShowSuccessEvent;
           _showSuccessSnackBar(successEvent.message);
           break;
@@ -104,8 +104,7 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
                 Expanded(
                   child: _buildContent(viewModel),
                 ),
-                if (viewModel.hasPendingData && !viewModel.isSending)
-                  _buildActionButtons(viewModel),
+                if (viewModel.hasPendingData) _buildActionButtons(viewModel),
               ],
             );
           },
@@ -161,7 +160,38 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
                   ],
                 ),
               ),
+              // Indicador de conexión
+              _buildConnectionIndicator(viewModel),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConnectionIndicator(PendingDataViewModel viewModel) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: viewModel.isConnected ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            viewModel.isConnected ? Icons.wifi : Icons.wifi_off,
+            size: 16,
+            color: viewModel.isConnected ? Colors.green : Colors.red,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            viewModel.isConnected ? 'En línea' : 'Sin conexión',
+            style: TextStyle(
+              fontSize: 12,
+              color: viewModel.isConnected ? Colors.green : Colors.red,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -217,12 +247,26 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           LinearProgressIndicator(
             value: viewModel.sendProgress,
             backgroundColor: Colors.grey[300],
             valueColor: AlwaysStoppedAnimation<Color>(
               Theme.of(context).primaryColor,
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Botón de cancelar
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _showCancelConfirmation(),
+              icon: const Icon(Icons.cancel, size: 18),
+              label: const Text('Cancelar Envío'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+                side: const BorderSide(color: Colors.red),
+              ),
             ),
           ),
         ],
@@ -269,18 +313,31 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
                 color: Theme.of(context).hintColor,
               ),
             ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: viewModel.refresh,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Verificar Nuevamente'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green[100],
+                foregroundColor: Colors.green[700],
+              ),
+            ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
-      itemCount: viewModel.pendingGroups.length,
-      itemBuilder: (context, index) {
-        final group = viewModel.pendingGroups[index];
-        return _buildPendingDataCard(group);
-      },
+    return RefreshIndicator(
+      onRefresh: viewModel.refresh,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16.0),
+        itemCount: viewModel.pendingGroups.length,
+        itemBuilder: (context, index) {
+          final group = viewModel.pendingGroups[index];
+          return _buildPendingDataCard(group);
+        },
+      ),
     );
   }
 
@@ -308,6 +365,7 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
                           fontSize: 16,
                         ),
                       ),
+                      const SizedBox(height: 4),
                       Text(
                         group.description,
                         style: TextStyle(
@@ -392,23 +450,70 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
         border: Border(
           top: BorderSide(color: Theme.of(context).dividerColor),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            offset: const Offset(0, -2),
+            blurRadius: 4,
+          ),
+        ],
       ),
       child: SafeArea(
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: viewModel.requestBulkSend,
-            icon: const Icon(Icons.cloud_upload),
-            label: Text('Enviar Todo (${viewModel.totalPendingItems})'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+        child: Column(
+          children: [
+            if (!viewModel.isConnected) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.wifi_off, color: Colors.red, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Sin conexión a Internet. Verifique su conectividad.',
+                        style: TextStyle(color: Colors.red[700], fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: viewModel.isSending || !viewModel.isConnected
+                    ? null
+                    : viewModel.requestBulkSend,
+                icon: viewModel.isSending
+                    ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+                    : const Icon(Icons.cloud_upload),
+                label: Text(viewModel.isSending
+                    ? 'Enviando...'
+                    : 'Enviar Todo (${viewModel.totalPendingItems})'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: viewModel.isSending || !viewModel.isConnected
+                      ? Colors.grey
+                      : Theme.of(context).primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -419,30 +524,82 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
   void _showBulkSendConfirmation(List<PendingDataGroup> groups, int totalItems) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Confirmar Envío'),
+        title: Row(
+          children: [
+            Icon(Icons.cloud_upload, color: Theme.of(context).primaryColor),
+            const SizedBox(width: 8),
+            const Text('Confirmar Envío'),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Se enviarán $totalItems elementos en ${groups.length} categorías:'),
             const SizedBox(height: 16),
-            ...groups.map((group) => Padding(
-              padding: const EdgeInsets.only(bottom: 4),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: groups.map((group) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      _buildTypeIcon(group.type),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          group.displayName,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${group.count}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: Colors.orange,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )).toList(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: Row(
                 children: [
-                  Text('• ${group.displayName}: '),
-                  Text(
-                    '${group.count}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Este proceso puede tardar varios minutos dependiendo de la cantidad de datos.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue[700],
+                      ),
+                    ),
                   ),
                 ],
               ),
-            )),
-            const SizedBox(height: 16),
-            const Text(
-              '¿Desea continuar?',
-              style: TextStyle(fontWeight: FontWeight.w500),
             ),
           ],
         ),
@@ -451,12 +608,52 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancelar'),
           ),
-          ElevatedButton(
+          ElevatedButton.icon(
             onPressed: () {
               Navigator.of(context).pop();
               _viewModel.executeBulkSend();
             },
-            child: const Text('Enviar'),
+            icon: const Icon(Icons.send),
+            label: const Text('Enviar'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCancelConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange),
+            const SizedBox(width: 8),
+            const Text('Cancelar Envío'),
+          ],
+        ),
+        content: const Text(
+          '¿Está seguro que desea cancelar el envío?\n\nLos datos ya enviados se mantendrán, pero el proceso se detendrá.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Continuar Enviando'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _viewModel.cancelSend();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Cancelar Envío'),
           ),
         ],
       ),
@@ -466,6 +663,7 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
   void _showSendCompletedDialog(BulkSendResult result) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: Row(
           children: [
@@ -477,38 +675,90 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
             Text(result.allSuccess ? 'Envío Completado' : 'Envío Parcial'),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(result.summary),
-            if (!result.allSuccess) ...[
-              const SizedBox(height: 16),
-              const Text(
-                'Detalles:',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              ...result.results.map((r) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  children: [
-                    Icon(
-                      r.success ? Icons.check : Icons.error,
-                      size: 16,
-                      color: r.success ? Colors.green : Colors.red,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(r.message)),
-                  ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: result.allSuccess
+                      ? Colors.green.withOpacity(0.1)
+                      : Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              )),
+                child: Text(
+                  result.summary,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ),
+              if (!result.allSuccess && result.results.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  'Detalles por categoría:',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                ...result.results.map((r) => Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        r.success ? Icons.check_circle : Icons.error,
+                        size: 16,
+                        color: r.success ? Colors.green : Colors.red,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              r.message,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            if (r.error != null)
+                              Text(
+                                'Error: ${r.error}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.red[600],
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+              ],
             ],
-          ],
+          ),
         ),
         actions: [
+          if (!result.allSuccess)
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _viewModel.refresh(); // Refrescar para ver qué queda pendiente
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reintentar Pendientes'),
+            ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: result.allSuccess ? Colors.green : Colors.orange,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Entendido'),
           ),
         ],
@@ -529,7 +779,14 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
           ],
         ),
         backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: 'Cerrar',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
       ),
     );
   }

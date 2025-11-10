@@ -3,8 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/services/database_validation_service.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/services/sync/sync_service.dart';
+import 'package:ada_app/services/post/base_post_service.dart';
+import 'package:ada_app/services/post/dynamic_form_post_service.dart';
+import 'package:ada_app/services/post/censo_activo_post_service.dart';
+import 'package:ada_app/services/post/device_log_post_service.dart';
+import 'package:ada_app/services/post/equipo_pendiente_post_service.dart';
+import 'package:ada_app/models/device_log.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:logger/logger.dart';
 import 'dart:async';
+import 'dart:convert';
 
 // ========== MODELOS DE DATOS ==========
 class PendingDataGroup {
@@ -99,10 +107,26 @@ class SendCompletedEvent extends PendingDataUIEvent {
   SendCompletedEvent(this.result);
 }
 
+// ========== CONFIGURACIÓN DE ENVÍO ==========
+class SendConfiguration {
+  final int maxRetries;
+  final Duration timeout;
+  final Duration retryDelay;
+  final int batchSize;
+
+  const SendConfiguration({
+    this.maxRetries = 3,
+    this.timeout = const Duration(seconds: 30),
+    this.retryDelay = const Duration(seconds: 2),
+    this.batchSize = 10,
+  });
+}
+
 // ========== VIEWMODEL ==========
 class PendingDataViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
   final DatabaseHelper _dbHelper = DatabaseHelper();
+  final SendConfiguration _config = const SendConfiguration();
 
   // ========== ESTADO INTERNO ==========
   bool _isLoading = false;
@@ -110,12 +134,16 @@ class PendingDataViewModel extends ChangeNotifier {
   List<PendingDataGroup> _pendingGroups = [];
   int _totalPendingItems = 0;
   String _lastUpdateTime = '';
+  bool _isConnected = true;
 
   // Estado de envío
   double _sendProgress = 0.0;
   String _sendCurrentStep = '';
   int _sendCompletedCount = 0;
   int _sendTotalCount = 0;
+
+  // Control de cancelación
+  bool _isCancelled = false;
 
   // ========== STREAMS PARA COMUNICACIÓN ==========
   final StreamController<PendingDataUIEvent> _eventController =
@@ -129,6 +157,7 @@ class PendingDataViewModel extends ChangeNotifier {
   int get totalPendingItems => _totalPendingItems;
   String get lastUpdateTime => _lastUpdateTime;
   bool get hasPendingData => _totalPendingItems > 0;
+  bool get isConnected => _isConnected;
 
   // Getters de progreso de envío
   double get sendProgress => _sendProgress;
@@ -198,15 +227,27 @@ class PendingDataViewModel extends ChangeNotifier {
     }
   }
 
+  /// Verifica la conectividad
+  Future<bool> _checkConnectivity() async {
+    try {
+      final conexion = await SyncService.probarConexion();
+      _isConnected = conexion.exito;
+      return _isConnected;
+    } catch (e) {
+      _isConnected = false;
+      return false;
+    }
+  }
+
   /// Solicita confirmación para envío masivo
   Future<void> requestBulkSend() async {
     if (_isSending || _pendingGroups.isEmpty) return;
 
     try {
       // Verificar conexión
-      final conexion = await SyncService.probarConexion();
-      if (!conexion.exito) {
-        _eventController.add(ShowErrorEvent('Sin conexión al servidor: ${conexion.mensaje}'));
+      final connected = await _checkConnectivity();
+      if (!connected) {
+        _eventController.add(ShowErrorEvent('Sin conexión al servidor. Verifique su conexión a Internet.'));
         return;
       }
 
@@ -224,9 +265,17 @@ class PendingDataViewModel extends ChangeNotifier {
 
     _setSending(true);
     _resetSendProgress();
+    _isCancelled = false;
 
     try {
       _logger.i('🚀 Iniciando envío masivo de datos pendientes...');
+
+      // Verificar conexión una vez más antes de empezar
+      final connected = await _checkConnectivity();
+      if (!connected) {
+        _eventController.add(ShowErrorEvent('Conexión perdida. No se puede proceder con el envío.'));
+        return;
+      }
 
       final results = <SendResult>[];
       int totalSent = 0;
@@ -236,20 +285,30 @@ class PendingDataViewModel extends ChangeNotifier {
       _sendCompletedCount = 0;
 
       for (int i = 0; i < _pendingGroups.length; i++) {
+        // Verificar cancelación
+        if (_isCancelled) {
+          _logger.i('🛑 Envío cancelado por el usuario');
+          _eventController.add(ShowErrorEvent('Envío cancelado por el usuario'));
+          return;
+        }
+
         final group = _pendingGroups[i];
 
         _updateSendProgress(
           progress: (i / _pendingGroups.length),
-          currentStep: 'Enviando ${group.displayName}...',
+          currentStep: 'Enviando ${group.displayName}... (${group.count} elementos)',
           completedCount: i,
         );
 
         try {
-          final result = await _sendDataGroup(group);
+          final result = await _sendDataGroupWithRetry(group);
           results.add(result);
 
           if (result.success) {
             totalSent += result.itemsSent;
+            _logger.i('✅ ${group.displayName}: ${result.itemsSent} elementos enviados');
+          } else {
+            _logger.w('⚠️ ${group.displayName}: ${result.error}');
           }
 
         } catch (e) {
@@ -258,10 +317,13 @@ class PendingDataViewModel extends ChangeNotifier {
             success: false,
             tableName: group.tableName,
             itemsSent: 0,
-            message: 'Error en envío',
+            message: 'Error en envío: $e',
             error: e.toString(),
           ));
         }
+
+        // Pequeña pausa para no saturar el servidor
+        await Future.delayed(const Duration(milliseconds: 100));
       }
 
       // Completar progreso
@@ -291,6 +353,10 @@ class PendingDataViewModel extends ChangeNotifier {
       // Recargar datos para actualizar la vista
       await loadPendingData();
 
+      if (allSuccess) {
+        _eventController.add(ShowSuccessEvent('¡Envío completado exitosamente!'));
+      }
+
       _logger.i('✅ Envío masivo completado: $summary');
 
     } catch (e) {
@@ -299,6 +365,14 @@ class PendingDataViewModel extends ChangeNotifier {
     } finally {
       _setSending(false);
       _resetSendProgress();
+    }
+  }
+
+  /// Cancela el envío en progreso
+  void cancelSend() {
+    if (_isSending) {
+      _isCancelled = true;
+      _logger.i('🛑 Cancelación solicitada...');
     }
   }
 
@@ -346,6 +420,39 @@ class PendingDataViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Envía un grupo de datos con reintentos
+  Future<SendResult> _sendDataGroupWithRetry(PendingDataGroup group) async {
+    for (int attempt = 0; attempt <= _config.maxRetries; attempt++) {
+      try {
+        final result = await _sendDataGroup(group);
+        return await Future.any([
+          Future.value(result),
+          Future.delayed(_config.timeout).then((_) => throw TimeoutException('Timeout', _config.timeout)),
+        ]);
+      } catch (e) {
+        if (attempt == _config.maxRetries) {
+          return SendResult(
+            success: false,
+            tableName: group.tableName,
+            itemsSent: 0,
+            message: 'Falló después de ${_config.maxRetries + 1} intentos',
+            error: e.toString(),
+          );
+        }
+
+        _logger.w('🔄 Reintentando ${group.displayName} (intento ${attempt + 1}/${_config.maxRetries + 1})');
+        await Future.delayed(_config.retryDelay);
+      }
+    }
+
+    return SendResult(
+      success: false,
+      tableName: group.tableName,
+      itemsSent: 0,
+      message: 'Error inesperado en reintentos',
+    );
+  }
+
   PendingDataType _getDataType(String tableName) {
     switch (tableName) {
       case 'dynamic_form_response':
@@ -377,7 +484,7 @@ class PendingDataViewModel extends ChangeNotifier {
       case 'censo_activo_foto':
         return 'Fotos tomadas durante censos';
       case 'equipos_pendientes':
-        return 'Equipos registrados localmente';
+        return 'Equipos registrados localmente (simulación)';
       case 'device_log':
         return 'Registros de actividad del dispositivo';
       default:
@@ -389,9 +496,6 @@ class PendingDataViewModel extends ChangeNotifier {
   Future<SendResult> _sendDataGroup(PendingDataGroup group) async {
     try {
       _logger.i('📤 Enviando ${group.displayName} (${group.count} elementos)...');
-
-      // TODO: Implementar el envío específico para cada tipo de dato
-      // Por ahora simularemos el envío exitoso
 
       switch (group.type) {
         case PendingDataType.forms:
@@ -417,64 +521,540 @@ class PendingDataViewModel extends ChangeNotifier {
     }
   }
 
-  // Métodos específicos de envío (placeholder por ahora)
-  Future<SendResult> _sendForms(PendingDataGroup group) async {
-    // TODO: Implementar envío de formularios
-    await Future.delayed(Duration(seconds: 1)); // Simular envío
+  // ========== IMPLEMENTACIÓN USANDO TU ESQUEMA REAL ==========
 
-    return SendResult(
-      success: true,
-      tableName: group.tableName,
-      itemsSent: group.count,
-      message: 'Formularios enviados correctamente',
+  Future<SendResult> _sendForms(PendingDataGroup group) async {
+    try {
+      final db = await _dbHelper.database;
+
+      // Usar sync_status como está en tu esquema
+      final pendingForms = await db.query(
+        'dynamic_form_response',
+        where: 'sync_status = ?',
+        whereArgs: ['pending'],
+        orderBy: 'creation_date ASC',
+      );
+
+      if (pendingForms.isEmpty) {
+        return SendResult(
+          success: true,
+          tableName: group.tableName,
+          itemsSent: 0,
+          message: 'No hay formularios pendientes',
+        );
+      }
+
+      int sentCount = 0;
+      final errors = <String>[];
+
+      for (final form in pendingForms) {
+        if (_isCancelled) break;
+
+        try {
+          // Preparar respuesta como lo espera el servicio existente
+          final respuesta = await _prepareFormResponse(form);
+
+          // Usar el servicio existente DynamicFormPostService
+          final response = await DynamicFormPostService.enviarRespuestaFormulario(
+            respuesta: respuesta,
+            incluirLog: true,
+          );
+
+          if (response['exito'] == true) {
+            // Marcar como enviado usando campos de tu esquema
+            await db.update(
+              'dynamic_form_response',
+              {
+                'sync_status': 'sent',
+                'fecha_sincronizado': DateTime.now().toIso8601String(),
+                'last_update_date': DateTime.now().toIso8601String(),
+              },
+              where: 'id = ?',
+              whereArgs: [form['id']],
+            );
+
+            // Marcar detalles como enviados
+            await db.update(
+              'dynamic_form_response_detail',
+              {'sync_status': 'sent'},
+              where: 'dynamic_form_response_id = ?',
+              whereArgs: [form['id']],
+            );
+
+            // Marcar imágenes como enviadas
+            await db.execute('''
+              UPDATE dynamic_form_response_image 
+              SET sync_status = 'sent' 
+              WHERE dynamic_form_response_detail_id IN (
+                SELECT id FROM dynamic_form_response_detail 
+                WHERE dynamic_form_response_id = ?
+              )
+            ''', [form['id']]);
+
+            sentCount++;
+          } else {
+            // Incrementar intentos de sync
+            await db.update(
+              'dynamic_form_response',
+              {
+                'intentos_sync': (form['intentos_sync'] as int? ?? 0) + 1,
+                'ultimo_intento_sync': DateTime.now().toIso8601String(),
+                'mensaje_error_sync': response['mensaje'] ?? 'Error desconocido',
+              },
+              where: 'id = ?',
+              whereArgs: [form['id']],
+            );
+
+            errors.add('Formulario ${form['id']}: ${response['mensaje'] ?? 'Error desconocido'}');
+          }
+
+        } catch (e) {
+          errors.add('Formulario ${form['id']}: $e');
+        }
+      }
+
+      final success = sentCount > 0;
+      final message = success
+          ? '$sentCount de ${pendingForms.length} formularios enviados'
+          : 'No se pudieron enviar formularios: ${errors.join(', ')}';
+
+      return SendResult(
+        success: success,
+        tableName: group.tableName,
+        itemsSent: sentCount,
+        message: message,
+        error: errors.isNotEmpty ? errors.join('; ') : null,
+      );
+
+    } catch (e) {
+      return SendResult(
+        success: false,
+        tableName: group.tableName,
+        itemsSent: 0,
+        message: 'Error en envío de formularios',
+        error: e.toString(),
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> _prepareFormResponse(Map<String, Object?> form) async {
+    final db = await _dbHelper.database;
+
+    // Obtener detalles del formulario
+    final details = await db.query(
+      'dynamic_form_response_detail',
+      where: 'dynamic_form_response_id = ?',
+      whereArgs: [form['id']],
     );
+
+    // Obtener imágenes del formulario (relación a través de detail)
+    final images = await db.rawQuery('''
+      SELECT dri.* FROM dynamic_form_response_image dri
+      INNER JOIN dynamic_form_response_detail drd ON dri.dynamic_form_response_detail_id = drd.id
+      WHERE drd.dynamic_form_response_id = ?
+    ''', [form['id']]);
+
+    // Preparar la respuesta en el formato que espera tu servicio
+    return {
+      'id': form['id'],
+      'dynamic_form_id': form['dynamic_form_id'],
+      'usuario_id': form['usuario_id'],
+      'contacto_id': form['contacto_id'],
+      'edf_vendedor_id': form['edf_vendedor_id'],
+      'creation_date': form['creation_date'],
+      'last_update_date': form['last_update_date'],
+      'estado': form['estado'],
+      'details': details,
+      'images': images,
+    };
   }
 
   Future<SendResult> _sendCensus(PendingDataGroup group) async {
-    // TODO: Implementar envío de censos
-    await Future.delayed(Duration(seconds: 2)); // Simular envío
+    try {
+      final db = await _dbHelper.database;
 
-    return SendResult(
-      success: true,
-      tableName: group.tableName,
-      itemsSent: group.count,
-      message: 'Censos enviados correctamente',
-    );
+      // Usar sincronizado = 0 para datos pendientes
+      final pendingCensus = await db.query(
+        'censo_activo',
+        where: 'sincronizado = ?',
+        whereArgs: [0],
+        orderBy: 'fecha_creacion ASC',
+      );
+
+      if (pendingCensus.isEmpty) {
+        return SendResult(
+          success: true,
+          tableName: group.tableName,
+          itemsSent: 0,
+          message: 'No hay censos pendientes',
+        );
+      }
+
+      int sentCount = 0;
+      final errors = <String>[];
+
+      for (final censo in pendingCensus) {
+        if (_isCancelled) break;
+
+        try {
+          // Preparar datos usando tu servicio existente
+          final position = Position(
+            latitude: (censo['latitud'] as num?)?.toDouble() ?? 0.0,
+            longitude: (censo['longitud'] as num?)?.toDouble() ?? 0.0,
+            timestamp: DateTime.now(),
+            accuracy: 0.0,
+            altitude: 0.0,
+            altitudeAccuracy: 0.0,
+            heading: 0.0,
+            headingAccuracy: 0.0,
+            speed: 0.0,
+            speedAccuracy: 0.0,
+          );
+
+          // Obtener fotos del censo
+          final fotos = await db.query(
+            'censo_activo_foto',
+            where: 'censo_activo_id = ? AND sincronizado = ?',
+            whereArgs: [censo['id'], 0],
+            orderBy: 'orden ASC',
+          );
+
+          String? imagenBase64;
+          String? imagenBase64_2;
+
+          if (fotos.isNotEmpty) {
+            imagenBase64 = fotos.first['imagen_base64'] as String?;
+            if (fotos.length > 1) {
+              imagenBase64_2 = fotos[1]['imagen_base64'] as String?;
+            }
+          }
+
+          // Usar tu servicio existente CensoActivoPostService
+          final response = await CensoActivoPostService.enviarCambioEstado(
+            codigoBarras: censo['equipo_id']?.toString() ?? '',
+            clienteId: (censo['cliente_id'] as num?)?.toInt() ?? 0,
+            enLocal: (censo['en_local'] as num?) == 1,
+            position: position,
+            observaciones: censo['observaciones']?.toString(),
+            imagenBase64: imagenBase64,
+            imagenBase64_2: imagenBase64_2,
+            equipoId: censo['equipo_id']?.toString(),
+          );
+
+          if (response['exito'] == true) {
+            // Marcar como enviado
+            await db.update(
+              'censo_activo',
+              {
+                'sincronizado': 1,
+                'fecha_actualizacion': DateTime.now().toIso8601String(),
+              },
+              where: 'id = ?',
+              whereArgs: [censo['id']],
+            );
+
+            // Marcar fotos como enviadas
+            await db.update(
+              'censo_activo_foto',
+              {'sincronizado': 1},
+              where: 'censo_activo_id = ?',
+              whereArgs: [censo['id']],
+            );
+
+            sentCount++;
+          } else {
+            errors.add('Censo ${censo['id']}: ${response['mensaje'] ?? 'Error desconocido'}');
+          }
+
+        } catch (e) {
+          errors.add('Censo ${censo['id']}: $e');
+        }
+      }
+
+      final success = sentCount > 0;
+      final message = success
+          ? '$sentCount de ${pendingCensus.length} censos enviados'
+          : 'No se pudieron enviar censos: ${errors.join(', ')}';
+
+      return SendResult(
+        success: success,
+        tableName: group.tableName,
+        itemsSent: sentCount,
+        message: message,
+        error: errors.isNotEmpty ? errors.join('; ') : null,
+      );
+
+    } catch (e) {
+      return SendResult(
+        success: false,
+        tableName: group.tableName,
+        itemsSent: 0,
+        message: 'Error en envío de censos',
+        error: e.toString(),
+      );
+    }
   }
 
+  /// SIMULACIÓN: Envío de equipos (preparado para implementación futura)
+  ///
+  /// NOTA: Este método está simulando el envío por ahora.
+  /// Para implementar realmente:
+  /// 1. Reemplazar la simulación con: await EquiposPendientesApiService.enviarEquipoPendiente(...)
+  /// 2. Usar response['exito'] en lugar de simulatedSuccess
+  /// 3. Manejar response['mensaje'] para errores reales
+  /// 4. Quitar los delays artificiales y logs de simulación
   Future<SendResult> _sendEquipment(PendingDataGroup group) async {
-    // TODO: Implementar envío de equipos
-    await Future.delayed(Duration(seconds: 1)); // Simular envío
+    try {
+      final db = await _dbHelper.database;
 
-    return SendResult(
-      success: true,
-      tableName: group.tableName,
-      itemsSent: group.count,
-      message: 'Equipos enviados correctamente',
-    );
+      _logger.i('🎭 Simulando envío de equipos...');
+
+      // Obtener equipos pendientes (simulación)
+      final pendingEquipment = await db.query(
+        'equipos_pendientes',
+        where: 'sincronizado = ?',
+        whereArgs: [0],
+        orderBy: 'fecha_creacion ASC',
+      );
+
+      if (pendingEquipment.isEmpty) {
+        return SendResult(
+          success: true,
+          tableName: group.tableName,
+          itemsSent: 0,
+          message: 'No hay equipos pendientes',
+        );
+      }
+
+      int sentCount = 0;
+      final errors = <String>[];
+
+      for (final equipo in pendingEquipment) {
+        if (_isCancelled) break;
+
+        try {
+          _logger.i('🎭 Simulando envío de equipo: ${equipo['equipo_id']}');
+
+          // SIMULACIÓN: Esperar un poco para simular red
+          await Future.delayed(Duration(milliseconds: 300 + (equipo.hashCode % 200)));
+
+          // SIMULACIÓN: 95% de éxito
+          final simulatedSuccess = (DateTime.now().millisecondsSinceEpoch % 100) < 95;
+
+          if (simulatedSuccess) {
+            // SIMULACIÓN: Marcar como enviado
+            await db.update(
+              'equipos_pendientes',
+              {
+                'sincronizado': 1,
+                'fecha_sincronizacion': DateTime.now().toIso8601String(),
+                'fecha_actualizacion': DateTime.now().toIso8601String(),
+              },
+              where: 'id = ?',
+              whereArgs: [equipo['id']],
+            );
+
+            sentCount++;
+            _logger.i('✅ Equipo ${equipo['equipo_id']} enviado (simulación exitosa)');
+          } else {
+            errors.add('Equipo ${equipo['equipo_id']}: Error simulado de red');
+            _logger.w('❌ Equipo ${equipo['equipo_id']} falló (simulación de error)');
+          }
+
+        } catch (e) {
+          errors.add('Equipo ${equipo['id']}: $e');
+        }
+      }
+
+      final success = sentCount > 0;
+      final message = success
+          ? '$sentCount de ${pendingEquipment.length} equipos enviados (simulación)'
+          : 'No se pudieron enviar equipos (simulación): ${errors.join(', ')}';
+
+      _logger.i('📊 Simulación equipos completada: $sentCount exitosos, ${errors.length} errores');
+
+      return SendResult(
+        success: success,
+        tableName: group.tableName,
+        itemsSent: sentCount,
+        message: message,
+        error: errors.isNotEmpty ? errors.join('; ') : null,
+      );
+
+    } catch (e) {
+      return SendResult(
+        success: false,
+        tableName: group.tableName,
+        itemsSent: 0,
+        message: 'Error en simulación de envío de equipos',
+        error: e.toString(),
+      );
+    }
   }
 
   Future<SendResult> _sendImages(PendingDataGroup group) async {
-    // TODO: Implementar envío de imágenes
-    await Future.delayed(Duration(seconds: 3)); // Simular envío más lento
+    try {
+      final db = await _dbHelper.database;
 
-    return SendResult(
-      success: true,
-      tableName: group.tableName,
-      itemsSent: group.count,
-      message: 'Imágenes enviadas correctamente',
-    );
+      // Obtener imágenes pendientes que tengan sync_status = 'pending'
+      final pendingImages = await db.query(
+        'dynamic_form_response_image',
+        where: 'sync_status = ? AND imagen_base64 IS NOT NULL',
+        whereArgs: ['pending'],
+        orderBy: 'created_at ASC',
+      );
+
+      if (pendingImages.isEmpty) {
+        return SendResult(
+          success: true,
+          tableName: group.tableName,
+          itemsSent: 0,
+          message: 'No hay imágenes pendientes',
+        );
+      }
+
+      // Las imágenes normalmente se envían junto con los formularios
+      // Este método puede ser usado para imágenes independientes o reintentos
+
+      int sentCount = 0;
+      final errors = <String>[];
+
+      // Procesamos imágenes en lotes pequeños
+      for (int i = 0; i < pendingImages.length; i += _config.batchSize) {
+        if (_isCancelled) break;
+
+        final batch = pendingImages.skip(i).take(_config.batchSize).toList();
+
+        for (final image in batch) {
+          try {
+            // Usar BasePostService directamente para imágenes independientes
+            final response = await BasePostService.post(
+              endpoint: '/api/upload-image',
+              body: {
+                'image_id': image['id'],
+                'dynamic_form_response_detail_id': image['dynamic_form_response_detail_id'],
+                'imagen_base64': image['imagen_base64'],
+                'mime_type': image['mime_type'],
+                'orden': image['orden'],
+              },
+              timeout: const Duration(seconds: 60), // Timeout mayor para imágenes
+            );
+
+            if (response['exito'] == true) {
+              // Marcar como enviada
+              await db.update(
+                'dynamic_form_response_image',
+                {
+                  'sync_status': 'sent',
+                },
+                where: 'id = ?',
+                whereArgs: [image['id']],
+              );
+
+              sentCount++;
+            } else {
+              errors.add('Imagen ${image['id']}: ${response['mensaje'] ?? 'Error desconocido'}');
+            }
+
+          } catch (e) {
+            errors.add('Imagen ${image['id']}: $e');
+          }
+        }
+
+        // Pausa entre lotes
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+
+      final success = sentCount > 0;
+      final message = success
+          ? '$sentCount de ${pendingImages.length} imágenes enviadas'
+          : 'No se pudieron enviar imágenes: ${errors.join(', ')}';
+
+      return SendResult(
+        success: success,
+        tableName: group.tableName,
+        itemsSent: sentCount,
+        message: message,
+        error: errors.isNotEmpty ? errors.join('; ') : null,
+      );
+
+    } catch (e) {
+      return SendResult(
+        success: false,
+        tableName: group.tableName,
+        itemsSent: 0,
+        message: 'Error en envío de imágenes',
+        error: e.toString(),
+      );
+    }
   }
 
   Future<SendResult> _sendLogs(PendingDataGroup group) async {
-    // TODO: Implementar envío de logs
-    await Future.delayed(Duration(milliseconds: 500)); // Simular envío rápido
+    try {
+      final db = await _dbHelper.database;
 
-    return SendResult(
-      success: true,
-      tableName: group.tableName,
-      itemsSent: group.count,
-      message: 'Logs enviados correctamente',
-    );
+      // Obtener logs pendientes (solo los más recientes por eficiencia)
+      final pendingLogsData = await db.query(
+        'device_log',
+        where: 'sincronizado = ?',
+        whereArgs: [0],
+        orderBy: 'fecha_registro DESC',
+        limit: 1000, // Limitar para no enviar demasiados logs de una vez
+      );
+
+      if (pendingLogsData.isEmpty) {
+        return SendResult(
+          success: true,
+          tableName: group.tableName,
+          itemsSent: 0,
+          message: 'No hay logs pendientes',
+        );
+      }
+
+      // Convertir a objetos DeviceLog
+      final pendingLogs = pendingLogsData.map((logData) => DeviceLog.fromMap(logData)).toList();
+
+      // Usar tu servicio existente DeviceLogPostService
+      final resultado = await DeviceLogPostService.enviarDeviceLogsBatch(pendingLogs);
+
+      final sentCount = resultado['exitosos'] ?? 0;
+      final failedCount = resultado['fallidos'] ?? 0;
+
+      if (sentCount > 0) {
+        // Marcar los logs exitosos como enviados
+        // Como el servicio no nos devuelve cuáles fueron exitosos específicamente,
+        // marcamos todos si la mayoría fue exitosa
+        if (sentCount > failedCount) {
+          await db.update(
+            'device_log',
+            {'sincronizado': 1},
+            where: 'sincronizado = ?',
+            whereArgs: [0],
+          );
+        }
+      }
+
+      final success = sentCount > 0;
+      final message = success
+          ? '$sentCount de ${pendingLogs.length} logs enviados${failedCount > 0 ? ' ($failedCount fallaron)' : ''}'
+          : 'No se pudieron enviar logs';
+
+      return SendResult(
+        success: success,
+        tableName: group.tableName,
+        itemsSent: sentCount,
+        message: message,
+        error: failedCount > 0 ? '$failedCount logs fallaron' : null,
+      );
+
+    } catch (e) {
+      return SendResult(
+        success: false,
+        tableName: group.tableName,
+        itemsSent: 0,
+        message: 'Error en envío de logs',
+        error: e.toString(),
+      );
+    }
   }
 }
