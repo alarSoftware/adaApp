@@ -461,4 +461,135 @@ class DynamicFormSyncRepository {
       return 0;
     }
   }
+
+  Future<bool> syncTo(String responseId) async {
+    try {
+      _logger.i('🔄 Sincronizando respuesta: $responseId');
+
+      // Importar el servicio de upload
+      final uploadService = await _getDynamicFormUploadService();
+
+      // Enviar al servidor
+      final resultado = await uploadService.enviarRespuestaAlServidor(responseId);
+
+      if (resultado['exito'] == true) {
+        _logger.i('✅ Respuesta sincronizada: $responseId');
+        return true;
+      } else {
+        _logger.w('⚠️ Error sincronizando: ${resultado['mensaje']}');
+        await markResponseAsError(responseId, resultado['mensaje'] ?? 'Error desconocido');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('❌ Error en syncTo: $e');
+      await markResponseAsError(responseId, 'Excepción: $e');
+      return false;
+    }
+  }
+
+  /// Sincronizar todas las respuestas pendientes
+  Future<Map<String, int>> syncAllPending() async {
+    try {
+      _logger.i('🔄 Sincronizando todas las respuestas pendientes...');
+
+      // Obtener respuestas pendientes y con error (listas para reintentar)
+      final pendientes = await getPendingResponses();
+      final conError = await getErrorResponses();
+
+      // Combinar ambas listas
+      final todasPendientes = [...pendientes, ...conError];
+
+      if (todasPendientes.isEmpty) {
+        _logger.i('✅ No hay respuestas pendientes');
+        return {'success': 0, 'failed': 0, 'total': 0};
+      }
+
+      _logger.i('📋 Total a sincronizar: ${todasPendientes.length}');
+
+      int exitosos = 0;
+      int fallidos = 0;
+
+      final uploadService = await _getDynamicFormUploadService();
+
+      for (final response in todasPendientes) {
+        final responseId = response['id'].toString();
+
+        try {
+          final resultado = await uploadService.enviarRespuestaAlServidor(responseId);
+
+          if (resultado['exito'] == true) {
+            exitosos++;
+            _logger.i('✅ Sincronizada: $responseId');
+          } else {
+            fallidos++;
+            _logger.w('⚠️ Error: $responseId - ${resultado['mensaje']}');
+          }
+        } catch (e) {
+          fallidos++;
+          _logger.e('❌ Error sincronizando $responseId: $e');
+        }
+      }
+
+      _logger.i('✅ Completado - Exitosos: $exitosos, Fallidos: $fallidos');
+
+      return {
+        'success': exitosos,
+        'failed': fallidos,
+        'total': todasPendientes.length,
+      };
+    } catch (e) {
+      _logger.e('❌ Error en syncAllPending: $e');
+      return {'success': 0, 'failed': 0, 'total': 0};
+    }
+  }
+
+  /// Reintentar sincronización de una respuesta específica
+  Future<bool> retrySyncResponse(String responseId) async {
+    try {
+      _logger.i('🔁 Reintentando sincronización: $responseId');
+
+      // Verificar que la respuesta exista
+      final response = await getResponseById(responseId);
+
+      if (response == null) {
+        _logger.e('❌ Respuesta no encontrada: $responseId');
+        return false;
+      }
+
+      // Resetear intentos previos
+      await resetSyncAttempts(responseId);
+
+      // Reintentar envío
+      final uploadService = await _getDynamicFormUploadService();
+      final resultado = await uploadService.reintentarEnvioRespuesta(responseId);
+
+      if (resultado['success'] == true) {
+        _logger.i('✅ Reintento exitoso: $responseId');
+        return true;
+      } else {
+        _logger.w('⚠️ Reintento fallido: ${resultado['error']}');
+        await markResponseAsError(responseId, resultado['error'] ?? 'Error en reintento');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('❌ Error en retrySyncResponse: $e');
+      await markResponseAsError(responseId, 'Excepción en reintento: $e');
+      return false;
+    }
+  }
+
+  // ==================== HELPER PRIVADO ====================
+
+  /// Obtener instancia del servicio de upload (lazy loading)
+  Future<dynamic> _getDynamicFormUploadService() async {
+    // Importar dinámicamente para evitar dependencias circulares
+    // Nota: Dart no permite import dinámicos, así que usamos un enfoque diferente
+
+    // OPCIÓN 1: Importar al inicio del archivo
+    // import 'package:ada_app/services/dynamic_form/dynamic_form_upload_service.dart';
+    // return DynamicFormUploadService();
+
+    // OPCIÓN 2: Inyección de dependencia (mejor práctica)
+    // Por ahora, importa al inicio del archivo y usa:
+  }
 }
