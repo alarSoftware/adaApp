@@ -30,6 +30,7 @@ class PreviewScreen extends StatefulWidget {
 class _PreviewScreenState extends State<PreviewScreen> {
   late PreviewScreenViewModel viewModel;
   bool _yaConfirmado = false; // Bandera para bloquear después del primer tap
+  bool _yaReintentando = false; // 🔴 NUEVA bandera para el reintento
 
   String? _imagePath;
   String? _imageBase64;
@@ -322,10 +323,30 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
   }
 
-  //CORRECCIÓN: Cambiar int? a String?
   Future<void> _reintentarEnvioHistorial(String? estadoId) async {
+    // 🔴 Verificar si ya se está reintentando
+    if (_yaReintentando) {
+      return; // Ignorar silenciosamente
+    }
+
+    // 🔴 CRÍTICO: Marcar como reintentando INMEDIATAMENTE
+    setState(() {
+      _yaReintentando = true;
+    });
+
     if (estadoId == null) {
       _mostrarSnackBar('Error: ID de estado no disponible', AppColors.error);
+      setState(() {
+        _yaReintentando = false;
+      });
+      return;
+    }
+
+    if (!viewModel.canConfirm) {
+      _mostrarSnackBar('Ya hay un proceso en curso. Por favor espere.', AppColors.warning);
+      setState(() {
+        _yaReintentando = false;
+      });
       return;
     }
 
@@ -334,8 +355,18 @@ class _PreviewScreenState extends State<PreviewScreen> {
     if (mounted) {
       if (resultado['success']) {
         _mostrarSnackBar(resultado['message'], AppColors.success);
-        setState(() {});
+
+        // 🔴 Mantener deshabilitado después del éxito
+        // porque ya no debería poder reintentar más
+        setState(() {
+          // _yaReintentando permanece en true
+        });
       } else {
+        // 🔴 Si falla, rehabilitar para permitir reintentar
+        setState(() {
+          _yaReintentando = false;
+        });
+
         await PreviewDialogs.mostrarErrorConReintentar(
           context,
           resultado['error'],
@@ -401,7 +432,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   Widget _buildBody(Cliente cliente) {
     final esHistorial = widget.datos['es_historial'] == true;
-    //CORRECCIÓN: Cambiar int? a String?
     final estadoId = widget.datos['id'] as String?;
 
     return SingleChildScrollView(
@@ -448,7 +478,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
     if (_imagePath2 != null || _imageBase64_2 != null) cantidadImagenes++;
 
     if (esHistorial) {
-      // CORRECCIÓN: Cambiar int? a String?
       final estadoId = widget.datos['id'] as String?;
 
       return FutureBuilder<Map<String, dynamic>>(
@@ -465,7 +494,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
             cantidadImagenes: cantidadImagenes,
             onVolver: () => Navigator.of(context).pop(),
             onConfirmar: null, // No mostrar confirmar en historial
-            onReintentarEnvio: envioFallido && estadoId != null
+            // 🔴 Deshabilitar si ya está reintentando
+            onReintentarEnvio: (envioFallido && estadoId != null && !_yaReintentando)
                 ? () => _reintentarEnvioHistorial(estadoId)
                 : null,
           );
@@ -532,7 +562,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
-  // CORRECCIÓN: Cambiar int? a String?
   Widget _buildSyncStatusIndicator(String? estadoId) {
     if (widget.datos['es_historial'] != true || estadoId == null) {
       return const SizedBox.shrink();

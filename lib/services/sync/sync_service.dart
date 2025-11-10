@@ -9,6 +9,7 @@ import 'package:ada_app/services/sync/equipos_pendientes_sync_service.dart';
 import 'package:ada_app/services/sync/dynamic_form_sync_service.dart';
 import 'package:ada_app/services/sync/censo_image_sync_service.dart';
 import 'package:ada_app/services/database_validation_service.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:sqflite/sqflite.dart';
 import '../database_helper.dart';
 import 'package:logger/logger.dart';
@@ -56,6 +57,15 @@ class SyncService {
 
     } catch (e) {
       BaseSyncService.logger.e('💥 Error en sincronización y limpieza: $e');
+
+      // Log del error
+      await ErrorLogService.logError(
+        tableName: 'sync_general',
+        operation: 'sincronizar_y_limpiar',
+        errorMessage: e.toString(),
+        errorType: 'sync_error',
+      );
+
       final errorResult = SyncResultUnificado();
       errorResult.exito = false;
       errorResult.mensaje = 'Error durante sincronización y limpieza: $e';
@@ -73,6 +83,13 @@ class SyncService {
       return await validationService.getPendingSyncSummary();
     } catch (e) {
       BaseSyncService.logger.e('❌ Error verificando estado: $e');
+
+      await ErrorLogService.logDatabaseError(
+        tableName: 'sync_general',
+        operation: 'verificar_estado',
+        errorMessage: e.toString(),
+      );
+
       return {
         'can_delete': false,
         'total_pending': -1,
@@ -158,6 +175,14 @@ class SyncService {
       BaseSyncService.logger.i('🔄 INICIANDO SINCRONIZACIÓN COMPLETA');
       final conexion = await BaseSyncService.testConnection();
       if (!conexion.exito) {
+        // Log de error de red
+        await ErrorLogService.logNetworkError(
+          tableName: 'sync_general',
+          operation: 'test_connection',
+          errorMessage: conexion.mensaje,
+          endpoint: await BaseSyncService.getBaseUrl(),
+        );
+
         resultado.exito = false;
         resultado.mensaje = 'Sin conexión al servidor: ${conexion.mensaje}';
         return resultado;
@@ -190,19 +215,71 @@ class SyncService {
 
       // Sincronizar clientes
       BaseSyncService.logger.i('🏢 Sincronizando clientes...');
-      final resultadoClientes = await ClientSyncService.sincronizarClientesDelUsuario();
-      resultado.clientesSincronizados = resultadoClientes.itemsSincronizados;
-      resultado.clientesExito = resultadoClientes.exito;
-      if (!resultadoClientes.exito) resultado.erroresClientes = resultadoClientes.mensaje;
-      BaseSyncService.logger.i('✅ Clientes sincronizados: ${resultadoClientes.itemsSincronizados} (Éxito: ${resultadoClientes.exito})');
+      try {
+        final resultadoClientes = await ClientSyncService.sincronizarClientesDelUsuario();
+        resultado.clientesSincronizados = resultadoClientes.itemsSincronizados;
+        resultado.clientesExito = resultadoClientes.exito;
+
+        if (!resultadoClientes.exito) {
+          resultado.erroresClientes = resultadoClientes.mensaje;
+
+          await ErrorLogService.logServerError(
+            tableName: 'clientes',
+            operation: 'sincronizar',
+            errorMessage: resultadoClientes.mensaje,
+            errorCode: 'CLIENT_SYNC_FAILED',
+            endpoint: '/api/clientes',
+            userId: edfVendedorId,
+          );
+        }
+
+        BaseSyncService.logger.i('✅ Clientes sincronizados: ${resultadoClientes.itemsSincronizados} (Éxito: ${resultadoClientes.exito})');
+      } catch (e) {
+        await ErrorLogService.logError(
+          tableName: 'clientes',
+          operation: 'sincronizar',
+          errorMessage: e.toString(),
+          errorType: 'sync_error',
+          userId: edfVendedorId,
+        );
+        resultado.clientesExito = false;
+        resultado.erroresClientes = 'Error al sincronizar clientes: $e';
+        resultado.clientesSincronizados = 0;
+      }
 
       // Sincronizar equipos
       BaseSyncService.logger.i('⚙️ Sincronizando equipos...');
-      final resultadoEquipos = await EquipmentSyncService.sincronizarEquipos();
-      resultado.equiposSincronizados = resultadoEquipos.itemsSincronizados;
-      resultado.equiposExito = resultadoEquipos.exito;
-      if (!resultadoEquipos.exito) resultado.erroresEquipos = resultadoEquipos.mensaje;
-      BaseSyncService.logger.i('✅ Equipos sincronizados: ${resultadoEquipos.itemsSincronizados} (Éxito: ${resultadoEquipos.exito})');
+      try {
+        final resultadoEquipos = await EquipmentSyncService.sincronizarEquipos();
+        resultado.equiposSincronizados = resultadoEquipos.itemsSincronizados;
+        resultado.equiposExito = resultadoEquipos.exito;
+
+        if (!resultadoEquipos.exito) {
+          resultado.erroresEquipos = resultadoEquipos.mensaje;
+
+          await ErrorLogService.logServerError(
+            tableName: 'equipments',
+            operation: 'sincronizar',
+            errorMessage: resultadoEquipos.mensaje,
+            errorCode: 'EQUIPMENT_SYNC_FAILED',
+            endpoint: '/api/equipos',
+            userId: edfVendedorId,
+          );
+        }
+
+        BaseSyncService.logger.i('✅ Equipos sincronizados: ${resultadoEquipos.itemsSincronizados} (Éxito: ${resultadoEquipos.exito})');
+      } catch (e) {
+        await ErrorLogService.logError(
+          tableName: 'equipments',
+          operation: 'sincronizar',
+          errorMessage: e.toString(),
+          errorType: 'sync_error',
+          userId: edfVendedorId,
+        );
+        resultado.equiposExito = false;
+        resultado.erroresEquipos = 'Error al sincronizar equipos: $e';
+        resultado.equiposSincronizados = 0;
+      }
 
       // Sincronizar censos
       BaseSyncService.logger.i('📊 Iniciando sincronización de censos...');
@@ -212,10 +289,33 @@ class SyncService {
         );
         resultado.censosSincronizados = resultadoCensos.itemsSincronizados;
         resultado.censosExito = resultadoCensos.exito;
-        if (!resultadoCensos.exito) resultado.erroresCensos = resultadoCensos.mensaje;
+
+        if (!resultadoCensos.exito) {
+          resultado.erroresCensos = resultadoCensos.mensaje;
+
+          await ErrorLogService.logServerError(
+            tableName: 'censo_activo',
+            operation: 'sincronizar',
+            errorMessage: resultadoCensos.mensaje,
+            errorCode: 'CENSO_SYNC_FAILED',
+            endpoint: '/api/censos',
+            userId: edfVendedorId,
+          );
+        }
+
         BaseSyncService.logger.i('✅ Censos sincronizados: ${resultadoCensos.itemsSincronizados} (Éxito: ${resultadoCensos.exito})');
       } catch (e) {
         BaseSyncService.logger.e('❌ ERROR ESPECÍFICO EN CENSOS: $e');
+
+        await ErrorLogService.logError(
+          tableName: 'censo_activo',
+          operation: 'sincronizar',
+          errorMessage: e.toString(),
+          errorType: 'sync_error',
+          errorCode: 'CENSO_SYNC_EXCEPTION',
+          userId: edfVendedorId,
+        );
+
         resultado.censosExito = false;
         resultado.erroresCensos = 'Error al sincronizar censos: $e';
         resultado.censosSincronizados = 0;
@@ -230,10 +330,32 @@ class SyncService {
           );
           resultado.imagenesCensosSincronizadas = resultadoImagenes.itemsSincronizados;
           resultado.imagenesCensosExito = resultadoImagenes.exito;
-          if (!resultadoImagenes.exito) resultado.erroresImagenesCensos = resultadoImagenes.mensaje;
+
+          if (!resultadoImagenes.exito) {
+            resultado.erroresImagenesCensos = resultadoImagenes.mensaje;
+
+            await ErrorLogService.logServerError(
+              tableName: 'censo_activo_foto',
+              operation: 'sincronizar_imagenes',
+              errorMessage: resultadoImagenes.mensaje,
+              errorCode: 'IMAGE_SYNC_FAILED',
+              endpoint: '/api/censos/fotos',
+              userId: edfVendedorId,
+            );
+          }
+
           BaseSyncService.logger.i('✅ Imágenes de censos sincronizadas: ${resultadoImagenes.itemsSincronizados} (Éxito: ${resultadoImagenes.exito})');
         } catch (e) {
           BaseSyncService.logger.e('❌ ERROR EN IMÁGENES DE CENSOS: $e');
+
+          await ErrorLogService.logError(
+            tableName: 'censo_activo_foto',
+            operation: 'sincronizar_imagenes',
+            errorMessage: e.toString(),
+            errorType: 'sync_error',
+            userId: edfVendedorId,
+          );
+
           resultado.imagenesCensosExito = false;
           resultado.erroresImagenesCensos = 'Error al sincronizar imágenes de censos: $e';
           resultado.imagenesCensosSincronizadas = 0;
@@ -254,10 +376,32 @@ class SyncService {
         );
         resultado.equiposPendientesSincronizados = resultadoPendientes.itemsSincronizados;
         resultado.equiposPendientesExito = resultadoPendientes.exito;
-        if (!resultadoPendientes.exito) resultado.erroresEquiposPendientes = resultadoPendientes.mensaje;
+
+        if (!resultadoPendientes.exito) {
+          resultado.erroresEquiposPendientes = resultadoPendientes.mensaje;
+
+          await ErrorLogService.logServerError(
+            tableName: 'equipos_pendientes',
+            operation: 'sincronizar',
+            errorMessage: resultadoPendientes.mensaje,
+            errorCode: 'PENDING_EQUIPMENT_SYNC_FAILED',
+            endpoint: '/api/equipos/pendientes',
+            userId: edfVendedorId,
+          );
+        }
+
         BaseSyncService.logger.i('✅ Equipos pendientes sincronizados: ${resultadoPendientes.itemsSincronizados} (Éxito: ${resultadoPendientes.exito})');
       } catch (e) {
         BaseSyncService.logger.e('❌ ERROR EN EQUIPOS PENDIENTES: $e');
+
+        await ErrorLogService.logError(
+          tableName: 'equipos_pendientes',
+          operation: 'sincronizar',
+          errorMessage: e.toString(),
+          errorType: 'sync_error',
+          userId: edfVendedorId,
+        );
+
         resultado.equiposPendientesExito = false;
         resultado.erroresEquiposPendientes = 'Error al sincronizar equipos pendientes: $e';
         resultado.equiposPendientesSincronizados = 0;
@@ -269,10 +413,32 @@ class SyncService {
         final resultadoFormularios = await DynamicFormSyncService.obtenerFormulariosDinamicos();
         resultado.formulariosSincronizados = resultadoFormularios.itemsSincronizados;
         resultado.formulariosExito = resultadoFormularios.exito;
-        if (!resultadoFormularios.exito) resultado.erroresFormularios = resultadoFormularios.mensaje;
+
+        if (!resultadoFormularios.exito) {
+          resultado.erroresFormularios = resultadoFormularios.mensaje;
+
+          await ErrorLogService.logServerError(
+            tableName: 'dynamic_form',
+            operation: 'sincronizar',
+            errorMessage: resultadoFormularios.mensaje,
+            errorCode: 'FORM_SYNC_FAILED',
+            endpoint: '/api/formularios',
+            userId: edfVendedorId,
+          );
+        }
+
         BaseSyncService.logger.i('✅ Formularios sincronizados: ${resultadoFormularios.itemsSincronizados} (Éxito: ${resultadoFormularios.exito})');
       } catch (e) {
         BaseSyncService.logger.e('❌ ERROR EN FORMULARIOS: $e');
+
+        await ErrorLogService.logError(
+          tableName: 'dynamic_form',
+          operation: 'sincronizar',
+          errorMessage: e.toString(),
+          errorType: 'sync_error',
+          userId: edfVendedorId,
+        );
+
         resultado.formulariosExito = false;
         resultado.erroresFormularios = 'Error al sincronizar formularios: $e';
         resultado.formulariosSincronizados = 0;
@@ -288,10 +454,32 @@ class SyncService {
         final resultadoRespuestas = await DynamicFormSyncService.obtenerRespuestasPorVendedor(edfVendedorId);
         resultado.respuestasFormulariosSincronizadas = resultadoRespuestas.itemsSincronizados;
         resultado.respuestasFormulariosExito = resultadoRespuestas.exito;
-        if (!resultadoRespuestas.exito) resultado.erroresRespuestasFormularios = resultadoRespuestas.mensaje;
+
+        if (!resultadoRespuestas.exito) {
+          resultado.erroresRespuestasFormularios = resultadoRespuestas.mensaje;
+
+          await ErrorLogService.logServerError(
+            tableName: 'dynamic_form_response',
+            operation: 'sincronizar_respuestas',
+            errorMessage: resultadoRespuestas.mensaje,
+            errorCode: 'RESPONSE_SYNC_FAILED',
+            endpoint: '/api/formularios/respuestas',
+            userId: edfVendedorId,
+          );
+        }
+
         BaseSyncService.logger.i('✅ Respuestas sincronizadas: ${resultadoRespuestas.itemsSincronizados} (Éxito: ${resultadoRespuestas.exito})');
       } catch (e) {
         BaseSyncService.logger.e('❌ ERROR EN RESPUESTAS DE FORMULARIOS: $e');
+
+        await ErrorLogService.logError(
+          tableName: 'dynamic_form_response',
+          operation: 'sincronizar_respuestas',
+          errorMessage: e.toString(),
+          errorType: 'sync_error',
+          userId: edfVendedorId,
+        );
+
         resultado.respuestasFormulariosExito = false;
         resultado.erroresRespuestasFormularios = 'Error al sincronizar respuestas: $e';
         resultado.respuestasFormulariosSincronizadas = 0;
@@ -306,10 +494,32 @@ class SyncService {
           );
           resultado.imagenesFormulariosSincronizadas = resultadoImagenesFormularios.itemsSincronizados;
           resultado.imagenesFormulariosExito = resultadoImagenesFormularios.exito;
-          if (!resultadoImagenesFormularios.exito) resultado.erroresImagenesFormularios = resultadoImagenesFormularios.mensaje;
+
+          if (!resultadoImagenesFormularios.exito) {
+            resultado.erroresImagenesFormularios = resultadoImagenesFormularios.mensaje;
+
+            await ErrorLogService.logServerError(
+              tableName: 'dynamic_form_response_image',
+              operation: 'sincronizar_imagenes',
+              errorMessage: resultadoImagenesFormularios.mensaje,
+              errorCode: 'FORM_IMAGE_SYNC_FAILED',
+              endpoint: '/api/formularios/imagenes',
+              userId: edfVendedorId,
+            );
+          }
+
           BaseSyncService.logger.i('✅ Imágenes de formularios sincronizadas: ${resultadoImagenesFormularios.itemsSincronizados} (Éxito: ${resultadoImagenesFormularios.exito})');
         } catch (e) {
           BaseSyncService.logger.e('❌ ERROR EN IMÁGENES DE FORMULARIOS: $e');
+
+          await ErrorLogService.logError(
+            tableName: 'dynamic_form_response_image',
+            operation: 'sincronizar_imagenes',
+            errorMessage: e.toString(),
+            errorType: 'sync_error',
+            userId: edfVendedorId,
+          );
+
           resultado.imagenesFormulariosExito = false;
           resultado.erroresImagenesFormularios = 'Error al sincronizar imágenes de formularios: $e';
           resultado.imagenesFormulariosSincronizadas = 0;
@@ -363,6 +573,15 @@ class SyncService {
 
     } catch (e) {
       BaseSyncService.logger.e('💥 ERROR GENERAL EN SINCRONIZACIÓN: $e');
+
+      await ErrorLogService.logError(
+        tableName: 'sync_general',
+        operation: 'sincronizar_todos',
+        errorMessage: e.toString(),
+        errorType: 'sync_general',
+        errorCode: 'SYNC_FAILED',
+      );
+
       resultado.exito = false;
       resultado.mensaje = 'Error inesperado: ${e.toString()}';
       return resultado;
@@ -455,6 +674,7 @@ class SyncService {
     bool? enLocal,
     int? limit,
     int? offset,
+    String? edfVendedorId,
   }) => CensusSyncService.obtenerCensosActivos(
     clienteId: clienteId,
     equipoId: equipoId,
@@ -464,6 +684,7 @@ class SyncService {
     enLocal: enLocal,
     limit: limit,
     offset: offset,
+    edfVendedorId: edfVendedorId,
   );
 
   static Future<SyncResult> obtenerCensoPorId(int censoId) =>
@@ -490,6 +711,11 @@ class SyncService {
       final currentUsername = prefs.getString('current_user');
 
       if (currentUsername == null || currentUsername.isEmpty) {
+        await ErrorLogService.logValidationError(
+          tableName: 'Users',
+          operation: 'obtener_edf_vendedor_id',
+          errorMessage: 'No hay usuario logueado en el sistema',
+        );
         throw 'No hay usuario logueado en el sistema';
       }
 
@@ -500,12 +726,23 @@ class SyncService {
       );
 
       if (resultado.isEmpty) {
+        await ErrorLogService.logDatabaseError(
+          tableName: 'Users',
+          operation: 'obtener_edf_vendedor_id',
+          errorMessage: 'Usuario $currentUsername no encontrado en la base de datos',
+        );
         throw 'Usuario $currentUsername no encontrado en la base de datos';
       }
 
       final edfVendedorId = resultado.first['edf_vendedor_id']?.toString();
 
       if (edfVendedorId == null || edfVendedorId.isEmpty) {
+        await ErrorLogService.logValidationError(
+          tableName: 'Users',
+          operation: 'obtener_edf_vendedor_id',
+          errorMessage: 'Usuario $currentUsername no tiene edf_vendedor_id configurado',
+          userId: currentUsername,
+        );
         throw 'Usuario $currentUsername no tiene edf_vendedor_id configurado';
       }
 
@@ -514,6 +751,19 @@ class SyncService {
 
     } catch (e) {
       logger.e('❌ Error obteniendo edf_vendedor_id: $e');
+
+      // Solo registrar si no es un error ya registrado
+      if (!e.toString().contains('no tiene edf_vendedor_id') &&
+          !e.toString().contains('no encontrado') &&
+          !e.toString().contains('No hay usuario')) {
+        await ErrorLogService.logError(
+          tableName: 'Users',
+          operation: 'obtener_edf_vendedor_id',
+          errorMessage: e.toString(),
+          errorType: 'unknown',
+        );
+      }
+
       rethrow;
     }
   }
@@ -533,6 +783,14 @@ class SyncService {
       };
     } catch (e) {
       final baseUrl = await BaseSyncService.getBaseUrl();
+
+      await ErrorLogService.logError(
+        tableName: 'sync_general',
+        operation: 'obtener_estadisticas',
+        errorMessage: e.toString(),
+        errorType: 'statistics',
+      );
+
       return {
         'error': e.toString(),
         'conexionServidor': false,

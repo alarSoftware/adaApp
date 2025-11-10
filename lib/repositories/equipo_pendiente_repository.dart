@@ -1,5 +1,5 @@
 import 'package:ada_app/models/equipos_pendientes.dart';
-import 'package:ada_app/services/post/equipos_pendientes_api_service.dart';
+import 'package:ada_app/services/post/equipo_pendiente_post_service.dart';
 import 'base_repository.dart';
 import 'package:uuid/uuid.dart';
 import 'package:logger/logger.dart';
