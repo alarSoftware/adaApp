@@ -446,7 +446,7 @@ class DynamicFormViewModel extends ChangeNotifier {
     _isSyncing = true;
     notifyListeners();
 
-    final synced = await _syncRepo.syncToServer(responseId);
+    final synced = await _syncRepo.syncTo(responseId);
 
     _isSyncing = false;
 

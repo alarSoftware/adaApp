@@ -1,11 +1,11 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+// lib/repositories/dynamic_form_sync_repository.dart
+
 import 'package:logger/logger.dart';
 import '../services/database_helper.dart';
-import '../services/sync/base_sync_service.dart';
-import 'package:ada_app/services/dynamic_form/dynamic_form_log_service.dart..dart';
 import 'dynamic_form_response_repository.dart';
 
+/// Repository especializado en gestionar el estado de sincronización
+/// de formularios dinámicos en la base de datos local
 class DynamicFormSyncRepository {
   final Logger _logger = Logger();
   final DatabaseHelper _dbHelper = DatabaseHelper();
@@ -13,106 +13,227 @@ class DynamicFormSyncRepository {
 
   String get _responseTableName => 'dynamic_form_response';
   String get _responseDetailTableName => 'dynamic_form_response_detail';
+  String get _imageTableName => 'dynamic_form_response_image';
 
-  // ==================== MÉTODOS DE SINCRONIZACIÓN ====================
+  // ==================== OBTENER RESPUESTAS PENDIENTES ====================
 
-  /// Sincronizar todas las respuestas pendientes
-  Future<Map<String, int>> syncAllPending() async {
-    int success = 0;
-    int failed = 0;
-
+  /// Obtiene respuestas pendientes de sincronización
+  Future<List<Map<String, dynamic>>> getPendingResponses() async {
     try {
-      final pending = await _responseRepository.getPendingSync();
-      _logger.i('📤 Sincronizando ${pending.length} respuestas pendientes');
+      final pending = await _dbHelper.consultar(
+        _responseTableName,
+        where: 'sync_status = ?',
+        whereArgs: ['pending'],
+        orderBy: 'creation_date ASC',
+      );
 
-      for (final formResponse in pending) {
-        final result = await syncToServer(formResponse.id);
-        if (result) {
-          success++;
-        } else {
-          failed++;
-        }
-      }
-
-      _logger.i('✅ Sincronización completada: $success exitosas, $failed fallidas');
+      _logger.i('📋 Respuestas pendientes: ${pending.length}');
+      return pending;
     } catch (e) {
-      _logger.e('❌ Error en sincronización masiva: $e');
+      _logger.e('❌ Error obteniendo respuestas pendientes: $e');
+      return [];
     }
-
-    return {'success': success, 'failed': failed};
   }
 
-  /// Marcar respuesta como sincronizada
-  Future<bool> markAsSynced(String responseId, {dynamic serverId}) async {
+  /// Obtiene respuestas con error de sincronización
+  Future<List<Map<String, dynamic>>> getErrorResponses() async {
     try {
-      final now = DateTime.now();
+      final errors = await _dbHelper.consultar(
+        _responseTableName,
+        where: 'sync_status = ? OR (intentos_sync > ? AND sync_status != ?)',
+        whereArgs: ['error', 0, 'synced'],
+        orderBy: 'ultimo_intento_sync ASC',
+      );
+
+      _logger.i('⚠️ Respuestas con error: ${errors.length}');
+      return errors;
+    } catch (e) {
+      _logger.e('❌ Error obteniendo respuestas con error: $e');
+      return [];
+    }
+  }
+
+  /// Obtiene una respuesta específica por ID
+  Future<Map<String, dynamic>?> getResponseById(String responseId) async {
+    try {
+      final results = await _dbHelper.consultar(
+        _responseTableName,
+        where: 'id = ?',
+        whereArgs: [responseId],
+        limit: 1,
+      );
+
+      return results.isNotEmpty ? results.first : null;
+    } catch (e) {
+      _logger.e('❌ Error obteniendo respuesta $responseId: $e');
+      return null;
+    }
+  }
+
+  /// Obtiene los detalles de una respuesta
+  Future<List<Map<String, dynamic>>> getResponseDetails(String responseId) async {
+    try {
+      return await _dbHelper.consultar(
+        _responseDetailTableName,
+        where: 'dynamic_form_response_id = ?',
+        whereArgs: [responseId],
+        orderBy: 'dynamic_form_detail_id ASC',
+      );
+    } catch (e) {
+      _logger.e('❌ Error obteniendo detalles: $e');
+      return [];
+    }
+  }
+
+  /// Obtiene las imágenes de una respuesta
+  Future<List<Map<String, dynamic>>> getResponseImages(String responseId) async {
+    try {
+      // Obtener IDs de los detalles
+      final details = await getResponseDetails(responseId);
+
+      if (details.isEmpty) return [];
+
+      final detailIds = details.map((d) => d['id']).toList();
+
+      // Obtener imágenes usando los detail IDs
+      final placeholders = detailIds.map((_) => '?').join(',');
+
+      return await _dbHelper.consultarPersonalizada(
+        'SELECT * FROM $_imageTableName WHERE dynamic_form_response_detail_id IN ($placeholders) ORDER BY orden ASC',
+        detailIds,
+      );
+    } catch (e) {
+      _logger.e('❌ Error obteniendo imágenes: $e');
+      return [];
+    }
+  }
+
+  // ==================== ACTUALIZAR ESTADO DE SINCRONIZACIÓN ====================
+
+  /// Marca una respuesta como sincronizada
+  Future<bool> markResponseAsSynced(String responseId) async {
+    try {
+      final now = DateTime.now().toIso8601String();
 
       final updated = await _dbHelper.actualizar(
         _responseTableName,
         {
           'sync_status': 'synced',
-          'fecha_sincronizado': now.toIso8601String(),
+          'fecha_sincronizado': now,
           'mensaje_error_sync': null,
+          'intentos_sync': 0,
+          'ultimo_intento_sync': null,
         },
         where: 'id = ?',
         whereArgs: [responseId],
       );
 
       if (updated > 0) {
-        await markDetailsAsSynced(responseId);
-        _logger.i('✅ Response marcada como sincronizada: $responseId');
+        _logger.i('✅ Respuesta marcada como sincronizada: $responseId');
         return true;
       }
       return false;
     } catch (e) {
-      _logger.e('❌ Error marcando response como sincronizada: $e');
+      _logger.e('❌ Error marcando respuesta como sincronizada: $e');
       return false;
     }
   }
 
-  /// Marcar detalles de respuesta como sincronizados
-  Future<bool> markDetailsAsSynced(String responseId) async {
+  /// Marca un detalle como sincronizado
+  Future<bool> markDetailAsSynced(String detailId) async {
     try {
       final updated = await _dbHelper.actualizar(
         _responseDetailTableName,
-        {
-          'sync_status': 'synced',
-        },
+        {'sync_status': 'synced'},
+        where: 'id = ?',
+        whereArgs: [detailId],
+      );
+
+      return updated > 0;
+    } catch (e) {
+      _logger.e('❌ Error marcando detalle como sincronizado: $e');
+      return false;
+    }
+  }
+
+  /// Marca todos los detalles de una respuesta como sincronizados
+  Future<bool> markAllDetailsAsSynced(String responseId) async {
+    try {
+      final updated = await _dbHelper.actualizar(
+        _responseDetailTableName,
+        {'sync_status': 'synced'},
         where: 'dynamic_form_response_id = ?',
         whereArgs: [responseId],
       );
 
       if (updated > 0) {
-        _logger.i('✅ Response details marcados como sincronizados: $responseId');
+        _logger.i('✅ ${updated} detalles marcados como sincronizados');
         return true;
       }
       return false;
     } catch (e) {
-      _logger.e('❌ Error marcando details como sincronizados: $e');
+      _logger.e('❌ Error marcando detalles como sincronizados: $e');
       return false;
     }
   }
 
-  /// Registrar intento fallido de sincronización
-  Future<bool> markSyncAttemptFailed(String responseId, String errorMessage) async {
+  /// Marca una imagen como sincronizada
+  Future<bool> markImageAsSynced(String imageId) async {
     try {
-      final now = DateTime.now();
-
-      final current = await _dbHelper.consultar(
-        _responseTableName,
+      final updated = await _dbHelper.actualizar(
+        _imageTableName,
+        {'sync_status': 'synced'},
         where: 'id = ?',
-        whereArgs: [responseId],
+        whereArgs: [imageId],
       );
 
-      if (current.isEmpty) return false;
+      return updated > 0;
+    } catch (e) {
+      _logger.e('❌ Error marcando imagen como sincronizada: $e');
+      return false;
+    }
+  }
 
-      final intentosActuales = current.first['intentos_sync'] as int? ?? 0;
+  /// Marca todas las imágenes de una respuesta como sincronizadas
+  Future<bool> markAllImagesAsSynced(String responseId) async {
+    try {
+      final details = await getResponseDetails(responseId);
+      if (details.isEmpty) return true;
+
+      final detailIds = details.map((d) => d['id']).toList();
+      final placeholders = detailIds.map((_) => '?').join(',');
+
+      final db = await _dbHelper.database;
+      final updated = await db.rawUpdate(
+        'UPDATE $_imageTableName SET sync_status = ? WHERE dynamic_form_response_detail_id IN ($placeholders)',
+        ['synced', ...detailIds],
+      );
+
+      if (updated > 0) {
+        _logger.i('✅ $updated imágenes marcadas como sincronizadas');
+      }
+      return true;
+    } catch (e) {
+      _logger.e('❌ Error marcando imágenes como sincronizadas: $e');
+      return false;
+    }
+  }
+
+  /// Marca una respuesta como error con mensaje
+  Future<bool> markResponseAsError(String responseId, String errorMessage) async {
+    try {
+      final now = DateTime.now().toIso8601String();
+
+      // Obtener intentos actuales
+      final current = await getResponseById(responseId);
+      final intentosActuales = (current?['intentos_sync'] as int?) ?? 0;
 
       final updated = await _dbHelper.actualizar(
         _responseTableName,
         {
+          'sync_status': 'error',
           'intentos_sync': intentosActuales + 1,
-          'ultimo_intento_sync': now.toIso8601String(),
+          'ultimo_intento_sync': now,
           'mensaje_error_sync': errorMessage,
         },
         where: 'id = ?',
@@ -120,262 +241,201 @@ class DynamicFormSyncRepository {
       );
 
       if (updated > 0) {
-        _logger.w('⚠️ Intento fallido registrado: $responseId (intento ${intentosActuales + 1})');
+        _logger.w('⚠️ Respuesta marcada como error: $responseId (intento ${intentosActuales + 1})');
         return true;
       }
       return false;
     } catch (e) {
-      _logger.e('❌ Error registrando intento fallido: $e');
+      _logger.e('❌ Error marcando respuesta como error: $e');
       return false;
     }
   }
 
-  /// Reintentar sincronización de una respuesta específica
-  Future<bool> retrySyncResponse(String responseId) async {
+  /// Actualiza el intento de sincronización
+  Future<bool> updateSyncAttempt(String responseId, int intentNumber, String timestamp) async {
     try {
-      _logger.i('🔄 Reintentando sincronización: $responseId');
-
-      await _dbHelper.actualizar(
+      final updated = await _dbHelper.actualizar(
         _responseTableName,
         {
-          'intentos_sync': 0,
-          'mensaje_error_sync': null,
+          'intentos_sync': intentNumber,
+          'ultimo_intento_sync': timestamp,
         },
         where: 'id = ?',
         whereArgs: [responseId],
       );
 
-      return await syncToServer(responseId);
+      return updated > 0;
     } catch (e) {
-      _logger.e('❌ Error reintentando sync: $e');
+      _logger.e('❌ Error actualizando intento de sync: $e');
       return false;
     }
   }
 
-
-  Future<bool> syncToServer(String responseId) async {
+  /// Reinicia el contador de intentos de una respuesta
+  Future<bool> resetSyncAttempts(String responseId) async {
     try {
-      _logger.i('📤 Enviando formulario al servidor: $responseId');
-
-      // Obtener la respuesta completa con detalles
-      final formResponse = await _responseRepository.getById(responseId);
-      if (formResponse == null) {
-        _logger.e('❌ Respuesta no encontrada: $responseId');
-        return false;
-      }
-
-      // Obtener TODOS los detalles
-      final allDetails = await _responseRepository.getDetails(responseId);
-
-      // 🎯 FILTRAR: Solo detalles que NO sean imágenes
-      final detailsToSend = allDetails
-          .where((d) => d.response != '[IMAGE]')
-          .toList();
-
-      // Obtener imágenes de la tabla separada
-      final images = await _responseRepository.getImagesForResponse(responseId);
-
-      // 🎯 FILTRAR: Solo imágenes con Base64 válido
-      final imagesToSend = images.where((img) =>
-      img.imagenBase64 != null &&
-          img.imagenBase64!.isNotEmpty &&
-          img.dynamicFormResponseDetailId != null
-      ).toList();
-
-      if (imagesToSend.length < images.length) {
-        _logger.w('⚠️ Algunas imágenes sin Base64: ${images.length - imagesToSend.length}');
-      }
-
-      _logger.d('📦 Detalles a enviar: ${detailsToSend.length} (${allDetails.length - detailsToSend.length} marcadores de imagen excluidos)');
-      _logger.d('📦 Imágenes a enviar: ${imagesToSend.length}');
-
-      // 🎯 AGRUPAR IMÁGENES POR DETAIL ID
-      final Map<String, List<dynamic>> imagesByDetailId = {};
-      for (final img in imagesToSend) {
-        final detailId = img.dynamicFormResponseDetailId!;
-        if (!imagesByDetailId.containsKey(detailId)) {
-          imagesByDetailId[detailId] = [];
-        }
-        imagesByDetailId[detailId]!.add({
-          'id': img.id,
-          'imageBase64': img.imagenBase64,
-          'imageTamano': img.imagenTamano,
-          'mimeType': img.mimeType,
-          'orden': img.orden,
-          'createdAt': img.createdAt,
-          'url': null,
-          'imagePath': img.imagenPath ?? '',
-        });
-      }
-
-      // 🎯 CONSTRUIR EL PAYLOAD CON EL FORMATO CORRECTO
-      final payload = {
-        'id': formResponse.id,
-        'dynamicFormId': formResponse.formTemplateId,
-        'contactoId': formResponse.contactoId,
-        'edfvendedorId': formResponse.edfVendedorId,
-        'usuarioId': formResponse.userId != null ? int.tryParse(formResponse.userId!) : null,
-        'estado': formResponse.status,
-        'creationDate': formResponse.createdAt.toIso8601String(),
-        'completedDate': formResponse.completedAt?.toIso8601String(),
-        'lastUpdateDate': formResponse.completedAt?.toIso8601String() ?? formResponse.createdAt.toIso8601String(),
-        'details': [
-          // 📝 Incluir detalles NO de imagen con fotos vacías
-          ...detailsToSend.map((d) => {
-            'id': d.id,
-            'dynamicFormDetailId': d.dynamicFormDetailId,
-            'response': d.response,
-            'syncStatus': d.syncStatus,
-            'fotos': [], // Siempre incluir fotos aunque esté vacío
-          }),
-          // 🖼️ Incluir detalles de imagen con sus fotos correspondientes
-          ...allDetails
-              .where((d) => d.response == '[IMAGE]')
-              .map((d) => {
-            'id': d.id,
-            'dynamicFormDetailId': d.dynamicFormDetailId,
-            'response': d.response,
-            'syncStatus': d.syncStatus,
-            'fotos': imagesByDetailId[d.id] ?? [], // Fotos correspondientes a este detail
-          }),
-        ],
-      };
-
-      // 🎯 LOG DETALLADO DEL TAMAÑO
-      final jsonString = jsonEncode(payload);
-      final sizeInBytes = jsonString.length;
-      final sizeInKB = (sizeInBytes / 1024).toStringAsFixed(2);
-      final sizeInMB = (sizeInBytes / (1024 * 1024)).toStringAsFixed(2);
-
-      _logger.i('📊 Tamaño del payload: $sizeInKB KB ($sizeInMB MB)');
-      _logger.d('📋 Details con imágenes: ${imagesByDetailId.keys.length}');
-
-      // ⚠️ ADVERTENCIA si es muy grande
-      if (sizeInBytes > 10 * 1024 * 1024) { // > 10MB
-        _logger.w('⚠️ ADVERTENCIA: Payload muy grande (${sizeInMB}MB), puede fallar');
-      }
-
-      // Obtener la URL dinámica
-      final baseUrl = await BaseSyncService.getBaseUrl();
-      final url = '$baseUrl/dynamicFormResponse/insertDynamicFormResponse';
-
-      _logger.i('🌐 URL: $url');
-
-      // 🎯 AUMENTAR TIMEOUT PARA IMÁGENES GRANDES
-      final timeoutDuration = sizeInBytes > 5 * 1024 * 1024
-          ? Duration(seconds: 120)  // 2 minutos para payloads grandes
-          : Duration(seconds: 60);   // 1 minuto normal
-
-      _logger.d('⏱️ Timeout configurado: ${timeoutDuration.inSeconds}s');
-
-      // 📁 GUARDAR LOG DEL JSON ANTES DE ENVIAR
-      try {
-        final logService = DynamicFormLogService();
-        await logService.guardarLogPost(
-          url: url,
-          headers: {
-            ...BaseSyncService.headers,
-            'Content-Type': 'application/json',
-          },
-          body: payload,
-          timestamp: DateTime.now().toIso8601String(),
-          responseId: responseId,
-        );
-      } catch (e) {
-        _logger.w('⚠️ No se pudo guardar el log: $e');
-      }
-
-      // Realizar el POST
-      final httpResponse = await http.post(
-        Uri.parse(url),
-        headers: {
-          ...BaseSyncService.headers,
-          'Content-Type': 'application/json',
-        },
-        body: jsonString,
-      ).timeout(timeoutDuration);
-
-      _logger.i('📡 Respuesta del servidor: ${httpResponse.statusCode}');
-
-      // 🔍 LOG DEL BODY DE RESPUESTA (para debug)
-      if (httpResponse.statusCode >= 400) {
-        final bodyText = httpResponse.body;
-        if (bodyText.isNotEmpty) {
-          final truncatedBody = bodyText.length > 500
-              ? bodyText.substring(0, 500)
-              : bodyText;
-          _logger.e('📄 Body de error: $truncatedBody');
-        } else {
-          _logger.e('📄 Body de error: (vacío)');
-        }
-      }
-
-      if (httpResponse.statusCode >= 200 && httpResponse.statusCode < 300) {
-        // ✅ ÉXITO
-        _logger.i('✅ Formulario enviado exitosamente');
-
-        // Marcar como sincronizado
-        await markAsSynced(responseId);
-        return true;
-
-      } else {
-        // ❌ ERROR DEL SERVIDOR
-        final errorMsg = BaseSyncService.extractErrorMessage(httpResponse);
-        _logger.e('❌ Error del servidor: $errorMsg');
-        await markSyncAttemptFailed(responseId, errorMsg);
-        return false;
-      }
-
-    } catch (e) {
-      _logger.e('❌ Error sincronizando al servidor: $e');
-      await markSyncAttemptFailed(responseId, e.toString());
-      return false;
-    }
-  }
-
-  /// Obtener estadísticas de sincronización
-  Future<Map<String, dynamic>> getSyncStats() async {
-    try {
-      final totalPending = await _responseRepository.countPendingSync();
-      final totalSynced = await _responseRepository.countSynced();
-
-      final errorMaps = await _dbHelper.consultar(
+      final updated = await _dbHelper.actualizar(
         _responseTableName,
-        where: 'intentos_sync > ?',
-        whereArgs: [0],
+        {
+          'intentos_sync': 0,
+          'ultimo_intento_sync': null,
+          'mensaje_error_sync': null,
+          'sync_status': 'pending',
+        },
+        where: 'id = ?',
+        whereArgs: [responseId],
       );
 
+      if (updated > 0) {
+        _logger.i('🔄 Intentos reiniciados para: $responseId');
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _logger.e('❌ Error reiniciando intentos: $e');
+      return false;
+    }
+  }
+
+  // ==================== ESTADÍSTICAS ====================
+
+  /// Obtiene estadísticas de sincronización
+  Future<Map<String, dynamic>> getSyncStats() async {
+    try {
+      final pending = await _countByStatus('pending');
+      final synced = await _countByStatus('synced');
+      final errors = await _countByStatus('error');
+      final draft = await _countByStatus('draft');
+
       return {
-        'pending': totalPending,
-        'synced': totalSynced,
-        'errors': errorMaps.length,
-        'total': totalPending + totalSynced,
+        'pending': pending,
+        'synced': synced,
+        'error': errors,
+        'draft': draft,
+        'total': pending + synced + errors + draft,
       };
     } catch (e) {
       _logger.e('❌ Error obteniendo estadísticas: $e');
       return {
         'pending': 0,
         'synced': 0,
-        'errors': 0,
+        'error': 0,
+        'draft': 0,
         'total': 0,
       };
     }
   }
 
-  /// Limpiar respuestas sincronizadas antiguas (opcional, para mantenimiento)
+  /// Cuenta respuestas por estado
+  Future<int> _countByStatus(String status) async {
+    try {
+      final result = await _dbHelper.consultar(
+        _responseTableName,
+        where: 'sync_status = ?',
+        whereArgs: [status],
+      );
+      return result.length;
+    } catch (e) {
+      _logger.e('❌ Error contando por estado $status: $e');
+      return 0;
+    }
+  }
+
+  /// Verifica si hay respuestas pendientes
+  Future<bool> hasPendingSync() async {
+    try {
+      final count = await _countByStatus('pending');
+      return count > 0;
+    } catch (e) {
+      _logger.e('❌ Error verificando pendientes: $e');
+      return false;
+    }
+  }
+
+  // ==================== LIMPIEZA ====================
+
+  /// Limpia respuestas sincronizadas antiguas
   Future<int> cleanOldSyncedResponses({int daysOld = 30}) async {
     try {
-      final cutoffDate = DateTime.now().subtract(Duration(days: daysOld));
+      final cutoffDate = DateTime.now().subtract(Duration(days: daysOld)).toIso8601String();
 
       final oldResponses = await _dbHelper.consultar(
         _responseTableName,
         where: 'sync_status = ? AND fecha_sincronizado < ?',
-        whereArgs: ['synced', cutoffDate.toIso8601String()],
+        whereArgs: ['synced', cutoffDate],
       );
 
       int deleted = 0;
       for (var response in oldResponses) {
         final responseId = response['id'].toString();
+
+        // Eliminar imágenes
+        final details = await getResponseDetails(responseId);
+        if (details.isNotEmpty) {
+          final detailIds = details.map((d) => d['id']).toList();
+          final placeholders = detailIds.map((_) => '?').join(',');
+
+          final db = await _dbHelper.database;
+          await db.rawDelete(
+            'DELETE FROM $_imageTableName WHERE dynamic_form_response_detail_id IN ($placeholders)',
+            detailIds,
+          );
+        }
+
+        // Eliminar detalles
+        await _dbHelper.eliminar(
+          _responseDetailTableName,
+          where: 'dynamic_form_response_id = ?',
+          whereArgs: [responseId],
+        );
+
+        // Eliminar respuesta
+        await _dbHelper.eliminar(
+          _responseTableName,
+          where: 'id = ?',
+          whereArgs: [responseId],
+        );
+
+        deleted++;
+      }
+
+      if (deleted > 0) {
+        _logger.i('🗑️ Respuestas antiguas eliminadas: $deleted');
+      }
+      return deleted;
+    } catch (e) {
+      _logger.e('❌ Error limpiando respuestas antiguas: $e');
+      return 0;
+    }
+  }
+
+  /// Limpia solo los borradores antiguos
+  Future<int> cleanOldDrafts({int daysOld = 7}) async {
+    try {
+      final cutoffDate = DateTime.now().subtract(Duration(days: daysOld)).toIso8601String();
+
+      final oldDrafts = await _dbHelper.consultar(
+        _responseTableName,
+        where: 'sync_status = ? AND creation_date < ?',
+        whereArgs: ['draft', cutoffDate],
+      );
+
+      int deleted = 0;
+      for (var draft in oldDrafts) {
+        final responseId = draft['id'].toString();
+
+        // Eliminar todo relacionado
+        final details = await getResponseDetails(responseId);
+        if (details.isNotEmpty) {
+          final detailIds = details.map((d) => d['id']).toList();
+          final placeholders = detailIds.map((_) => '?').join(',');
+
+          final db = await _dbHelper.database;
+          await db.rawDelete(
+            'DELETE FROM $_imageTableName WHERE dynamic_form_response_detail_id IN ($placeholders)',
+            detailIds,
+          );
+        }
 
         await _dbHelper.eliminar(
           _responseDetailTableName,
@@ -392,22 +452,13 @@ class DynamicFormSyncRepository {
         deleted++;
       }
 
-      _logger.i('🗑️ Respuestas antiguas eliminadas: $deleted');
+      if (deleted > 0) {
+        _logger.i('🗑️ Borradores antiguos eliminados: $deleted');
+      }
       return deleted;
     } catch (e) {
-      _logger.e('❌ Error limpiando respuestas antiguas: $e');
+      _logger.e('❌ Error limpiando borradores: $e');
       return 0;
-    }
-  }
-
-  /// Verificar si hay respuestas pendientes de sincronización
-  Future<bool> hasPendingSync() async {
-    try {
-      final count = await _responseRepository.countPendingSync();
-      return count > 0;
-    } catch (e) {
-      _logger.e('❌ Error verificando pendientes: $e');
-      return false;
     }
   }
 }
