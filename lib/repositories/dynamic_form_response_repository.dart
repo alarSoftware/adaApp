@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../models/dynamic_form/dynamic_form_response.dart';
 import '../models/dynamic_form/dynamic_form_response_detail.dart';
 import '../models/dynamic_form/dynamic_form_response_image.dart';
+import 'package:path_provider/path_provider.dart';
 import '../services/database_helper.dart';
 
 class DynamicFormResponseRepository {
@@ -102,7 +103,7 @@ class DynamicFormResponseRepository {
     try {
       final maps = await _dbHelper.consultar(
         'dynamic_form_response',
-        where: 'estado = ?',  // ✅ Solo buscar 'completed'
+        where: 'estado = ?',
         whereArgs: ['completed'],
         orderBy: 'creation_date ASC',
       );
@@ -134,6 +135,113 @@ class DynamicFormResponseRepository {
     }
   }
 
+  // ==================== MÉTODO PARA GUARDAR IMAGEN INMEDIATAMENTE ====================
+
+  /// Guarda una imagen inmediatamente cuando se selecciona (sin esperar a completar el form)
+  Future<String?> saveImageImmediately({
+    required String responseId,
+    required String fieldId,
+    required String imagePath,
+  }) async {
+    try {
+      _logger.i('📸 Guardando imagen inmediatamente para campo: $fieldId');
+
+      // 1. Crear o buscar el detailId para este campo
+      String detailId = await _getOrCreateDetailId(responseId, fieldId);
+
+      // 2. Eliminar imágenes previas de este detalle (si existen)
+      await _deleteImagesForDetail(detailId);
+
+      // 3. Convertir imagen a Base64
+      final imageData = await _convertImageToBase64(imagePath);
+
+      if (imageData['base64'] == null) {
+        _logger.e('❌ No se pudo convertir la imagen a Base64');
+        return null;
+      }
+
+      // 4. Guardar en la tabla de imágenes
+      final imageId = _uuid.v4();
+      await _dbHelper.insertar(_imageTable, {
+        'id': imageId,
+        'dynamic_form_response_detail_id': detailId,
+        'imagen_path': imagePath,
+        'imagen_base64': imageData['base64'],
+        'imagen_tamano': imageData['tamano'],
+        'mime_type': _getMimeType(imagePath),
+        'orden': 1,
+        'created_at': DateTime.now().toIso8601String(),
+        'sync_status': 'pending',
+      });
+
+      _logger.i('✅ Imagen guardada inmediatamente: $imageId (${imageData['tamano']} bytes)');
+      return imageId;
+    } catch (e, stackTrace) {
+      _logger.e('❌ Error guardando imagen inmediatamente: $e\n$stackTrace');
+      return null;
+    }
+  }
+
+  /// Obtiene o crea un detail_id para un campo específico
+  Future<String> _getOrCreateDetailId(String responseId, String fieldId) async {
+    try {
+      // Buscar si ya existe un detalle para este campo
+      final existing = await _dbHelper.consultar(
+        _detailTable,
+        where: 'dynamic_form_response_id = ? AND dynamic_form_detail_id = ?',
+        whereArgs: [responseId, fieldId],
+        limit: 1,
+      );
+
+      if (existing.isNotEmpty) {
+        return existing.first['id'].toString();
+      }
+
+      // Si no existe, crear uno nuevo
+      final detailId = _uuid.v4();
+      await _dbHelper.insertar(_detailTable, {
+        'id': detailId,
+        'version': 1,
+        'response': '[IMAGE]',
+        'dynamic_form_response_id': responseId,
+        'dynamic_form_detail_id': fieldId,
+        'sync_status': 'pending',
+      });
+
+      _logger.d('➕ Detail creado para imagen: $detailId');
+      return detailId;
+    } catch (e) {
+      _logger.e('❌ Error obteniendo/creando detailId: $e');
+      rethrow;
+    }
+  }
+
+  /// Elimina imágenes previas de un detalle específico
+  Future<void> _deleteImagesForDetail(String detailId) async {
+    try {
+      // Obtener imágenes para eliminar archivos físicos
+      final images = await getImagesForDetail(detailId);
+
+      // Eliminar archivos físicos
+      for (var image in images) {
+        await deleteImageFile(image);
+      }
+
+      // Eliminar registros de la BD
+      await _dbHelper.eliminar(
+        _imageTable,
+        where: 'dynamic_form_response_detail_id = ?',
+        whereArgs: [detailId],
+      );
+
+      if (images.isNotEmpty) {
+        _logger.d('🗑️ ${images.length} imagen(es) anterior(es) eliminada(s)');
+      }
+    } catch (e) {
+      _logger.w('⚠️ Error eliminando imágenes previas: $e');
+    }
+  }
+
   // ==================== MÉTODOS PÚBLICOS - CONTADORES ====================
 
   Future<int> countPendingSync() async {
@@ -145,7 +253,6 @@ class DynamicFormResponseRepository {
           )
       );
 
-      // ✅ CORRECCIÓN: Usar el método correcto
       final count = result.first['count'] as int?;
       return count ?? 0;
 
@@ -306,6 +413,55 @@ class DynamicFormResponseRepository {
     return count;
   }
 
+  Future<int> saveResponseImagesFromServer(List<Map<String, dynamic>> images) async {
+    int count = 0;
+
+    for (var imageData in images) {
+      try {
+        String? localPath;
+        int? imageSize;
+
+        // 👇 DECODIFICAR BASE64 Y GUARDAR LOCALMENTE
+        if (imageData['imageBase64'] != null && imageData['imageBase64'].toString().isNotEmpty) {
+          final base64String = imageData['imageBase64'].toString();
+          final bytes = base64Decode(base64String);
+
+          // Crear archivo local
+          final directory = await getApplicationDocumentsDirectory();
+          final fileName = '${_uuid.v4()}.jpg';
+          final file = File('${directory.path}/$fileName');
+
+          await file.writeAsBytes(bytes);
+          localPath = file.path;
+          imageSize = bytes.length;
+
+          _logger.d('💾 Imagen reconstruida localmente: $localPath');
+        }
+
+        final imageForDB = {
+          'id': imageData['id']?.toString() ?? _uuid.v4(),
+          'dynamic_form_response_detail_id': imageData['dynamicFormResponseDetail']?['id']?.toString() ?? '',
+          'imagen_path': localPath ?? imageData['imagePath']?.toString(), // 👈 USA PATH LOCAL
+          'imagen_base64': imageData['imageBase64']?.toString(),
+          'imagen_tamano': imageSize,
+          'mime_type': imageData['mimeType']?.toString() ?? 'image/jpeg',
+          'orden': imageData['orden'] != null ? int.tryParse(imageData['orden'].toString()) ?? 1 : 1,
+          'created_at': imageData['creationDate']?.toString() ?? DateTime.now().toIso8601String(),
+          'sync_status': 'synced',
+        };
+
+        await _upsertImage(imageForDB['id']!.toString(), imageForDB);
+        count++;
+
+      } catch (e, stackTrace) {
+        _logger.e('❌ Error guardando imagen desde servidor: $e\n$stackTrace');
+      }
+    }
+
+    _logger.i('🖼️ Total de imágenes guardadas desde servidor: $count');
+    return count;
+  }
+
   // ==================== MÉTODOS PRIVADOS - CONSTRUCCIÓN DE DATOS ====================
 
   Map<String, dynamic> _buildResponseData(DynamicFormResponse response) {
@@ -363,14 +519,26 @@ class DynamicFormResponseRepository {
     }
   }
 
-  Future<void> _saveResponseDetails(DynamicFormResponse response) async {
-    await _dbHelper.eliminar(
-      _detailTable,
-      where: 'dynamic_form_response_id = ?',
-      whereArgs: [response.id],
+  Future<void> _upsertImage(String id, Map<String, dynamic> data) async {
+    final existing = await _dbHelper.consultar(
+      _imageTable,
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
     );
 
+    if (existing.isNotEmpty) {
+      await _dbHelper.actualizar(_imageTable, data, where: 'id = ?', whereArgs: [id]);
+      _logger.d('🔄 Imagen actualizada: $id');
+    } else {
+      await _dbHelper.insertar(_imageTable, data);
+      _logger.d('➕ Imagen insertada: $id');
+    }
+  }
+
+  Future<void> _saveResponseDetails(DynamicFormResponse response) async {
     _logger.d('📝 Guardando ${response.answers.length} respuestas detalle');
+    _logger.d('🔍 Respuestas: ${response.answers}');
 
     for (var entry in response.answers.entries) {
       if (entry.key.isEmpty) {
@@ -378,16 +546,44 @@ class DynamicFormResponseRepository {
         continue;
       }
 
+      // 🎯 CAMBIO: Verificar si ya existe un detalle con imagen guardada
+      final existingDetails = await _dbHelper.consultar(
+        _detailTable,
+        where: 'dynamic_form_response_id = ? AND dynamic_form_detail_id = ?',
+        whereArgs: [response.id, entry.key],
+        limit: 1,
+      );
+
+      if (existingDetails.isNotEmpty) {
+        // Ya existe (probablemente con imagen), solo actualizar sync_status
+        final detailId = existingDetails.first['id'].toString();
+        await _dbHelper.actualizar(
+          _detailTable,
+          {'sync_status': 'pending'},
+          where: 'id = ?',
+          whereArgs: [detailId],
+        );
+        _logger.d('  ✓ Campo ${entry.key}: [YA EXISTÍA]');
+        continue;
+      }
+
+      // Si no existe, crear nuevo detalle
       final detailId = _uuid.v4();
 
       if (_isImagePath(entry.value)) {
-        await _saveImageForDetail(
-          detailId: detailId,
-          responseId: response.id,
-          fieldId: entry.key,
-          imagePath: entry.value as String,
-          isCompleted: response.status == 'completed',
-        );
+        // Para imágenes, verificar si ya está guardada
+        final hasImage = await _hasImageForField(response.id, entry.key);
+
+        if (!hasImage) {
+          // Si no está guardada, guardarla ahora
+          await _saveImageForDetail(
+            detailId: detailId,
+            responseId: response.id,
+            fieldId: entry.key,
+            imagePath: entry.value as String,
+            isCompleted: response.status == 'completed',
+          );
+        }
 
         await _dbHelper.insertar(_detailTable, {
           'id': detailId,
@@ -398,7 +594,7 @@ class DynamicFormResponseRepository {
           'sync_status': 'pending',
         });
 
-        _logger.d('  ✓ Campo ${entry.key}: [IMAGEN en tabla separada]');
+        _logger.d('  ✓ Campo ${entry.key}: [IMAGEN]');
       } else {
         await _dbHelper.insertar(_detailTable, {
           'id': detailId,
@@ -411,6 +607,25 @@ class DynamicFormResponseRepository {
 
         _logger.d('  ✓ Campo ${entry.key}: ${entry.value}');
       }
+    }
+  }
+
+  /// Verifica si ya existe una imagen guardada para un campo
+  Future<bool> _hasImageForField(String responseId, String fieldId) async {
+    try {
+      final details = await _dbHelper.consultar(
+        _detailTable,
+        where: 'dynamic_form_response_id = ? AND dynamic_form_detail_id = ?',
+        whereArgs: [responseId, fieldId],
+        limit: 1,
+      );
+
+      if (details.isEmpty) return false;
+
+      final images = await getImagesForDetail(details.first['id']);
+      return images.isNotEmpty;
+    } catch (e) {
+      return false;
     }
   }
 
@@ -543,7 +758,6 @@ class DynamicFormResponseRepository {
         completedAt: map['estado'] == 'completed' || map['estado'] == 'synced'
             ? _parseDateTime(map['last_update_date'])
             : null,
-        // ✅ CORREGIR: Leer fecha_sincronizado de la BD
         syncedAt: _parseDateTime(map['fecha_sincronizado']),
         status: map['estado']?.toString() ?? 'draft',
         userId: map['usuario_id']?.toString(),

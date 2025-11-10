@@ -7,6 +7,11 @@ class Cliente {
   final String rucCi;
   final String propietario;
 
+  // ✅ CAMPOS CALCULADOS - NO VAN A LA BASE DE DATOS
+  // Solo se llenan cuando se obtienen desde queries con JOIN
+  final bool tieneCensoHoy;
+  final bool tieneFormularioCompleto;
+
   const Cliente({
     this.id,
     required this.nombre,
@@ -15,6 +20,9 @@ class Cliente {
     required this.direccion,
     required this.rucCi,
     required this.propietario,
+    // ✅ Campos calculados con valores por defecto
+    this.tieneCensoHoy = false,
+    this.tieneFormularioCompleto = false,
   });
 
   String get displayName {
@@ -28,26 +36,26 @@ class Cliente {
     return Cliente(
       id: json['id'] as int?,
       nombre: _parseString(json['cliente']) ?? '',
-      codigo: _parseIntFromString(json['clienteIdGc']) ?? 0, // ← clienteIdGc se carga en codigo
+      codigo: _parseIntFromString(json['clienteIdGc']) ?? 0,
       telefono: _parseString(json['telefono']) ?? '',
       direccion: _parseString(json['direccion']) ?? '',
       rucCi: _parseString(json['ruc'] ?? json['cedula']) ?? '',
       propietario: _parseString(json['propietario']) ?? '',
+      // ✅ Estados desde JSON (para futuras APIs) - opcional
+      tieneCensoHoy: json['tiene_censo_hoy'] == 1 || json['tiene_censo_hoy'] == true,
+      tieneFormularioCompleto: json['tiene_formulario_completo'] == 1 || json['tiene_formulario_completo'] == true,
     );
   }
 
-  // Factory constructor desde Map (base de datos local)
-// Factory constructor desde Map (base de datos local) - VERSIÓN CORREGIDA
+  // ✅ FROMMAP - CARGA ESTADOS CALCULADOS DESDE QUERIES
   factory Cliente.fromMap(Map<String, dynamic> map) {
     return Cliente(
-      // Conversión segura de id - puede ser int, String, o null
       id: map['id'] is int
           ? map['id']
           : int.tryParse(map['id']?.toString() ?? ''),
 
       nombre: map['nombre']?.toString() ?? '',
 
-      // Conversión segura de codigo - puede ser int, String, o null
       codigo: map['codigo'] is int
           ? map['codigo'] ?? 0
           : int.tryParse(map['codigo']?.toString() ?? '') ?? 0,
@@ -56,10 +64,15 @@ class Cliente {
       direccion: map['direccion']?.toString() ?? '',
       rucCi: map['ruc_ci']?.toString() ?? '',
       propietario: map['propietario']?.toString() ?? '',
+
+      // ✅ ESTADOS CALCULADOS DESDE QUERIES (1/0 o true/false)
+      // Si el query no incluye estos campos, quedan en false por defecto
+      tieneCensoHoy: map['tiene_censo_hoy'] == 1 || map['tiene_censo_hoy'] == true,
+      tieneFormularioCompleto: map['tiene_formulario_completo'] == 1 || map['tiene_formulario_completo'] == true,
     );
   }
 
-  // Convertir a Map para base de datos local
+  // ✅ TOMAP - SOLO CAMPOS DE LA TABLA (SIN ESTADOS CALCULADOS)
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -69,27 +82,27 @@ class Cliente {
       'direccion': direccion,
       'ruc_ci': rucCi,
       'propietario': propietario,
+      // ✅ NO incluir los campos calculados aquí
+      // porque no van a la tabla clientes
     };
   }
 
   // Convertir a JSON para enviar a la API
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{
-      'cliente': nombre,  // ← API usa 'cliente', no 'nombre'
-      'clienteIdGc': codigo.toString(), // ← Enviar codigo como clienteIdGc
+      'cliente': nombre,
+      'clienteIdGc': codigo.toString(),
       'telefono': telefono,
       'direccion': direccion,
       'ruc': rucCi,
       'propietario': propietario,
     };
 
-    // Solo incluir ID si existe (para updates)
     if (id != null) json['id'] = id;
-
     return json;
   }
 
-  // Método copyWith para crear copias con cambios
+  // ✅ COPYWITH - INCLUYE CAMPOS CALCULADOS
   Cliente copyWith({
     int? id,
     String? nombre,
@@ -98,6 +111,8 @@ class Cliente {
     String? direccion,
     String? rucCi,
     String? propietario,
+    bool? tieneCensoHoy,
+    bool? tieneFormularioCompleto,
   }) {
     return Cliente(
       id: id ?? this.id,
@@ -107,6 +122,8 @@ class Cliente {
       direccion: direccion ?? this.direccion,
       rucCi: rucCi ?? this.rucCi,
       propietario: propietario ?? this.propietario,
+      tieneCensoHoy: tieneCensoHoy ?? this.tieneCensoHoy,
+      tieneFormularioCompleto: tieneFormularioCompleto ?? this.tieneFormularioCompleto,
     );
   }
 
@@ -121,29 +138,22 @@ class Cliente {
   String get tipoDocumento {
     if (rucCi.isEmpty) return 'Documento';
 
-    // Si contiene guión, es RUC
     if (rucCi.contains('-')) {
       return 'RUC';
     }
 
-    // Si solo son números, es CI
     final clean = rucCi.replaceAll(RegExp(r'[\s]'), '');
     if (RegExp(r'^\d+$').hasMatch(clean)) {
       return 'CI';
     }
 
-    // Cualquier otro formato
     return 'Documento';
   }
 
-  // Getters simples sin formateo automático
   bool get esRuc => tipoDocumento == 'RUC';
   bool get esCi => tipoDocumento == 'CI';
-
-  // Validación básica de teléfono paraguayo
   bool get hasValidPhone => telefono.isNotEmpty && _isValidParaguayanPhone(telefono);
 
-  // Métodos de utilidad privados
   static String? _parseString(dynamic value) {
     if (value == null) return null;
     final str = value.toString().trim();
@@ -159,7 +169,6 @@ class Cliente {
   bool _isValidParaguayanPhone(String phone) {
     if (phone.isEmpty) return false;
 
-    // Formatos válidos: 0981-123456, 0981123456, +595981123456
     final cleanPhone = phone.replaceAll(RegExp(r'[\s\-+]'), '');
 
     if (cleanPhone.startsWith('595')) {
@@ -181,7 +190,9 @@ class Cliente {
               telefono == other.telefono &&
               direccion == other.direccion &&
               rucCi == other.rucCi &&
-              propietario == other.propietario;
+              propietario == other.propietario &&
+              tieneCensoHoy == other.tieneCensoHoy &&
+              tieneFormularioCompleto == other.tieneFormularioCompleto;
 
   @override
   int get hashCode =>
@@ -191,10 +202,12 @@ class Cliente {
       telefono.hashCode ^
       direccion.hashCode ^
       rucCi.hashCode ^
-      propietario.hashCode;
+      propietario.hashCode ^
+      tieneCensoHoy.hashCode ^
+      tieneFormularioCompleto.hashCode;
 
   @override
   String toString() {
-    return 'Cliente{id: $id, nombre: $nombre, codigo: $codigo, tipo: $tipoDocumento, ruc_ci: $rucCi}';
+    return 'Cliente{id: $id, nombre: $nombre, codigo: $codigo, tipo: $tipoDocumento, ruc_ci: $rucCi, censo: $tieneCensoHoy, form: $tieneFormularioCompleto}';
   }
 }

@@ -1,6 +1,7 @@
 import 'package:ada_app/models/equipos_pendientes.dart';
-import 'package:ada_app/services/post/equipos_pendientes_api_service.dart';
+import 'package:ada_app/services/post/equipo_pendiente_post_service.dart';
 import 'base_repository.dart';
+import 'package:uuid/uuid.dart';
 import 'package:logger/logger.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -76,24 +77,38 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
   }
 
   /// Buscar ID del registro pendiente (para EstadoEquipoRepository)
+  /// Buscar ID del registro pendiente (para EstadoEquipoRepository)
   Future<int?> buscarEquipoPendienteId(dynamic equipoId, int clienteId) async {
     try {
+      // Convertir a string para consistencia
+      final equipoIdStr = equipoId.toString();
+
+      _logger.i('🔍 Buscando pendiente: equipoId=$equipoIdStr, clienteId=$clienteId');
+
       final maps = await dbHelper.consultar(
         tableName,
-        where: 'equipo_id = ? AND cliente_id = ?',
-        whereArgs: [equipoId, clienteId],
+        where: 'CAST(equipo_id AS TEXT) = ? AND cliente_id = ?',
+        whereArgs: [equipoIdStr, clienteId],
+        orderBy: 'fecha_creacion DESC', // Obtener el más reciente
         limit: 1,
       );
 
-      return maps.isNotEmpty ? maps.first['id'] as int? : null;
+      if (maps.isNotEmpty) {
+        final id = maps.first['id'] as int?;
+        _logger.i('✅ Encontrado registro pendiente: ID=$id');
+        return id;
+      }
+
+      _logger.i('❌ No existe registro pendiente');
+      return null;
     } catch (e) {
-      _logger.e('Error buscando ID de equipo pendiente: $e');
+      _logger.e('❌ Error buscando ID de equipo pendiente: $e');
       return null;
     }
   }
 
   /// Procesar escaneo de censo - crear registro pendiente
-  Future<int> procesarEscaneoCenso({
+  Future<String> procesarEscaneoCenso({ // ✅ Cambia int a String para retornar UUID
     required dynamic equipoId,
     required int clienteId,
   }) async {
@@ -102,52 +117,104 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
       final equipoIdString = equipoId.toString();
       _logger.i('Procesando censo - equipoId: $equipoIdString, clienteId: $clienteId');
 
-      // Verificar si ya existe
-      final existe = await buscarEquipoPendienteId(equipoIdString, clienteId);
-      if (existe != null) {
-        _logger.i('Ya existe registro pendiente para equipoId: $equipoIdString, clienteId: $clienteId');
+      // Verificar si ya existe por equipo_id + cliente_id
+      final existente = await dbHelper.consultar(
+        tableName,
+        where: 'equipo_id = ? AND cliente_id = ?',
+        whereArgs: [equipoIdString, clienteId],
+        limit: 1,
+      );
+
+      if (existente.isNotEmpty) {
+        final registroId = existente.first['id'].toString();
+        _logger.i('✅ Ya existe registro pendiente (UUID: $registroId) - ACTUALIZANDO');
+
+        // ✅ Actualizar fecha del censo existente
+        await dbHelper.actualizar(
+          tableName,
+          {
+            'fecha_censo': now.toIso8601String(),
+            'fecha_actualizacion': now.toIso8601String(),
+            'sincronizado': 0, // Marcar para reenvío
+          },
+          where: 'id = ?',
+          whereArgs: [registroId],
+        );
+
+        _logger.i('📅 Fecha actualizada para UUID: $registroId');
         _enviarAlServidorAsync(equipoIdString, clienteId);
-        return existe;
+        return registroId;
       }
 
-      // Crear nuevo registro - SOLO con campos que existen
+      // Crear nuevo registro con UUID
+      final uuid = Uuid().v4();
       final datos = {
+        'id': uuid,
         'equipo_id': equipoIdString,
         'cliente_id': clienteId,
         'fecha_censo': now.toIso8601String(),
         'usuario_censo_id': 1,
+        'fecha_creacion': now.toIso8601String(),
+        'fecha_actualizacion': now.toIso8601String(),
+        'sincronizado': 0,
       };
 
-      final id = await crear(datos);
-      _logger.i('Registro pendiente creado: Equipo $equipoIdString → Cliente $clienteId (ID: $id)');
+      await dbHelper.insertar(tableName, datos);
+      _logger.i('✅ Registro pendiente NUEVO creado con UUID: $uuid');
 
-      // Enviar al servidor
       _enviarAlServidorAsync(equipoIdString, clienteId);
+      return uuid;
 
-      return id;
     } catch (e) {
-      _logger.e('Error procesando escaneo de censo: $e');
+      _logger.e('❌ Error procesando escaneo de censo: $e');
       rethrow;
+    }
+  }
+
+  /// Marcar equipos pendientes como sincronizados cuando su censo se migra
+  Future<int> marcarSincronizadosPorCenso(String equipoId, int clienteId) async {
+    try {
+      final actualizados = await dbHelper.actualizar(
+        tableName,
+        {
+          'sincronizado': 1,
+          'fecha_actualizacion': DateTime.now().toIso8601String(),
+        },
+        where: 'equipo_id = ? AND cliente_id = ? AND sincronizado = 0',
+        whereArgs: [equipoId, clienteId],
+      );
+
+      _logger.i('✅ Equipos pendientes marcados como sincronizados: $actualizados');
+      return actualizados;
+    } catch (e) {
+      _logger.e('❌ Error marcando equipos pendientes como sincronizados: $e');
+      return 0;
     }
   }
 
   /// Crear nuevo registro de equipo pendiente
   Future<int> crear(Map<String, dynamic> datos) async {
     try {
+      final uuid = Uuid();
+
       final registroData = {
+        'id': uuid.v4(), // ✅ UUID temporal para identificación local
         'equipo_id': datos['equipo_id'],
         'cliente_id': datos['cliente_id'],
         'fecha_censo': datos['fecha_censo'],
         'usuario_censo_id': datos['usuario_censo_id'],
         'fecha_creacion': DateTime.now().toIso8601String(),
         'fecha_actualizacion': DateTime.now().toIso8601String(),
+        'sincronizado': 0,
       };
 
-      final id = await dbHelper.insertar(tableName, registroData);
-      _logger.i('Registro creado con ID: $id');
-      return id;
+      await dbHelper.insertar(tableName, registroData);
+      _logger.i('✅ Registro pendiente creado con UUID: ${registroData['id']}');
+
+      // Retornar 0 o un hash del UUID ya que la función espera int
+      return 0; // O podrías retornar el UUID.hashCode
     } catch (e) {
-      _logger.e('Error creando registro: $e');
+      _logger.e('❌ Error creando registro: $e');
       rethrow;
     }
   }
@@ -310,12 +377,14 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
         try {
           // MAPEO SIMPLIFICADO: Solo los campos que existen en la tabla
           final equipoLocal = {
+            'id': equipoAPI['id'],
             'equipo_id': equipoAPI['edfEquipoId'],
             'cliente_id': equipoAPI['edfClienteId'],
             'fecha_creacion': equipoAPI['creationDate'],
             'fecha_actualizacion': DateTime.now().toIso8601String(),
             'fecha_censo': equipoAPI['creationDate'],
             'usuario_censo_id': 1,
+            'sincronizado': 1,
           };
 
           _logger.i('Insertando: equipo_id=${equipoLocal['equipo_id']}, cliente_id=${equipoLocal['cliente_id']}');

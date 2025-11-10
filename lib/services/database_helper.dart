@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:logger/logger.dart';
@@ -109,14 +110,50 @@ class DatabaseHelper {
     return result.isNotEmpty ? result.first : null;
   }
 
-  Future<int> insertar(String tableName, Map<String, dynamic> values) async {
+  Future<int> insertar(
+      String tableName,
+      Map<String, dynamic> values, {
+        ConflictAlgorithm? conflictAlgorithm,
+      }) async {
     _validateValues(values);
     _addTimestamps(tableName, values);
 
     final db = await database;
-    final id = await db.insert(tableName, values);
+    final id = await db.insert(
+      tableName,
+      values,
+      conflictAlgorithm: conflictAlgorithm ?? ConflictAlgorithm.abort,  // ✅ Maneja conflictos
+    );
     logger.d('Insertado en $tableName: ID $id');
     return id;
+  }
+
+// Método específico para insertar o ignorar duplicados
+  Future<int> insertarOIgnorar(String tableName, Map<String, dynamic> values) async {
+    return insertar(tableName, values, conflictAlgorithm: ConflictAlgorithm.ignore);
+  }
+
+// Método específico para insertar o reemplazar duplicados
+  Future<int> insertarOReemplazar(String tableName, Map<String, dynamic> values) async {
+    return insertar(tableName, values, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<int> vaciarEInsertar(String tableName, List<Map<String, dynamic>> nuevosRegistros) async {
+    final db = await database;
+
+    return await db.transaction<int>((txn) async {
+      // 1. Vaciar
+      await txn.delete(tableName);
+
+      // 2. Insertar
+      for (final record in nuevosRegistros) {
+        _validateValues(record);
+        _addTimestamps(tableName, record);
+        await txn.insert(tableName, record);
+      }
+
+      return nuevosRegistros.length;
+    });
   }
 
   Future<int> actualizar(
@@ -144,6 +181,8 @@ class DatabaseHelper {
   Future<int> eliminarPorId(String tableName, int id) async {
     return await eliminar(tableName, where: 'id = ?', whereArgs: [id]);
   }
+
+
 
   // ================================================================
   // MÉTODOS DE SINCRONIZACIÓN (DELEGADOS)
@@ -381,6 +420,7 @@ class DatabaseHelper {
       values['fecha_creacion'] = now;
     }
   }
+  //evitar campo fecha_actualizacion
   bool _requiresTimestamps(String tableName) {
     const tablesWithoutTimestamps = {
       'clientes',
@@ -390,6 +430,7 @@ class DatabaseHelper {
       'dynamic_form_response',
       'dynamic_form_response_detail',
       'dynamic_form_response_image',
+      'censo_activo_foto',
     };
     return !tablesWithoutTimestamps.contains(tableName);
   }

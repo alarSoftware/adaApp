@@ -113,8 +113,19 @@ class DynamicFormViewModel extends ChangeNotifier {
   void _loadExistingResponse(DynamicFormResponse response) {
     _currentResponse = response;
     _fieldValues = Map<String, dynamic>.from(response.answers);
+
     _logger.i('✅ Formulario cargado para editar: ${response.id}');
     _logger.i('📝 Valores cargados: ${_fieldValues.length} campos');
+
+    // ✨ NUEVO: Log detallado de los valores cargados
+    _logger.i('📋 Contenido de campos:');
+    _fieldValues.forEach((key, value) {
+      if (value is String && (value.contains('.jpg') || value.contains('.png') || value.contains('.jpeg'))) {
+        _logger.i('  📸 $key: $value (posible imagen)');
+      } else {
+        _logger.i('  📝 $key: $value');
+      }
+    });
   }
 
   void _createNewResponse(
@@ -217,6 +228,70 @@ class DynamicFormViewModel extends ChangeNotifier {
     }
   }
 
+  // ==================== MANEJO DE IMÁGENES ====================
+
+  /// Guarda una imagen inmediatamente cuando el usuario la selecciona
+  Future<bool> saveImageForField(String fieldId, String imagePath) async {
+    try {
+      if (_currentResponse == null) {
+        _errorMessage = 'No hay formulario activo';
+        return false;
+      }
+
+      // 1. Guardar imagen en dynamic_form_response_image
+      final imageId = await _responseRepo.saveImageImmediately(
+        responseId: _currentResponse!.id,
+        fieldId: fieldId,
+        imagePath: imagePath,
+      );
+
+      if (imageId != null) {
+        updateFieldValue(fieldId, imagePath);
+
+        _logger.i('✅ Imagen y detalle guardados exitosamente');
+        return true;
+      }
+
+      return false;
+    } catch (e) {
+      _errorMessage = 'Error guardando imagen: $e';
+      _logger.e('❌ Error en saveImageForField: $e');
+      return false;
+    }
+  }
+
+  /// Elimina una imagen de un campo
+  Future<bool> deleteImageForField(String fieldId) async {
+    try {
+      if (_currentResponse == null) {
+        _logger.e('❌ No hay formulario activo para eliminar imagen');
+        return false;
+      }
+
+      _logger.i('🗑️ Eliminando imagen del campo: $fieldId');
+
+      // Buscar el detalle asociado
+      final details = await _responseRepo.getDetails(_currentResponse!.id);
+      final detail = details.where((d) => d.dynamicFormDetailId == fieldId).firstOrNull;
+
+      if (detail != null) {
+        // Obtener y eliminar imágenes
+        final images = await _responseRepo.getImagesForDetail(detail.id);
+        for (var image in images) {
+          await _responseRepo.deleteImageFile(image);
+        }
+      }
+
+      // Limpiar el valor del campo
+      updateFieldValue(fieldId, null);
+      _logger.i('✅ Imagen eliminada');
+      return true;
+    } catch (e) {
+      _logger.e('❌ Error eliminando imagen: $e');
+      return false;
+    }
+  }
+
   // ==================== VALIDATION ====================
 
   bool _validateAllFields() {
@@ -295,11 +370,15 @@ class DynamicFormViewModel extends ChangeNotifier {
         return false;
       }
 
+      // ✅ MEJORADO: Asegurar que completedAt esté establecido correctamente
+      final now = DateTime.now();
       final completedResponse = _currentResponse!.copyWith(
         answers: Map<String, dynamic>.from(_fieldValues),
-        completedAt: DateTime.now(),
+        completedAt: now,
         status: 'completed',
       );
+
+      _logger.i('🔍 DEBUG: Guardando formulario completado con fecha: ${now.toIso8601String()}');
 
       final saved = await _responseRepo.save(completedResponse);
       if (!saved) {
@@ -308,7 +387,7 @@ class DynamicFormViewModel extends ChangeNotifier {
         return false;
       }
 
-      _logger.i('✅ Formulario completado (imágenes convertidas a Base64)');
+      _logger.i('✅ Formulario completado y guardado en BD');
 
       // Sincronizar
       await _syncResponse(completedResponse.id);
@@ -367,18 +446,28 @@ class DynamicFormViewModel extends ChangeNotifier {
 
   // ==================== SYNC ====================
 
+  /// ✅ MEJORADO: Mejor manejo de errores y logging
   Future<void> _syncResponse(String responseId) async {
     _isSyncing = true;
     notifyListeners();
 
-    final synced = await _syncRepo.syncToServer(responseId);
+    try {
+      _logger.i('🔄 Iniciando sincronización de respuesta: $responseId');
 
-    _isSyncing = false;
+      final synced = await _syncRepo.syncTo(responseId);
 
-    if (synced) {
-      _logger.i('✅ Formulario sincronizado exitosamente');
-    } else {
-      _logger.w('⚠️ Formulario guardado pero no sincronizado');
+      if (synced) {
+        _logger.i('✅ Formulario sincronizado exitosamente');
+      } else {
+        _logger.w('⚠️ Formulario guardado pero no sincronizado - se reintentará automáticamente');
+      }
+    } catch (e) {
+      _logger.e('❌ Error en sincronización: $e');
+      // No establecer _errorMessage aquí para no confundir al usuario
+      // El error se maneja en el syncRepo
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
     }
   }
 

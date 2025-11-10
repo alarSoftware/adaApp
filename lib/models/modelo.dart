@@ -17,14 +17,14 @@ class Modelo {
   factory Modelo.fromMap(Map<String, dynamic> map) {
     return Modelo(
       id: map['id'],
-      nombre: map['nombre'],
+      nombre: (map['nombre'] ?? '').toString().trim(),
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'nombre': nombre,
+      'nombre': nombre.trim(),
     };
   }
 }

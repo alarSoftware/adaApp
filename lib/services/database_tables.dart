@@ -32,6 +32,9 @@ class DatabaseTables {
     await db.execute(_sqlEquiposPendientes());
     await db.execute(_sqlUsuarios());
     await db.execute(_sqlCensoActivo());
+    await db.execute(_sqlCensoActivoFoto());
+    await db.execute(_sqlDeviceLog());
+    await db.execute(_sqlErrorLog()); // 🆕 NUEVA TABLA
 
     // Tablas de formularios dinámicos
     await db.execute(_sqlDynamicForm());
@@ -100,6 +103,9 @@ class DatabaseTables {
     usuario_censo_id INTEGER,
     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion DATETIME,
+    sincronizado INTEGER DEFAULT 0,
+    fecha_sincronizacion DATETIME,        
+    UNIQUE(equipo_id, cliente_id),
     FOREIGN KEY (equipo_id) REFERENCES equipos (id),
     FOREIGN KEY (cliente_id) REFERENCES clientes (id)
   )
@@ -118,9 +124,10 @@ class DatabaseTables {
 
   String _sqlCensoActivo() => '''
   CREATE TABLE censo_activo (
-    id TEXT,
+    id TEXT PRIMARY KEY,
     equipo_id TEXT NOT NULL,
-    cliente_id INTEGER NOT NULL,   
+    cliente_id INTEGER NOT NULL,
+    usuario_id INTEGER,
     en_local INTEGER DEFAULT 0,
     latitud REAL,
     longitud REAL,
@@ -129,17 +136,52 @@ class DatabaseTables {
     fecha_actualizacion TEXT,
     sincronizado INTEGER DEFAULT 0,
     observaciones TEXT,
-    imagen_path TEXT,
-    imagen_base64 TEXT,
-    tiene_imagen INTEGER DEFAULT 0,
-    imagen_tamano INTEGER,
-    imagen_path2 TEXT,
-    imagen_base64_2 TEXT,
-    tiene_imagen2 INTEGER DEFAULT 0,
-    imagen_tamano2 INTEGER,
     estado_censo TEXT DEFAULT 'creado'
   )
 ''';
+
+  String _sqlCensoActivoFoto() => '''
+  CREATE TABLE censo_activo_foto (
+    id TEXT PRIMARY KEY,
+    censo_activo_id TEXT NOT NULL,
+    imagen_path TEXT,
+    imagen_base64 TEXT,
+    imagen_tamano INTEGER,
+    orden INTEGER DEFAULT 1,
+    fecha_creacion TEXT,
+    sincronizado INTEGER DEFAULT 0,
+    FOREIGN KEY (censo_activo_id) REFERENCES censo_activo (id) ON DELETE CASCADE
+  )
+''';
+
+  String _sqlDeviceLog() => '''
+  CREATE TABLE device_log (
+    id TEXT PRIMARY KEY,
+    edf_vendedor_id TEXT,
+    latitud_longitud TEXT,
+    bateria INTEGER,
+    modelo TEXT,
+    fecha_registro TEXT NOT NULL,
+    sincronizado INTEGER DEFAULT 0,
+    FOREIGN KEY (edf_vendedor_id) REFERENCES Users (edf_vendedor_id)
+  )
+''';
+
+  String _sqlErrorLog() => '''
+    CREATE TABLE error_log (
+      id TEXT PRIMARY KEY,
+      timestamp TEXT NOT NULL,
+      table_name TEXT NOT NULL,
+      operation TEXT NOT NULL,
+      registro_fail_id TEXT,
+      error_code TEXT,
+      error_message TEXT NOT NULL,
+      error_type TEXT,
+      sync_attempt INTEGER DEFAULT 1,
+      user_id TEXT,
+      endpoint TEXT
+    )
+  ''';
 
   // ==================== TABLAS DE FORMULARIOS DINÁMICOS ====================
 
@@ -229,7 +271,10 @@ class DatabaseTables {
     await _crearIndicesEquipos(db);
     await _crearIndicesEquiposPendientes(db);
     await _crearIndicesMaestras(db);
+    await _crearIndicesCensoActivo(db);
     await _crearIndicesDynamicForms(db);
+    await _crearIndicesDeviceLog(db);
+    await _crearIndicesErrorLog(db);
   }
 
   Future<void> _crearIndicesClientes(Database db) async {
@@ -287,6 +332,25 @@ class DatabaseTables {
     }
   }
 
+  Future<void> _crearIndicesCensoActivo(Database db) async {
+    final indices = [
+      // Índices para censo_activo
+      'CREATE INDEX IF NOT EXISTS idx_censo_activo_equipo_id ON censo_activo (equipo_id)',
+      'CREATE INDEX IF NOT EXISTS idx_censo_activo_cliente_id ON censo_activo (cliente_id)',
+      'CREATE INDEX IF NOT EXISTS idx_censo_activo_estado_censo ON censo_activo (estado_censo)',
+      'CREATE INDEX IF NOT EXISTS idx_censo_activo_fecha_revision ON censo_activo (fecha_revision)',
+
+      // Índices para censo_activo_foto
+      'CREATE INDEX IF NOT EXISTS idx_censo_activo_foto_censo_id ON censo_activo_foto (censo_activo_id)',
+      'CREATE INDEX IF NOT EXISTS idx_censo_activo_foto_orden ON censo_activo_foto (orden)',
+      'CREATE INDEX IF NOT EXISTS idx_censo_activo_foto_sincronizado ON censo_activo_foto (sincronizado)',
+    ];
+
+    for (final indice in indices) {
+      await db.execute(indice);
+    }
+  }
+
   Future<void> _crearIndicesDynamicForms(Database db) async {
     final indices = [
       // Índices para dynamic_form
@@ -313,6 +377,23 @@ class DatabaseTables {
       // Índices para dynamic_form_response_image
       'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_image_detail_id ON dynamic_form_response_image(dynamic_form_response_detail_id)',
       'CREATE INDEX IF NOT EXISTS idx_dynamic_form_response_image_sync_status ON dynamic_form_response_image(sync_status)',
+    ];
+
+    for (final indice in indices) {
+      await db.execute(indice);
+    }
+  }
+
+  Future<void> _crearIndicesDeviceLog(Database db) async {
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_device_log_fecha ON device_log (fecha_registro)');
+  }
+
+  // 🆕 ÍNDICES PARA ERROR_LOG
+  Future<void> _crearIndicesErrorLog(Database db) async {
+    final indices = [
+      'CREATE INDEX IF NOT EXISTS idx_error_log_timestamp ON error_log (timestamp)',
+      'CREATE INDEX IF NOT EXISTS idx_error_log_table_name ON error_log (table_name)',
+      'CREATE INDEX IF NOT EXISTS idx_error_log_error_type ON error_log (error_type)',
     ];
 
     for (final indice in indices) {

@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
 import '../repositories/censo_activo_repository.dart';
-import 'package:ada_app/services/post/censo_activo_api_service.dart';
+import 'package:ada_app/services/post/censo_activo_post_service.dart';
 import '../repositories/equipo_repository.dart';
 import '../models/censo_activo.dart';
 import '../services/location_service.dart';
@@ -351,7 +351,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
       // 2. Sincronizar con el servidor - AGREGAR TODOS LOS CAMPOS
       try {
-        final resultadoSync = await CensoActivoApiService.enviarCambioEstado(
+        final resultadoSync = await CensoActivoPostService.enviarCambioEstado(
           codigoBarras: codigoBarras.toString(),
           clienteId: int.parse(clienteId.toString()),
           enLocal: _estadoUbicacionEquipo!,

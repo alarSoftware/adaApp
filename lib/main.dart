@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
+import 'package:ada_app/services/app_services.dart';
 import 'ui/screens/login_screen.dart';
 import 'ui/screens/clients_screen.dart';
 import 'ui/screens/select_screen.dart';
 import 'ui/screens/equipos_screen.dart';
 import 'ui/screens/cliente_detail_screen.dart';
-import 'ui/screens/api_settings_screen.dart'; // AGREGAR ESTE IMPORT
+import 'ui/screens/api_settings_screen.dart';
 import 'models/cliente.dart';
 
 var logger = Logger();
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await AppServices().inicializar();
+
   runApp(MyApp());
 }
 
@@ -35,7 +40,7 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const SelectScreen(),
         '/clienteLista': (context) => const ClienteListScreen(),
         '/equiposLista': (context) => const EquipoListScreen(),
-        '/api-settings': (context) => const ApiSettingsScreen(), // AGREGAR ESTA RUTA
+        '/api-settings': (context) => const ApiSettingsScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/detalleCliente') {

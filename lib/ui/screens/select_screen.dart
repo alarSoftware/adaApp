@@ -1,12 +1,20 @@
 import 'package:ada_app/ui/screens/sync_panel_screen.dart';
+import 'package:ada_app/ui/screens/pending_data_screen.dart'; // 🆕 NUEVO
 import 'package:flutter/material.dart';
+import 'package:ada_app/ui/theme/colors.dart';
+import 'package:ada_app/services/app_services.dart';
+import 'package:ada_app/ui/widgets/app_connection_indicator.dart';
 import 'package:ada_app/ui/screens/equipos_screen.dart';
 import 'package:ada_app/ui/screens/modelos_screen.dart';
 import 'package:ada_app/ui/screens/logo_screen.dart';
 import 'package:ada_app/ui/screens/marca_screen.dart';
-import 'package:ada_app/ui/theme/colors.dart';
+import 'package:ada_app/ui/screens/device_log_screen.dart';
 import 'package:ada_app/viewmodels/select_screen_viewmodel.dart';
 import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
+import 'package:ada_app/services/database_validation_service.dart';
+import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/repositories/device_log_repository.dart';
+import 'package:ada_app/services/device_log/device_log_service.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -20,18 +28,107 @@ class _SelectScreenState extends State<SelectScreen> {
   late SelectScreenViewModel _viewModel;
   late StreamSubscription<UIEvent> _eventSubscription;
 
+  // 🆕 NUEVO: Estado para datos pendientes
+  int _pendingDataCount = 0;
+  Timer? _pendingDataTimer;
+
   @override
   void initState() {
     super.initState();
     _viewModel = SelectScreenViewModel();
     _setupEventListener();
+    _startPendingDataMonitoring(); // 🆕 NUEVO
   }
 
   @override
   void dispose() {
     _eventSubscription.cancel();
+    _pendingDataTimer?.cancel(); // 🆕 NUEVO
     _viewModel.dispose();
     super.dispose();
+  }
+
+  // 🆕 NUEVO: Monitoreo de datos pendientes
+  void _startPendingDataMonitoring() {
+    _pendingDataTimer = Timer.periodic(
+      Duration(minutes: 2),
+          (_) => _checkPendingData(),
+    );
+    _checkPendingData(); // Verificar inmediatamente
+  }
+
+  // 🆕 NUEVO: Verificar datos pendientes
+  Future<void> _checkPendingData() async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final db = await dbHelper.database;
+      final validationService = DatabaseValidationService(db);
+      final status = await validationService.getPendingSyncSummary();
+
+      if (mounted) {
+        setState(() {
+          _pendingDataCount = status['total_pending'] ?? 0;
+        });
+      }
+    } catch (e) {
+      // Silently ignore errors for background check
+    }
+  }
+
+  // 🆕 NUEVO: Botón de campanita con badge
+  Widget _buildPendingDataButton() {
+    return Stack(
+      children: [
+        IconButton(
+          onPressed: () async {
+            // Navegar a la pantalla de datos pendientes
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PendingDataScreen(),
+              ),
+            );
+            // Refrescar contador después de volver
+            _checkPendingData();
+          },
+          icon: Icon(Icons.notifications, color: AppColors.onPrimary),
+          tooltip: 'Datos pendientes de envío',
+        ),
+        // Badge con contador
+        if (_pendingDataCount > 0)
+          Positioned(
+            right: 6,
+            top: 6,
+            child: Container(
+              padding: EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: AppColors.error,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 2,
+                    offset: Offset(0, 1),
+                  ),
+                ],
+              ),
+              constraints: BoxConstraints(
+                minWidth: 16,
+                minHeight: 16,
+              ),
+              child: Text(
+                _pendingDataCount > 99 ? '99+' : _pendingDataCount.toString(),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   void _setupEventListener() {
@@ -42,6 +139,8 @@ class _SelectScreenState extends State<SelectScreen> {
         _mostrarError(event.message);
       } else if (event is ShowSuccessEvent) {
         _mostrarExito(event.message);
+        // 🆕 NUEVO: Refrescar contador después de sync exitoso
+        _checkPendingData();
       } else if (event is RequestSyncConfirmationEvent) {
         _handleSyncConfirmation();
       } else if (event is RequiredSyncEvent) {
@@ -50,12 +149,150 @@ class _SelectScreenState extends State<SelectScreen> {
         _redirectToLogin();
       } else if (event is RequestDeleteConfirmationEvent) {
         _handleDeleteConfirmation();
+      } else if (event is RequestDeleteWithValidationEvent) {
+        _handleDeleteValidationFailed(event.validationResult);
       } else if (event is SyncCompletedEvent) {
         _mostrarExito(event.result.message);
+        // 🆕 NUEVO: Refrescar contador después de sync
+        _checkPendingData();
       }
-      // 🆕 No necesitamos manejar SyncProgressEvent aquí porque
-      // el overlay se actualiza automáticamente con notifyListeners()
     });
+  }
+
+  Future<void> _handleDeleteValidationFailed(DatabaseValidationResult validation) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 28),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '⚠️ No se puede eliminar',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hay datos pendientes de sincronizar:',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                SizedBox(height: 16),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: validation.pendingItems.map((item) {
+                      return Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Icon(Icons.circle, size: 8, color: AppColors.warning),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${item.displayName}: ${item.count} registro(s)',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Por favor, sincroniza estos datos antes de eliminar la base de datos.',
+                          style: TextStyle(
+                            color: AppColors.info,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Entendido',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+            // 🆕 NUEVO: Botón para ir a datos pendientes
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => PendingDataScreen()),
+                );
+                _checkPendingData();
+              },
+              child: Text(
+                'Ver Detalles',
+                style: TextStyle(color: AppColors.primary),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _viewModel.requestSync();
+              },
+              icon: Icon(Icons.sync),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.info,
+                foregroundColor: AppColors.onPrimary,
+              ),
+              label: Text('Sincronizar Ahora'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _handleSyncConfirmation() async {
@@ -287,7 +524,6 @@ class _SelectScreenState extends State<SelectScreen> {
     );
   }
 
-  // 🔥 NUEVO: Overlay mejorado con progreso detallado
   Widget _buildSyncOverlay() {
     return Container(
       color: Colors.black54,
@@ -316,7 +552,6 @@ class _SelectScreenState extends State<SelectScreen> {
                   ),
                 ),
                 SizedBox(height: 16),
-                // ✅ Reutilizar el mismo widget que usa el login
                 SyncProgressWidget(
                   progress: _viewModel.syncProgress,
                   currentStep: _viewModel.syncCurrentStep,
@@ -345,33 +580,9 @@ class _SelectScreenState extends State<SelectScreen> {
       listenable: _viewModel,
       builder: (context, child) {
         final status = _viewModel.connectionStatus;
-        IconData icon;
-        Color color;
-        String text;
-
-        if (!status.hasInternet) {
-          icon = Icons.wifi_off;
-          color = AppColors.error;
-          text = 'Sin Internet';
-        } else if (!status.hasApiConnection) {
-          icon = Icons.cloud_off;
-          color = AppColors.warning;
-          text = 'API Desconectada';
-        } else {
-          icon = Icons.cloud_done;
-          color = AppColors.success;
-          text = 'Conectado';
-        }
-
-        return Container(
-          margin: EdgeInsets.only(right: 8),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 20),
-              SizedBox(width: 4),
-              Text(text, style: TextStyle(fontSize: 12, color: AppColors.appBarForeground)),
-            ],
-          ),
+        return AppConnectionIndicator(
+          hasInternet: status.hasInternet,
+          hasApiConnection: status.hasApiConnection,
         );
       },
     );
@@ -385,6 +596,7 @@ class _SelectScreenState extends State<SelectScreen> {
         backgroundColor: AppColors.appBarBackground,
         foregroundColor: AppColors.appBarForeground,
         actions: [
+          // Botón de sincronización
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {
@@ -404,7 +616,11 @@ class _SelectScreenState extends State<SelectScreen> {
               );
             },
           ),
+          // 🆕 NUEVO: Botón de campanita para datos pendientes
+          _buildPendingDataButton(),
+          // Indicador de conexión
           _buildConnectionStatus(),
+          // Menú de opciones
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {
@@ -571,6 +787,30 @@ class _SelectScreenState extends State<SelectScreen> {
                           color: AppColors.primary,
                           page: const MarcaScreen(),
                         ),
+                        SizedBox(height: 12),
+                        _buildMenuCard(
+                          label: 'Registro de Dispositivo',
+                          description: 'Ver datos del dispositivo registrados',
+                          icon: Icons.phone_android,
+                          color: AppColors.info,
+                          onTap: () async {
+                            try {
+                              final database = await DatabaseHelper().database;
+                              final repository = DeviceLogRepository(database);
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => DeviceLogScreen(
+                                    repository: repository,
+                                  ),
+                                ),
+                              );
+                            } catch (e) {
+                              _mostrarError('Error al abrir registro: $e');
+                            }
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -594,7 +834,7 @@ class _SelectScreenState extends State<SelectScreen> {
             ),
           ),
 
-          // 🔥 Overlay de sincronización mejorado con progreso
+          // Overlay de sincronización mejorado con progreso
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {

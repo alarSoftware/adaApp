@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/equipos_clientes_detail_screen_viewmodel.dart';
+import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'dart:async';
@@ -863,6 +864,52 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
 
       print('DEBUG: Datos del historial extraídos - lat: $latitudSafe, lon: $longitudSafe, fecha: $fechaRevisionSafe, enLocal: $enLocalSafe');
 
+      // ✅ NUEVA LÓGICA: Obtener fotos desde el repositorio
+      String? imagenPath;
+      String? imagenBase64;
+      bool tieneImagen = false;
+      int? imagenTamano;
+
+      String? imagenPath2;
+      String? imagenBase64_2;
+      bool tieneImagen2 = false;
+      int? imagenTamano2;
+
+      if (historialItem?.id != null) {
+        print('DEBUG: Obteniendo fotos para estado_equipo ID: ${historialItem.id}');
+
+        try {
+          final censoActivoFotoRepo = CensoActivoFotoRepository();
+          final fotos = await censoActivoFotoRepo.obtenerFotosPorCenso(historialItem.id);
+
+          print('DEBUG: Se encontraron ${fotos.length} fotos');
+
+          // Primera foto
+          if (fotos.isNotEmpty) {
+            final primeraFoto = fotos.first;
+            imagenPath = primeraFoto.imagenPath;
+            imagenBase64 = primeraFoto.imagenBase64;
+            tieneImagen = primeraFoto.tieneImagen;
+            imagenTamano = primeraFoto.imagenTamano;
+            print('DEBUG: Primera foto cargada - path: $imagenPath, tiene imagen: $tieneImagen');
+          }
+
+          // Segunda foto
+          if (fotos.length > 1) {
+            final segundaFoto = fotos[1];
+            imagenPath2 = segundaFoto.imagenPath;
+            imagenBase64_2 = segundaFoto.imagenBase64;
+            tieneImagen2 = segundaFoto.tieneImagen;
+            imagenTamano2 = segundaFoto.imagenTamano;
+            print('DEBUG: Segunda foto cargada - path: $imagenPath2, tiene imagen: $tieneImagen2');
+          }
+
+        } catch (e) {
+          print('ERROR: No se pudieron cargar las fotos: $e');
+          // Las variables ya están inicializadas en null/false
+        }
+      }
+
       final datosFinales = {
         'id': historialItem?.id,
         'cliente': cliente,
@@ -877,25 +924,25 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
         'logo': widget.equipoCliente['logo_nombre']?.toString() ?? 'No especificado',
         'numero_serie': widget.equipoCliente['numero_serie']?.toString() ?? 'No especificado',
 
-        // ✅ CORRECCIÓN: Usar las observaciones reales del historial
         'observaciones': historialItem?.observaciones ?? 'Sin observaciones',
 
-        'imagen_path': historialItem?.imagenPath?.toString(),
-        'imagen_base64': historialItem?.imagenBase64?.toString(),
-        'tiene_imagen': historialItem?.tieneImagen ?? false,
-        'imagen_tamano': historialItem?.imagenTamano,
+        // ✅ Usar las fotos obtenidas del repositorio
+        'imagen_path': imagenPath,
+        'imagen_base64': imagenBase64,
+        'tiene_imagen': tieneImagen,
+        'imagen_tamano': imagenTamano,
 
-        'imagen_path2': historialItem?.imagenPath2?.toString(),
-        'imagen_base64_2': historialItem?.imagenBase64_2?.toString(),
-        'tiene_imagen2': historialItem?.tieneImagen2 ?? false,
-        'imagen_tamano2': historialItem?.imagenTamano2,
+        'imagen_path2': imagenPath2,
+        'imagen_base64_2': imagenBase64_2,
+        'tiene_imagen2': tieneImagen2,
+        'imagen_tamano2': imagenTamano2,
 
         'es_censo': false,
         'es_historial': true,
         'historial_item': historialItem,
       };
 
-      print('DEBUG: Datos finales preparados exitosamente con cliente real desde BD');
+      print('DEBUG: Datos finales preparados exitosamente con cliente real desde BD y fotos cargadas');
       return datosFinales;
 
     } catch (e, stackTrace) {

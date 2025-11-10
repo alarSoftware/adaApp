@@ -1,3 +1,5 @@
+import 'package:ada_app/utils/parsing_helpers.dart';
+
 class Usuario {
   final int? id;
   final String? edfVendedorId;
@@ -6,7 +8,7 @@ class Usuario {
   final String password;
   final String fullname;
 
-  Usuario({
+  const Usuario({
     this.id,
     this.edfVendedorId,
     required this.code,
@@ -15,31 +17,32 @@ class Usuario {
     required this.fullname,
   });
 
-  // Constructor para crear desde Map (base de datos)
+  // ========== FACTORY CONSTRUCTORS ==========
+
   factory Usuario.fromMap(Map<String, dynamic> map) {
     return Usuario(
-      id: map['id']?.toInt(),
-      edfVendedorId: map['edf_vendedor_id']?.toString(),
-      code: map['code']?.toInt() ?? 0,
-      username: map['username']?.toString() ?? '',
-      password: map['password']?.toString() ?? '',
-      fullname: map['fullname']?.toString() ?? '',
+      id: ParsingHelpers.parseInt(map['id']),
+      edfVendedorId: ParsingHelpers.parseString(map['edf_vendedor_id']),
+      code: ParsingHelpers.parseInt(map['code']),
+      username: ParsingHelpers.parseString(map['username']) ?? '',
+      password: ParsingHelpers.parseString(map['password']) ?? '',
+      fullname: ParsingHelpers.parseString(map['fullname']) ?? '',
     );
   }
 
-  // Constructor para crear desde JSON (API)
   factory Usuario.fromJson(Map<String, dynamic> json) {
     return Usuario(
-      id: json['id']?.toInt(),  // ✅ ID viene de la API
-      edfVendedorId: json['edfVendedorId']?.toString(),  // ✅ camelCase de la API
-      code: json['id']?.toInt() ?? 0,  // ✅ code usa el mismo ID de la API
-      username: json['username']?.toString() ?? '',
-      password: json['password']?.toString() ?? '',
-      fullname: json['fullname']?.toString() ?? '',
+      id: ParsingHelpers.parseInt(json['id']),
+      edfVendedorId: ParsingHelpers.parseString(json['edfVendedorId']),
+      code: ParsingHelpers.parseInt(json['id']), // code usa el mismo ID
+      username: ParsingHelpers.parseString(json['username']) ?? '',
+      password: ParsingHelpers.parseString(json['password']) ?? '',
+      fullname: ParsingHelpers.parseString(json['fullname']) ?? '',
     );
   }
 
-  // Convertir a Map para insertar en base de datos
+  // ========== SERIALIZATION ==========
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -51,15 +54,48 @@ class Usuario {
     };
   }
 
-  // Convertir a JSON para enviar a API
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'edfVendedorId': edfVendedorId,  // ✅ camelCase para la API
+      'edfVendedorId': edfVendedorId,
       'code': code,
       'username': username,
       'password': password,
       'fullname': fullname,
     };
   }
+
+  // ========== UTILITIES ==========
+
+  Usuario copyWith({
+    int? id,
+    String? edfVendedorId,
+    int? code,
+    String? username,
+    String? password,
+    String? fullname,
+  }) {
+    return Usuario(
+      id: id ?? this.id,
+      edfVendedorId: edfVendedorId ?? this.edfVendedorId,
+      code: code ?? this.code,
+      username: username ?? this.username,
+      password: password ?? this.password,
+      fullname: fullname ?? this.fullname,
+    );
+  }
+
+  @override
+  String toString() => 'Usuario(id: $id, username: $username, code: $code)';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+          other is Usuario &&
+              runtimeType == other.runtimeType &&
+              id == other.id &&
+              code == other.code;
+
+  @override
+  int get hashCode => id.hashCode ^ code.hashCode;
 }

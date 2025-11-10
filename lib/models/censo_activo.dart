@@ -36,6 +36,7 @@ class EstadoEquipo {
   final String? id;
   final String equipoId;
   final int clienteId;
+  final int? usuarioId;  // ← Nuevo campo agregado
   final bool enLocal;
   final double? latitud;
   final double? longitud;
@@ -46,22 +47,11 @@ class EstadoEquipo {
   final String? estadoCenso;
   final String? observaciones;
 
-  // Primera imagen
-  final String? imagenPath;
-  final String? imagenBase64;
-  final bool tieneImagen;
-  final int? imagenTamano;
-
-  // Segunda imagen
-  final String? imagenPath2;
-  final String? imagenBase64_2;
-  final bool tieneImagen2;
-  final int? imagenTamano2;
-
   EstadoEquipo({
     this.id,
     required this.equipoId,
     required this.clienteId,
+    this.usuarioId,  // ← Agregado al constructor
     required this.enLocal,
     this.latitud,
     this.longitud,
@@ -71,48 +61,29 @@ class EstadoEquipo {
     this.estaSincronizado = false,
     this.estadoCenso,
     this.observaciones,
-    // Primera imagen
-    this.imagenPath,
-    this.imagenBase64,
-    this.tieneImagen = false,
-    this.imagenTamano,
-    // Segunda imagen
-    this.imagenPath2,
-    this.imagenBase64_2,
-    this.tieneImagen2 = false,
-    this.imagenTamano2,
   });
 
   factory EstadoEquipo.fromMap(Map<String, dynamic> map) {
     return EstadoEquipo(
-        id: map['id'] as String?,
-        equipoId: map['equipo_id'] as String? ?? '0',
-        clienteId: map['cliente_id'] as int? ?? 0,
-        enLocal: (map['en_local'] as int?) == 1,
-        latitud: map['latitud'] as double?,
-        longitud: map['longitud'] as double?,
-        fechaRevision: map['fecha_revision'] != null
-            ? DateTime.parse(map['fecha_revision'] as String)
-            : DateTime.now(),
-        fechaCreacion: map['fecha_creacion'] != null
-            ? DateTime.parse(map['fecha_creacion'] as String)
-            : DateTime.now(),
-        fechaActualizacion: map['fecha_actualizacion'] != null
-            ? DateTime.parse(map['fecha_actualizacion'] as String)
-            : DateTime.now(),
-        estaSincronizado: (map['sincronizado'] as int?) == 1,
-        // Primera imagen
-        imagenPath: map['imagen_path'] as String?,
-        imagenBase64: map['imagen_base64'] as String?,
-        tieneImagen: (map['tiene_imagen'] as int?) == 1,
-        imagenTamano: map['imagen_tamano'] as int?,
-        // Segunda imagen
-        imagenPath2: map['imagen_path2'] as String?,
-        imagenBase64_2: map['imagen_base64_2'] as String?,
-        tieneImagen2: (map['tiene_imagen2'] as int?) == 1,
-        imagenTamano2: map['imagen_tamano2'] as int?,
-        estadoCenso: map['estado_censo'] as String?,
-        observaciones: map['observaciones'] as String?
+      id: map['id'] as String?,
+      equipoId: map['equipo_id'] as String? ?? '0',
+      clienteId: map['cliente_id'] as int? ?? 0,
+      usuarioId: map['usuario_id'] as int?,  // ← Agregado al fromMap
+      enLocal: (map['en_local'] as int?) == 1,
+      latitud: map['latitud'] as double?,
+      longitud: map['longitud'] as double?,
+      fechaRevision: map['fecha_revision'] != null
+          ? DateTime.parse(map['fecha_revision'] as String)
+          : DateTime.now(),
+      fechaCreacion: map['fecha_creacion'] != null
+          ? DateTime.parse(map['fecha_creacion'] as String)
+          : DateTime.now(),
+      fechaActualizacion: map['fecha_actualizacion'] != null
+          ? DateTime.parse(map['fecha_actualizacion'] as String)
+          : null,
+      estaSincronizado: (map['sincronizado'] as int?) == 1,
+      estadoCenso: map['estado_censo'] as String?,
+      observaciones: map['observaciones'] as String?,
     );
   }
 
@@ -121,6 +92,7 @@ class EstadoEquipo {
       'id': id,
       'equipo_id': equipoId,
       'cliente_id': clienteId,
+      'usuario_id': usuarioId,  // ← Agregado al toMap
       'en_local': enLocal ? 1 : 0,
       'latitud': latitud,
       'longitud': longitud,
@@ -129,16 +101,6 @@ class EstadoEquipo {
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
       'sincronizado': estaSincronizado ? 1 : 0,
       'observaciones': observaciones,
-      // Primera imagen
-      'imagen_path': imagenPath,
-      'imagen_base64': imagenBase64,
-      'tiene_imagen': tieneImagen ? 1 : 0,
-      'imagen_tamano': imagenTamano,
-      // Segunda imagen
-      'imagen_path2': imagenPath2,
-      'imagen_base64_2': imagenBase64_2,
-      'tiene_imagen2': tieneImagen2 ? 1 : 0,
-      'imagen_tamano2': imagenTamano2,
     };
 
     if (estadoCenso != null) {
@@ -153,6 +115,7 @@ class EstadoEquipo {
       'id': id,
       'equipo_id': equipoId,
       'cliente_id': clienteId,
+      'usuario_id': usuarioId,  // ← Agregado al toJson
       'en_local': enLocal,
       'latitud': latitud,
       'longitud': longitud,
@@ -162,20 +125,14 @@ class EstadoEquipo {
       'sincronizado': estaSincronizado,
       'estado_censo': estadoCenso,
       'observaciones': observaciones,
-      // Primera imagen
-      'imagen_path': imagenPath,
-      'tiene_imagen': tieneImagen,
-      'imagen_tamano': imagenTamano,
-      // Segunda imagen
-      'imagen_path2': imagenPath2,
-      'tiene_imagen2': tieneImagen2,
-      'imagen_tamano2': imagenTamano2,
     };
   }
 
   EstadoEquipo copyWith({
-    String? id,  // ✅ CORREGIDO: String? en lugar de int?
-    int? equipoClienteId,
+    String? id,
+    String? equipoId,
+    int? clienteId,
+    int? usuarioId,  // ← Agregado al copyWith
     bool? enLocal,
     double? latitud,
     double? longitud,
@@ -185,21 +142,12 @@ class EstadoEquipo {
     bool? estaSincronizado,
     String? estadoCenso,
     String? observaciones,
-    // Primera imagen
-    String? imagenPath,
-    String? imagenBase64,
-    bool? tieneImagen,
-    int? imagenTamano,
-    // Segunda imagen
-    String? imagenPath2,
-    String? imagenBase64_2,
-    bool? tieneImagen2,
-    int? imagenTamano2,
   }) {
     return EstadoEquipo(
       id: id ?? this.id,
-      equipoId: equipoId,
-      clienteId: clienteId,
+      equipoId: equipoId ?? this.equipoId,
+      clienteId: clienteId ?? this.clienteId,
+      usuarioId: usuarioId ?? this.usuarioId,
       enLocal: enLocal ?? this.enLocal,
       latitud: latitud ?? this.latitud,
       longitud: longitud ?? this.longitud,
@@ -209,52 +157,12 @@ class EstadoEquipo {
       estaSincronizado: estaSincronizado ?? this.estaSincronizado,
       estadoCenso: estadoCenso ?? this.estadoCenso,
       observaciones: observaciones ?? this.observaciones,
-      // Primera imagen
-      imagenPath: imagenPath ?? this.imagenPath,
-      imagenBase64: imagenBase64 ?? this.imagenBase64,
-      tieneImagen: tieneImagen ?? this.tieneImagen,
-      imagenTamano: imagenTamano ?? this.imagenTamano,
-      // Segunda imagen
-      imagenPath2: imagenPath2 ?? this.imagenPath2,
-      imagenBase64_2: imagenBase64_2 ?? this.imagenBase64_2,
-      tieneImagen2: tieneImagen2 ?? this.tieneImagen2,
-      imagenTamano2: imagenTamano2 ?? this.imagenTamano2,
     );
   }
 
+  // Estados del censo
   EstadoEquipoCenso get estadoCensoEnum => EstadoEquipoCensoExtension.fromString(estadoCenso);
   bool get estaCreado => estadoCenso == EstadoEquipoCenso.creado.valor;
   bool get estaMigrado => estadoCenso == EstadoEquipoCenso.migrado.valor;
   bool get tieneError => estadoCenso == EstadoEquipoCenso.error.valor;
-
-  // Helpers para imágenes
-  bool get necesitaSincronizarImagen =>
-      (tieneImagen && imagenBase64 != null) ||
-          (tieneImagen2 && imagenBase64_2 != null);
-
-  String get infoImagen {
-    if (!tieneImagen && !tieneImagen2) return 'Sin imágenes';
-
-    List<String> infos = [];
-
-    if (tieneImagen) {
-      final tamanoMB = imagenTamano != null ? (imagenTamano! / (1024 * 1024)).toStringAsFixed(1) : '?';
-      infos.add('Img1 ($tamanoMB MB)');
-    }
-
-    if (tieneImagen2) {
-      final tamanoMB = imagenTamano2 != null ? (imagenTamano2! / (1024 * 1024)).toStringAsFixed(1) : '?';
-      infos.add('Img2 ($tamanoMB MB)');
-    }
-
-    final estado = estaSincronizado ? 'Sincronizadas' : 'Pendientes';
-    return '${infos.join(' + ')} - $estado';
-  }
-
-  int get totalImagenes {
-    int count = 0;
-    if (tieneImagen) count++;
-    if (tieneImagen2) count++;
-    return count;
-  }
 }
