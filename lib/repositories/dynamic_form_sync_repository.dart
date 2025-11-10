@@ -1,8 +1,7 @@
-// lib/repositories/dynamic_form_sync_repository.dart
-
 import 'package:logger/logger.dart';
 import '../services/database_helper.dart';
 import 'dynamic_form_response_repository.dart';
+import '../services/dynamic_form/dynamic_form_upload_service.dart';
 
 /// Repository especializado en gestionar el estado de sincronización
 /// de formularios dinámicos en la base de datos local
@@ -462,18 +461,26 @@ class DynamicFormSyncRepository {
     }
   }
 
+  // ==================== SINCRONIZACIÓN PRINCIPAL ====================
+
+  /// ✅ CORREGIDO: Sincroniza una respuesta al servidor con manejo completo de estados
   Future<bool> syncTo(String responseId) async {
     try {
       _logger.i('🔄 Sincronizando respuesta: $responseId');
 
-      // Importar el servicio de upload
+      // Obtener el servicio de upload
       final uploadService = await _getDynamicFormUploadService();
 
       // Enviar al servidor
       final resultado = await uploadService.enviarRespuestaAlServidor(responseId);
 
       if (resultado['exito'] == true) {
-        _logger.i('✅ Respuesta sincronizada: $responseId');
+        // ✅ Actualizar todos los estados locales después del éxito
+        await markResponseAsSynced(responseId);
+        await markAllDetailsAsSynced(responseId);
+        await markAllImagesAsSynced(responseId);
+
+        _logger.i('✅ Respuesta sincronizada exitosamente: $responseId');
         return true;
       } else {
         _logger.w('⚠️ Error sincronizando: ${resultado['mensaje']}');
@@ -485,6 +492,11 @@ class DynamicFormSyncRepository {
       await markResponseAsError(responseId, 'Excepción: $e');
       return false;
     }
+  }
+
+  /// Alias para compatibilidad
+  Future<bool> syncToServer(String responseId) async {
+    return await syncTo(responseId);
   }
 
   /// Sincronizar todas las respuestas pendientes
@@ -509,20 +521,17 @@ class DynamicFormSyncRepository {
       int exitosos = 0;
       int fallidos = 0;
 
-      final uploadService = await _getDynamicFormUploadService();
-
       for (final response in todasPendientes) {
         final responseId = response['id'].toString();
 
         try {
-          final resultado = await uploadService.enviarRespuestaAlServidor(responseId);
-
-          if (resultado['exito'] == true) {
+          final success = await syncTo(responseId);
+          if (success) {
             exitosos++;
             _logger.i('✅ Sincronizada: $responseId');
           } else {
             fallidos++;
-            _logger.w('⚠️ Error: $responseId - ${resultado['mensaje']}');
+            _logger.w('⚠️ Error: $responseId');
           }
         } catch (e) {
           fallidos++;
@@ -559,18 +568,8 @@ class DynamicFormSyncRepository {
       // Resetear intentos previos
       await resetSyncAttempts(responseId);
 
-      // Reintentar envío
-      final uploadService = await _getDynamicFormUploadService();
-      final resultado = await uploadService.reintentarEnvioRespuesta(responseId);
-
-      if (resultado['success'] == true) {
-        _logger.i('✅ Reintento exitoso: $responseId');
-        return true;
-      } else {
-        _logger.w('⚠️ Reintento fallido: ${resultado['error']}');
-        await markResponseAsError(responseId, resultado['error'] ?? 'Error en reintento');
-        return false;
-      }
+      // Reintentar envío usando syncTo
+      return await syncTo(responseId);
     } catch (e) {
       _logger.e('❌ Error en retrySyncResponse: $e');
       await markResponseAsError(responseId, 'Excepción en reintento: $e');
@@ -581,15 +580,7 @@ class DynamicFormSyncRepository {
   // ==================== HELPER PRIVADO ====================
 
   /// Obtener instancia del servicio de upload (lazy loading)
-  Future<dynamic> _getDynamicFormUploadService() async {
-    // Importar dinámicamente para evitar dependencias circulares
-    // Nota: Dart no permite import dinámicos, así que usamos un enfoque diferente
-
-    // OPCIÓN 1: Importar al inicio del archivo
-    // import 'package:ada_app/services/dynamic_form/dynamic_form_upload_service.dart';
-    // return DynamicFormUploadService();
-
-    // OPCIÓN 2: Inyección de dependencia (mejor práctica)
-    // Por ahora, importa al inicio del archivo y usa:
+  Future<DynamicFormUploadService> _getDynamicFormUploadService() async {
+    return DynamicFormUploadService();
   }
 }

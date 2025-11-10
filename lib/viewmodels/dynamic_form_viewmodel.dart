@@ -370,11 +370,15 @@ class DynamicFormViewModel extends ChangeNotifier {
         return false;
       }
 
+      // ✅ MEJORADO: Asegurar que completedAt esté establecido correctamente
+      final now = DateTime.now();
       final completedResponse = _currentResponse!.copyWith(
         answers: Map<String, dynamic>.from(_fieldValues),
-        completedAt: DateTime.now(),
+        completedAt: now,
         status: 'completed',
       );
+
+      _logger.i('🔍 DEBUG: Guardando formulario completado con fecha: ${now.toIso8601String()}');
 
       final saved = await _responseRepo.save(completedResponse);
       if (!saved) {
@@ -383,7 +387,7 @@ class DynamicFormViewModel extends ChangeNotifier {
         return false;
       }
 
-      _logger.i('✅ Formulario completado (imágenes ya guardadas en BD)');
+      _logger.i('✅ Formulario completado y guardado en BD');
 
       // Sincronizar
       await _syncResponse(completedResponse.id);
@@ -442,18 +446,28 @@ class DynamicFormViewModel extends ChangeNotifier {
 
   // ==================== SYNC ====================
 
+  /// ✅ MEJORADO: Mejor manejo de errores y logging
   Future<void> _syncResponse(String responseId) async {
     _isSyncing = true;
     notifyListeners();
 
-    final synced = await _syncRepo.syncTo(responseId);
+    try {
+      _logger.i('🔄 Iniciando sincronización de respuesta: $responseId');
 
-    _isSyncing = false;
+      final synced = await _syncRepo.syncTo(responseId);
 
-    if (synced) {
-      _logger.i('✅ Formulario sincronizado exitosamente');
-    } else {
-      _logger.w('⚠️ Formulario guardado pero no sincronizado');
+      if (synced) {
+        _logger.i('✅ Formulario sincronizado exitosamente');
+      } else {
+        _logger.w('⚠️ Formulario guardado pero no sincronizado - se reintentará automáticamente');
+      }
+    } catch (e) {
+      _logger.e('❌ Error en sincronización: $e');
+      // No establecer _errorMessage aquí para no confundir al usuario
+      // El error se maneja en el syncRepo
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
     }
   }
 

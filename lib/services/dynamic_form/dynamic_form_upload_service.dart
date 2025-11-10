@@ -251,7 +251,7 @@ class DynamicFormUploadService {
 
   // ==================== MÉTODOS PRIVADOS ====================
 
-  /// Prepara el payload completo con detalles e imágenes
+  /// ✅ CORREGIDO: Prepara el payload completo con detalles e imágenes
   Future<Map<String, dynamic>> _prepararPayloadCompleto(
       Map<String, dynamic> respuesta,
       List<Map<String, dynamic>> detalles,
@@ -294,9 +294,14 @@ class DynamicFormUploadService {
         };
       }).toList();
 
-      _logger.i('📦 Payload: ${detallesFormateados.length} detalles, ${imagenes.length} fotos');
+      // ✅ FIX: Obtener completedDate correctamente
+      final completedDate = _getCompletedDate(respuesta);
+      final estado = respuesta['estado'] as String?;
 
-      return {
+      _logger.i('📦 Payload: ${detallesFormateados.length} detalles, ${imagenes.length} fotos');
+      _logger.i('🔍 DEBUG estado: $estado, completedDate: $completedDate');
+
+      final payload = {
         'id': respuesta['id'],
         'dynamicFormId': respuesta['dynamic_form_id'],
         'contactoId': respuesta['contacto_id'],
@@ -304,16 +309,57 @@ class DynamicFormUploadService {
         'usuarioId': respuesta['usuario_id'] != null
             ? int.tryParse(respuesta['usuario_id'].toString())
             : null,
-        'estado': respuesta['estado'],
+        'estado': estado,
         'creationDate': respuesta['creation_date'],
-        'completedDate': respuesta['completed_at'],
+        'completedDate': completedDate, // ✅ Usar método helper
         'lastUpdateDate': respuesta['last_update_date'] ?? respuesta['creation_date'],
         'details': detallesFormateados,
       };
+
+      // ✅ DEBUG adicional
+      _logger.i('🔍 PAYLOAD FINAL:');
+      _logger.i('  - ID: ${payload['id']}');
+      _logger.i('  - Estado: ${payload['estado']}');
+      _logger.i('  - CreationDate: ${payload['creationDate']}');
+      _logger.i('  - CompletedDate: ${payload['completedDate']}');
+      _logger.i('  - LastUpdateDate: ${payload['lastUpdateDate']}');
+      _logger.i('  - Details: ${(payload['details'] as List).length}');
+
+      return payload;
     } catch (e) {
       _logger.e('❌ Error preparando payload: $e');
       rethrow;
     }
+  }
+
+  /// ✅ NUEVO: Método helper para obtener completedDate correctamente
+  String? _getCompletedDate(Map<String, dynamic> respuesta) {
+    final estado = respuesta['estado'] as String?;
+
+    _logger.d('🔍 _getCompletedDate - Estado: $estado');
+
+    // Solo enviar completedDate si el formulario está completado o sincronizado
+    if (estado == 'completed' || estado == 'synced') {
+      // Usar last_update_date como fecha de completado
+      final lastUpdateDate = respuesta['last_update_date'] as String?;
+
+      _logger.d('🔍 LastUpdateDate en BD: $lastUpdateDate');
+
+      if (lastUpdateDate != null && lastUpdateDate.isNotEmpty) {
+        _logger.i('✅ Usando lastUpdateDate como completedDate: $lastUpdateDate');
+        return lastUpdateDate;
+      }
+
+      // Fallback: usar creation_date si no hay last_update_date
+      final creationDate = respuesta['creation_date'] as String?;
+      _logger.w('⚠️ No hay lastUpdateDate, usando creationDate: $creationDate');
+
+      return creationDate ?? DateTime.now().toIso8601String();
+    }
+
+    // Para drafts, no enviar completedDate (el servidor lo espera como null)
+    _logger.d('🔍 Estado es draft, completedDate será null');
+    return null;
   }
 
   /// Sincroniza una respuesta individual con backoff

@@ -3,7 +3,7 @@
 import 'package:ada_app/services/post/base_post_service.dart';
 
 class DynamicFormPostService {
-  static const String _endpoint = '/api/insertDynamicFormResponse';
+  static const String _endpoint = '/dynamicFormResponse/insertDynamicFormResponse';
 
   /// Enviar respuesta de formulario dinámico
   static Future<Map<String, dynamic>> enviarRespuestaFormulario({
