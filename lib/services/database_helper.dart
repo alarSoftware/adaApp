@@ -431,6 +431,8 @@ class DatabaseHelper {
       'dynamic_form_response_detail',
       'dynamic_form_response_image',
       'censo_activo_foto',
+      'operacion_comercial',
+      'operacion_comercial_detalle',
     };
     return !tablesWithoutTimestamps.contains(tableName);
   }

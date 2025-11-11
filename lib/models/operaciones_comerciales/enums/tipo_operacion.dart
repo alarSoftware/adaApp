@@ -37,6 +37,12 @@ extension TipoOperacionExtension on TipoOperacion {
     }
   }
 
+  // ✅ NUEVO: Getter para saber si el tipo de operación necesita fecha de retiro
+  bool get necesitaFechaRetiro {
+    return this == TipoOperacion.notaRetiro ||
+        this == TipoOperacion.notaRetiroDiscontinuos;
+  }
+
   static TipoOperacion fromString(String? tipo) {
     if (tipo == null) return TipoOperacion.pedidoVenta;
 

@@ -309,6 +309,9 @@ class DatabaseTables {
     orden INTEGER DEFAULT 1,
     fecha_creacion TEXT NOT NULL,
     sincronizado INTEGER DEFAULT 0,
+    producto_reemplazo_codigo TEXT,
+    producto_reemplazo_descripcion TEXT,
+    producto_reemplazo_categoria TEXT,
     FOREIGN KEY (operacion_comercial_id) REFERENCES operacion_comercial (id) ON DELETE CASCADE
   )
 ''';

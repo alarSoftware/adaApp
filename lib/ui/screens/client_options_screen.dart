@@ -3,7 +3,7 @@ import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/ui/screens/cliente_detail_screen.dart';
 import 'package:ada_app/ui/screens/dynamic_form_responses_screen.dart';
-import 'package:ada_app/ui/screens/operaciones_comerciales_menu_screen.dart';
+import 'package:ada_app/ui/screens/operaciones_comerciales/operaciones_comerciales_menu_screen.dart';
 import 'package:ada_app/ui/widgets/client_info_card.dart';
 
 /// Pantalla de selección de opciones para un cliente

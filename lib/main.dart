@@ -6,6 +6,7 @@ import 'ui/screens/clients_screen.dart';
 import 'ui/screens/select_screen.dart';
 import 'ui/screens/equipos_screen.dart';
 import 'ui/screens/cliente_detail_screen.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'ui/screens/api_settings_screen.dart';
 import 'models/cliente.dart';
 
@@ -28,6 +29,16 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'AdaApp',
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('es'), // Español (correcto)
+        Locale('en'), // Inglés (opcional)
+      ],
+      locale: const Locale('es'), // ← IMPORTANTE: solo 'es'
       theme: ThemeData(
         primarySwatch: Colors.grey,
         visualDensity: VisualDensity.adaptivePlatformDensity,

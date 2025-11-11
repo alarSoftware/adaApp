@@ -14,6 +14,11 @@ class OperacionComercialDetalle {
   final DateTime fechaCreacion;
   final bool estaSincronizado;
 
+  // 🆕 CAMPOS PARA INTERCAMBIO (RETIRO DISCONTINUOS)
+  final String? productoReemplazoCodigo;
+  final String? productoReemplazoDescripcion;
+  final String? productoReemplazoCategoria;
+
   const OperacionComercialDetalle({
     this.id,
     required this.operacionComercialId,
@@ -28,6 +33,9 @@ class OperacionComercialDetalle {
     this.orden = 1,
     required this.fechaCreacion,
     this.estaSincronizado = false,
+    this.productoReemplazoCodigo,
+    this.productoReemplazoDescripcion,
+    this.productoReemplazoCategoria,
   });
 
   factory OperacionComercialDetalle.fromMap(Map<String, dynamic> map) {
@@ -47,6 +55,9 @@ class OperacionComercialDetalle {
           ? DateTime.parse(map['fecha_creacion'] as String)
           : DateTime.now(),
       estaSincronizado: (map['sincronizado'] as int?) == 1,
+      productoReemplazoCodigo: map['producto_reemplazo_codigo'] as String?,
+      productoReemplazoDescripcion: map['producto_reemplazo_descripcion'] as String?,
+      productoReemplazoCategoria: map['producto_reemplazo_categoria'] as String?,
     );
   }
 
@@ -65,6 +76,9 @@ class OperacionComercialDetalle {
       'orden': orden,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'sincronizado': estaSincronizado ? 1 : 0,
+      'producto_reemplazo_codigo': productoReemplazoCodigo,
+      'producto_reemplazo_descripcion': productoReemplazoDescripcion,
+      'producto_reemplazo_categoria': productoReemplazoCategoria,
     };
   }
 
@@ -80,6 +94,9 @@ class OperacionComercialDetalle {
       'precio_unitario': precioUnitario,
       'subtotal': subtotal,
       'orden': orden,
+      'producto_reemplazo_codigo': productoReemplazoCodigo,
+      'producto_reemplazo_descripcion': productoReemplazoDescripcion,
+      'producto_reemplazo_categoria': productoReemplazoCategoria,
     };
   }
 
@@ -97,6 +114,9 @@ class OperacionComercialDetalle {
     int? orden,
     DateTime? fechaCreacion,
     bool? estaSincronizado,
+    String? productoReemplazoCodigo,
+    String? productoReemplazoDescripcion,
+    String? productoReemplazoCategoria,
   }) {
     return OperacionComercialDetalle(
       id: id ?? this.id,
@@ -112,6 +132,9 @@ class OperacionComercialDetalle {
       orden: orden ?? this.orden,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       estaSincronizado: estaSincronizado ?? this.estaSincronizado,
+      productoReemplazoCodigo: productoReemplazoCodigo ?? this.productoReemplazoCodigo,
+      productoReemplazoDescripcion: productoReemplazoDescripcion ?? this.productoReemplazoDescripcion,
+      productoReemplazoCategoria: productoReemplazoCategoria ?? this.productoReemplazoCategoria,
     );
   }
 
@@ -119,6 +142,8 @@ class OperacionComercialDetalle {
   String get displayInfo => '$productoCodigo - $productoDescripcion';
   bool get tieneTicket => ticket != null && ticket!.isNotEmpty;
   bool get tienePrecio => precioUnitario != null && precioUnitario! > 0;
+  bool get esIntercambio => productoReemplazoCodigo != null;
+  bool get intercambioCompleto => productoReemplazoCodigo != null && productoReemplazoDescripcion != null;
 
   @override
   bool operator ==(Object other) =>
@@ -134,6 +159,6 @@ class OperacionComercialDetalle {
 
   @override
   String toString() {
-    return 'OperacionComercialDetalle{id: $id, codigo: $productoCodigo, descripcion: $productoDescripcion, cantidad: $cantidad, unidad: $unidadMedida}';
+    return 'OperacionComercialDetalle{id: $id, codigo: $productoCodigo, descripcion: $productoDescripcion, cantidad: $cantidad, unidad: $unidadMedida, reemplazo: $productoReemplazoCodigo}';
   }
 }
