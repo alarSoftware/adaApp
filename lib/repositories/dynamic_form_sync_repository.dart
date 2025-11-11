@@ -1,6 +1,5 @@
 import 'package:logger/logger.dart';
 import '../services/database_helper.dart';
-import 'dynamic_form_response_repository.dart';
 import '../services/dynamic_form/dynamic_form_upload_service.dart';
 
 /// Repository especializado en gestionar el estado de sincronización
@@ -8,7 +7,6 @@ import '../services/dynamic_form/dynamic_form_upload_service.dart';
 class DynamicFormSyncRepository {
   final Logger _logger = Logger();
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  final DynamicFormResponseRepository _responseRepository = DynamicFormResponseRepository();
 
   String get _responseTableName => 'dynamic_form_response';
   String get _responseDetailTableName => 'dynamic_form_response_detail';

@@ -160,38 +160,7 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
                   ],
                 ),
               ),
-              // Indicador de conexión
-              _buildConnectionIndicator(viewModel),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildConnectionIndicator(PendingDataViewModel viewModel) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: viewModel.isConnected ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            viewModel.isConnected ? Icons.wifi : Icons.wifi_off,
-            size: 16,
-            color: viewModel.isConnected ? Colors.green : Colors.red,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            viewModel.isConnected ? 'En línea' : 'Sin conexión',
-            style: TextStyle(
-              fontSize: 12,
-              color: viewModel.isConnected ? Colors.green : Colors.red,
-              fontWeight: FontWeight.w500,
-            ),
           ),
         ],
       ),
