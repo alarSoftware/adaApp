@@ -1,5 +1,3 @@
-// lib/services/device_log/device_log_upload_service.dart
-
 import 'dart:async';
 import 'package:logger/logger.dart';
 import 'package:sqflite/sqflite.dart';
@@ -7,26 +5,23 @@ import 'package:ada_app/repositories/device_log_repository.dart';
 import 'package:ada_app/services/post/device_log_post_service.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/models/device_log.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart'; // 🆕 AGREGAR
 
 class DeviceLogUploadService {
   final Logger _logger = Logger();
 
-  // Variables para sincronización automática
   static Timer? _syncTimer;
   static bool _syncActivo = false;
 
-  /// Sincroniza todos los device logs pendientes (SOLO UPLOAD)
+  /// Sincroniza todos los device logs pendientes
   static Future<Map<String, int>> sincronizarDeviceLogsPendientes() async {
     final logger = Logger();
 
     try {
       logger.i('🔄 Sincronización de device logs pendientes...');
 
-      // Obtener BD y repositorio
       final db = await DatabaseHelper().database;
       final repository = DeviceLogRepository(db);
-
-      // Obtener logs no sincronizados
       final logsPendientes = await repository.obtenerNoSincronizados();
 
       if (logsPendientes.isEmpty) {
@@ -39,10 +34,13 @@ class DeviceLogUploadService {
       int exitosos = 0;
       int fallidos = 0;
 
-      // Enviar cada log al servidor
       for (final log in logsPendientes) {
         try {
-          final resultado = await DeviceLogPostService.enviarDeviceLog(log);
+          // Pasar userId para el logging
+          final resultado = await DeviceLogPostService.enviarDeviceLog(
+            log,
+            userId: log.edfVendedorId, // 🆕 AGREGAR
+          );
 
           if (resultado['exito'] == true) {
             await repository.marcarComoSincronizado(log.id);
@@ -54,6 +52,17 @@ class DeviceLogUploadService {
           }
         } catch (e) {
           logger.e('❌ Error enviando ${log.id}: $e');
+
+          // 🆕 AGREGAR - Log adicional por si el error no se capturó en BasePostService
+          await ErrorLogService.logError(
+            tableName: 'device_log',
+            operation: 'sync_batch',
+            errorMessage: 'Error en sincronización batch: $e',
+            errorType: 'upload',
+            registroFailId: log.id,
+            userId: log.edfVendedorId,
+          );
+
           fallidos++;
         }
       }
@@ -67,6 +76,15 @@ class DeviceLogUploadService {
       };
     } catch (e) {
       logger.e('💥 Error en sincronización: $e');
+
+      // 🆕 AGREGAR - Log de error general
+      await ErrorLogService.logError(
+        tableName: 'device_log',
+        operation: 'sync_batch',
+        errorMessage: 'Error general en sincronización: $e',
+        errorType: 'sync',
+      );
+
       return {'exitosos': 0, 'fallidos': 0, 'total': 0};
     }
   }
@@ -78,9 +96,14 @@ class DeviceLogUploadService {
     try {
       logger.i('📤 Enviando batch de ${logs.length} device logs...');
 
-      final resultado = await DeviceLogPostService.enviarDeviceLogsBatch(logs);
+      // Obtener userId del primer log (asumiendo que todos son del mismo usuario)
+      final userId = logs.isNotEmpty ? logs.first.edfVendedorId : null;
 
-      // Marcar exitosos como sincronizados
+      final resultado = await DeviceLogPostService.enviarDeviceLogsBatch(
+        logs,
+        userId: userId, // 🆕 AGREGAR
+      );
+
       if (resultado['exitosos']! > 0) {
         final db = await DatabaseHelper().database;
         final repository = DeviceLogRepository(db);
@@ -97,6 +120,15 @@ class DeviceLogUploadService {
       return resultado;
     } catch (e) {
       logger.e('❌ Error en batch: $e');
+
+      // 🆕 AGREGAR - Log de error en batch
+      await ErrorLogService.logError(
+        tableName: 'device_log',
+        operation: 'batch_upload',
+        errorMessage: 'Error en envío batch: $e',
+        errorType: 'upload',
+      );
+
       return {
         'exitosos': 0,
         'fallidos': logs.length,

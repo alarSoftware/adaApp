@@ -166,10 +166,10 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
 
               const SizedBox(width: 8),
 
-              // Campo de cantidad (solo para no discontinuos)
-              if (!esDiscontinuos) _buildQuantityField(index, detalle),
+              // 👈 CAMBIO: Campo de cantidad SIEMPRE visible (incluso en discontinuos)
+              _buildQuantityField(index, detalle),
 
-              if (!esDiscontinuos) const SizedBox(width: 8),
+              const SizedBox(width: 8),
 
               // Botón eliminar
               _buildDeleteButton(index),
@@ -251,10 +251,12 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     return SizedBox(
       width: 80,
       child: TextFormField(
-        initialValue: detalle.cantidad.toInt().toString(),
+        initialValue: detalle.cantidad > 0 ? detalle.cantidad.toInt().toString() : '', // 👈 CAMBIO: Vacío si es 0
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
         decoration: InputDecoration(
+          hintText: '0', // 👈 NUEVO: Placeholder
+          hintStyle: TextStyle(color: AppColors.textTertiary),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 8,
             vertical: 8,
@@ -271,6 +273,15 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
             borderSide: BorderSide(color: AppColors.primary, width: 2),
           ),
+          // 👈 CAMBIO: Borde rojo si cantidad es 0
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: BorderSide(color: AppColors.error, width: 2),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: BorderSide(color: AppColors.error, width: 2),
+          ),
           filled: true,
           fillColor: Colors.white,
         ),
@@ -286,7 +297,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
         validator: (value) {
           final cantidad = int.tryParse(value ?? '');
           if (cantidad == null || cantidad <= 0) {
-            return '';
+            return ''; // Mostrar error visual
           }
           return null;
         },

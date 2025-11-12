@@ -109,7 +109,10 @@ class DatabaseTables {
     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion DATETIME,
     sincronizado INTEGER DEFAULT 0,
-    fecha_sincronizacion DATETIME,        
+    fecha_sincronizacion DATETIME,
+    intentos_sync INTEGER DEFAULT 0,
+    ultimo_intento TEXT,                  
+    error_mensaje TEXT,                    
     UNIQUE(equipo_id, cliente_id),
     FOREIGN KEY (equipo_id) REFERENCES equipos (id),
     FOREIGN KEY (cliente_id) REFERENCES clientes (id)
@@ -141,7 +144,10 @@ class DatabaseTables {
     fecha_actualizacion TEXT,
     sincronizado INTEGER DEFAULT 0,
     observaciones TEXT,
-    estado_censo TEXT DEFAULT 'creado'
+    estado_censo TEXT DEFAULT 'creado',
+    intentos_sync INTEGER DEFAULT 0,   
+    ultimo_intento TEXT,  
+    error_mensaje TEXT
   )
 ''';
 
@@ -328,12 +334,10 @@ class DatabaseTables {
   String _sqlProductos() => '''
   CREATE TABLE productos (
     id INTEGER PRIMARY KEY,
-    codigo TEXT NOT NULL,
-    descripcion TEXT NOT NULL,
-    categoria TEXT,
-    precio REAL,
-    stock REAL,
-    activo INTEGER DEFAULT 1
+    codigo TEXT,
+    codigo_barras TEXT,
+    nombre TEXT,
+    categoria TEXT
   )
 ''';
 
@@ -494,7 +498,6 @@ class DatabaseTables {
       // Índices para productos
       'CREATE INDEX IF NOT EXISTS idx_productos_codigo ON productos (codigo)',
       'CREATE INDEX IF NOT EXISTS idx_productos_categoria ON productos (categoria)',
-      'CREATE INDEX IF NOT EXISTS idx_productos_activo ON productos (activo)',
     ];
 
     for (final indice in indices) {

@@ -110,26 +110,26 @@ class ErrorLogService {
     }
   }
 
-  /// Limpia errores antiguos (más de 30 días)
-  static Future<void> cleanOldErrors() async {
-    try {
-      final dbHelper = DatabaseHelper();
-      final db = await dbHelper.database;
-
-      final thirtyDaysAgo = DateTime.now().subtract(Duration(days: 30)).toIso8601String();
-
-      final deletedCount = await db.delete(
-        'error_log',
-        where: 'timestamp < ?',
-        whereArgs: [thirtyDaysAgo],
-      );
-
-      _logger.i('🧹 Limpiados $deletedCount errores antiguos');
-
-    } catch (e) {
-      _logger.e('❌ Error limpiando errores antiguos: $e');
-    }
-  }
+  // /// Limpia errores antiguos (más de 30 días)
+  // static Future<void> cleanOldErrors() async {
+  //   try {
+  //     final dbHelper = DatabaseHelper();
+  //     final db = await dbHelper.database;
+  //
+  //     final thirtyDaysAgo = DateTime.now().subtract(Duration(days: 30)).toIso8601String();
+  //
+  //     final deletedCount = await db.delete(
+  //       'error_log',
+  //       where: 'timestamp < ?',
+  //       whereArgs: [thirtyDaysAgo],
+  //     );
+  //
+  //     _logger.i('🧹 Limpiados $deletedCount errores antiguos');
+  //
+  //   } catch (e) {
+  //     _logger.e('❌ Error limpiando errores antiguos: $e');
+  //   }
+  // }
 
   /// Obtiene estadísticas de errores
   static Future<Map<String, dynamic>> getErrorStats() async {

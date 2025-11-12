@@ -433,6 +433,7 @@ class DatabaseHelper {
       'censo_activo_foto',
       'operacion_comercial',
       'operacion_comercial_detalle',
+      'productos',
     };
     return !tablesWithoutTimestamps.contains(tableName);
   }

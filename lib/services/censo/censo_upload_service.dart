@@ -1,5 +1,3 @@
-// lib/services/censo/censo_upload_service.dart
-
 import 'dart:async';
 import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
@@ -7,7 +5,8 @@ import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/services/censo/censo_api_mapper.dart';
-import 'package:ada_app/services/post/base_post_service.dart'; // ✅ NUEVO IMPORT
+import 'package:ada_app/services/post/base_post_service.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart'; // 🆕 AGREGAR
 import 'censo_log_service.dart';
 
 class CensoUploadService {
@@ -17,7 +16,9 @@ class CensoUploadService {
   final CensoActivoFotoRepository _fotoRepository;
   final CensoLogService _logService;
 
-  // Variables para sincronización automática (sin cambios)
+  static const String _tableName = 'censo_activo'; // 🆕 AGREGAR
+  static const String _endpoint = '/censoActivo/insertCensoActivo'; // 🆕 AGREGAR
+
   static Timer? _syncTimer;
   static bool _syncActivo = false;
   static int? _usuarioActual;
@@ -30,33 +31,38 @@ class CensoUploadService {
         _fotoRepository = fotoRepository ?? CensoActivoFotoRepository(),
         _logService = logService ?? CensoLogService();
 
-  /// ✅ MÉTODO ACTUALIZADO: Usa BasePostService
+  /// Envía censo al servidor usando BasePostService
   Future<Map<String, dynamic>> enviarCensoAlServidor(
       Map<String, dynamic> datos, {
         int timeoutSegundos = 60,
         bool guardarLog = false,
+        String? userId,
       }) async {
+    final estadoId = datos['id'] ?? datos['id_local'];
+
     try {
       _logger.i('📤 Preparando envío de censo...');
 
       final timestamp = DateTime.now().toIso8601String();
 
-      // Guardar log si está habilitado
       if (guardarLog) {
         await _logService.guardarLogPost(
-          url: 'API_ENDPOINT', // Se reemplazará en BasePostService
+          url: 'API_ENDPOINT',
           headers: {'Content-Type': 'application/json'},
           body: datos,
           timestamp: timestamp,
-          censoActivoId: datos['id'] ?? datos['id_local'],
+          censoActivoId: estadoId,
         );
       }
 
-      // ✅ USAR BasePostService CENTRALIZADO
+      // ✅ USAR BasePostService con logging
       final resultado = await BasePostService.post(
-        endpoint: '/censoActivo/insertCensoActivo',
+        endpoint: _endpoint,
         body: datos,
         timeout: Duration(seconds: timeoutSegundos),
+        tableName: _tableName,
+        registroId: estadoId?.toString(),
+        userId: userId,
       );
 
       _logger.i('✅ Respuesta recibida: ${resultado['exito']}');
@@ -64,6 +70,17 @@ class CensoUploadService {
 
     } catch (e) {
       _logger.e('❌ Error en envío: $e');
+
+      // 🚨 LOG: Error general en envío
+      await ErrorLogService.logError(
+        tableName: _tableName,
+        operation: 'enviar_censo',
+        errorMessage: 'Error de conexión: $e',
+        errorType: 'upload',
+        registroFailId: estadoId?.toString(),
+        userId: userId,
+      );
+
       return {
         'exito': false,
         'mensaje': 'Error de conexión: $e',
@@ -71,15 +88,15 @@ class CensoUploadService {
     }
   }
 
-  /// Prepara datos usando el mapper correctamente (sin cambios en la lógica)
+  /// Prepara datos usando el mapper correctamente
   Future<Map<String, dynamic>> _prepararPayloadConMapper(
       String estadoId,
       List<dynamic> fotos,
+      String? userId,
       ) async {
     try {
       _logger.i('📦 Preparando payload con mapper para: $estadoId');
 
-      // Obtener datos de la tabla censo_activo
       final maps = await _estadoEquipoRepository.dbHelper.consultar(
         'censo_activo',
         where: 'id = ?',
@@ -88,6 +105,15 @@ class CensoUploadService {
       );
 
       if (maps.isEmpty) {
+        // 🚨 LOG: Censo no encontrado
+        await ErrorLogService.logValidationError(
+          tableName: _tableName,
+          operation: 'preparar_payload',
+          errorMessage: 'No se encontró el censo en BD local',
+          registroFailId: estadoId,
+          userId: userId,
+        );
+
         throw Exception('No se encontró el censo: $estadoId');
       }
 
@@ -95,16 +121,33 @@ class CensoUploadService {
       final usuarioId = datosLocales['usuario_id'] as int?;
 
       if (usuarioId == null) {
+        // 🚨 LOG: usuario_id faltante
+        await ErrorLogService.logValidationError(
+          tableName: _tableName,
+          operation: 'preparar_payload',
+          errorMessage: 'usuario_id es requerido',
+          registroFailId: estadoId,
+        );
+
         throw Exception('usuario_id es requerido para el censo: $estadoId');
       }
 
-      // Resolver edfVendedorId desde usuario_id
+      // Resolver edfVendedorId
       final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(usuarioId);
       if (edfVendedorId == null) {
+        // 🚨 LOG: edfVendedorId no encontrado
+        await ErrorLogService.logValidationError(
+          tableName: _tableName,
+          operation: 'preparar_payload',
+          errorMessage: 'No se pudo resolver edfVendedorId para usuario_id: $usuarioId',
+          registroFailId: estadoId,
+          userId: usuarioId.toString(),
+        );
+
         throw Exception('No se pudo resolver edfVendedorId para usuario_id: $usuarioId');
       }
 
-      // Verificar si el equipo ya está asignado
+      // Verificar asignación
       final estaAsignado = await _verificarEquipoAsignado(
         datosLocales['equipo_id']?.toString(),
         datosLocales['cliente_id'],
@@ -115,7 +158,7 @@ class CensoUploadService {
 
       _logger.i('🔍 Equipo ${datosLocales['equipo_id']} para cliente ${datosLocales['cliente_id']}: ${estaAsignado ? "ASIGNADO" : "PENDIENTE"}');
 
-      // Usar el mapper para formatear correctamente
+      // Usar mapper
       final payload = CensoApiMapper.prepararDatosParaApi(
         datosLocales: datosLocalesMutable,
         usuarioId: usuarioId,
@@ -126,13 +169,29 @@ class CensoUploadService {
       _logger.i('✅ Payload preparado: ${payload.keys.length} campos y ${fotos.length} fotos');
 
       return payload;
+
     } catch (e) {
       _logger.e('❌ Error preparando payload: $e');
+
+      // 🚨 LOG: Error preparando payload (si no se logueó antes)
+      if (!e.toString().contains('No se encontró') &&
+          !e.toString().contains('requerido') &&
+          !e.toString().contains('resolver')) {
+        await ErrorLogService.logError(
+          tableName: _tableName,
+          operation: 'preparar_payload',
+          errorMessage: 'Error preparando payload: $e',
+          errorType: 'preparation',
+          registroFailId: estadoId,
+          userId: userId,
+        );
+      }
+
       rethrow;
     }
   }
 
-  // Resto de métodos sin cambios (helpers privados)
+  // Helpers sin cambios
   Future<String?> _obtenerEdfVendedorIdDesdeUsuarioId(int? usuarioId) async {
     try {
       if (usuarioId == null) return null;
@@ -185,6 +244,8 @@ class CensoUploadService {
       Map<String, dynamic> datos,
       ) async {
     Future.delayed(Duration.zero, () async {
+      String? userId;
+
       try {
         _logger.i('🔄 Sincronización background para: $estadoId');
 
@@ -198,15 +259,26 @@ class CensoUploadService {
 
         if (maps.isEmpty) {
           _logger.e('❌ No se encontró el estado: $estadoId');
+
+          // 🚨 LOG: Estado no encontrado
+          await ErrorLogService.logValidationError(
+            tableName: _tableName,
+            operation: 'sync_background',
+            errorMessage: 'Estado no encontrado en BD local',
+            registroFailId: estadoId,
+          );
+
           return;
         }
+
+        userId = maps.first['usuario_id']?.toString();
 
         // Obtener fotos
         final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
         _logger.i('📸 Fotos encontradas: ${fotos.length}');
 
         // Preparar payload
-        final datosParaApi = await _prepararPayloadConMapper(estadoId, fotos);
+        final datosParaApi = await _prepararPayloadConMapper(estadoId, fotos, userId);
 
         // Registrar intento
         await _actualizarUltimoIntento(estadoId, 1);
@@ -215,6 +287,7 @@ class CensoUploadService {
         final respuesta = await enviarCensoAlServidor(
           datosParaApi,
           timeoutSegundos: 45,
+          userId: userId,
         );
 
         // Actualizar estado
@@ -225,7 +298,6 @@ class CensoUploadService {
           );
           await _estadoEquipoRepository.marcarComoSincronizado(estadoId);
 
-          // Marcar fotos
           for (final foto in fotos) {
             if (foto.id != null) {
               await _fotoRepository.marcarComoSincronizada(foto.id!);
@@ -239,11 +311,34 @@ class CensoUploadService {
             'Error (intento #1): ${respuesta['detalle'] ?? respuesta['mensaje']}',
           );
 
+          // 🚨 LOG: Error en primer intento
+          await ErrorLogService.logError(
+            tableName: _tableName,
+            operation: 'sync_background',
+            errorMessage: 'Error en primer intento: ${respuesta['mensaje']}',
+            errorType: 'sync',
+            registroFailId: estadoId,
+            syncAttempt: 1,
+            userId: userId,
+          );
+
           final proximoIntento = _calcularProximoIntento(1);
           _logger.w('⚠️ Error - reintento en $proximoIntento minuto(s)');
         }
+
       } catch (e) {
         _logger.e('💥 Excepción en sincronización: $e');
+
+        // 🚨 LOG: Excepción en background sync
+        await ErrorLogService.logError(
+          tableName: _tableName,
+          operation: 'sync_background',
+          errorMessage: 'Excepción en sincronización: $e',
+          errorType: 'exception',
+          registroFailId: estadoId,
+          userId: userId,
+        );
+
         await _actualizarUltimoIntento(estadoId, 1);
         await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción: $e');
       }
@@ -279,6 +374,16 @@ class CensoUploadService {
           _logger.e('❌ Error: $e');
           fallidos++;
 
+          // 🚨 LOG: Error en sincronización individual
+          await ErrorLogService.logError(
+            tableName: _tableName,
+            operation: 'sync_pendientes',
+            errorMessage: 'Error sincronizando censo: $e',
+            errorType: 'sync_batch',
+            registroFailId: registro.id,
+            userId: usuarioId.toString(),
+          );
+
           if (registro.id != null) {
             await _estadoEquipoRepository.marcarComoError(
               registro.id!,
@@ -290,13 +395,35 @@ class CensoUploadService {
 
       _logger.i('✅ Completado - Exitosos: $exitosos, Fallidos: $fallidos');
 
+      // 🚨 LOG: Alta tasa de fallos
+      if (fallidos > 0 && fallidos >= exitosos) {
+        await ErrorLogService.logError(
+          tableName: _tableName,
+          operation: 'sync_pendientes',
+          errorMessage: 'Alta tasa de fallos: $fallidos de ${todosLosRegistros.length}',
+          errorType: 'sync_batch_high_failure',
+          userId: usuarioId.toString(),
+        );
+      }
+
       return {
         'exitosos': exitosos,
         'fallidos': fallidos,
         'total': todosLosRegistros.length,
       };
+
     } catch (e) {
       _logger.e('💥 Error en sincronización: $e');
+
+      // 🚨 LOG: Error general en batch
+      await ErrorLogService.logError(
+        tableName: _tableName,
+        operation: 'sync_pendientes',
+        errorMessage: 'Error en sincronización masiva: $e',
+        errorType: 'sync_batch',
+        userId: usuarioId.toString(),
+      );
+
       return {'exitosos': 0, 'fallidos': 0, 'total': 0};
     }
   }
@@ -310,6 +437,10 @@ class CensoUploadService {
     try {
       _logger.i('🔁 Reintentando: $estadoId');
 
+      // Obtener intentos previos
+      final intentosPrevios = await _obtenerNumeroIntentos(estadoId);
+      final numeroIntento = intentosPrevios + 1;
+
       final maps = await _estadoEquipoRepository.dbHelper.consultar(
         'censo_activo',
         where: 'id = ?',
@@ -322,11 +453,16 @@ class CensoUploadService {
       }
 
       final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
-      final datosParaApi = await _prepararPayloadConMapper(estadoId, fotos);
+      final datosParaApi = await _prepararPayloadConMapper(
+        estadoId,
+        fotos,
+        usuarioId.toString(),
+      );
 
       final respuesta = await enviarCensoAlServidor(
         datosParaApi,
         timeoutSegundos: 45,
+        userId: usuarioId.toString(),
       );
 
       if (respuesta['exito'] == true) {
@@ -342,10 +478,34 @@ class CensoUploadService {
         return {'success': true, 'message': 'Registro sincronizado'};
       } else {
         await _estadoEquipoRepository.marcarComoError(estadoId, 'Error: ${respuesta['mensaje']}');
+
+        // 🚨 LOG: Reintento fallido
+        await ErrorLogService.logError(
+          tableName: _tableName,
+          operation: 'RETRY_POST',
+          errorMessage: 'Reintento #$numeroIntento falló: ${respuesta['mensaje']}',
+          errorType: 'retry_failed',
+          registroFailId: estadoId,
+          syncAttempt: numeroIntento,
+          userId: usuarioId.toString(),
+        );
+
         return {'success': false, 'error': respuesta['mensaje']};
       }
+
     } catch (e) {
       _logger.e('💥 Error en reintento: $e');
+
+      // 🚨 LOG: Excepción en reintento
+      await ErrorLogService.logError(
+        tableName: _tableName,
+        operation: 'RETRY_POST',
+        errorMessage: 'Excepción en reintento: $e',
+        errorType: 'retry_exception',
+        registroFailId: estadoId,
+        userId: usuarioId.toString(),
+      );
+
       await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción: $e');
       return {'success': false, 'error': 'Error: $e'};
     }
@@ -396,8 +556,18 @@ class CensoUploadService {
       if (resultado['total']! > 0) {
         logger.i('✅ Auto-sync: ${resultado['exitosos']}/${resultado['total']}');
       }
+
     } catch (e) {
       Logger().e('❌ Error: $e');
+
+      // 🚨 LOG: Error en auto-sync
+      await ErrorLogService.logError(
+        tableName: _tableName,
+        operation: 'auto_sync',
+        errorMessage: 'Error en sincronización automática: $e',
+        errorType: 'auto_sync',
+        userId: _usuarioActual?.toString(),
+      );
     }
   }
 
@@ -427,10 +597,18 @@ class CensoUploadService {
 
     _logger.i('🔄 Sincronizando ${registro.id} (intento #$numeroIntento)');
 
-    final datosParaApi = await _prepararPayloadConMapper(registro.id!, fotos);
+    final datosParaApi = await _prepararPayloadConMapper(
+      registro.id!,
+      fotos,
+      usuarioId.toString(),
+    );
     await _actualizarUltimoIntento(registro.id!, numeroIntento);
 
-    final respuesta = await enviarCensoAlServidor(datosParaApi, timeoutSegundos: 60);
+    final respuesta = await enviarCensoAlServidor(
+      datosParaApi,
+      timeoutSegundos: 60,
+      userId: usuarioId.toString(),
+    );
 
     if (respuesta['exito'] == true) {
       await _estadoEquipoRepository.marcarComoMigrado(registro.id!, servidorId: respuesta['id']);
@@ -449,11 +627,23 @@ class CensoUploadService {
         'Error (intento #$numeroIntento): ${respuesta['mensaje']}',
       );
 
+      // 🚨 LOG: Intento fallido con backoff
+      await ErrorLogService.logError(
+        tableName: _tableName,
+        operation: 'sync_individual',
+        errorMessage: 'Error en intento #$numeroIntento: ${respuesta['mensaje']}',
+        errorType: 'sync_retry',
+        registroFailId: registro.id!,
+        syncAttempt: numeroIntento,
+        userId: usuarioId.toString(),
+      );
+
       final proximoIntento = _calcularProximoIntento(numeroIntento);
       _logger.w('⚠️ Error intento #$numeroIntento - próximo en $proximoIntento min');
     }
   }
 
+  // Resto de métodos sin cambios...
   Future<List<dynamic>> _filtrarRegistrosListosParaReintento(List<dynamic> registrosError) async {
     final registrosListos = <dynamic>[];
     final ahora = DateTime.now();

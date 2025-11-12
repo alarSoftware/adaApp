@@ -1,27 +1,25 @@
-// lib/ui/widgets/operaciones_comerciales/buscador_productos_widget.dart
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
-import 'package:ada_app/viewmodels/operaciones_comerciales/operacion_comercial_viewmodel.dart';
+import 'package:ada_app/models/producto.dart';
 
 /// Widget especializado para búsqueda de productos
-/// Utiliza los patrones de diseño ya establecidos en tus widgets existentes
 class BuscadorProductosWidget extends StatefulWidget {
   final String searchQuery;
-  final List<ProductoDisponible> productosFiltrados;
-  final List<dynamic> productosSeleccionados; // OperacionComercialDetalle list
+  final List<Producto> productosFiltrados;
+  final List<dynamic> productosSeleccionados;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onClearSearch;
-  final ValueChanged<ProductoDisponible> onProductoSelected;
+  final ValueChanged<Producto> onProductoSelected;
 
   const BuscadorProductosWidget({
-    Key? key,
+    super.key,
     required this.searchQuery,
     required this.productosFiltrados,
     required this.productosSeleccionados,
     required this.onSearchChanged,
     required this.onClearSearch,
     required this.onProductoSelected,
-  }) : super(key: key);
+  });
 
   @override
   State<BuscadorProductosWidget> createState() => _BuscadorProductosWidgetState();
@@ -85,7 +83,7 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
         controller: _controller,
         onChanged: widget.onSearchChanged,
         decoration: InputDecoration(
-          hintText: 'Buscar por código o descripción...',
+          hintText: 'Buscar por código, nombre o código de barras...', // ✅ Actualizado
           hintStyle: TextStyle(color: AppColors.textSecondary),
           prefixIcon: Icon(Icons.search, color: AppColors.primary),
           suffixIcon: widget.searchQuery.isNotEmpty
@@ -126,24 +124,21 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
               color: yaSeleccionado ? AppColors.success : AppColors.primary,
               size: 20,
             ),
+            // ✅ Usa displayName de tu modelo (funciona con la nueva estructura)
             title: Text(
-              producto.descripcion,
+              producto.displayName, // "[BEB001] Coca Cola 2L" o "Coca Cola 2L"
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: AppColors.textPrimary,
               ),
             ),
-            subtitle: Text(
-              producto.codigo,
-              style: TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            enabled: !yaSeleccionado,
+            // ✅ Mejora: Muestra categoría y código de barras si están disponibles
+            subtitle: _buildSubtitle(producto),
+            // ✅ Solo verificar si es válido (no stock/precio que no existen)
+            enabled: !yaSeleccionado && producto.isValid,
             onTap: () {
-              if (!yaSeleccionado) {
+              if (!yaSeleccionado && producto.isValid) {
                 widget.onProductoSelected(producto);
                 // Limpiar búsqueda después de seleccionar
                 widget.onClearSearch();
@@ -153,6 +148,35 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
             },
           );
         },
+      ),
+    );
+  }
+
+  // ✅ Actualizado: Construir subtitle solo con información disponible
+  Widget _buildSubtitle(Producto producto) {
+    final parts = <String>[];
+
+    // Agregar categoría si existe
+    if (producto.tieneCategoria) {
+      parts.add(producto.displayCategoria);
+    }
+
+    // Agregar código de barras si existe
+    if (producto.tieneCodigoBarras) {
+      parts.add('CB: ${producto.codigoBarras}');
+    }
+
+    // Si no hay información adicional, mostrar el ID
+    if (parts.isEmpty && producto.id != null) {
+      parts.add('ID: ${producto.id}');
+    }
+
+    return Text(
+      parts.join(' • '),
+      style: TextStyle(
+        fontSize: 11,
+        color: AppColors.textSecondary,
+        fontWeight: FontWeight.normal,
       ),
     );
   }
@@ -176,7 +200,9 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
     );
   }
 
-  bool _isProductoSeleccionado(String codigo) {
+  bool _isProductoSeleccionado(String? codigo) {
+    // ✅ Manejar código nullable
+    if (codigo == null) return false;
     return widget.productosSeleccionados
         .any((detalle) => detalle.productoCodigo == codigo);
   }

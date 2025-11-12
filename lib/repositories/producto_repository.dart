@@ -1,474 +1,412 @@
-import 'package:ada_app/models/equipos_pendientes.dart';
-import 'package:ada_app/services/post/equipo_pendiente_post_service.dart';
-import 'base_repository.dart';
-import 'package:uuid/uuid.dart';
-import 'package:logger/logger.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/models/producto.dart';
+import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:logger/logger.dart';
 
-class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
-  final Logger _logger = Logger();
+/// Repository para manejo de productos
+/// Estructura de tabla productos actualizada:
+/// - id INTEGER PRIMARY KEY
+/// - codigo TEXT
+/// - codigo_barras TEXT
+/// - nombre TEXT NULL
+/// - categoria TEXT
+abstract class ProductoRepository {
+  /// Obtener todos los productos disponibles
+  Future<List<Producto>> obtenerProductosDisponibles();
+
+  /// Buscar productos por término (código, nombre o código de barras)
+  Future<List<Producto>> buscarProductos(String searchTerm);
+
+  /// Obtener producto por código específico
+  Future<Producto?> obtenerProductoPorCodigo(String codigo);
+
+  /// Obtener productos por categoría (para productos de reemplazo)
+  Future<List<Producto>> obtenerProductosPorCategoria(String categoria, {int? excluirId}); // 👈 CAMBIO: usar ID
+
+  /// Obtener total de productos
+  Future<int> contarProductos();
+
+  /// Guardar productos desde el servidor
+  Future<int> guardarProductosDesdeServidor(List<Map<String, dynamic>> productos);
+
+  /// Limpiar todos los productos locales
+  Future<void> limpiarProductosLocales();
+}
+
+class ProductoRepositoryImpl implements ProductoRepository {
+  final DatabaseHelper _dbHelper;
+  static final Logger _logger = Logger();
+
+  ProductoRepositoryImpl({DatabaseHelper? dbHelper})
+      : _dbHelper = dbHelper ?? DatabaseHelper();
+
+  Logger get logger => _logger;
+
 
   @override
-  String get tableName => 'equipos_pendientes';
-
-  @override
-  EquiposPendientes fromMap(Map<String, dynamic> map) =>
-      EquiposPendientes.fromMap(map);
-
-  @override
-  Map<String, dynamic> toMap(EquiposPendientes equipoPendiente) =>
-      equipoPendiente.toMap();
-
-  @override
-  String getDefaultOrderBy() => 'fecha_creacion DESC';
-
-  @override
-  String getBuscarWhere() =>
-      'CAST(equipo_id AS TEXT) LIKE ? OR CAST(cliente_id AS TEXT) LIKE ?';
-
-  @override
-  List<dynamic> getBuscarArgs(String query) {
-    final searchTerm = '%${query.toLowerCase()}%';
-    return [searchTerm, searchTerm];
-  }
-
-  @override
-  String getEntityName() => 'EquipoPendiente';
-
-  /// Obtener equipos PENDIENTES de un cliente
-  Future<List<Map<String, dynamic>>> obtenerEquiposPendientesPorCliente(
-      int clienteId) async {
+  Future<List<Producto>> obtenerProductosDisponibles() async {
     try {
-      final sql = '''
-    SELECT DISTINCT
-      ep.id,
-      ep.equipo_id,
-      ep.cliente_id,
-      ep.fecha_creacion,
-      e.cod_barras,
-      e.numero_serie,
-      m.nombre as marca_nombre,
-      mo.nombre as modelo_nombre,
-      l.nombre as logo_nombre,
-      c.nombre as cliente_nombre,
-      'pendiente' as estado,
-      'pendiente' as tipo_estado
-    FROM equipos_pendientes ep
-    INNER JOIN equipos e ON ep.equipo_id = e.id
-    INNER JOIN marcas m ON e.marca_id = m.id
-    INNER JOIN modelos mo ON e.modelo_id = mo.id
-    INNER JOIN logo l ON e.logo_id = l.id
-    INNER JOIN clientes c ON ep.cliente_id = c.id
-    WHERE ep.cliente_id = ?
-    ORDER BY ep.fecha_creacion DESC
-  ''';
+      _logger.d('🔍 Obteniendo productos disponibles...');
 
-      final result = await dbHelper.consultarPersonalizada(sql, [clienteId]);
-      _logger.i('Equipos PENDIENTES para cliente $clienteId: ${result.length}');
-      return result;
+      final db = await _dbHelper.database;
+
+      final List<Map<String, dynamic>> maps = await db.query(
+        'productos',
+        orderBy: 'nombre ASC',
+      );
+
+      final productos = maps.map((map) => Producto.fromMap(map)).toList();
+      _logger.d('✅ ${productos.length} productos disponibles obtenidos');
+
+      return productos;
     } catch (e) {
-      _logger.e(
-          'Error obteniendo equipos pendientes del cliente $clienteId: $e');
-      rethrow;
+      _logger.e('❌ Error obteniendo productos disponibles: $e');
+
+      await ErrorLogService.logDatabaseError(
+        tableName: 'productos',
+        operation: 'obtener_disponibles',
+        errorMessage: 'Error obteniendo productos disponibles: $e',
+      );
+
+      return [];
     }
   }
 
-  /// Buscar ID del registro pendiente (para EstadoEquipoRepository)
-  /// Buscar ID del registro pendiente (para EstadoEquipoRepository)
-  Future<int?> buscarEquipoPendienteId(dynamic equipoId, int clienteId) async {
+  @override
+  Future<List<Producto>> buscarProductos(String searchTerm) async {
+    if (searchTerm.isEmpty) {
+      _logger.d('⚠️ Término de búsqueda vacío');
+      return [];
+    }
+
     try {
-      // Convertir a string para consistencia
-      final equipoIdStr = equipoId.toString();
+      _logger.d('🔍 Buscando productos con término: "$searchTerm"');
 
-      _logger.i('🔍 Buscando pendiente: equipoId=$equipoIdStr, clienteId=$clienteId');
+      final db = await _dbHelper.database;
+      final searchLower = '%${searchTerm.toLowerCase()}%';
 
-      final maps = await dbHelper.consultar(
-        tableName,
-        where: 'CAST(equipo_id AS TEXT) = ? AND cliente_id = ?',
-        whereArgs: [equipoIdStr, clienteId],
-        orderBy: 'fecha_creacion DESC', // Obtener el más reciente
+      final List<Map<String, dynamic>> maps = await db.query(
+        'productos',
+        where: '''
+          (LOWER(codigo) LIKE ? OR 
+           LOWER(nombre) LIKE ? OR 
+           LOWER(codigo_barras) LIKE ?)
+        ''',
+        whereArgs: [searchLower, searchLower, searchLower],
+        orderBy: 'nombre ASC',
+        limit: 50,
+      );
+
+      final productos = maps.map((map) => Producto.fromMap(map)).toList();
+      _logger.d('✅ ${productos.length} productos encontrados para "$searchTerm"');
+
+      return productos;
+    } catch (e) {
+      _logger.e('❌ Error buscando productos con término "$searchTerm": $e');
+
+      await ErrorLogService.logDatabaseError(
+        tableName: 'productos',
+        operation: 'buscar_productos',
+        errorMessage: 'Error buscando productos con término "$searchTerm": $e',
+      );
+
+      return [];
+    }
+  }
+
+  @override
+  Future<Producto?> obtenerProductoPorCodigo(String codigo) async {
+    try {
+      _logger.d('🔍 Obteniendo producto por código: $codigo');
+
+      final db = await _dbHelper.database;
+
+      final List<Map<String, dynamic>> maps = await db.query(
+        'productos',
+        where: 'codigo = ?',
+        whereArgs: [codigo],
         limit: 1,
       );
 
-      if (maps.isNotEmpty) {
-        final id = maps.first['id'] as int?;
-        _logger.i('✅ Encontrado registro pendiente: ID=$id');
-        return id;
+      if (maps.isEmpty) {
+        _logger.d('⚠️ Producto con código "$codigo" no encontrado');
+        return null;
       }
 
-      _logger.i('❌ No existe registro pendiente');
-      return null;
+      final producto = Producto.fromMap(maps.first);
+      _logger.d('✅ Producto encontrado: ${producto.displayName}');
+
+      return producto;
     } catch (e) {
-      _logger.e('❌ Error buscando ID de equipo pendiente: $e');
+      _logger.e('❌ Error obteniendo producto por código $codigo: $e');
+
+      await ErrorLogService.logDatabaseError(
+        tableName: 'productos',
+        operation: 'obtener_por_codigo',
+        errorMessage: 'Error obteniendo producto por código "$codigo": $e',
+      );
+
       return null;
     }
   }
 
-  /// Procesar escaneo de censo - crear registro pendiente
-  Future<String> procesarEscaneoCenso({ // ✅ Cambia int a String para retornar UUID
-    required dynamic equipoId,
-    required int clienteId,
-  }) async {
+  @override
+  Future<List<Producto>> obtenerProductosPorCategoria(
+      String categoria, {
+        int? excluirId, // 👈 CAMBIO: Usar ID en lugar de código
+      }) async {
+    _logger.d('🔍 Obteniendo productos de categoría: $categoria (excluyendo ID: ${excluirId ?? "ninguno"})');
+
     try {
-      final now = DateTime.now();
-      final equipoIdString = equipoId.toString();
-      _logger.i('Procesando censo - equipoId: $equipoIdString, clienteId: $clienteId');
+      final db = await _dbHelper.database;
 
-      // Verificar si ya existe por equipo_id + cliente_id
-      final existente = await dbHelper.consultar(
-        tableName,
-        where: 'equipo_id = ? AND cliente_id = ?',
-        whereArgs: [equipoIdString, clienteId],
-        limit: 1,
-      );
+      // ✅ Construir query dinámicamente
+      String whereClause = 'categoria = ?';
+      List<dynamic> whereArgs = [categoria];
 
-      if (existente.isNotEmpty) {
-        final registroId = existente.first['id'].toString();
-        _logger.i('✅ Ya existe registro pendiente (UUID: $registroId) - ACTUALIZANDO');
-
-        // ✅ Actualizar fecha del censo existente
-        await dbHelper.actualizar(
-          tableName,
-          {
-            'fecha_censo': now.toIso8601String(),
-            'fecha_actualizacion': now.toIso8601String(),
-            'sincronizado': 0, // Marcar para reenvío
-          },
-          where: 'id = ?',
-          whereArgs: [registroId],
-        );
-
-        _logger.i('📅 Fecha actualizada para UUID: $registroId');
-        _enviarAlServidorAsync(equipoIdString, clienteId);
-        return registroId;
+      if (excluirId != null) {
+        whereClause += ' AND id != ?';
+        whereArgs.add(excluirId);
       }
 
-      // Crear nuevo registro con UUID
-      final uuid = Uuid().v4();
-      final datos = {
-        'id': uuid,
-        'equipo_id': equipoIdString,
-        'cliente_id': clienteId,
-        'fecha_censo': now.toIso8601String(),
-        'usuario_censo_id': 1,
-        'fecha_creacion': now.toIso8601String(),
-        'fecha_actualizacion': now.toIso8601String(),
-        'sincronizado': 0,
-      };
+      final List<Map<String, dynamic>> maps = await db.query(
+        'productos',
+        where: whereClause,
+        whereArgs: whereArgs,
+        orderBy: 'nombre ASC',
+      );
 
-      await dbHelper.insertar(tableName, datos);
-      _logger.i('✅ Registro pendiente NUEVO creado con UUID: $uuid');
+      final productos = maps.map((map) => Producto.fromMap(map)).toList();
+      _logger.d('✅ ${productos.length} productos encontrados en categoría "$categoria"');
 
-      _enviarAlServidorAsync(equipoIdString, clienteId);
-      return uuid;
-
+      return productos;
     } catch (e) {
-      _logger.e('❌ Error procesando escaneo de censo: $e');
-      rethrow;
+      _logger.e('❌ Error obteniendo productos por categoría: $e');
+
+      await ErrorLogService.logDatabaseError(
+        tableName: 'productos',
+        operation: 'obtener_por_categoria',
+        errorMessage: 'Error obteniendo productos de categoría "$categoria": $e',
+      );
+
+      return [];
     }
   }
 
-  /// Marcar equipos pendientes como sincronizados cuando su censo se migra
-  Future<int> marcarSincronizadosPorCenso(String equipoId, int clienteId) async {
+  @override
+  Future<int> contarProductos() async {
     try {
-      final actualizados = await dbHelper.actualizar(
-        tableName,
-        {
-          'sincronizado': 1,
-          'fecha_actualizacion': DateTime.now().toIso8601String(),
-        },
-        where: 'equipo_id = ? AND cliente_id = ? AND sincronizado = 0',
-        whereArgs: [equipoId, clienteId],
+      _logger.d('🔍 Contando productos...');
+
+      final db = await _dbHelper.database;
+
+      final resultado = await db.rawQuery(
+        'SELECT COUNT(*) as total FROM productos',
       );
 
-      _logger.i('✅ Equipos pendientes marcados como sincronizados: $actualizados');
-      return actualizados;
+      final total = resultado.first['total'] as int? ?? 0;
+      _logger.d('✅ Total de productos: $total');
+
+      return total;
     } catch (e) {
-      _logger.e('❌ Error marcando equipos pendientes como sincronizados: $e');
+      _logger.e('❌ Error contando productos: $e');
+
+      await ErrorLogService.logDatabaseError(
+        tableName: 'productos',
+        operation: 'contar_productos',
+        errorMessage: 'Error contando productos: $e',
+      );
+
       return 0;
     }
   }
 
-  /// Crear nuevo registro de equipo pendiente
-  Future<int> crear(Map<String, dynamic> datos) async {
-    try {
-      final uuid = Uuid();
-
-      final registroData = {
-        'id': uuid.v4(), // ✅ UUID temporal para identificación local
-        'equipo_id': datos['equipo_id'],
-        'cliente_id': datos['cliente_id'],
-        'fecha_censo': datos['fecha_censo'],
-        'usuario_censo_id': datos['usuario_censo_id'],
-        'fecha_creacion': DateTime.now().toIso8601String(),
-        'fecha_actualizacion': DateTime.now().toIso8601String(),
-        'sincronizado': 0,
-      };
-
-      await dbHelper.insertar(tableName, registroData);
-      _logger.i('✅ Registro pendiente creado con UUID: ${registroData['id']}');
-
-      // Retornar 0 o un hash del UUID ya que la función espera int
-      return 0; // O podrías retornar el UUID.hashCode
-    } catch (e) {
-      _logger.e('❌ Error creando registro: $e');
-      rethrow;
-    }
-  }
-
-  /// Sincronizar pendientes locales al servidor
-  Future<Map<String, dynamic>> sincronizarPendientesAlServidor() async {
-    try {
-      _logger.i('Sincronizando pendientes...');
-
-      // Obtener pendientes no sincronizados
-      final pendientes = await dbHelper.consultar(
-        tableName,
-        where: 'sincronizado = ?',
-        whereArgs: [0],
-      );
-
-      if (pendientes.isEmpty) {
-        return {'exito': true, 'mensaje': 'No hay pendientes'};
-      }
-
-      _logger.i('Encontrados ${pendientes.length} pendientes');
-
-      // Necesitamos AuthService para el usuario
-      final authService = AuthService();
-      final usuario = await authService.getCurrentUser();
-      final usuarioId = usuario?.id ?? 1;
-      final edfVendedorId = usuario?.edfVendedorId ?? '1';
-
-      int exitosos = 0;
-      int fallidos = 0;
-
-      // Enviar cada pendiente
-      for (final pendiente in pendientes) {
-        try {
-          final payload = {
-            'id': DateTime.now().millisecondsSinceEpoch.toString(),
-            'edfVendedorSucursalId': edfVendedorId,
-            'edfEquipoId': pendiente['equipo_id'].toString(),
-            'edfClienteId': pendiente['cliente_id'],
-            'usuarioId': usuarioId,
-            'fecha_revision': pendiente['fecha_censo'] ?? DateTime.now().toIso8601String(),
-            'equipo_id': pendiente['equipo_id'].toString(),
-            'cliente_id': pendiente['cliente_id'],
-            'usuario_id': usuarioId,
-            'es_censo': true,
-            'estadoCenso': 'pendiente'
-          };
-
-          _logger.i('Enviando pendiente: ${pendiente['equipo_id']}');
-
-          final response = await http.post(
-            Uri.parse('https://ada-api.loca.lt/adaControl/censoActivo/insertCensoActivo'),
-            headers: {'Content-Type': 'application/json'},
-            body: json.encode(payload),
-          ).timeout(Duration(seconds: 10));
-
-          if (response.statusCode >= 200 && response.statusCode < 300) {
-            // Marcar como sincronizado
-            await dbHelper.actualizar(
-              tableName,
-              {
-                'sincronizado': 1,
-                'fecha_sincronizacion': DateTime.now().toIso8601String(),
-              },
-              where: 'id = ?',
-              whereArgs: [pendiente['id']],
-            );
-            exitosos++;
-          } else {
-            fallidos++;
-          }
-        } catch (e) {
-          _logger.e('Error en pendiente: $e');
-          fallidos++;
-        }
-      }
-
-      return {
-        'exito': exitosos > 0,
-        'mensaje': 'Sincronizados: $exitosos, Fallidos: $fallidos'
-      };
-    } catch (e) {
-      _logger.e('Error sincronizando: $e');
-      return {'exito': false, 'mensaje': 'Error: $e'};
-    }
-  }
-
-  /// Procesar equipos pendientes después de descargar censo del servidor
-  Future<int> procesarPendientesDelCensoDescargado() async {
-    try {
-      _logger.i('🔄 Procesando pendientes del censo descargado...');
-
-      final db = await dbHelper.database;
-
-      // Obtener equipos con estadoCenso = 'pendiente' del censo_activo
-      final equiposPendientes = await db.rawQuery('''
-      SELECT DISTINCT
-        ca.equipo_id,
-        ca.cliente_id
-      FROM censo_activo ca
-      WHERE ca.estado_censo = 'pendiente'
-      AND NOT EXISTS (
-        SELECT 1 
-        FROM equipos_pendientes ep 
-        WHERE ep.equipo_id = ca.equipo_id 
-        AND ep.cliente_id = ca.cliente_id
-      )
-    ''');
-
-      if (equiposPendientes.isEmpty) {
-        _logger.i('✅ No hay pendientes nuevos en el censo descargado');
-        return 0;
-      }
-
-      _logger.i('📋 Encontrados ${equiposPendientes.length} pendientes nuevos');
-
-      int creados = 0;
-      final now = DateTime.now();
-
-      for (final equipo in equiposPendientes) {
-        try {
-          final datos = {
-            'equipo_id': equipo['equipo_id'].toString(),
-            'cliente_id': equipo['cliente_id'],
-            'fecha_censo': now.toIso8601String(),
-            'usuario_censo_id': 1,
-            'fecha_creacion': now.toIso8601String(),
-            'fecha_actualizacion': now.toIso8601String(),
-            'sincronizado': 1, // Ya viene del servidor
-          };
-
-          await dbHelper.insertar(tableName, datos);
-          creados++;
-          _logger.i('✅ Pendiente recreado: Equipo ${equipo['equipo_id']} → Cliente ${equipo['cliente_id']}');
-        } catch (e) {
-          _logger.w('⚠️ Error creando pendiente: $e');
-        }
-      }
-
-      _logger.i('📊 Procesamiento completado: $creados pendientes recreados');
-      return creados;
-    } catch (e) {
-      _logger.e('❌ Error procesando pendientes del censo: $e');
+  @override
+  Future<int> guardarProductosDesdeServidor(List<Map<String, dynamic>> productos) async {
+    if (productos.isEmpty) {
+      _logger.d('⚠️ No hay productos para guardar');
       return 0;
     }
-  }
 
-  /// Guardar equipos pendientes desde el servidor con mapeo de campos
-  Future<int> guardarEquiposPendientesDesdeServidor(List<Map<String, dynamic>> equiposAPI) async {
-    final db = await dbHelper.database;
-    int guardados = 0;
+    try {
+      _logger.i('💾 Guardando ${productos.length} productos desde servidor...');
 
-    _logger.i('Guardando ${equiposAPI.length} equipos pendientes desde servidor...');
+      // Usar vaciarEInsertar para reemplazar todos los datos
+      await _dbHelper.vaciarEInsertar('productos', productos);
 
-    await db.transaction((txn) async {
-      await txn.delete('equipos_pendientes');
-      _logger.i('Tabla equipos_pendientes limpiada');
+      _logger.i('✅ ${productos.length} productos guardados correctamente');
+      return productos.length;
 
-      for (var equipoAPI in equiposAPI) {
-        try {
-          // MAPEO SIMPLIFICADO: Solo los campos que existen en la tabla
-          final equipoLocal = {
-            'id': equipoAPI['id'],
-            'equipo_id': equipoAPI['edfEquipoId'],
-            'cliente_id': equipoAPI['edfClienteId'],
-            'fecha_creacion': equipoAPI['creationDate'],
-            'fecha_actualizacion': DateTime.now().toIso8601String(),
-            'fecha_censo': equipoAPI['creationDate'],
-            'usuario_censo_id': 1,
-            'sincronizado': 1,
-          };
+    } catch (e) {
+      _logger.e('❌ Error guardando productos desde servidor: $e');
 
-          _logger.i('Insertando: equipo_id=${equipoLocal['equipo_id']}, cliente_id=${equipoLocal['cliente_id']}');
+      await ErrorLogService.logDatabaseError(
+        tableName: 'productos',
+        operation: 'guardar_desde_servidor',
+        errorMessage: 'Error guardando ${productos.length} productos desde servidor: $e',
+      );
 
-          await txn.insert(
-            'equipos_pendientes',
-            equipoLocal,
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-
-          guardados++;
-          _logger.i('✅ Guardado exitosamente');
-
-        } catch (e) {
-          _logger.e('❌ Error guardando: $e');
-          _logger.e('Dato API: $equipoAPI');
-        }
-      }
-    });
-
-    _logger.i('✅ $guardados equipos pendientes guardados correctamente');
-
-    // DEBUG: Verificar lo que se guardó
-    await debugVerificarDatos();
-
-    return guardados;
-  }
-
-  /// DEBUG: Verificar datos guardados
-  Future<void> debugVerificarDatos() async {
-    final db = await dbHelper.database;
-
-    _logger.i('=== DEBUG: Verificando datos en equipos_pendientes ===');
-
-    // Ver todas las columnas de la tabla
-    final schema = await db.rawQuery("PRAGMA table_info(equipos_pendientes)");
-    _logger.i('Columnas de la tabla: ${schema.map((e) => e['name']).toList()}');
-
-    // Ver todos los registros
-    final todos = await db.query('equipos_pendientes');
-    _logger.i('Total de registros en tabla: ${todos.length}');
-
-    if (todos.isNotEmpty) {
-      _logger.i('=== TODOS LOS REGISTROS ===');
-      for (var i = 0; i < todos.length; i++) {
-        _logger.i('--- Registro ${i + 1} ---');
-        todos[i].forEach((key, value) {
-          _logger.i('  $key: $value');
-        });
-      }
-    } else {
-      _logger.w('⚠️ LA TABLA ESTÁ VACÍA');
+      throw Exception('Error guardando productos: $e');
     }
-
-    _logger.i('========================================================');
   }
 
-  void _enviarAlServidorAsync(String equipoId, int clienteId) {
-    Future(() async {
-      try {
-        _logger.i('🚀 INICIO envío async: equipo=$equipoId, cliente=$clienteId');
+  @override
+  Future<void> limpiarProductosLocales() async {
+    try {
+      _logger.i('🗑️ Limpiando productos locales...');
 
-        final authService = AuthService();
-        final usuario = await authService.getCurrentUser();
-        final edfVendedorId = usuario?.edfVendedorId ?? '1_1';
+      final db = await _dbHelper.database;
+      await db.delete('productos');
 
-        _logger.i('👤 VendedorId obtenido: $edfVendedorId');
+      _logger.i('✅ Productos locales eliminados');
+    } catch (e) {
+      _logger.e('❌ Error limpiando productos locales: $e');
 
-        final resultado = await EquiposPendientesApiService.enviarEquipoPendiente(
-          equipoId: equipoId,
-          clienteId: clienteId,
-          edfVendedorId: edfVendedorId,
-        );
+      await ErrorLogService.logDatabaseError(
+        tableName: 'productos',
+        operation: 'limpiar_locales',
+        errorMessage: 'Error limpiando productos locales: $e',
+      );
 
-        _logger.i('📨 RESULTADO FINAL: $resultado');
+      throw Exception('Error limpiando productos: $e');
+    }
+  }
 
-        if (resultado['exito']) {
-          _logger.i('✅ Enviado al servidor correctamente');
-        } else {
-          _logger.w('⚠️ Fallo: ${resultado['mensaje']}');
-        }
-      } catch (e) {
-        _logger.e('❌ Error completo: $e');
+  // ========== MÉTODOS ADICIONALES DE UTILIDAD ==========
+
+  /// Verificar si existe un producto con el código dado
+  Future<bool> existeProductoConCodigo(String codigo) async {
+    try {
+      final producto = await obtenerProductoPorCodigo(codigo);
+      return producto != null;
+    } catch (e) {
+      _logger.e('❌ Error verificando existencia de producto $codigo: $e');
+      return false;
+    }
+  }
+
+  /// Obtener producto por código de barras
+  Future<Producto?> obtenerProductoPorCodigoBarras(String codigoBarras) async {
+    try {
+      _logger.d('🔍 Obteniendo producto por código de barras: $codigoBarras');
+
+      final db = await _dbHelper.database;
+
+      final List<Map<String, dynamic>> maps = await db.query(
+        'productos',
+        where: 'codigo_barras = ?',
+        whereArgs: [codigoBarras],
+        limit: 1,
+      );
+
+      if (maps.isEmpty) {
+        _logger.d('⚠️ Producto con código de barras "$codigoBarras" no encontrado');
+        return null;
       }
-    });
+
+      final producto = Producto.fromMap(maps.first);
+      _logger.d('✅ Producto encontrado por código de barras: ${producto.displayName}');
+
+      return producto;
+    } catch (e) {
+      _logger.e('❌ Error obteniendo producto por código de barras $codigoBarras: $e');
+
+      await ErrorLogService.logDatabaseError(
+        tableName: 'productos',
+        operation: 'obtener_por_codigo_barras',
+        errorMessage: 'Error obteniendo producto por código de barras "$codigoBarras": $e',
+      );
+
+      return null;
+    }
+  }
+
+  /// Obtener productos por lista de códigos
+  Future<List<Producto>> obtenerProductosPorCodigos(List<String> codigos) async {
+    if (codigos.isEmpty) return [];
+
+    try {
+      _logger.d('🔍 Obteniendo productos por ${codigos.length} códigos...');
+
+      final db = await _dbHelper.database;
+      final placeholders = List.filled(codigos.length, '?').join(',');
+
+      final List<Map<String, dynamic>> maps = await db.query(
+        'productos',
+        where: 'codigo IN ($placeholders)',
+        whereArgs: codigos,
+        orderBy: 'nombre ASC',
+      );
+
+      final productos = maps.map((map) => Producto.fromMap(map)).toList();
+      _logger.d('✅ ${productos.length} productos encontrados');
+
+      return productos;
+    } catch (e) {
+      _logger.e('❌ Error obteniendo productos por códigos: $e');
+      return [];
+    }
+  }
+
+  /// Obtener categorías disponibles
+  Future<List<String>> obtenerCategorias() async {
+    try {
+      _logger.d('🔍 Obteniendo categorías...');
+
+      final db = await _dbHelper.database;
+
+      final List<Map<String, dynamic>> maps = await db.rawQuery(
+        'SELECT DISTINCT categoria FROM productos WHERE categoria IS NOT NULL ORDER BY categoria ASC',
+      );
+
+      final categorias = maps
+          .map((map) => map['categoria'] as String)
+          .where((categoria) => categoria.isNotEmpty)
+          .toList();
+
+      _logger.d('✅ ${categorias.length} categorías encontradas');
+
+      return categorias;
+    } catch (e) {
+      _logger.e('❌ Error obteniendo categorías: $e');
+      return [];
+    }
+  }
+
+  /// 👈 NUEVO: Obtener producto por ID
+  Future<Producto?> obtenerProductoPorId(int id) async {
+    try {
+      _logger.d('🔍 Obteniendo producto por ID: $id');
+
+      final db = await _dbHelper.database;
+
+      final List<Map<String, dynamic>> maps = await db.query(
+        'productos',
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+
+      if (maps.isEmpty) {
+        _logger.d('⚠️ Producto con ID $id no encontrado');
+        return null;
+      }
+
+      final producto = Producto.fromMap(maps.first);
+      _logger.d('✅ Producto encontrado: ${producto.displayName}');
+
+      return producto;
+    } catch (e) {
+      _logger.e('❌ Error obteniendo producto por ID $id: $e');
+
+      await ErrorLogService.logDatabaseError(
+        tableName: 'productos',
+        operation: 'obtener_por_id',
+        errorMessage: 'Error obteniendo producto por ID $id: $e',
+      );
+
+      return null;
+    }
   }
 }

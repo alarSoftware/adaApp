@@ -3,9 +3,11 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:ada_app/services/post/base_post_service.dart';
 import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart'; // 🆕 AGREGAR
 
 class CensoActivoPostService {
   static const String _endpoint = '/censoActivo/insertCensoActivo';
+  static const String _tableName = 'censo_activo'; // 🆕 AGREGAR
   static final AuthService _authService = AuthService();
 
   /// Enviar cambio de estado de equipo
@@ -24,40 +26,71 @@ class CensoActivoPostService {
     String? marca,
     String? logo,
   }) async {
-    // Obtener usuario actual
-    final usuario = await _authService.getCurrentUser();
-    final usuarioId = usuario?.id ?? 1;
-    final edfVendedorId = usuario?.edfVendedorId ?? '';
+    String? userId;
+    String? estadoId;
 
-    final now = DateTime.now().toLocal();
-    final timestampId = now.millisecondsSinceEpoch;
+    try {
+      // Obtener usuario actual
+      final usuario = await _authService.getCurrentUser();
+      final usuarioId = usuario?.id ?? 1;
+      final edfVendedorId = usuario?.edfVendedorId ?? '';
+      userId = usuarioId.toString();
 
-    // Preparar datos
-    final datos = _prepararDatosEstado(
-      timestampId: timestampId,
-      edfVendedorId: edfVendedorId,
-      equipoId: equipoId ?? codigoBarras,
-      usuarioId: usuarioId,
-      clienteId: clienteId,
-      position: position,
-      enLocal: enLocal,
-      observaciones: observaciones,
-      imagenBase64: imagenBase64,
-      imagenBase64_2: imagenBase64_2,
-      codigoBarras: codigoBarras,
-      numeroSerie: numeroSerie,
-      modelo: modelo,
-      marca: marca,
-      logo: logo,
-      clienteNombre: clienteNombre,
-      now: now,
-    );
+      final now = DateTime.now().toLocal();
+      final timestampId = now.millisecondsSinceEpoch;
+      estadoId = timestampId.toString();
 
-    return await BasePostService.post(
-      endpoint: _endpoint,
-      body: datos,
-      timeout: const Duration(seconds: 30),
-    );
+      // Preparar datos
+      final datos = _prepararDatosEstado(
+        timestampId: timestampId,
+        edfVendedorId: edfVendedorId,
+        equipoId: equipoId ?? codigoBarras,
+        usuarioId: usuarioId,
+        clienteId: clienteId,
+        position: position,
+        enLocal: enLocal,
+        observaciones: observaciones,
+        imagenBase64: imagenBase64,
+        imagenBase64_2: imagenBase64_2,
+        codigoBarras: codigoBarras,
+        numeroSerie: numeroSerie,
+        modelo: modelo,
+        marca: marca,
+        logo: logo,
+        clienteNombre: clienteNombre,
+        now: now,
+      );
+
+      // ✅ BasePostService maneja todos los errores
+      return await BasePostService.post(
+        endpoint: _endpoint,
+        body: datos,
+        timeout: const Duration(seconds: 30),
+        tableName: _tableName,      // 🔥 Activa logging
+        registroId: estadoId,        // 🔥 ID del censo
+        userId: userId,              // 🔥 Usuario
+      );
+
+    } catch (e) {
+      BasePostService.logger.e('❌ Error preparando censo: $e');
+
+      // 🚨 LOG: Error en preparación de datos (antes de enviar)
+      await ErrorLogService.logError(
+        tableName: _tableName,
+        operation: 'enviar_cambio_estado',
+        errorMessage: 'Error preparando datos del censo: $e',
+        errorType: 'preparation',
+        errorCode: 'PREPARATION_ERROR',
+        registroFailId: estadoId,
+        userId: userId,
+      );
+
+      return {
+        'success': false,
+        'exito': false,
+        'error': 'Error preparando datos: $e',
+      };
+    }
   }
 
   /// Preparar datos para el estado
@@ -125,5 +158,39 @@ class CensoActivoPostService {
       'imagen_path': null,
       'imagen_path2': null,
     };
+  }
+
+  /// Reintentar envío de censo fallido
+  static Future<Map<String, dynamic>> reintentarEnvioCenso({
+    required String estadoId,
+    required Map<String, dynamic> datos,
+    int intentoNumero = 1,
+    String? userId,
+  }) async {
+    BasePostService.logger.i('🔁 Reintentando censo: $estadoId (Intento #$intentoNumero)');
+
+    final result = await BasePostService.post(
+      endpoint: _endpoint,
+      body: datos,
+      timeout: const Duration(seconds: 30),
+      tableName: _tableName,
+      registroId: estadoId,
+      userId: userId,
+    );
+
+    // Loguear reintento fallido
+    if (result['success'] == false || result['exito'] == false) {
+      await ErrorLogService.logError(
+        tableName: _tableName,
+        operation: 'RETRY_POST',
+        errorMessage: 'Reintento #$intentoNumero falló: ${result['error'] ?? result['mensaje']}',
+        errorType: 'retry_failed',
+        registroFailId: estadoId,
+        syncAttempt: intentoNumero,
+        userId: userId,
+      );
+    }
+
+    return result;
   }
 }

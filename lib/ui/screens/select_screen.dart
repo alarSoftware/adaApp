@@ -15,6 +15,7 @@ import 'package:ada_app/services/database_validation_service.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/repositories/device_log_repository.dart';
 import 'package:ada_app/services/device_log/device_log_service.dart';
+import 'package:ada_app/ui/screens/productos_screen.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -786,6 +787,13 @@ class _SelectScreenState extends State<SelectScreen> {
                           icon: Icons.domain,
                           color: AppColors.primary,
                           page: const MarcaScreen(),
+                        ),
+                        _buildMenuCard(
+                          label: 'Productos',
+                          description: 'Catálogo completo de productos',
+                          icon: Icons.inventory_2,
+                          color: AppColors.primary,
+                          page: const ProductosScreen(),
                         ),
                         SizedBox(height: 12),
                         _buildMenuCard(

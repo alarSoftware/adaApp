@@ -10,7 +10,6 @@ import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/ui/screens/operaciones_comerciales/operacion_comercial_form_screen.dart';
 import 'package:ada_app/viewmodels/operaciones_comerciales/operaciones_comerciales_menu_viewmodel.dart';
-
 class OperacionesComercialesMenuScreen extends StatelessWidget {
   final Cliente cliente;
 

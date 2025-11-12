@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:ada_app/models/cliente.dart';
+import 'package:ada_app/models/producto.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/ui/theme/colors.dart';
@@ -15,7 +16,7 @@ import 'package:ada_app/ui/widgets/bottom_bar_widget.dart';
 import 'package:ada_app/ui/widgets/observaciones_widget.dart';
 
 /// Pantalla principal del formulario de operación comercial
-/// Diseño compacto y profesional restaurado
+/// Actualizada para trabajar con la nueva estructura de productos
 class OperacionComercialFormScreen extends StatelessWidget {
   final Cliente cliente;
   final TipoOperacion tipoOperacion;
@@ -106,9 +107,8 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
 
   Widget _buildBody(vm.OperacionComercialFormViewModel viewModel) {
     return GestureDetector(
-      behavior: HitTestBehavior.opaque, // Solo captura toques en áreas vacías
+      behavior: HitTestBehavior.opaque,
       onTap: () {
-        // Ocultar el teclado al tocar fuera
         FocusScope.of(context).unfocus();
       },
       child: Form(
@@ -124,7 +124,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                     _buildClienteInfo(viewModel),
                     const SizedBox(height: 16),
 
-                    // Buscador siempre visible
                     BuscadorProductosWidget(
                       searchQuery: viewModel.searchQuery,
                       productosFiltrados: viewModel.productosFiltrados,
@@ -135,13 +134,11 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                     ),
                     const SizedBox(height: 16),
 
-                    // Fecha de retiro si es necesaria
                     if (viewModel.tipoOperacion.necesitaFechaRetiro) ...[
                       _buildFechaRetiroField(viewModel),
                       const SizedBox(height: 16),
                     ],
 
-                    // Productos seleccionados
                     ProductosSeleccionadosWidget(
                       productosSeleccionados: viewModel.productosSeleccionados,
                       tipoOperacion: viewModel.tipoOperacion,
@@ -152,7 +149,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                     ),
                     const SizedBox(height: 16),
 
-                    // Observaciones
                     ObservacionesWidget(
                       observaciones: viewModel.observaciones,
                       onObservacionesChanged: viewModel.setObservaciones,
@@ -162,7 +158,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
               ),
             ),
 
-            // Bottom bar
             BottomBarWidget(
               totalProductos: viewModel.totalProductos,
               isSaving: viewModel.isSaving,
@@ -302,9 +297,11 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
       int index,
       dynamic detalle,
       ) async {
+    // ✅ Usar el ID que ya está guardado en el detalle
     final productosReemplazo = await viewModel.getProductosReemplazo(
       detalle.productoCategoria ?? '',
       detalle.productoCodigo,
+      detalle.productoId, // 👈 Usar el ID guardado directamente
     );
 
     if (productosReemplazo.isEmpty) {
@@ -320,7 +317,7 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
 
     if (!mounted) return;
 
-    final productoSeleccionado = await showModalBottomSheet<vm.ProductoDisponible>(
+    final productoSeleccionado = await showModalBottomSheet<Producto>(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
@@ -398,8 +395,8 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
 // MODAL PARA SELECCIONAR PRODUCTO DE REEMPLAZO
 // ═══════════════════════════════════════════════════════════════════
 
-class _ProductoReemplazoModal extends StatelessWidget {
-  final List<vm.ProductoDisponible> productos;
+class _ProductoReemplazoModal extends StatefulWidget {
+  final List<Producto> productos;
   final String categoriaOriginal;
 
   const _ProductoReemplazoModal({
@@ -408,59 +405,295 @@ class _ProductoReemplazoModal extends StatelessWidget {
   });
 
   @override
+  State<_ProductoReemplazoModal> createState() => _ProductoReemplazoModalState();
+}
+
+class _ProductoReemplazoModalState extends State<_ProductoReemplazoModal> {
+  final _searchController = TextEditingController();
+  List<Producto> _productosFiltrados = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _productosFiltrados = widget.productos;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filtrarProductos(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _productosFiltrados = widget.productos;
+      } else {
+        final queryLower = query.toLowerCase();
+        _productosFiltrados = widget.productos.where((producto) {
+          // ✅ CORREGIDO: Usar campos que existen en la nueva estructura
+          final codigo = producto.codigo?.toLowerCase() ?? '';
+          final nombre = producto.nombre?.toLowerCase() ?? '';
+          final codigoBarras = producto.codigoBarras?.toLowerCase() ?? '';
+
+          return codigo.contains(queryLower) ||
+              nombre.contains(queryLower) ||
+              codigoBarras.contains(queryLower);
+        }).toList();
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      height: MediaQuery.of(context).size.height * 0.75,
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header
           Row(
             children: [
               Icon(
                 Icons.swap_horiz,
                 color: AppColors.primary,
-                size: 24,
+                size: 28,
               ),
               const SizedBox(width: 12),
-              Text(
-                'Seleccionar Reemplazo',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Seleccionar Reemplazo',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Categoría: ${widget.categoriaOriginal}',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: Icon(Icons.close, color: AppColors.textSecondary),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Categoría: $categoriaOriginal',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
+
+          const SizedBox(height: 16),
+
+          // Buscador
+          TextField(
+            controller: _searchController,
+            onChanged: _filtrarProductos,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Buscar por código, nombre o código de barras...', // ✅ Actualizado
+              hintStyle: TextStyle(color: AppColors.textSecondary),
+              prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                icon: Icon(Icons.clear, color: AppColors.textSecondary),
+                onPressed: () {
+                  _searchController.clear();
+                  _filtrarProductos('');
+                },
+              )
+                  : null,
+              filled: true,
+              fillColor: AppColors.surfaceVariant,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: AppColors.primary, width: 2),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
             ),
           ),
-          const SizedBox(height: 20),
-          Flexible(
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: productos.length,
+
+          const SizedBox(height: 12),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.inventory_2,
+                  size: 14,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _productosFiltrados.length == widget.productos.length
+                      ? '${widget.productos.length} productos disponibles'
+                      : '${_productosFiltrados.length} de ${widget.productos.length} productos',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Lista de productos
+          Expanded(
+            child: _productosFiltrados.isEmpty
+                ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.search_off,
+                    size: 64,
+                    color: AppColors.textSecondary.withOpacity(0.3),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No se encontraron productos',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Intenta con otro término de búsqueda',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            )
+                : ListView.builder(
+              itemCount: _productosFiltrados.length,
               itemBuilder: (context, index) {
-                final producto = productos[index];
+                final producto = _productosFiltrados[index];
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
+                    color: AppColors.surface,
                     border: Border.all(color: AppColors.border),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.03),
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  child: ListTile(
-                    leading: Icon(
-                      Icons.inventory_2,
-                      color: AppColors.primary,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => Navigator.pop(context, producto),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            // Icono
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.inventory_2,
+                                color: AppColors.primary,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+
+                            // Información del producto
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    producto.codigo ?? 'Sin código', // ✅ CORREGIDO: Manejar nullable
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    producto.nombre ?? 'Sin nombre', // ✅ CORREGIDO: Usar nombre en lugar de descripcion
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  // ✅ CORREGIDO: Mostrar código de barras en lugar de stock
+                                  if (producto.tieneCodigoBarras) ...[
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.qr_code,
+                                          size: 12,
+                                          color: AppColors.primary,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'CB: ${producto.codigoBarras}',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: AppColors.textSecondary,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+
+                            // Flecha
+                            Icon(
+                              Icons.arrow_forward_ios,
+                              size: 16,
+                              color: AppColors.textSecondary,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    title: Text(producto.codigo),
-                    subtitle: Text(producto.descripcion),
-                    trailing: Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () => Navigator.pop(context, producto),
                   ),
                 );
               },

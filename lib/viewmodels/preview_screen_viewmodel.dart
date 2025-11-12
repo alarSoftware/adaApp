@@ -13,6 +13,7 @@ import 'package:ada_app/services/censo/censo_log_service.dart';
 import 'package:ada_app/services/censo/censo_upload_service.dart';
 import 'package:ada_app/services/censo/censo_api_mapper.dart';
 import 'package:ada_app/services/censo/censo_foto_service.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart';
 
 final _logger = Logger();
 final Uuid _uuid = const Uuid();
@@ -30,10 +31,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   final AuthService _authService = AuthService();
 
-  // Nuevos servicios
   late final CensoLogService _logService;
   late final CensoUploadService _uploadService;
-
   late final CensoFotoService _fotoService;
 
   Usuario? _usuarioActual;
@@ -53,23 +52,59 @@ class PreviewScreenViewModel extends ChangeNotifier {
   bool get canConfirm => !_isProcessing && !_isSaving;
 
   Future<int> get _getUsuarioId async {
-    if (_usuarioActual != null && _usuarioActual!.id != null) {
-      return _usuarioActual!.id!;
+    try {
+      if (_usuarioActual != null && _usuarioActual!.id != null) {
+        return _usuarioActual!.id!;
+      }
+      _usuarioActual = await _authService.getCurrentUser();
+      if (_usuarioActual?.id != null) {
+        return _usuarioActual!.id!;
+      }
+
+      // 🚨 LOG: Usuario no encontrado
+      await ErrorLogService.logValidationError(
+        tableName: 'Users',
+        operation: 'get_usuario_id',
+        errorMessage: 'No se pudo obtener usuario actual, usando fallback',
+      );
+
+      _logger.w('No se pudo obtener usuario, usando ID 1 como fallback');
+      return 1;
+
+    } catch (e) {
+      // 🚨 LOG: Error obteniendo usuario
+      await ErrorLogService.logError(
+        tableName: 'Users',
+        operation: 'get_usuario_id',
+        errorMessage: 'Error obteniendo usuario: $e',
+        errorType: 'auth',
+      );
+
+      _logger.e('Error obteniendo usuario: $e');
+      return 1;
     }
-    _usuarioActual = await _authService.getCurrentUser();
-    if (_usuarioActual?.id != null) {
-      return _usuarioActual!.id!;
-    }
-    _logger.w('No se pudo obtener usuario, usando ID 1 como fallback');
-    return 1;
   }
 
   Future<String?> get _getEdfVendedorId async {
-    if (_usuarioActual != null) {
-      return _usuarioActual!.edfVendedorId;
+    try {
+      if (_usuarioActual != null) {
+        return _usuarioActual!.edfVendedorId;
+      }
+      _usuarioActual = await _authService.getCurrentUser();
+      return _usuarioActual?.edfVendedorId;
+
+    } catch (e) {
+      // 🚨 LOG: Error obteniendo edf_vendedor_id
+      await ErrorLogService.logError(
+        tableName: 'Users',
+        operation: 'get_edf_vendedor_id',
+        errorMessage: 'Error obteniendo edf_vendedor_id: $e',
+        errorType: 'auth',
+      );
+
+      _logger.e('Error obteniendo edf_vendedor_id: $e');
+      return null;
     }
-    _usuarioActual = await _authService.getCurrentUser();
-    return _usuarioActual?.edfVendedorId;
   }
 
   void _setSaving(bool saving) {
@@ -126,6 +161,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     _setSaving(true);
     _setStatusMessage(null);
     String? estadoIdActual;
+    String? userId;
 
     try {
       _logger.i('🔄 Confirmando registro [Process: $processId]');
@@ -139,20 +175,59 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final esNuevoEquipo = datos['es_nuevo_equipo'] as bool? ?? false;
       var equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
 
-      if (cliente == null) throw 'Cliente no encontrado';
-      if (cliente.id == null) throw 'El cliente no tiene ID';
+      // VALIDACIONES
+      if (cliente == null) {
+        // 🚨 LOG: Validación fallida - Cliente null
+        await ErrorLogService.logValidationError(
+          tableName: 'censo_activo',
+          operation: 'confirmar_registro',
+          errorMessage: 'Cliente no encontrado en los datos',
+        );
+        throw 'Cliente no encontrado';
+      }
+
+      if (cliente.id == null) {
+        // 🚨 LOG: Validación fallida - Cliente sin ID
+        await ErrorLogService.logValidationError(
+          tableName: 'censo_activo',
+          operation: 'confirmar_registro',
+          errorMessage: 'El cliente no tiene ID',
+        );
+        throw 'El cliente no tiene ID';
+      }
 
       final usuarioId = await _getUsuarioId;
+      userId = usuarioId.toString();
       final clienteId = _convertirAInt(cliente.id, 'cliente_id');
 
       // CREAR EQUIPO NUEVO SI CORRESPONDE
       String equipoId;
       if (esNuevoEquipo) {
-        equipoId = await _crearEquipoNuevo(datos, clienteId, processId);
+        equipoId = await _crearEquipoNuevo(datos, clienteId, processId, userId);
         equipoCompleto = _construirEquipoCompleto(datos, equipoId, clienteId);
       } else {
-        if (equipoCompleto == null) throw 'No se encontró información del equipo';
-        if (equipoCompleto['id'] == null) throw 'El equipo no tiene ID';
+        if (equipoCompleto == null) {
+          // 🚨 LOG: Validación fallida - Equipo no encontrado
+          await ErrorLogService.logValidationError(
+            tableName: 'censo_activo',
+            operation: 'confirmar_registro',
+            errorMessage: 'No se encontró información del equipo',
+            userId: userId,
+          );
+          throw 'No se encontró información del equipo';
+        }
+
+        if (equipoCompleto['id'] == null) {
+          // 🚨 LOG: Validación fallida - Equipo sin ID
+          await ErrorLogService.logValidationError(
+            tableName: 'censo_activo',
+            operation: 'confirmar_registro',
+            errorMessage: 'El equipo no tiene ID',
+            registroFailId: equipoCompleto.toString(),
+            userId: userId,
+          );
+          throw 'El equipo no tiene ID';
+        }
         equipoId = equipoCompleto['id'].toString();
       }
 
@@ -161,6 +236,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         equipoId,
         clienteId,
         processId,
+        userId,
       );
 
       // CREAR CENSO EN BD LOCAL
@@ -169,9 +245,16 @@ class PreviewScreenViewModel extends ChangeNotifier {
         clienteId: clienteId,
         datos: datos,
         processId: processId,
+        userId: userId,
       );
 
       if (estadoIdActual == null) {
+        // 🚨 LOG: Error creando estado
+        await ErrorLogService.logDatabaseError(
+          tableName: 'censo_activo',
+          operation: 'crear_estado',
+          errorMessage: 'No se pudo crear el estado en la base de datos',
+        );
         throw 'No se pudo crear el estado en la base de datos';
       }
 
@@ -199,7 +282,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       _logger.i('🔍 DATOS COMPLETOS: ID en datosCompletos: ${datosCompletos['id']}');
 
       // GUARDAR REGISTRO LOCAL
-      await _guardarRegistroLocal(datosCompletos);
+      await _guardarRegistroLocal(datosCompletos, userId);
 
       // SINCRONIZAR EN BACKGROUND
       _logger.i('🔍 SYNC: Pasando estadoId: $estadoIdActual');
@@ -218,8 +301,20 @@ class PreviewScreenViewModel extends ChangeNotifier {
         'estado_id': estadoIdActual,
         'equipo_completo': equipoCompleto,
       };
+
     } catch (e) {
       _logger.e('❌ Error crítico en confirmación: $e');
+
+      // 🚨 LOG: Error general en confirmación
+      await ErrorLogService.logError(
+        tableName: 'censo_activo',
+        operation: 'confirmar_registro',
+        errorMessage: 'Error crítico en confirmación: $e',
+        errorType: 'general',
+        registroFailId: estadoIdActual,
+        userId: userId,
+      );
+
       return {'success': false, 'error': 'Error guardando registro: $e'};
     } finally {
       _setSaving(false);
@@ -232,6 +327,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       Map<String, dynamic> datos,
       int clienteId,
       String processId,
+      String? userId,
       ) async {
     _setStatusMessage('Registrando equipo nuevo...');
 
@@ -250,8 +346,18 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       _logger.i('✅ Equipo nuevo creado: $equipoId');
       return equipoId;
+
     } catch (e) {
       _logger.e('❌ Error creando equipo: $e');
+
+      // 🚨 LOG: Error creando equipo
+      await ErrorLogService.logDatabaseError(
+        tableName: 'equipments',
+        operation: 'crear_equipo_nuevo',
+        errorMessage: 'Error registrando equipo nuevo: $e',
+        registroFailId: datos['codigo_barras']?.toString(),
+      );
+
       throw 'Error registrando equipo nuevo: $e';
     }
   }
@@ -280,6 +386,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       String equipoId,
       int clienteId,
       String processId,
+      String? userId,
       ) async {
     _setStatusMessage('Verificando estado del equipo...');
 
@@ -287,32 +394,56 @@ class PreviewScreenViewModel extends ChangeNotifier {
       throw 'Proceso cancelado';
     }
 
-    final yaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(
-      equipoId,
-      clienteId,
-    );
+    try {
+      final yaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(
+        equipoId,
+        clienteId,
+      );
 
-    _logger.i('Equipo $equipoId ya asignado: $yaAsignado');
+      _logger.i('Equipo $equipoId ya asignado: $yaAsignado');
 
-    if (!yaAsignado) {
-      _setStatusMessage('Registrando equipo pendiente...');
+      if (!yaAsignado) {
+        _setStatusMessage('Registrando equipo pendiente...');
 
-      if (_currentProcessId != processId) {
-        throw 'Proceso cancelado';
+        if (_currentProcessId != processId) {
+          throw 'Proceso cancelado';
+        }
+
+        try {
+          await _equipoPendienteRepository.procesarEscaneoCenso(
+            equipoId: equipoId,
+            clienteId: clienteId,
+          );
+          _logger.i('✅ Registro pendiente creado');
+
+        } catch (e) {
+          _logger.w('⚠️ Error registrando pendiente: $e');
+
+          // 🚨 LOG: Error en equipo pendiente (warning, no crítico)
+          await ErrorLogService.logDatabaseError(
+            tableName: 'equipos_pendientes',
+            operation: 'registrar_pendiente',
+            errorMessage: 'Error registrando equipo pendiente: $e',
+            registroFailId: equipoId,
+          );
+        }
       }
 
-      try {
-        await _equipoPendienteRepository.procesarEscaneoCenso(
-          equipoId: equipoId,
-          clienteId: clienteId,
-        );
-        _logger.i('✅ Registro pendiente creado');
-      } catch (e) {
-        _logger.w('⚠️ Error registrando pendiente: $e');
-      }
+      return yaAsignado;
+
+    } catch (e) {
+      _logger.e('❌ Error verificando asignación: $e');
+
+      // 🚨 LOG: Error verificando asignación
+      await ErrorLogService.logDatabaseError(
+        tableName: 'equipments',
+        operation: 'verificar_asignacion',
+        errorMessage: 'Error verificando asignación: $e',
+        registroFailId: equipoId,
+      );
+
+      throw 'Error verificando asignación: $e';
     }
-
-    return yaAsignado;
   }
 
   Future<String?> _crearCensoLocal({
@@ -320,6 +451,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     required int clienteId,
     required Map<String, dynamic> datos,
     required String processId,
+    String? userId,
   }) async {
     _setStatusMessage('Registrando censo...');
 
@@ -345,25 +477,50 @@ class PreviewScreenViewModel extends ChangeNotifier {
         return estadoCreado.id!;
       } else {
         _logger.w('⚠️ Estado creado sin ID');
+
+        // 🚨 LOG: Estado sin ID
+        await ErrorLogService.logDatabaseError(
+          tableName: 'censo_activo',
+          operation: 'crear_estado',
+          errorMessage: 'Estado creado pero sin ID retornado',
+          registroFailId: equipoId,
+        );
+
         return null;
       }
+
     } catch (e) {
       _logger.e('❌ Error creando estado: $e');
+
+      // 🚨 LOG: Error creando censo
+      await ErrorLogService.logDatabaseError(
+        tableName: 'censo_activo',
+        operation: 'crear_censo_local',
+        errorMessage: 'Error creando censo: $e',
+        registroFailId: equipoId,
+      );
+
       throw 'Error creando censo: $e';
     }
   }
 
-  Future<void> _guardarRegistroLocal(Map<String, dynamic> datos) async {
+  Future<void> _guardarRegistroLocal(Map<String, dynamic> datos, String? userId) async {
     try {
       final estadoId = datos['id'];
 
       if (estadoId == null) {
+        // 🚨 LOG: ID null al guardar
+        await ErrorLogService.logValidationError(
+          tableName: 'censo_activo',
+          operation: 'guardar_registro_local',
+          errorMessage: 'No se pudo obtener el ID del estado',
+          userId: userId,
+        );
         throw 'No se pudo obtener el ID del estado';
       }
 
       _logger.i('💾 Actualizando registro local con datos completos: $estadoId');
 
-      // Actualizar el registro existente con el usuario_id
       await _estadoEquipoRepository.dbHelper.actualizar(
         'censo_activo',
         {
@@ -375,8 +532,18 @@ class PreviewScreenViewModel extends ChangeNotifier {
       );
 
       _logger.i('✅ Registro actualizado con usuario_id: ${datos['usuario_id']}');
+
     } catch (e) {
       _logger.e('❌ Error guardando datos localmente: $e');
+
+      // 🚨 LOG: Error guardando localmente
+      await ErrorLogService.logDatabaseError(
+        tableName: 'censo_activo',
+        operation: 'guardar_registro_local',
+        errorMessage: 'Error guardando datos localmente: $e',
+        registroFailId: datos['id']?.toString(),
+      );
+
       throw 'Error guardando datos localmente: $e';
     }
   }
@@ -403,8 +570,18 @@ class PreviewScreenViewModel extends ChangeNotifier {
       return {
         'pendiente': (estadoCenso == 'creado' || estadoCenso == 'error') && sincronizado == 0,
       };
+
     } catch (e) {
       _logger.e('❌ Error verificando sincronización: $e');
+
+      // 🚨 LOG: Error verificando sincronización
+      await ErrorLogService.logDatabaseError(
+        tableName: 'censo_activo',
+        operation: 'verificar_sincronizacion',
+        errorMessage: 'Error verificando sincronización: $e',
+        registroFailId: estadoId,
+      );
+
       return {'pendiente': false};
     }
   }
@@ -473,8 +650,18 @@ class PreviewScreenViewModel extends ChangeNotifier {
         'fecha_creacion': estado['fecha_creacion'],
         'observaciones': estado['observaciones'],
       };
+
     } catch (e) {
       _logger.e('❌ Error obteniendo info: $e');
+
+      // 🚨 LOG: Error obteniendo info
+      await ErrorLogService.logDatabaseError(
+        tableName: 'censo_activo',
+        operation: 'obtener_info_sincronizacion',
+        errorMessage: 'Error consultando estado: $e',
+        registroFailId: estadoId,
+      );
+
       return {
         'pendiente': false,
         'estado': 'error',
@@ -486,14 +673,33 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> reintentarEnvio(String estadoId) async {
-    final usuarioId = await _getUsuarioId;
-    final edfVendedorId = await _getEdfVendedorId;
+    try {
+      final usuarioId = await _getUsuarioId;
+      final edfVendedorId = await _getEdfVendedorId;
 
-    return await _uploadService.reintentarEnvioCenso(
-      estadoId,
-      usuarioId,
-      edfVendedorId,
-    );
+      return await _uploadService.reintentarEnvioCenso(
+        estadoId,
+        usuarioId,
+        edfVendedorId,
+      );
+
+    } catch (e) {
+      _logger.e('❌ Error en reintento de envío: $e');
+
+      // 🚨 LOG: Error en reintento
+      await ErrorLogService.logError(
+        tableName: 'censo_activo',
+        operation: 'reintentar_envio',
+        errorMessage: 'Error al reintentar envío: $e',
+        errorType: 'retry',
+        registroFailId: estadoId,
+      );
+
+      return {
+        'success': false,
+        'error': 'Error al reintentar: $e',
+      };
+    }
   }
 
   // ==================== LOGS ====================

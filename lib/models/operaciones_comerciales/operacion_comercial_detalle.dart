@@ -5,6 +5,7 @@ class OperacionComercialDetalle {
   final String productoCodigo;
   final String productoDescripcion;
   final String? productoCategoria;
+  final int? productoId; // 👈 NUEVO CAMPO
   final double cantidad;
   final String unidadMedida;
   final String? ticket;
@@ -25,6 +26,7 @@ class OperacionComercialDetalle {
     required this.productoCodigo,
     required this.productoDescripcion,
     this.productoCategoria,
+    this.productoId, // 👈 NUEVO
     required this.cantidad,
     required this.unidadMedida,
     this.ticket,
@@ -45,6 +47,7 @@ class OperacionComercialDetalle {
       productoCodigo: map['producto_codigo'] as String? ?? '',
       productoDescripcion: map['producto_descripcion'] as String? ?? '',
       productoCategoria: map['producto_categoria'] as String?,
+      productoId: map['producto_id'] as int?, // 👈 NUEVO
       cantidad: (map['cantidad'] as num?)?.toDouble() ?? 0.0,
       unidadMedida: map['unidad_medida'] as String? ?? '',
       ticket: map['ticket'] as String?,
@@ -68,6 +71,7 @@ class OperacionComercialDetalle {
       'producto_codigo': productoCodigo,
       'producto_descripcion': productoDescripcion,
       'producto_categoria': productoCategoria,
+      'producto_id': productoId, // 👈 NUEVO
       'cantidad': cantidad,
       'unidad_medida': unidadMedida,
       'ticket': ticket,
@@ -88,6 +92,7 @@ class OperacionComercialDetalle {
       'producto_codigo': productoCodigo,
       'producto_descripcion': productoDescripcion,
       'producto_categoria': productoCategoria,
+      'producto_id': productoId, // 👈 NUEVO
       'cantidad': cantidad,
       'unidad_medida': unidadMedida,
       'ticket': ticket,
@@ -106,6 +111,7 @@ class OperacionComercialDetalle {
     String? productoCodigo,
     String? productoDescripcion,
     String? productoCategoria,
+    int? productoId, // 👈 NUEVO
     double? cantidad,
     String? unidadMedida,
     String? ticket,
@@ -124,6 +130,7 @@ class OperacionComercialDetalle {
       productoCodigo: productoCodigo ?? this.productoCodigo,
       productoDescripcion: productoDescripcion ?? this.productoDescripcion,
       productoCategoria: productoCategoria ?? this.productoCategoria,
+      productoId: productoId ?? this.productoId, // 👈 NUEVO
       cantidad: cantidad ?? this.cantidad,
       unidadMedida: unidadMedida ?? this.unidadMedida,
       ticket: ticket ?? this.ticket,
