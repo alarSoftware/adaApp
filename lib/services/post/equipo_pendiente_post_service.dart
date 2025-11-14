@@ -1,13 +1,15 @@
 import 'dart:convert';
-import 'dart:async'; // 🆕 AGREGAR
-import 'dart:io'; // 🆕 AGREGAR
+import 'dart:async';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
-import 'package:ada_app/services/error_log/error_log_service.dart'; // 🆕 AGREGAR
+import 'package:ada_app/services/error_log/error_log_service.dart';
 
 class EquiposPendientesApiService {
-  static const String _tableName = 'equipos_pendientes'; // 🆕 AGREGAR
-  static const String _endpoint = '/edfEquipoPendiente/insertEquipoPendiente'; // 🆕 AGREGAR
+  static const String _tableName = 'equipos_pendientes';
+  static const String _endpoint = '/edfEquipoPendiente/insertEquipoPendiente';
+  static const _uuid = Uuid();
 
   static Future<Map<String, dynamic>> enviarEquipoPendiente({
     required String equipoId,
@@ -157,7 +159,7 @@ class EquiposPendientesApiService {
     return {
       'equipoId': equipoId,
       'clienteId': clienteId.toString(),
-      'appId': DateTime.now().millisecondsSinceEpoch.toString(),
+      'appId': _uuid.v4(),
       'vendedorSucursalId': edfVendedorId,
     };
   }

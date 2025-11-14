@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/sync/dynamic_form_sync_service.dart';
+import 'package:ada_app/services/censo/censo_upload_service.dart';
 import 'package:ada_app/services/app_services.dart';
 import 'package:ada_app/models/usuario.dart';
 
@@ -35,7 +36,7 @@ class AuthService {
   static const String _keyCurrentUser = 'current_user';
   static const String _keyCurrentUserRole = 'current_user_role';
   static const String _keyLastLoginDate = 'last_login_date';
-  static const String _keyLastSyncedVendedor = 'last_synced_vendedor_id'; // NUEVA KEY
+  static const String _keyLastSyncedVendedor = 'last_synced_vendedor_id';
 
   // Singleton
   static AuthService? _instance;
@@ -350,7 +351,6 @@ class AuthService {
   }
 
 
-  // Login simplificado - solo valida contra base de datos local
   Future<AuthResult> login(String username, String password) async {
     logger.i('Intentando login para: $username');
 
@@ -386,7 +386,7 @@ class AuthService {
 
       await _saveLoginSuccess(usuarioAuth);
 
-      // 🆕 ÚNICA SECCIÓN NUEVA: INICIAR LOGGING
+      // 🆕 SECCIÓN DE LOGGING (ya existente)
       try {
         logger.i('🔐 Login exitoso - Iniciando logging persistente');
         await AppServices().inicializarEnLogin();
@@ -395,7 +395,20 @@ class AuthService {
         logger.e('💥 Error iniciando logging: $e');
         // No fallar el login por error en logging
       }
-      // 🆕 FIN SECCIÓN NUEVA
+
+      // ✅ NUEVA SECCIÓN: INICIAR SINCRONIZACIÓN AUTOMÁTICA
+      try {
+        if (usuario.id != null) {
+          CensoUploadService.iniciarSincronizacionAutomatica(usuario.id!);
+          logger.i('🚀 Sincronización automática iniciada para usuario ${usuario.id}');
+        } else {
+          logger.w('⚠️ Usuario sin ID, no se puede iniciar sincronización automática');
+        }
+      } catch (e) {
+        logger.e('💥 Error iniciando sincronización automática: $e');
+        // No fallar el login por error en sincronización
+      }
+      // ✅ FIN NUEVA SECCIÓN
 
       logger.i('Login exitoso para: $username');
       return AuthResult(
@@ -500,6 +513,7 @@ class AuthService {
     try {
       final prefs = await SharedPreferences.getInstance();
 
+      await prefs.remove(_keyHasLoggedIn);
       await prefs.remove(_keyCurrentUser);
       await prefs.remove(_keyCurrentUserRole);
 
@@ -526,6 +540,20 @@ class AuthService {
       }
 
       final usuarioAuth = UsuarioAuth.fromUsuario(currentUser);
+
+      // ✅ NUEVO: INICIAR SINCRONIZACIÓN AUTOMÁTICA
+      try {
+        if (currentUser.id != null) {
+          CensoUploadService.iniciarSincronizacionAutomatica(currentUser.id!);
+          logger.i('🚀 Sincronización automática iniciada para usuario ${currentUser.id}');
+        } else {
+          logger.w('⚠️ Usuario sin ID, no se puede iniciar sincronización automática');
+        }
+      } catch (e) {
+        logger.e('💥 Error iniciando sincronización automática: $e');
+        // No fallar el login por error en sincronización
+      }
+      // ✅ FIN NUEVO
 
       logger.i('Autenticación biométrica exitosa para: ${currentUser.username}');
       return AuthResult(

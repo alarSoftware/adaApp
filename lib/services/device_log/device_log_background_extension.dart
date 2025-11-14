@@ -19,7 +19,7 @@ class BackgroundLogConfig {
   static const int horaFin = 17;    // 5 PM
 
   // 🔄 INTERVALO
-  static const Duration intervalo = Duration(minutes: 1);
+  static const Duration intervalo = Duration(minutes: 10);
 
   // 🌐 LOCALHOST (puedes cambiarlo después)
   static const String baseUrl = "http://localhost:3000";

@@ -24,8 +24,9 @@ class LoginForm extends StatelessWidget {
           const SizedBox(height: 16),
           _buildPasswordField(),
           const SizedBox(height: 24),
-          _buildErrorMessage(),
           _buildLoginButton(),
+          const SizedBox(height: 16), // ✅ ESPACIO DESPUÉS DEL BOTÓN
+          _buildErrorMessage(), // ✅ ERROR ABAJO, NO EMPUJA EL BOTÓN
         ],
       ),
     );
@@ -122,7 +123,7 @@ class LoginForm extends StatelessWidget {
           ? Container(
         key: ValueKey(viewModel.errorMessage),
         padding: const EdgeInsets.all(16),
-        margin: const EdgeInsets.only(bottom: 24),
+        margin: const EdgeInsets.only(top: 8), // ✅ CAMBIO: top en lugar de bottom
         decoration: BoxDecoration(
           color: AppColors.errorContainer,
           borderRadius: BorderRadius.circular(8),

@@ -3,6 +3,8 @@ import 'package:ada_app/ui/screens/pending_data_screen.dart'; // 🆕 NUEVO
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/services/app_services.dart';
+import 'package:ada_app/services/auth_service.dart'; // ✅ IMPORT FALTANTE AÑADIDO
+import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart'; // ✅ NUEVO IMPORT
 import 'package:ada_app/ui/widgets/app_connection_indicator.dart';
 import 'package:ada_app/ui/screens/equipos_screen.dart';
 import 'package:ada_app/ui/screens/modelos_screen.dart';
@@ -33,12 +35,20 @@ class _SelectScreenState extends State<SelectScreen> {
   int _pendingDataCount = 0;
   Timer? _pendingDataTimer;
 
+  // ✅ NUEVO: Variable para evitar múltiples verificaciones de batería
+  bool _batteryOptimizationChecked = false;
+
   @override
   void initState() {
     super.initState();
     _viewModel = SelectScreenViewModel();
     _setupEventListener();
     _startPendingDataMonitoring(); // 🆕 NUEVO
+
+    // ✅ NUEVO: Verificar optimización de batería cuando se carga la pantalla
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkBatteryOptimizationOnFirstLoad();
+    });
   }
 
   @override
@@ -73,6 +83,71 @@ class _SelectScreenState extends State<SelectScreen> {
       }
     } catch (e) {
       // Silently ignore errors for background check
+    }
+  }
+
+  // ✅ NUEVO: Verificar optimización de batería en el primer acceso
+  Future<void> _checkBatteryOptimizationOnFirstLoad() async {
+    // Evitar múltiples verificaciones
+    if (_batteryOptimizationChecked) return;
+    _batteryOptimizationChecked = true;
+
+    try {
+      print('🔋 INICIANDO verificación de batería en SelectScreen...');
+      await BatteryOptimizationDialog.checkAndRequestBatteryOptimization(context);
+      print('🔋 ✅ COMPLETADO verificación de batería en SelectScreen');
+    } catch (e) {
+      print('🔋 ❌ ERROR verificando optimización de batería en SelectScreen: $e');
+    }
+  }
+
+  // ✅ NUEVO: Método para manejar logout correctamente
+  Future<void> _handleLogout() async {
+    try {
+      // Mostrar indicador de carga
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Center(
+          child: Card(
+            color: AppColors.surface,
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text(
+                    'Cerrando sesión...',
+                    style: TextStyle(color: AppColors.textPrimary),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Hacer logout
+      await AuthService().logout();
+
+      // Cerrar diálogo de carga
+      if (mounted) Navigator.of(context).pop();
+
+      // Navegar a login y limpiar stack completo
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/login',
+              (route) => false, // Elimina TODAS las pantallas anteriores
+        );
+      }
+    } catch (e) {
+      // Cerrar diálogo si está abierto
+      if (mounted) Navigator.of(context).pop();
+
+      _mostrarError('Error al cerrar sesión: $e');
     }
   }
 
@@ -796,40 +871,15 @@ class _SelectScreenState extends State<SelectScreen> {
                           page: const ProductosScreen(),
                         ),
                         SizedBox(height: 12),
-                        _buildMenuCard(
-                          label: 'Registro de Dispositivo',
-                          description: 'Ver datos del dispositivo registrados',
-                          icon: Icons.phone_android,
-                          color: AppColors.info,
-                          onTap: () async {
-                            try {
-                              final database = await DatabaseHelper().database;
-                              final repository = DeviceLogRepository(database);
-
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => DeviceLogScreen(
-                                    repository: repository,
-                                  ),
-                                ),
-                              );
-                            } catch (e) {
-                              _mostrarError('Error al abrir registro: $e');
-                            }
-                          },
-                        ),
                       ],
                     ),
                   ),
 
-                  // Botón de cerrar sesión
+                  // ✅ BOTÓN DE CERRAR SESIÓN CORREGIDO
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: TextButton.icon(
-                      onPressed: () {
-                        Navigator.pushReplacementNamed(context, '/login');
-                      },
+                      onPressed: _handleLogout, // ✅ Usar el método correcto
                       icon: Icon(Icons.logout, color: AppColors.textSecondary),
                       label: Text(
                         'Cerrar Sesión',

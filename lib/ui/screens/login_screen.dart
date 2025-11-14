@@ -6,19 +6,35 @@ import 'package:ada_app/ui/widgets/login/login_header.dart';
 import 'package:ada_app/ui/widgets/login/login_form.dart';
 import 'package:ada_app/ui/widgets/login/biometric_button.dart';
 import 'package:ada_app/ui/widgets/login/login_appbar.dart';
-import 'package:ada_app/ui/widgets/login/sync_dialog.dart';
 import 'package:ada_app/ui/widgets/login/delete_users_dialog.dart';
+import 'package:ada_app/ui/widgets/login/sync_dialog.dart'; // ✅ AGREGAR ESTE
 import 'package:ada_app/ui/common/snackbar_helper.dart';
+import 'dart:async';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  Widget build(BuildContext context) {
+    // ✅ PROVIDER AQUÍ ARRIBA
+    return ChangeNotifierProvider(
+      create: (_) => LoginScreenViewModel(),
+      child: const _LoginScreenContent(),
+    );
+  }
 }
 
-class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
+// ✅ CONTENIDO SEPARADO
+class _LoginScreenContent extends StatefulWidget {
+  const _LoginScreenContent();
+
+  @override
+  State<_LoginScreenContent> createState() => _LoginScreenContentState();
+}
+
+class _LoginScreenContentState extends State<_LoginScreenContent> with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
+  StreamSubscription? _eventSubscription;
 
   late AnimationController _fadeController;
   late AnimationController _slideController;
@@ -29,6 +45,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   void initState() {
     super.initState();
     _setupAnimations();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _setupEventListener();  // ✅ AHORA SÍ HAY PROVIDER DISPONIBLE
   }
 
   void _setupAnimations() {
@@ -62,110 +84,238 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     _slideController.forward();
   }
 
-  Future<void> _handleLogin(LoginScreenViewModel viewModel) async {
+  void _setupEventListener() {
+    final viewModel = context.read<LoginScreenViewModel>();
+
+    _eventSubscription?.cancel();
+    _eventSubscription = viewModel.uiEvents.listen((event) {
+      if (!mounted) return;
+
+      if (event is ShowErrorEvent) {
+        _handleShowError(event.message);
+      } else if (event is ShowSuccessEvent) {
+        _handleShowSuccess(event.message, event.icon);
+      } else if (event is NavigateToHomeEvent) {
+        _handleNavigateToHome();
+      } else if (event is ShowSyncRequiredDialogEvent) {
+        _handleShowSyncRequiredDialog(event);
+      } else if (event is ShowPendingRecordsDialogEvent) {
+        _handleShowPendingRecordsDialog(event);
+      } else if (event is SyncProgressEvent) {
+        _handleSyncProgress(event);
+      } else if (event is SyncCompletedEvent) {
+        _handleSyncCompleted(event);
+      }
+    });
+  }
+
+  // ========== MANEJADORES DE EVENTOS ==========
+
+  void _handleShowError(String message) {
+    SnackbarHelper.showError(context, message);
+  }
+
+  void _handleShowSuccess(String message, IconData? icon) {
+    SnackbarHelper.showSuccess(
+      context,
+      message,
+      icon ?? Icons.check,
+    );
+  }
+
+  void _handleNavigateToHome() {
+    Navigator.of(context).pushReplacementNamed('/home');
+  }
+
+  void _handleShowSyncRequiredDialog(ShowSyncRequiredDialogEvent event) {
+    final viewModel = context.read<LoginScreenViewModel>();
+
+    SyncDialog.show(
+      context: context,
+      viewModel: viewModel,
+      validation: event.validation,
+    );
+  }
+
+  void _handleShowPendingRecordsDialog(ShowPendingRecordsDialogEvent event) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => _buildPendingRecordsDialog(event.validationResult),
+    );
+  }
+
+  void _handleSyncProgress(SyncProgressEvent event) {
+    // El progreso ya se está mostrando en el diálogo de sincronización
+    // Este método está disponible por si necesitas hacer algo adicional
+  }
+
+  void _handleSyncCompleted(SyncCompletedEvent event) {
+    // La navegación al home se maneja con NavigateToHomeEvent
+    // Este método está disponible por si necesitas hacer algo adicional
+  }
+
+  // ========== ACCIONES DE UI ==========
+
+  Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final result = await viewModel.handleLogin();
-
-    if (mounted) {
-      if (result.success) {
-        if (result.requiresSync && result.syncValidation != null) {
-          await SyncDialog.show(
-            context: context,
-            viewModel: viewModel,
-            validation: result.syncValidation!,
-          );
-        } else {
-          SnackbarHelper.showSuccess(
-            context,
-            result.message,
-            result.icon ?? Icons.check,
-          );
-          Navigator.of(context).pushReplacementNamed('/home');
-        }
-      }
-    }
+    final viewModel = context.read<LoginScreenViewModel>();
+    await viewModel.handleLogin();
   }
 
-  Future<void> _handleBiometricLogin(LoginScreenViewModel viewModel) async {
-    final result = await viewModel.authenticateWithBiometric();
-
-    if (mounted) {
-      if (result.success) {
-        if (result.requiresSync && result.syncValidation != null) {
-          await SyncDialog.show(
-            context: context,
-            viewModel: viewModel,
-            validation: result.syncValidation!,
-          );
-        } else {
-          SnackbarHelper.showSuccess(
-            context,
-            result.message,
-            result.icon ?? Icons.check,
-          );
-          Navigator.of(context).pushReplacementNamed('/home');
-        }
-      } else {
-        SnackbarHelper.showError(context, result.message);
-      }
-    }
+  Future<void> _handleBiometricLogin() async {
+    final viewModel = context.read<LoginScreenViewModel>();
+    await viewModel.authenticateWithBiometric();
   }
 
-  Future<void> _handleSync(LoginScreenViewModel viewModel) async {
-    try {
-      final resultado = await viewModel.syncUsers();
-
-      if (mounted) {
-        if (resultado.exito) {
-          SnackbarHelper.showSuccess(
-            context,
-            '${resultado.itemsSincronizados} usuarios sincronizados',
-            Icons.cloud_done,
-          );
-        } else {
-          SnackbarHelper.showError(context, resultado.mensaje);
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        SnackbarHelper.showError(context, 'Error al sincronizar usuarios: $e');
-      }
-    }
+  Future<void> _handleSync() async {
+    final viewModel = context.read<LoginScreenViewModel>();
+    await viewModel.syncUsers();
   }
 
   Future<void> _handleDeleteUsers() async {
     final confirmed = await DeleteUsersDialog.show(context);
     if (confirmed == true && mounted) {
-      await _deleteUsersTable();
+      final viewModel = context.read<LoginScreenViewModel>();
+      await viewModel.deleteUsersTable();
     }
   }
 
-  Future<void> _deleteUsersTable() async {
-    try {
-      final viewModel = context.read<LoginScreenViewModel>();
-      final result = await viewModel.deleteUsersTable();
+  // ========== DIÁLOGOS ==========
 
-      if (mounted) {
-        if (result.exito) {
-          SnackbarHelper.showSuccess(
-            context,
-            result.mensaje,
-            Icons.delete_sweep,
-          );
-        } else {
-          SnackbarHelper.showError(context, result.mensaje);
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        SnackbarHelper.showError(context, 'Error al eliminar usuarios: $e');
-      }
-    }
+  Widget _buildPendingRecordsDialog(dynamic validationResult) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.warning_amber, color: Colors.orange, size: 28),
+          const SizedBox(width: 12),
+          const Text('Registros Pendientes'),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Hay registros que aún no han sido sincronizados con el servidor:',
+            style: TextStyle(fontSize: 15),
+          ),
+          const SizedBox(height: 16),
+          if (validationResult.pendingEquipments > 0)
+            _buildPendingItem(
+              Icons.devices,
+              'Equipos pendientes',
+              validationResult.pendingEquipments,
+            ),
+          if (validationResult.pendingCensus > 0)
+            _buildPendingItem(
+              Icons.assignment,
+              'Censos pendientes',
+              validationResult.pendingCensus,
+            ),
+          if (validationResult.pendingForms > 0)
+            _buildPendingItem(
+              Icons.description,
+              'Formularios pendientes',
+              validationResult.pendingForms,
+            ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Sincronice estos registros antes de continuar',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Entendido'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPendingItem(IconData icon, String label, int count) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.orange),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade100,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              count.toString(),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.orange.shade900,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   void dispose() {
+    _eventSubscription?.cancel();
     _fadeController.dispose();
     _slideController.dispose();
     super.dispose();
@@ -173,51 +323,48 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => LoginScreenViewModel(),
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        extendBodyBehindAppBar: true,
-        appBar: LoginAppBar(
-          onSync: (viewModel) => _handleSync(viewModel),
-          onDeleteUsers: _handleDeleteUsers,
-        ),
-        body: SafeArea(
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: SlideTransition(
-              position: _slideAnimation,
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Consumer<LoginScreenViewModel>(
-                    builder: (context, viewModel, child) {
-                      return Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SizedBox(height: 40),
-                          const LoginHeader(),
-                          const SizedBox(height: 48),
-                          LoginForm(
-                            formKey: _formKey,
-                            viewModel: viewModel,
-                            onSubmit: () => _handleLogin(viewModel),
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      extendBodyBehindAppBar: true,
+      appBar: LoginAppBar(
+        onSync: _handleSync,
+        onDeleteUsers: _handleDeleteUsers,
+      ),
+      body: SafeArea(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Consumer<LoginScreenViewModel>(
+                  builder: (context, viewModel, child) {
+                    return Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 40),
+                        const LoginHeader(),
+                        const SizedBox(height: 48),
+                        LoginForm(
+                          formKey: _formKey,
+                          viewModel: viewModel,
+                          onSubmit: _handleLogin,
+                        ),
+                        if (viewModel.biometricAvailable) ...[
+                          const SizedBox(height: 24),
+                          _buildDivider(),
+                          const SizedBox(height: 24),
+                          BiometricButton(
+                            onPressed: _handleBiometricLogin,
                           ),
-                          if (viewModel.biometricAvailable) ...[
-                            const SizedBox(height: 24),
-                            _buildDivider(),
-                            const SizedBox(height: 24),
-                            BiometricButton(
-                              onPressed: () => _handleBiometricLogin(viewModel),
-                            ),
-                          ],
-                          const SizedBox(height: 40),
-                          _buildFooter(),
                         ],
-                      );
-                    },
-                  ),
+                        const SizedBox(height: 40),
+                        _buildFooter(),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
