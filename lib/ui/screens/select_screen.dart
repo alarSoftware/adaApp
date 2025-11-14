@@ -1,21 +1,18 @@
-import 'package:ada_app/ui/screens/sync_panel_screen.dart';
-import 'package:ada_app/ui/screens/pending_data_screen.dart'; // 🆕 NUEVO
+
+import 'package:ada_app/ui/screens/pending_data_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
-import 'package:ada_app/services/app_services.dart';
-import 'package:ada_app/services/auth_service.dart'; // ✅ IMPORT FALTANTE AÑADIDO
-import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart'; // ✅ NUEVO IMPORT
+import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
 import 'package:ada_app/ui/widgets/app_connection_indicator.dart';
 import 'package:ada_app/ui/screens/equipos_screen.dart';
 import 'package:ada_app/ui/screens/modelos_screen.dart';
 import 'package:ada_app/ui/screens/logo_screen.dart';
 import 'package:ada_app/ui/screens/marca_screen.dart';
-import 'package:ada_app/ui/screens/device_log_screen.dart';
 import 'package:ada_app/viewmodels/select_screen_viewmodel.dart';
 import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
 import 'package:ada_app/services/database_validation_service.dart';
 import 'package:ada_app/services/database_helper.dart';
-import 'package:ada_app/repositories/device_log_repository.dart';
 import 'package:ada_app/ui/screens/productos_screen.dart';
 import 'dart:async';
 
@@ -205,6 +202,8 @@ class _SelectScreenState extends State<SelectScreen> {
       ],
     );
   }
+
+
 
   void _setupEventListener() {
     _eventSubscription = _viewModel.uiEvents.listen((event) {

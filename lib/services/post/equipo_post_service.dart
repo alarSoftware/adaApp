@@ -1,16 +1,17 @@
+// lib/services/post/equipo_post_service.dart
+
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:uuid/uuid.dart';
-import 'package:ada_app/services/sync/base_sync_service.dart';
-import 'package:ada_app/services/error_log/error_log_service.dart';
+import 'package:logger/logger.dart';
+import 'package:ada_app/services/api_config_service.dart';
 
 class EquipoPostService {
-  static const String _tableName = 'equipo';
+  static final Logger _logger = Logger();
   static const String _endpoint = '/edfEquipo/insertEdfEquipo/';
-  static const _uuid = Uuid();
 
+  /// Enviar equipo nuevo al servidor
   static Future<Map<String, dynamic>> enviarEquipoNuevo({
     required String equipoId,
     required String codigoBarras,
@@ -21,12 +22,10 @@ class EquipoPostService {
     String? clienteId,
     required String edfVendedorId,
   }) async {
-    String? fullEndpoint;
-
     try {
-      BaseSyncService.logger.i('💡 Enviando equipo nuevo...');
+      _logger.i('📤 Enviando equipo: $equipoId');
 
-      // ✅ Llamar al método _construirPayload (que está abajo)
+      // ✅ Construir payload que coincide con EdfEquipo.groovy
       final payload = _construirPayload(
         equipoId: equipoId,
         codigoBarras: codigoBarras,
@@ -38,135 +37,58 @@ class EquipoPostService {
         edfVendedorId: edfVendedorId,
       );
 
-      BaseSyncService.logger.i('📦 Payload completo: $payload');
-      print(jsonEncode(payload));
+      _logger.i('📦 Payload:');
+      _logger.i(jsonEncode(payload));
 
-      final baseUrl = await BaseSyncService.getBaseUrl();
-      fullEndpoint = '$baseUrl$_endpoint';
+      // Obtener URL completa
+      final baseUrl = await ApiConfigService.getBaseUrl();
+      final fullUrl = '$baseUrl$_endpoint';
 
+      _logger.i('🌐 URL: $fullUrl');
+
+      // Enviar al servidor
       final response = await http.post(
-        Uri.parse(fullEndpoint),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse(fullUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: jsonEncode(payload),
-      ).timeout(BaseSyncService.timeout);
+      ).timeout(Duration(seconds: 60));
 
-      BaseSyncService.logger.i('📥 Respuesta HTTP: ${response.statusCode}');
-      BaseSyncService.logger.i('📄 Body respuesta: ${response.body}');
+      _logger.i('📥 Response Status: ${response.statusCode}');
+      _logger.i('📄 Response Body: ${response.body}');
 
-      final result = _procesarRespuesta(response);
-
-      // 🚨 LOG: Si hubo error del servidor
-      if (!result['exito'] && response.statusCode >= 400) {
-        await ErrorLogService.logServerError(
-          tableName: _tableName,
-          operation: 'POST',
-          errorMessage: result['mensaje'],
-          errorCode: response.statusCode.toString(),
-          registroFailId: equipoId,
-          endpoint: fullEndpoint,
-          userId: edfVendedorId,
-        );
-      }
-
-      return result;
+      // Procesar respuesta
+      return _procesarRespuesta(response);
 
     } on TimeoutException catch (e) {
-      BaseSyncService.logger.e('⏰ Timeout: $e');
-
-      // 🚨 LOG: Timeout
-      await ErrorLogService.logNetworkError(
-        tableName: _tableName,
-        operation: 'POST',
-        errorMessage: 'Timeout al enviar equipo nuevo: $e',
-        registroFailId: equipoId,
-        endpoint: fullEndpoint ?? _endpoint,
-        userId: edfVendedorId,
-      );
-
+      _logger.e('⏰ Timeout: $e');
       return {
         'exito': false,
-        'mensaje': 'Tiempo de espera agotado'
+        'mensaje': 'Tiempo de espera agotado',
+        'error': e.toString(),
       };
 
     } on SocketException catch (e) {
-      BaseSyncService.logger.e('📡 Error de red: $e');
-
-      // 🚨 LOG: Error de red
-      await ErrorLogService.logNetworkError(
-        tableName: _tableName,
-        operation: 'POST',
-        errorMessage: 'Sin conexión de red: $e',
-        registroFailId: equipoId,
-        endpoint: fullEndpoint ?? _endpoint,
-        userId: edfVendedorId,
-      );
-
+      _logger.e('📡 Sin conexión: $e');
       return {
         'exito': false,
-        'mensaje': 'Sin conexión de red'
-      };
-
-    } on http.ClientException catch (e) {
-      BaseSyncService.logger.e('🌐 Error de cliente HTTP: $e');
-
-      // 🚨 LOG: Error de cliente HTTP
-      await ErrorLogService.logNetworkError(
-        tableName: _tableName,
-        operation: 'POST',
-        errorMessage: 'Error de cliente HTTP: ${e.message}',
-        registroFailId: equipoId,
-        endpoint: fullEndpoint ?? _endpoint,
-        userId: edfVendedorId,
-      );
-
-      return {
-        'exito': false,
-        'mensaje': 'Error de red: ${e.message}'
-      };
-
-    } on FormatException catch (e) {
-      BaseSyncService.logger.e('📄 Error de formato JSON: $e');
-
-      // 🚨 LOG: Error de formato
-      await ErrorLogService.logError(
-        tableName: _tableName,
-        operation: 'POST',
-        errorMessage: 'Error de formato en payload: $e',
-        errorType: 'format',
-        errorCode: 'FORMAT_ERROR',
-        registroFailId: equipoId,
-        endpoint: fullEndpoint ?? _endpoint,
-        userId: edfVendedorId,
-      );
-
-      return {
-        'exito': false,
-        'mensaje': 'Error de formato en la petición'
+        'mensaje': 'Sin conexión de red',
+        'error': e.toString(),
       };
 
     } catch (e) {
-      BaseSyncService.logger.e('❌ Error general: $e');
-
-      // 🚨 LOG: Error general
-      await ErrorLogService.logError(
-        tableName: _tableName,
-        operation: 'POST',
-        errorMessage: 'Error general al enviar equipo nuevo: $e',
-        errorType: 'unknown',
-        errorCode: 'POST_FAILED',
-        registroFailId: equipoId,
-        endpoint: fullEndpoint ?? _endpoint,
-        userId: edfVendedorId,
-      );
-
+      _logger.e('❌ Error: $e');
       return {
         'exito': false,
-        'mensaje': 'Error de conexión: $e'
+        'mensaje': 'Error: $e',
+        'error': e.toString(),
       };
     }
   }
 
-  // ✅ ESTA ES LA ÚNICA DECLARACIÓN DEL MÉTODO
+  /// ✅ Construir payload según tu clase EdfEquipo.groovy
   static Map<String, dynamic> _construirPayload({
     required String equipoId,
     required String codigoBarras,
@@ -177,187 +99,112 @@ class EquipoPostService {
     String? clienteId,
     required String edfVendedorId,
   }) {
+    final now = DateTime.now().toIso8601String();
+
+    // Según tu clase Groovy EdfEquipo:
     return {
-      'id': equipoId,
-      'cod_barras': codigoBarras,
-      'marca_id': marcaId,
-      'modelo_id': modeloId,
-      'logo_id': logoId,
-      'numero_serie': numeroSerie,
-      'cliente_id': clienteId,
-      'app_insert': 1,
-      'appId': _uuid.v4(),
-      'vendedorSucursalId': edfVendedorId,
-      'fecha_creacion': DateTime.now().toIso8601String(),  // 🆕 AGREGADO
+      // IDs principales
+      'id': equipoId,                      // id (text)
+      'equipoId': equipoId,                // equipoId (text)
+
+      // IDs de relaciones (según Groovy)
+      'marcaId': marcaId.toString(),       // marcaId (text en Groovy)
+      'edfModeloId': modeloId,             // edfModeloId (Long)
+      'edfLogoId': logoId,                 // edfLogoId (Long)
+
+      // Campos de texto
+      'codigoBarras': codigoBarras,        // codigoBarras (nuevo campo)
+      'numSerie': numeroSerie,             // numSerie (text)
+      'equipo': codigoBarras,              // equipo (text) - descripción
+
+      // Cliente
+      'clienteId': clienteId,              // clienteId (text)
+
+      // Flags booleanos
+      'appInsert': true,                   // appInsert (Boolean)
+      'esActivo': true,                    // esActivo (Boolean)
+      'esDisponible': true,                // esDisponible (Boolean)
+      'esAplicaCenso': true,               // esAplicaCenso (Boolean)
+
+      // Fechas
+      'fecha': now,                        // fecha (Date)
+
+      // Metadata
+      'vendedorSucursalId': edfVendedorId, // Para tracking
+      'version': 0,                        // version de GORM
     };
   }
 
+  /// Procesar respuesta del servidor
   static Map<String, dynamic> _procesarRespuesta(http.Response response) {
+    // Si el status no es 2xx
     if (response.statusCode < 200 || response.statusCode >= 300) {
       return {
         'exito': false,
-        'mensaje': 'Error del servidor: ${response.statusCode}'
+        'mensaje': 'Error del servidor: ${response.statusCode}',
+        'status_code': response.statusCode,
       };
     }
 
     try {
+      // Intentar parsear como JSON
       final body = jsonDecode(response.body);
 
-      // Ajustar según la respuesta de tu backend Grails
+      // Si viene con serverAction
+      if (body is Map && body.containsKey('serverAction')) {
+        final serverAction = body['serverAction'];
+
+        if (serverAction == 100) {
+          return {
+            'exito': true,
+            'mensaje': body['resultMessage'] ?? 'Equipo registrado',
+            'servidor_id': body['resultId'],
+            'server_action': serverAction,
+          };
+        } else {
+          return {
+            'exito': false,
+            'mensaje': body['resultError'] ?? body['resultMessage'] ?? 'Error del servidor',
+            'server_action': serverAction,
+          };
+        }
+      }
+
+      // Si es otro formato JSON
       if (body is Map && body['success'] == true) {
         return {
           'exito': true,
           'mensaje': 'Equipo registrado correctamente',
-          'data': body
-        };
-      } else if (response.body.contains('REGISTRADO') ||
-          response.body.contains('éxito')) {
-        return {
-          'exito': true,
-          'mensaje': 'Equipo registrado correctamente'
-        };
-      } else if (response.body.contains('ya existe') ||
-          response.body.contains('duplicado')) {
-        return {
-          'exito': true,
-          'mensaje': 'Equipo ya estaba registrado'
-        };
-      } else {
-        return {
-          'exito': false,
-          'mensaje': response.body
+          'data': body,
         };
       }
-    } catch (e) {
-      // Si no es JSON, procesar como texto
-      final body = response.body;
-      if (body.contains('REGISTRADO') || body.contains('éxito')) {
-        return {
-          'exito': true,
-          'mensaje': 'Equipo registrado correctamente'
-        };
-      } else {
-        return {
-          'exito': false,
-          'mensaje': body
-        };
-      }
-    }
-  }
-
-  /// 🆕 Método para reintentar envío
-  static Future<Map<String, dynamic>> reintentarEnvio({
-    required String equipoId,
-    required String codigoBarras,
-    required int marcaId,
-    required int modeloId,
-    required int logoId,
-    String? numeroSerie,
-    String? clienteId,
-    required String edfVendedorId,
-    int intentoNumero = 1,
-  }) async {
-    BaseSyncService.logger.i('🔁 Reintentando equipo: $equipoId (Intento #$intentoNumero)');
-
-    final result = await enviarEquipoNuevo(
-      equipoId: equipoId,
-      codigoBarras: codigoBarras,
-      marcaId: marcaId,
-      modeloId: modeloId,
-      logoId: logoId,
-      numeroSerie: numeroSerie,
-      clienteId: clienteId,
-      edfVendedorId: edfVendedorId,
-    );
-
-    // Loguear reintento fallido
-    if (!result['exito']) {
-      await ErrorLogService.logError(
-        tableName: _tableName,
-        operation: 'RETRY_POST',
-        errorMessage: 'Reintento #$intentoNumero falló: ${result['mensaje']}',
-        errorType: 'retry_failed',
-        registroFailId: equipoId,
-        syncAttempt: intentoNumero,
-        userId: edfVendedorId,
-      );
-    }
-
-    return result;
-  }
-
-  /// 🆕 Verificar si un equipo ya existe en el servidor
-  static Future<Map<String, dynamic>> verificarEquipoExiste(
-      String codigoBarras,
-      ) async {
-    String? fullEndpoint;
-
-    try {
-      final baseUrl = await BaseSyncService.getBaseUrl();
-      fullEndpoint = '$baseUrl/edfEquipo/existe/$codigoBarras';
-
-      final response = await http.get(
-        Uri.parse(fullEndpoint),
-        headers: {'Content-Type': 'application/json'},
-      ).timeout(BaseSyncService.timeout);
-
-      if (response.statusCode == 200) {
-        final body = jsonDecode(response.body);
-        return {
-          'exito': true,
-          'existe': body['existe'] ?? false,
-          'data': body
-        };
-      }
-
-      return {
-        'exito': false,
-        'mensaje': 'Error verificando equipo: ${response.statusCode}'
-      };
 
     } catch (e) {
-      BaseSyncService.logger.e('❌ Error verificando equipo: $e');
+      _logger.w('⚠️ No es JSON, procesando como texto: $e');
+    }
+
+    // Procesar como texto plano
+    final bodyText = response.body.toLowerCase();
+
+    if (bodyText.contains('registrado') ||
+        bodyText.contains('éxito') ||
+        bodyText.contains('success')) {
       return {
-        'exito': false,
-        'mensaje': 'Error de conexión: $e'
+        'exito': true,
+        'mensaje': 'Equipo registrado correctamente',
       };
     }
-  }
 
-  /// 🆕 Obtener equipo del servidor por código
-  static Future<Map<String, dynamic>> obtenerEquipoPorCodigo(
-      String codigoBarras,
-      ) async {
-    String? fullEndpoint;
-
-    try {
-      final baseUrl = await BaseSyncService.getBaseUrl();
-      fullEndpoint = '$baseUrl/edfEquipo/buscar/$codigoBarras';
-
-      final response = await http.get(
-        Uri.parse(fullEndpoint),
-        headers: {'Content-Type': 'application/json'},
-      ).timeout(BaseSyncService.timeout);
-
-      if (response.statusCode == 200) {
-        final body = jsonDecode(response.body);
-        return {
-          'exito': true,
-          'equipo': body,
-        };
-      }
-
+    if (bodyText.contains('ya existe') || bodyText.contains('duplicado')) {
       return {
-        'exito': false,
-        'mensaje': 'Equipo no encontrado'
-      };
-
-    } catch (e) {
-      BaseSyncService.logger.e('❌ Error obteniendo equipo: $e');
-      return {
-        'exito': false,
-        'mensaje': 'Error de conexión: $e'
+        'exito': true,
+        'mensaje': 'Equipo ya estaba registrado',
       };
     }
+
+    return {
+      'exito': false,
+      'mensaje': response.body,
+    };
   }
 }

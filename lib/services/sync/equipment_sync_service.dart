@@ -13,7 +13,6 @@ class EquipmentSyncService extends BaseSyncService {
 
   static Future<SyncResult> sincronizarMarcas() async {
     try {
-      // CAMBIO AQUÍ: Obtener la URL dinámica
       final baseUrl = await BaseSyncService.getBaseUrl();
 
       final response = await http.get(
@@ -38,14 +37,17 @@ class EquipmentSyncService extends BaseSyncService {
           marcasAPI = responseData;
         }
 
-        final marcasValidas = marcasAPI.where((marca) {
+        final marcasValidas = marcasAPI
+            .where((marca) {
           return marca != null &&
               marca['marca'] != null &&
               marca['marca'].toString().trim().isNotEmpty;
-        }).toList();
+        })
+            .map((marca) => Map<String, dynamic>.from(marca as Map))
+            .toList();
 
         if (marcasValidas.isNotEmpty) {
-          await _dbHelper.sincronizarMarcas(marcasValidas);
+          await _dbHelper.vaciarEInsertar('marcas', marcasValidas);
           BaseSyncService.logger.i('Marcas sincronizadas: ${marcasValidas.length} de ${marcasAPI.length}');
 
           return SyncResult(
@@ -82,7 +84,6 @@ class EquipmentSyncService extends BaseSyncService {
 
   static Future<SyncResult> sincronizarModelos() async {
     try {
-      // CAMBIO AQUÍ: Obtener la URL dinámica
       final baseUrl = await BaseSyncService.getBaseUrl();
 
       final response = await http.get(
@@ -107,19 +108,22 @@ class EquipmentSyncService extends BaseSyncService {
           modelosAPI = responseData;
         }
 
-        final modelosValidos = modelosAPI.where((modelo) {
+        final modelosValidos = modelosAPI
+            .where((modelo) {
           return modelo != null &&
               modelo['modelo'] != null &&
               modelo['modelo'].toString().trim().isNotEmpty;
-        }).map((modelo) {
-          return {
+        })
+            .map((modelo) {
+          return <String, dynamic>{
             'id': modelo['id'],
             'nombre': modelo['modelo'],
           };
-        }).toList();
+        })
+            .toList();
 
         if (modelosValidos.isNotEmpty) {
-          await _dbHelper.sincronizarModelos(modelosValidos);
+          await _dbHelper.vaciarEInsertar('modelos', modelosValidos);
           BaseSyncService.logger.i('Modelos sincronizados: ${modelosValidos.length} de ${modelosAPI.length}');
 
           return SyncResult(
@@ -156,7 +160,6 @@ class EquipmentSyncService extends BaseSyncService {
 
   static Future<SyncResult> sincronizarLogos() async {
     try {
-      // CAMBIO AQUÍ: Obtener la URL dinámica
       final baseUrl = await BaseSyncService.getBaseUrl();
 
       final response = await http.get(
@@ -181,14 +184,18 @@ class EquipmentSyncService extends BaseSyncService {
           logosAPI = responseData;
         }
 
-        if (logosAPI.isNotEmpty) {
-          await _dbHelper.sincronizarLogos(logosAPI);
-          BaseSyncService.logger.i('Logos sincronizados: ${logosAPI.length}');
+        final logosValidos = logosAPI
+            .map((logo) => Map<String, dynamic>.from(logo as Map))
+            .toList();
+
+        if (logosValidos.isNotEmpty) {
+          await _dbHelper.vaciarEInsertar('logos', logosValidos);
+          BaseSyncService.logger.i('Logos sincronizados: ${logosValidos.length}');
 
           return SyncResult(
             exito: true,
             mensaje: 'Logos sincronizados correctamente',
-            itemsSincronizados: logosAPI.length,
+            itemsSincronizados: logosValidos.length,
           );
         } else {
           BaseSyncService.logger.w('No se encontraron logos en la respuesta');
@@ -220,7 +227,6 @@ class EquipmentSyncService extends BaseSyncService {
     try {
       BaseSyncService.logger.i('🔄 Iniciando sincronización de equipos...');
 
-      // CAMBIO AQUÍ: Obtener la URL dinámica
       final baseUrl = await BaseSyncService.getBaseUrl();
 
       final response = await http.get(
@@ -234,14 +240,11 @@ class EquipmentSyncService extends BaseSyncService {
         final List<dynamic> equiposData = BaseSyncService.parseResponse(response.body);
         BaseSyncService.logger.i('📊 Equipos parseados: ${equiposData.length}');
 
-        if (equiposData.isEmpty) {
-          return SyncResult(
-            exito: true,
-            mensaje: 'No hay equipos en el servidor',
-            itemsSincronizados: 0,
-          );
-        }
+        final equipos = <Equipo>[];
+        int procesados = 0;
+        int conCodigo = 0;
 
+        // Procesar equipos (si hay)
         if (equiposData.isNotEmpty) {
           BaseSyncService.logger.i('PRIMER EQUIPO DE LA API:');
           final primer = equiposData.first;
@@ -253,10 +256,6 @@ class EquipmentSyncService extends BaseSyncService {
           BaseSyncService.logger.i('- numSerie: ${primer['numSerie']}');
           BaseSyncService.logger.i('- equipo (modelo): ${primer['equipo']}');
         }
-
-        final equipos = <Equipo>[];
-        int procesados = 0;
-        int conCodigo = 0;
 
         for (var equipoJson in equiposData) {
           try {
@@ -280,9 +279,19 @@ class EquipmentSyncService extends BaseSyncService {
         BaseSyncService.logger.i('- Equipos procesados: $procesados de ${equiposData.length}');
         BaseSyncService.logger.i('- Con código de barras: $conCodigo');
 
-        BaseSyncService.logger.i('💾 Guardando en base de datos...');
+        // Vaciar e insertar (incluso si la lista está vacía, esto limpia la tabla)
+        BaseSyncService.logger.i('💾 Sincronizando base de datos...');
         final equiposMapas = equipos.map((e) => e.toMap()).toList();
-        await _equipoRepo.limpiarYSincronizar(equiposMapas);
+        await _dbHelper.vaciarEInsertar('equipos', equiposMapas);
+
+        if (equiposMapas.isEmpty) {
+          BaseSyncService.logger.i('✅ Tabla limpiada, no hay equipos en el servidor');
+          return SyncResult(
+            exito: true,
+            mensaje: 'Tabla limpiada - No hay equipos en el servidor',
+            itemsSincronizados: 0,
+          );
+        }
 
         return SyncResult(
           exito: true,
@@ -321,8 +330,6 @@ class EquipmentSyncService extends BaseSyncService {
       if (registrosPendientes.isEmpty) return 0;
 
       int exitosos = 0;
-
-      // CAMBIO AQUÍ: Obtener la URL dinámica UNA VEZ fuera del loop
       final baseUrl = await BaseSyncService.getBaseUrl();
 
       for (final registro in registrosPendientes) {

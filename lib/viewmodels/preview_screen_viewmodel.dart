@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'dart:async';
+import 'dart:io';
 import 'package:uuid/uuid.dart';
 import '../../models/cliente.dart';
 import '../../models/usuario.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
+import 'package:ada_app/services/post/equipo_post_service.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
@@ -61,7 +63,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
         return _usuarioActual!.id!;
       }
 
-      // 🚨 LOG: Usuario no encontrado
       await ErrorLogService.logValidationError(
         tableName: 'Users',
         operation: 'get_usuario_id',
@@ -72,7 +73,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       return 1;
 
     } catch (e) {
-      // 🚨 LOG: Error obteniendo usuario
       await ErrorLogService.logError(
         tableName: 'Users',
         operation: 'get_usuario_id',
@@ -94,7 +94,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       return _usuarioActual?.edfVendedorId;
 
     } catch (e) {
-      // 🚨 LOG: Error obteniendo edf_vendedor_id
       await ErrorLogService.logError(
         tableName: 'Users',
         operation: 'get_edf_vendedor_id',
@@ -177,7 +176,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       // VALIDACIONES
       if (cliente == null) {
-        // 🚨 LOG: Validación fallida - Cliente null
         await ErrorLogService.logValidationError(
           tableName: 'censo_activo',
           operation: 'confirmar_registro',
@@ -187,7 +185,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
 
       if (cliente.id == null) {
-        // 🚨 LOG: Validación fallida - Cliente sin ID
         await ErrorLogService.logValidationError(
           tableName: 'censo_activo',
           operation: 'confirmar_registro',
@@ -207,7 +204,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
         equipoCompleto = _construirEquipoCompleto(datos, equipoId, clienteId);
       } else {
         if (equipoCompleto == null) {
-          // 🚨 LOG: Validación fallida - Equipo no encontrado
           await ErrorLogService.logValidationError(
             tableName: 'censo_activo',
             operation: 'confirmar_registro',
@@ -218,7 +214,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
         }
 
         if (equipoCompleto['id'] == null) {
-          // 🚨 LOG: Validación fallida - Equipo sin ID
           await ErrorLogService.logValidationError(
             tableName: 'censo_activo',
             operation: 'confirmar_registro',
@@ -249,7 +244,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       );
 
       if (estadoIdActual == null) {
-        // 🚨 LOG: Error creando estado
         await ErrorLogService.logDatabaseError(
           tableName: 'censo_activo',
           operation: 'crear_estado',
@@ -305,7 +299,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     } catch (e) {
       _logger.e('❌ Error crítico en confirmación: $e');
 
-      // 🚨 LOG: Error general en confirmación
       await ErrorLogService.logError(
         tableName: 'censo_activo',
         operation: 'confirmar_registro',
@@ -335,8 +328,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
       throw 'Proceso cancelado';
     }
 
+    String? equipoId;
+
     try {
-      final equipoId = await _equipoRepository.crearEquipoNuevo(
+      // 1️⃣ GUARDAR LOCALMENTE PRIMERO (offline-first)
+      equipoId = await _equipoRepository.crearEquipoNuevo(
         codigoBarras: datos['codigo_barras']?.toString() ?? '',
         marcaId: _safeCastToInt(datos['marca_id'], 'marca_id') ?? 1,
         modeloId: _safeCastToInt(datos['modelo_id'], 'modelo_id') ?? 1,
@@ -344,13 +340,25 @@ class PreviewScreenViewModel extends ChangeNotifier {
         logoId: _safeCastToInt(datos['logo_id'], 'logo_id') ?? 1,
       );
 
-      _logger.i('✅ Equipo nuevo creado: $equipoId');
+      _logger.i('✅ Equipo creado localmente: $equipoId');
+
+      // 2️⃣ INTENTAR ENVIAR AL SERVIDOR (en background, no bloquea el flujo)
+      _enviarEquipoAlServidorAsync(
+        equipoId: equipoId,
+        codigoBarras: datos['codigo_barras']?.toString() ?? '',
+        marcaId: _safeCastToInt(datos['marca_id'], 'marca_id') ?? 1,
+        modeloId: _safeCastToInt(datos['modelo_id'], 'modelo_id') ?? 1,
+        logoId: _safeCastToInt(datos['logo_id'], 'logo_id') ?? 1,
+        numeroSerie: datos['numero_serie']?.toString(),
+        clienteId: clienteId,
+        userId: userId,
+      );
+
       return equipoId;
 
-    } catch (e) {
-      _logger.e('❌ Error creando equipo: $e');
+    } catch (e, stackTrace) {
+      _logger.e('❌ Error creando equipo: $e', stackTrace: stackTrace);
 
-      // 🚨 LOG: Error creando equipo
       await ErrorLogService.logDatabaseError(
         tableName: 'equipments',
         operation: 'crear_equipo_nuevo',
@@ -360,6 +368,108 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       throw 'Error registrando equipo nuevo: $e';
     }
+  }
+
+  /// 🆕 NUEVO: Enviar equipo al servidor en background (sin bloquear)
+  void _enviarEquipoAlServidorAsync({
+    required String equipoId,
+    required String codigoBarras,
+    required int marcaId,
+    required int modeloId,
+    required int logoId,
+    String? numeroSerie,
+    required int clienteId,
+    String? userId,
+  }) {
+    // Ejecutar en background
+    Future(() async {
+      try {
+        _logger.i('📤 Intentando enviar equipo al servidor: $equipoId');
+
+        // Obtener edfVendedorId
+        final edfVendedorId = await _getEdfVendedorId;
+
+        if (edfVendedorId == null || edfVendedorId.isEmpty) {
+          _logger.w('⚠️ No se pudo obtener edfVendedorId, no se enviará al servidor');
+
+          await ErrorLogService.logValidationError(
+            tableName: 'equipments',
+            operation: 'POST',
+            errorMessage: 'edfVendedorId no disponible',
+            registroFailId: equipoId,
+            userId: userId,
+          );
+          return;
+        }
+
+        // Intentar enviar al servidor
+        final resultado = await EquipoPostService.enviarEquipoNuevo(
+          equipoId: equipoId,
+          codigoBarras: codigoBarras,
+          marcaId: marcaId,
+          modeloId: modeloId,
+          logoId: logoId,
+          numeroSerie: numeroSerie,
+          clienteId: clienteId.toString(),
+          edfVendedorId: edfVendedorId,
+        );
+
+        if (resultado['exito'] == true) {
+          // ✅ Éxito - marcar como sincronizado
+          await _equipoRepository.marcarEquipoComoSincronizado(equipoId);
+          _logger.i('✅ Equipo $equipoId enviado y sincronizado correctamente');
+        } else {
+          // ⚠️ Error del servidor
+          _logger.w('⚠️ Error enviando equipo $equipoId: ${resultado['mensaje']}');
+
+          await ErrorLogService.logError(
+            tableName: 'equipments',
+            operation: 'POST',
+            errorMessage: 'Error del servidor: ${resultado['mensaje']}',
+            errorType: 'server',
+            registroFailId: equipoId,
+            userId: userId,
+          );
+        }
+
+      } on SocketException catch (e) {
+        // 📡 Sin conexión (no es error crítico)
+        _logger.w('📡 Sin conexión - equipo $equipoId quedó local: $e');
+
+        await ErrorLogService.logNetworkError(
+          tableName: 'equipments',
+          operation: 'POST',
+          errorMessage: 'Sin conexión: $e',
+          registroFailId: equipoId,
+          userId: userId,
+        );
+
+      } on TimeoutException catch (e) {
+        // ⏰ Timeout
+        _logger.w('⏰ Timeout enviando equipo $equipoId: $e');
+
+        await ErrorLogService.logNetworkError(
+          tableName: 'equipments',
+          operation: 'POST',
+          errorMessage: 'Timeout: $e',
+          registroFailId: equipoId,
+          userId: userId,
+        );
+
+      } catch (e) {
+        // ❌ Error general
+        _logger.e('❌ Error enviando equipo $equipoId: $e');
+
+        await ErrorLogService.logError(
+          tableName: 'equipments',
+          operation: 'POST',
+          errorMessage: 'Error general: $e',
+          errorType: 'unknown',
+          registroFailId: equipoId,
+          userId: userId,
+        );
+      }
+    });
   }
 
   Map<String, dynamic> _construirEquipoCompleto(
@@ -419,7 +529,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
         } catch (e) {
           _logger.w('⚠️ Error registrando pendiente: $e');
 
-          // 🚨 LOG: Error en equipo pendiente (warning, no crítico)
           await ErrorLogService.logDatabaseError(
             tableName: 'equipos_pendientes',
             operation: 'registrar_pendiente',
@@ -434,7 +543,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     } catch (e) {
       _logger.e('❌ Error verificando asignación: $e');
 
-      // 🚨 LOG: Error verificando asignación
       await ErrorLogService.logDatabaseError(
         tableName: 'equipments',
         operation: 'verificar_asignacion',
@@ -478,7 +586,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       } else {
         _logger.w('⚠️ Estado creado sin ID');
 
-        // 🚨 LOG: Estado sin ID
         await ErrorLogService.logDatabaseError(
           tableName: 'censo_activo',
           operation: 'crear_estado',
@@ -492,7 +599,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     } catch (e) {
       _logger.e('❌ Error creando estado: $e');
 
-      // 🚨 LOG: Error creando censo
       await ErrorLogService.logDatabaseError(
         tableName: 'censo_activo',
         operation: 'crear_censo_local',
@@ -509,7 +615,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final estadoId = datos['id'];
 
       if (estadoId == null) {
-        // 🚨 LOG: ID null al guardar
         await ErrorLogService.logValidationError(
           tableName: 'censo_activo',
           operation: 'guardar_registro_local',
@@ -536,7 +641,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     } catch (e) {
       _logger.e('❌ Error guardando datos localmente: $e');
 
-      // 🚨 LOG: Error guardando localmente
       await ErrorLogService.logDatabaseError(
         tableName: 'censo_activo',
         operation: 'guardar_registro_local',
@@ -574,7 +678,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     } catch (e) {
       _logger.e('❌ Error verificando sincronización: $e');
 
-      // 🚨 LOG: Error verificando sincronización
       await ErrorLogService.logDatabaseError(
         tableName: 'censo_activo',
         operation: 'verificar_sincronizacion',
@@ -654,7 +757,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     } catch (e) {
       _logger.e('❌ Error obteniendo info: $e');
 
-      // 🚨 LOG: Error obteniendo info
       await ErrorLogService.logDatabaseError(
         tableName: 'censo_activo',
         operation: 'obtener_info_sincronizacion',
@@ -686,7 +788,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     } catch (e) {
       _logger.e('❌ Error en reintento de envío: $e');
 
-      // 🚨 LOG: Error en reintento
       await ErrorLogService.logError(
         tableName: 'censo_activo',
         operation: 'reintentar_envio',
