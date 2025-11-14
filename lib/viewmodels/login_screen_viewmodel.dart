@@ -516,7 +516,7 @@ class LoginScreenViewModel extends ChangeNotifier {
 
       if (resultado.exito) {
         _eventController.add(ShowSuccessEvent(
-          '${resultado.itemsSincronizados} usuarios sincronizados',
+          'Usuarios sincronizados',
           Icons.cloud_done,
         ));
       } else {
