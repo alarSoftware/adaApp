@@ -31,7 +31,7 @@ class DeviceLogRepository {
       sincronizado: 0, // ✅ Por defecto no sincronizado
     );
 
-    await db.insert('device_log', log.toMap());
+    await db.insert('device_log', log.toMapLocal());
     _logger.i('✅ Device log guardado: ${log.id}');
     return log.id;
   }

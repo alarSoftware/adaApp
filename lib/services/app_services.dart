@@ -2,7 +2,8 @@
 
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/repositories/device_log_repository.dart';
-import 'package:ada_app/services/device_log/device_log_service.dart';
+// ❌ REMOVER esta línea:
+// import 'package:ada_app/services/device_log/device_log_service.dart';
 import 'package:ada_app/services/device_log/device_log_background_extension.dart';
 import 'package:ada_app/services/censo/censo_upload_service.dart';
 import 'package:ada_app/services/dynamic_form/dynamic_form_upload_service.dart';
@@ -13,7 +14,8 @@ import 'package:logger/logger.dart';
 
 class AppServices {
   static AppServices? _instance;
-  static DeviceLogService? _deviceLogService;
+  // ❌ REMOVER esta línea:
+  // static DeviceLogService? _deviceLogService;
   static bool _isUserLoggedIn = false;
 
   final _logger = Logger();
@@ -35,7 +37,6 @@ class AppServices {
 
       // 1. Inicializar servicios de logging básicos
       await _inicializarExtensionLogging();
-      await _inicializarDeviceLogService();
 
       // 2. Obtener información del usuario
       final usuario = await _obtenerUsuarioActual();
@@ -92,9 +93,7 @@ class AppServices {
       _isUserLoggedIn = false;
 
       // 1. Detener servicios de logging básicos
-      _deviceLogService?.detener();
       await DeviceLogBackgroundExtension.detener();
-      _deviceLogService = null;
 
       // 2. Detener sincronizaciones automáticas
       await _detenerSincronizacionesAutomaticas();
@@ -136,7 +135,6 @@ class AppServices {
 
       if (_isUserLoggedIn) {
         await _inicializarExtensionLogging();
-        await _inicializarDeviceLogService();
         _logger.i('Servicios inicializados correctamente');
       } else {
         _logger.i('⚠️ Usuario no logueado - servicios de logging no iniciados');
@@ -160,6 +158,8 @@ class AppServices {
     }
   }
 
+  // ❌ REMOVER este método completo:
+  /*
   Future<void> _inicializarDeviceLogService() async {
     try {
       if (!_isUserLoggedIn) {
@@ -178,10 +178,13 @@ class AppServices {
       _logger.e('Error al inicializar DeviceLogService: $e');
     }
   }
+  */
 
   // ==================== GETTERS ====================
 
-  DeviceLogService? get deviceLogService => _deviceLogService;
+  // ❌ REMOVER este getter:
+  // DeviceLogService? get deviceLogService => _deviceLogService;
+
   bool get usuarioLogueado => _isUserLoggedIn;
 
   // ==================== MÉTODOS DE UTILIDAD ====================
@@ -204,7 +207,6 @@ class AppServices {
     return DeviceLogBackgroundExtension.estaEnHorarioTrabajo();
   }
 
-  // ✅ MÉTODO CORREGIDO - Ahora es async
   Future<Map<String, dynamic>> obtenerEstadoServicios() async {
     try {
       // 🔍 Obtener estado de background extension
@@ -212,7 +214,8 @@ class AppServices {
 
       return {
         'usuario_logueado': _isUserLoggedIn,
-        'servicio_normal': _deviceLogService?.estaActivo ?? false,
+        // ❌ REMOVER esta línea:
+        // 'servicio_normal': _deviceLogService?.estaActivo ?? false,
         'extension_activa': DeviceLogBackgroundExtension.estaActivo,
         'censo_sync_activo': CensoUploadService.esSincronizacionActiva,
         'formularios_sync_activo': DynamicFormUploadService.esSincronizacionActiva,
@@ -230,7 +233,6 @@ class AppServices {
       _logger.e('Error obteniendo estado de servicios: $e');
       return {
         'usuario_logueado': _isUserLoggedIn,
-        'servicio_normal': _deviceLogService?.estaActivo ?? false,
         'extension_activa': DeviceLogBackgroundExtension.estaActivo,
         'censo_sync_activo': false,
         'formularios_sync_activo': false,
@@ -242,8 +244,6 @@ class AppServices {
 
   Future<void> detener() async {
     _logger.i('Deteniendo servicios');
-
-    _deviceLogService?.detener();
     await DeviceLogBackgroundExtension.detener();
   }
 
@@ -256,7 +256,6 @@ class AppServices {
 
       if (_isUserLoggedIn) {
         await _inicializarExtensionLogging();
-        await _inicializarDeviceLogService();
       }
 
       _logger.i('✅ Servicios reiniciados');
@@ -334,7 +333,6 @@ class AppServices {
       _logger.i("👤 Usuario logueado: ${estado['usuario_logueado']}");
       _logger.i("🔄 Servicios activos:");
       _logger.i("   • Background Extension: ${estado['extension_activa']}");
-      _logger.i("   • Device Log Service: ${estado['servicio_normal']}");
       _logger.i("   • Censos Sync: ${estado['censo_sync_activo']}");
       _logger.i("   • Formularios Sync: ${estado['formularios_sync_activo']}");
       _logger.i("   • Device Logs Sync: ${estado['device_logs_sync_activo']}");

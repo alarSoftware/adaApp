@@ -224,7 +224,7 @@ class DeviceLogBackgroundExtension {
     try {
       final db = await DatabaseHelper().database;
       await db.update(
-        'DeviceLogs',
+        'device_log',
         {'sincronizado': 1},
         where: 'id = ?',
         whereArgs: [logId],

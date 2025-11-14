@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:ada_app/services/app_services.dart';
 import 'package:ada_app/services/auth_service.dart';
-import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart'; // ✅ IMPORT AÑADIDO
+import 'package:ada_app/services/device_log/device_log_background_extension.dart';
+import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
 import 'ui/screens/login_screen.dart';
 import 'ui/screens/clients_screen.dart';
 import 'ui/screens/select_screen.dart';
@@ -111,6 +112,36 @@ class _InitializationScreenState extends State<InitializationScreen> {
       final estaAutenticado = await authService.hasUserLoggedInBefore();
 
       print('🔐 ¿Está autenticado? $estaAutenticado');
+
+      if (estaAutenticado) {
+        setState(() {
+          _loadingMessage = 'Iniciando servicios de logging...';
+        });
+
+        try {
+          print('🔐 Sesión activa detectada - Iniciando servicios automáticamente');
+          await AppServices().inicializarEnLogin();
+          print('✅ Servicios de logging iniciados automáticamente');
+
+          // 🎯 NUEVO: Crear log inicial inmediatamente
+          setState(() {
+            _loadingMessage = 'Creando log inicial...';
+          });
+
+          try {
+            print('🎯 Creando device log inicial...');
+            await DeviceLogBackgroundExtension.ejecutarManual();
+            print('✅ Log inicial creado exitosamente');
+          } catch (e) {
+            print('💥 Error creando log inicial: $e');
+            // No fallar por esto
+          }
+
+        } catch (e) {
+          print('💥 Error iniciando servicios automáticamente: $e');
+          // No fallar la app por error en logging
+        }
+      }
 
       // ✅ Pequeña pausa para que se vea la pantalla de carga (opcional)
       await Future.delayed(const Duration(milliseconds: 500));
