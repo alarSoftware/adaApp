@@ -16,7 +16,6 @@ import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
 import 'package:ada_app/services/database_validation_service.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/repositories/device_log_repository.dart';
-import 'package:ada_app/services/device_log/device_log_service.dart';
 import 'package:ada_app/ui/screens/productos_screen.dart';
 import 'dart:async';
 
