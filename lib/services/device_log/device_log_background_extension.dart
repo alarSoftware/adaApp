@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:geolocator/geolocator.dart';
 import 'package:battery_plus/battery_plus.dart';
@@ -9,10 +8,11 @@ import 'package:uuid/uuid.dart';
 import 'package:ada_app/repositories/device_log_repository.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/models/device_log.dart';
+import 'package:ada_app/services/post/device_log_post_service.dart';
+import 'package:ada_app/services/api_config_service.dart';
 import 'package:logger/logger.dart';
-import 'package:http/http.dart' as http;
 
-// 🔧 CONFIGURACIÓN
+// 🔧 CONFIGURACIÓN LIMPIA - Solo horarios
 class BackgroundLogConfig {
   // ⏰ HORARIO DE TRABAJO
   static const int horaInicio = 9;  // 9 AM
@@ -20,13 +20,9 @@ class BackgroundLogConfig {
 
   // 🔄 INTERVALO
   static const Duration intervalo = Duration(minutes: 10);
-
-  // 🌐 LOCALHOST (puedes cambiarlo después)
-  static const String baseUrl = "http://localhost:3000";
-  static const String endpoint = "/api/device-logs";
 }
 
-// 🎯 EXTENSIÓN MEJORADA DE TU SERVICIO (SIN BACKGROUND SERVICE COMPLEJO)
+// 🎯 EXTENSIÓN MEJORADA DE TU SERVICIO (SIN CÓDIGO DUPLICADO)
 class DeviceLogBackgroundExtension {
   static final _logger = Logger();
   static Timer? _backgroundTimer;
@@ -47,7 +43,11 @@ class DeviceLogBackgroundExtension {
 
       _isInitialized = true;
 
+      // 🌐 Mostrar URL configurada
+      final urlActual = await ApiConfigService.getBaseUrl();
+
       _logger.i("✅ Extensión de logging configurada");
+      _logger.i("🌐 URL del servidor: $urlActual");
       _logger.i("⏰ Horario: ${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00");
       _logger.i("🔄 Intervalo: ${BackgroundLogConfig.intervalo.inMinutes} minutos");
 
@@ -117,13 +117,13 @@ class DeviceLogBackgroundExtension {
       // 💾 Guardar en BD local
       await _guardarEnBD(log);
 
-      // 🌐 Intentar enviar a localhost
+      // 🌐 Intentar enviar a servidor (usando tu servicio existente)
       await _intentarEnviarAServidor(log);
 
-      logger.i("✅ Extended log creado: ${log.id}");
+      logger.i("✅ Background log creado: ${log.id}");
 
     } catch (e) {
-      logger.e("💥 Error en logging extendido: $e");
+      logger.e("💥 Error en logging background: $e");
     }
   }
 
@@ -220,30 +220,51 @@ class DeviceLogBackgroundExtension {
         modelo: log.modelo,
       );
 
-      Logger().i('💾 Extended log guardado en BD');
+      Logger().i('💾 Background log guardado en BD');
     } catch (e) {
       Logger().e('Error guardando en BD: $e');
     }
   }
 
-  // 🌐 Enviar a servidor (opcional)
+  // 🌐 Enviar a servidor (usando tu servicio existente - SIN DUPLICACIÓN)
   static Future<void> _intentarEnviarAServidor(DeviceLog log) async {
     try {
-      final url = Uri.parse('${BackgroundLogConfig.baseUrl}${BackgroundLogConfig.endpoint}');
+      // 🎯 Mostrar URL completa para debugging
+      final urlCompleta = await ApiConfigService.getFullUrl('/appDeviceLog/insertAppDeviceLog');
+      _logger.i("🌐 Enviando a: $urlCompleta");
 
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(log.toMap()),
-      ).timeout(const Duration(seconds: 10));
+      // 🔥 Usar tu servicio existente (con logging de errores automático)
+      final resultado = await DeviceLogPostService.enviarDeviceLog(
+        log,
+        userId: log.edfVendedorId,
+      );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        Logger().i("✅ Enviado a servidor: ${response.statusCode}");
+      if (resultado['exito'] == true) {
+        _logger.i("✅ Background log enviado exitosamente");
+
+        // 🔄 Marcar como sincronizado en BD si fue exitoso
+        await _marcarComoSincronizado(log.id);
       } else {
-        Logger().w("⚠️ Error en servidor: ${response.statusCode}");
+        _logger.w("⚠️ Error en servidor: ${resultado['mensaje']}");
       }
     } catch (e) {
-      Logger().w("⚠️ No se pudo conectar al servidor: $e");
+      _logger.w("⚠️ Error enviando background log: $e");
+    }
+  }
+
+  // 🔄 Marcar log como sincronizado
+  static Future<void> _marcarComoSincronizado(String logId) async {
+    try {
+      final db = await DatabaseHelper().database;
+      await db.update(
+        'DeviceLogs',
+        {'sincronizado': 1},
+        where: 'id = ?',
+        whereArgs: [logId],
+      );
+      _logger.i('✅ Log marcado como sincronizado: $logId');
+    } catch (e) {
+      _logger.e('Error marcando como sincronizado: $e');
     }
   }
 
@@ -262,9 +283,12 @@ class DeviceLogBackgroundExtension {
   // 🔧 Ejecutar manualmente (para testing)
   static Future<void> ejecutarManual() async {
     try {
+      final urlActual = await ApiConfigService.getBaseUrl();
       _logger.i("🔧 Ejecutando logging manual...");
+      _logger.i("🌐 URL configurada: $urlActual");
+
       await _ejecutarLogging();
-      _logger.i("✅ Manual ejecutado");
+      _logger.i("✅ Ejecución manual completada");
     } catch (e) {
       _logger.e("Error en ejecución manual: $e");
     }
@@ -274,8 +298,10 @@ class DeviceLogBackgroundExtension {
   static bool get estaActivo => _isInitialized && (_backgroundTimer?.isActive ?? false);
 
   // 📊 Obtener información de estado
-  static Map<String, dynamic> obtenerEstado() {
+  static Future<Map<String, dynamic>> obtenerEstado() async {
     final now = DateTime.now();
+    final urlActual = await ApiConfigService.getBaseUrl();
+
     return {
       'activo': estaActivo,
       'en_horario': estaEnHorarioTrabajo(),
@@ -283,6 +309,23 @@ class DeviceLogBackgroundExtension {
       'dia_actual': now.weekday,
       'intervalo_minutos': BackgroundLogConfig.intervalo.inMinutes,
       'horario': '${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00',
+      'url_servidor': urlActual,
+      'endpoint_completo': '$urlActual/appDeviceLog/insertAppDeviceLog',
     };
+  }
+
+  // 🔍 Método para debugging - mostrar configuración actual
+  static Future<void> mostrarConfiguracion() async {
+    final estado = await obtenerEstado();
+    _logger.i("═══════════════════════════════════════");
+    _logger.i("🔧 CONFIGURACIÓN BACKGROUND LOGGING");
+    _logger.i("═══════════════════════════════════════");
+    _logger.i("🌐 URL Servidor: ${estado['url_servidor']}");
+    _logger.i("📍 Endpoint: ${estado['endpoint_completo']}");
+    _logger.i("⏰ Horario: ${estado['horario']}");
+    _logger.i("🔄 Intervalo: ${estado['intervalo_minutos']} min");
+    _logger.i("📊 Estado: ${estado['activo'] ? 'ACTIVO' : 'INACTIVO'}");
+    _logger.i("🕐 En horario: ${estado['en_horario'] ? 'SÍ' : 'NO'}");
+    _logger.i("═══════════════════════════════════════");
   }
 }

@@ -8,7 +8,7 @@ import 'package:ada_app/services/error_log/error_log_service.dart';
 
 class EquipoPostService {
   static const String _tableName = 'equipo';
-  static const String _endpoint = '/edfEquipo/insertEquipo';
+  static const String _endpoint = '/edfEquipo/insertEdfEquipo/';
   static const _uuid = Uuid();
 
   static Future<Map<String, dynamic>> enviarEquipoNuevo({
@@ -26,6 +26,7 @@ class EquipoPostService {
     try {
       BaseSyncService.logger.i('💡 Enviando equipo nuevo...');
 
+      // ✅ Llamar al método _construirPayload (que está abajo)
       final payload = _construirPayload(
         equipoId: equipoId,
         codigoBarras: codigoBarras,
@@ -165,6 +166,7 @@ class EquipoPostService {
     }
   }
 
+  // ✅ ESTA ES LA ÚNICA DECLARACIÓN DEL MÉTODO
   static Map<String, dynamic> _construirPayload({
     required String equipoId,
     required String codigoBarras,
@@ -186,6 +188,7 @@ class EquipoPostService {
       'app_insert': 1,
       'appId': _uuid.v4(),
       'vendedorSucursalId': edfVendedorId,
+      'fecha_creacion': DateTime.now().toIso8601String(),  // 🆕 AGREGADO
     };
   }
 

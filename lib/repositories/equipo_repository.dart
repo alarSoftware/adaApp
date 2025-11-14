@@ -283,8 +283,9 @@ class EquipoRepository extends BaseRepository<Equipo> {
         }
       }
 
+      final now = DateTime.now();                                    // 🆕
       final equipoId = codigoBarras.isEmpty
-          ? 'NUEVO_${DateTime.now().millisecondsSinceEpoch}'
+          ? 'NUEVO_${now.millisecondsSinceEpoch}'                    // 🆕 Usar now
           : codigoBarras;
 
       final equipoMap = {
@@ -296,6 +297,9 @@ class EquipoRepository extends BaseRepository<Equipo> {
         'numero_serie': numeroSerie,
         'logo_id': logoId,
         'app_insert': 1,
+        'sincronizado': 0,                                           // 🆕 AGREGAR
+        'fecha_creacion': now.toIso8601String(),                     // 🆕 AGREGAR
+        'fecha_actualizacion': now.toIso8601String(),                // 🆕 AGREGAR
       };
 
       _logger.i('Datos a insertar: $equipoMap');

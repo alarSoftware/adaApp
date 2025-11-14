@@ -40,9 +40,6 @@ class Equipo {
     this.logoNombre,
   });
 
-  // ==========================================================================
-  // FACTORY CONSTRUCTORS
-  // ==========================================================================
 
   /// Constructor desde Map (base de datos local)
   factory Equipo.fromMap(Map<String, dynamic> map) {
@@ -113,8 +110,12 @@ class Equipo {
       'numero_serie': numeroSerie,
       'logo_id': logoId,
       'app_insert': ParsingHelpers.boolToInt(nuevoEquipo),
+      'sincronizado': sincronizado,
+      'fecha_creacion': fechaCreacion.toIso8601String(),
+      'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
     };
   }
+
 
   /// Convertir a JSON para API externa
   Map<String, dynamic> toJson() {

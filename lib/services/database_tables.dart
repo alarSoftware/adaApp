@@ -83,7 +83,7 @@ class DatabaseTables {
   ''';
 
   String _sqlEquipos() => '''
-  CREATE TABLE equipos (
+    CREATE TABLE equipos (
     id TEXT PRIMARY KEY,
     cliente_id TEXT,                 
     cod_barras TEXT,                       
@@ -92,6 +92,9 @@ class DatabaseTables {
     numero_serie TEXT,                      
     logo_id INTEGER,
     app_insert INTEGER DEFAULT 0,
+    sincronizado INTEGER DEFAULT 0,              
+    fecha_creacion TEXT NOT NULL,                
+    fecha_actualizacion TEXT,                   
     FOREIGN KEY (marca_id) REFERENCES marcas (id),
     FOREIGN KEY (modelo_id) REFERENCES modelos (id),
     FOREIGN KEY (logo_id) REFERENCES logo (id),

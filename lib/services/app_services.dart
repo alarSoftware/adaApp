@@ -4,11 +4,11 @@ import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/repositories/device_log_repository.dart';
 import 'package:ada_app/services/device_log/device_log_service.dart';
 import 'package:ada_app/services/device_log/device_log_background_extension.dart';
-import 'package:ada_app/services/censo/censo_upload_service.dart'; // ✅ NUEVO
-import 'package:ada_app/services/dynamic_form/dynamic_form_upload_service.dart'; // ✅ NUEVO
-import 'package:ada_app/services/device_log/device_log_upload_service.dart'; // ✅ NUEVO
-import 'package:ada_app/services/auth_service.dart'; // ✅ NUEVO
-import 'package:ada_app/models/usuario.dart'; // ✅ NUEVO
+import 'package:ada_app/services/censo/censo_upload_service.dart';
+import 'package:ada_app/services/dynamic_form/dynamic_form_upload_service.dart';
+import 'package:ada_app/services/device_log/device_log_upload_service.dart';
+import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/models/usuario.dart';
 import 'package:logger/logger.dart';
 
 class AppServices {
@@ -204,16 +204,40 @@ class AppServices {
     return DeviceLogBackgroundExtension.estaEnHorarioTrabajo();
   }
 
-  Map<String, dynamic> obtenerEstadoServicios() {
-    return {
-      'usuario_logueado': _isUserLoggedIn,
-      'servicio_normal': _deviceLogService?.estaActivo ?? false,
-      'extension_activa': DeviceLogBackgroundExtension.estaActivo,
-      'censo_sync_activo': CensoUploadService.esSincronizacionActiva, // ✅ NUEVO
-      'formularios_sync_activo': DynamicFormUploadService.esSincronizacionActiva, // ✅ NUEVO
-      'device_logs_sync_activo': DeviceLogUploadService.esSincronizacionActiva, // ✅ NUEVO
-      ...DeviceLogBackgroundExtension.obtenerEstado(),
-    };
+  // ✅ MÉTODO CORREGIDO - Ahora es async
+  Future<Map<String, dynamic>> obtenerEstadoServicios() async {
+    try {
+      // 🔍 Obtener estado de background extension
+      final backgroundState = await DeviceLogBackgroundExtension.obtenerEstado();
+
+      return {
+        'usuario_logueado': _isUserLoggedIn,
+        'servicio_normal': _deviceLogService?.estaActivo ?? false,
+        'extension_activa': DeviceLogBackgroundExtension.estaActivo,
+        'censo_sync_activo': CensoUploadService.esSincronizacionActiva,
+        'formularios_sync_activo': DynamicFormUploadService.esSincronizacionActiva,
+        'device_logs_sync_activo': DeviceLogUploadService.esSincronizacionActiva,
+        // ✅ Agregar campos del background state individualmente
+        'en_horario': backgroundState['en_horario'],
+        'hora_actual': backgroundState['hora_actual'],
+        'dia_actual': backgroundState['dia_actual'],
+        'intervalo_minutos': backgroundState['intervalo_minutos'],
+        'horario': backgroundState['horario'],
+        'url_servidor': backgroundState['url_servidor'],
+        'endpoint_completo': backgroundState['endpoint_completo'],
+      };
+    } catch (e) {
+      _logger.e('Error obteniendo estado de servicios: $e');
+      return {
+        'usuario_logueado': _isUserLoggedIn,
+        'servicio_normal': _deviceLogService?.estaActivo ?? false,
+        'extension_activa': DeviceLogBackgroundExtension.estaActivo,
+        'censo_sync_activo': false,
+        'formularios_sync_activo': false,
+        'device_logs_sync_activo': false,
+        'error': 'No se pudo obtener estado completo',
+      };
+    }
   }
 
   Future<void> detener() async {
@@ -293,6 +317,37 @@ class AppServices {
     } catch (e) {
       _logger.e('Error en sincronización completa: $e');
       return {};
+    }
+  }
+
+  // ==================== MÉTODOS PARA DEBUGGING ====================
+
+  /// Mostrar configuración completa de todos los servicios
+  Future<void> mostrarConfiguracionCompleta() async {
+    try {
+      _logger.i("═══════════════════════════════════════");
+      _logger.i("🔧 CONFIGURACIÓN COMPLETA DE SERVICIOS");
+      _logger.i("═══════════════════════════════════════");
+
+      // Estado general
+      final estado = await obtenerEstadoServicios();
+      _logger.i("👤 Usuario logueado: ${estado['usuario_logueado']}");
+      _logger.i("🔄 Servicios activos:");
+      _logger.i("   • Background Extension: ${estado['extension_activa']}");
+      _logger.i("   • Device Log Service: ${estado['servicio_normal']}");
+      _logger.i("   • Censos Sync: ${estado['censo_sync_activo']}");
+      _logger.i("   • Formularios Sync: ${estado['formularios_sync_activo']}");
+      _logger.i("   • Device Logs Sync: ${estado['device_logs_sync_activo']}");
+
+      // Configuración de Background Extension
+      await DeviceLogBackgroundExtension.mostrarConfiguracion();
+
+      // Configuración de Upload Service
+      await DeviceLogUploadService.mostrarConfiguracion();
+
+      _logger.i("═══════════════════════════════════════");
+    } catch (e) {
+      _logger.e("Error mostrando configuración: $e");
     }
   }
 
