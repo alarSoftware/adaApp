@@ -1,7 +1,7 @@
 // ui/screens/forms_screen.dart
 import 'dart:async';
 import 'dart:io';
-import 'package:ada_app/ui/widgets/searchable_dropdown.dart';
+import 'package:ada_app/ui/widgets/simple_autocomplete_field.dart';  // ✅ CAMBIO AQUÍ
 import 'package:flutter/material.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/viewmodels/forms_screens_viewmodel.dart';
@@ -28,10 +28,8 @@ class _FormsScreenState extends State<FormsScreen> {
   late StreamSubscription<FormsUIEvent> _eventSubscription;
   late FocusNode _codigoBarrasFocusNode;
 
-  // ✅ NUEVA: Bandera para evitar búsquedas durante acciones específicas
   bool _ejecutandoAccion = false;
 
-  // ✅ Variables para notificaciones inline
   String? _inlineNotificationMessage;
   InlineNotificationType? _inlineNotificationType;
   bool _isInlineNotificationVisible = false;
@@ -42,7 +40,6 @@ class _FormsScreenState extends State<FormsScreen> {
     _viewModel = FormsScreenViewModel();
     _setupEventListener();
     _viewModel.initialize(widget.cliente);
-    // Inicializar FocusNode para el campo de código
     _codigoBarrasFocusNode = FocusNode();
     _codigoBarrasFocusNode.addListener(_onCodigoBarrasFocusChanged);
   }
@@ -56,23 +53,19 @@ class _FormsScreenState extends State<FormsScreen> {
     super.dispose();
   }
 
-  // ✅ MODIFICADO: Método que detecta cuando el campo pierde el foco
   void _onCodigoBarrasFocusChanged() {
     if (!_codigoBarrasFocusNode.hasFocus) {
-      // ✅ Solo buscar si NO estamos ejecutando una acción (Continuar/Cancelar)
       if (!_ejecutandoAccion) {
         _viewModel.buscarEquipoSiHuboCambios();
       }
     }
   }
 
-  // ✅ MODIFICADO: Ahora usa notificaciones inline para mensajes de equipo con colores específicos
   void _setupEventListener() {
     _eventSubscription = _viewModel.uiEvents.listen((event) {
       if (!mounted) return;
 
       if (event is ShowSnackBarEvent) {
-        // ✅ Detectar si es un mensaje relacionado con búsqueda de equipo
         final mensajesInline = [
           'Equipo encontrado',
           'pendiente',
@@ -85,35 +78,28 @@ class _FormsScreenState extends State<FormsScreen> {
         );
 
         if (esInline) {
-          // ✅ NUEVO: Determinar color según el contenido exacto del mensaje
           Color color;
           final message = event.message;
 
-          // 🟢 Verde: "¡Equipo encontrado!" (mensaje corto, equipo YA asignado)
           if (message.contains('¡Equipo encontrado!') ||
               (message.contains('Equipo encontrado') && !message.contains('pero no asignado'))) {
             color = AppColors.success;
           }
-          // 🟠 Amarillo/Naranja: "Equipo encontrado pero no asignado..." (mensaje largo, pendiente)
           else if (message.contains('pero no asignado') ||
               message.contains('pendiente') ||
               message.contains('se censara como pendiente')) {
             color = AppColors.warning;
           }
-          // 🔴 Rojo: No encontrado
           else if (message.toLowerCase().contains('no se encontró') ||
               message.toLowerCase().contains('no encontrado')) {
             color = AppColors.error;
           }
-          // Por defecto usar el color original
           else {
             color = event.color;
           }
 
-          // Usar notificación inline con el color correcto
           _showInlineNotification(event.message, color);
         } else {
-          // Usar SnackBar normal para otros mensajes
           _showSnackBar(event.message, event.color);
         }
       } else if (event is ShowDialogEvent) {
@@ -127,7 +113,6 @@ class _FormsScreenState extends State<FormsScreen> {
   }
 
   void _showSnackBar(String message, Color color) {
-    // ✅ Determinar tipo de notificación según el color
     NotificationType type;
     if (color == AppColors.success) {
       type = NotificationType.success;
@@ -139,7 +124,6 @@ class _FormsScreenState extends State<FormsScreen> {
       type = NotificationType.info;
     }
 
-    // ✅ Mostrar notificación moderna
     AppNotification.show(
       context,
       message: message,
@@ -147,9 +131,7 @@ class _FormsScreenState extends State<FormsScreen> {
     );
   }
 
-  // ✅ NUEVO: Método para mostrar notificación inline
   void _showInlineNotification(String message, Color color) {
-    // Determinar tipo de notificación según el color
     InlineNotificationType type;
     if (color == AppColors.success) {
       type = InlineNotificationType.success;
@@ -167,7 +149,6 @@ class _FormsScreenState extends State<FormsScreen> {
       _isInlineNotificationVisible = true;
     });
 
-    // Auto-ocultar después de 5 segundos
     Future.delayed(const Duration(seconds: 5), () {
       if (mounted) {
         setState(() {
@@ -177,7 +158,6 @@ class _FormsScreenState extends State<FormsScreen> {
     });
   }
 
-  // ✅ NUEVO: Método para ocultar notificación inline
   void _dismissInlineNotification() {
     setState(() {
       _isInlineNotificationVisible = false;
@@ -247,10 +227,7 @@ class _FormsScreenState extends State<FormsScreen> {
 
           content: ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: MediaQuery
-                  .of(context)
-                  .size
-                  .height * 0.5,
+              maxHeight: MediaQuery.of(context).size.height * 0.5,
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -434,11 +411,10 @@ class _FormsScreenState extends State<FormsScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false, // ✅ Evita que se cierre automáticamente
+      canPop: false,
       onPopInvoked: (didPop) async {
         if (didPop) return;
 
-        // ✅ Mostrar diálogo de confirmación
         final shouldExit = await _showCancelConfirmation();
         if (shouldExit && context.mounted) {
           Navigator.of(context).pop();
@@ -508,7 +484,6 @@ class _FormsScreenState extends State<FormsScreen> {
     );
   }
 
-  // ✅ MODIFICADO: Ahora incluye la notificación inline debajo del campo
   Widget _buildCodigoBarrasField() {
     return ListenableBuilder(
       listenable: _viewModel,
@@ -586,7 +561,6 @@ class _FormsScreenState extends State<FormsScreen> {
               ],
             ),
 
-            // ✅ NUEVA: Notificación inline debajo del campo de código
             if (_isInlineNotificationVisible &&
                 _inlineNotificationMessage != null &&
                 _inlineNotificationType != null)
@@ -602,12 +576,11 @@ class _FormsScreenState extends State<FormsScreen> {
     );
   }
 
-  // NUEVO: Widget para construir el dropdown de marca
+  // ✅ ACTUALIZADO: Usa SimpleAutocompleteField
   Widget _buildMarcaDropdown() {
     return ListenableBuilder(
       listenable: _viewModel,
       builder: (context, child) {
-        // Convertir la lista de marcas a DropdownItems
         final marcaItems = _viewModel.marcas.map((marca) {
           final marcaId = marca['id'] is int
               ? marca['id']
@@ -619,7 +592,7 @@ class _FormsScreenState extends State<FormsScreen> {
           );
         }).toList();
 
-        return SearchableDropdown<int>(
+        return SimpleAutocompleteField<int>(
           label: 'Marca:',
           hint: _viewModel.marcaHint,
           value: _viewModel.marcaSeleccionada,
@@ -627,19 +600,12 @@ class _FormsScreenState extends State<FormsScreen> {
           prefixIcon: Icons.business,
           enabled: _viewModel.areFieldsEnabled,
           onChanged: (value) {
-            print('Marca dropdown onChanged: $value');
             _viewModel.setMarcaSeleccionada(value);
-
-            // Forzar revalidación del formulario
             Future.microtask(() {
               _formKey.currentState?.validate();
             });
           },
-          validator: (value) {
-            final result = _viewModel.validarMarca(value);
-            print('Marca dropdown validation: $value -> $result');
-            return result;
-          },
+          validator: (value) => _viewModel.validarMarca(value),
         );
       },
     );
@@ -649,7 +615,6 @@ class _FormsScreenState extends State<FormsScreen> {
     return ListenableBuilder(
       listenable: _viewModel,
       builder: (context, child) {
-        // Convertir la lista de modelos a DropdownItems
         final modeloItems = _viewModel.modelos.map((modelo) {
           final modeloId = modelo['id'] is int
               ? modelo['id']
@@ -661,7 +626,7 @@ class _FormsScreenState extends State<FormsScreen> {
           );
         }).toList();
 
-        return SearchableDropdown<int>(
+        return SimpleAutocompleteField<int>(
           label: 'Modelo:',
           hint: _viewModel.modeloHint,
           value: _viewModel.modeloSeleccionado,
@@ -669,19 +634,12 @@ class _FormsScreenState extends State<FormsScreen> {
           prefixIcon: Icons.devices,
           enabled: _viewModel.areFieldsEnabled,
           onChanged: (value) {
-            print('Modelo dropdown onChanged: $value');
             _viewModel.setModeloSeleccionado(value);
-
-            // Forzar revalidación del formulario
             Future.microtask(() {
               _formKey.currentState?.validate();
             });
           },
-          validator: (value) {
-            final result = _viewModel.validarModelo(value);
-            print('Modelo dropdown validation: $value -> $result');
-            return result;
-          },
+          validator: (value) => _viewModel.validarModelo(value),
         );
       },
     );
@@ -763,7 +721,6 @@ class _FormsScreenState extends State<FormsScreen> {
     return ListenableBuilder(
       listenable: _viewModel,
       builder: (context, child) {
-        // Convertir la lista de logos a DropdownItems
         final logoItems = _viewModel.logos.map((logo) {
           final logoId = logo['id'] is int
               ? logo['id']
@@ -775,7 +732,7 @@ class _FormsScreenState extends State<FormsScreen> {
           );
         }).toList();
 
-        return SearchableDropdown<int>(
+        return SimpleAutocompleteField<int>(
           label: 'Logo:',
           hint: _viewModel.logoHint,
           value: _viewModel.logoSeleccionado,
@@ -783,19 +740,12 @@ class _FormsScreenState extends State<FormsScreen> {
           prefixIcon: Icons.branding_watermark,
           enabled: _viewModel.areFieldsEnabled,
           onChanged: (value) {
-            print('Logo dropdown onChanged: $value');
             _viewModel.setLogoSeleccionado(value);
-
-            // Forzar revalidación del formulario
             Future.microtask(() {
               _formKey.currentState?.validate();
             });
           },
-          validator: (value) {
-            final result = _viewModel.validarLogo(value);
-            print('Logo dropdown validation: $value -> $result');
-            return result;
-          },
+          validator: (value) => _viewModel.validarLogo(value),
         );
       },
     );
@@ -1036,21 +986,14 @@ class _FormsScreenState extends State<FormsScreen> {
     );
   }
 
-  // ✅ NUEVO: Método para manejar el botón Continuar
   Future<void> _handleContinuar() async {
-    // ✅ Activar bandera para evitar búsqueda automática
     setState(() {
       _ejecutandoAccion = true;
     });
 
-    // ✅ Verificar cambios manualmente ANTES de continuar
     await _viewModel.buscarEquipoSiHuboCambios();
-
-    // ✅ Continuar con el flujo normal
     _viewModel.continuarAPreview(_formKey);
 
-    // ✅ Desactivar bandera después de un pequeño delay
-    // (para evitar que se dispare la búsqueda durante la navegación)
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
         setState(() {
@@ -1060,9 +1003,7 @@ class _FormsScreenState extends State<FormsScreen> {
     });
   }
 
-  // ✅ MODIFICADO: Método para manejar el botón Cancelar
   Future<void> _handleCancel() async {
-    // ✅ Activar bandera para evitar búsqueda automática
     setState(() {
       _ejecutandoAccion = true;
     });
@@ -1070,16 +1011,13 @@ class _FormsScreenState extends State<FormsScreen> {
     final shouldExit = await _showCancelConfirmation();
     if (shouldExit) {
       _viewModel.cancelar();
-      // No hace falta desactivar la bandera porque salimos de la pantalla
     } else {
-      // ✅ Si decide continuar, desactivar bandera
       setState(() {
         _ejecutandoAccion = false;
       });
     }
   }
 
-  // ✅ NUEVO: Diálogo de confirmación simple
   Future<bool> _showCancelConfirmation() async {
     final confirmed = await showDialog<bool>(
       context: context,

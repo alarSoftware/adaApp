@@ -261,7 +261,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
         // Navegar INMEDIATAMENTE sin delays
         if (mounted) {
-          await _navegarAEquipoClienteDetail();
+          await _navegarAEquipoClienteDetail(resultado); // ✅ PASAR resultado
         }
       } else {
         // Si hay error, desbloquear para permitir reintentar
@@ -278,15 +278,30 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
   }
 
-  Future<void> _navegarAEquipoClienteDetail() async {
+  Future<void> _navegarAEquipoClienteDetail(Map<String, dynamic> resultado) async {
     try {
-      final cliente = widget.datos['cliente'] as Cliente;
-      final equipoCompleto = widget.datos['equipo_completo'];
 
-      if (cliente.id == null || equipoCompleto == null) {
+
+      final cliente = widget.datos['cliente'] as Cliente;
+
+      final equipoCompleto = resultado['equipo_completo'] ?? widget.datos['equipo_completo'];
+
+
+      if (cliente.id == null) {
+        debugPrint('❌ FALLA: cliente.id es NULL');
         Navigator.of(context).pop(true);
         return;
       }
+
+      if (equipoCompleto == null) {
+        debugPrint('❌ FALLA: equipoCompleto es NULL');
+        debugPrint('   resultado["equipo_completo"]: ${resultado['equipo_completo']}');
+        debugPrint('   widget.datos["equipo_completo"]: ${widget.datos['equipo_completo']}');
+        Navigator.of(context).pop(true);
+        return;
+      }
+
+      debugPrint('✅ Datos válidos, construyendo equipoCliente...');
 
       final equipoCliente = {
         'id': equipoCompleto['id'],
@@ -302,15 +317,23 @@ class _PreviewScreenState extends State<PreviewScreen> {
         'cliente_nombre': cliente.nombre,
         'cliente_telefono': cliente.telefono,
         'cliente_direccion': cliente.direccion,
-        'tipo_estado': widget.datos['ya_asignado'] == true ? 'asignado' : 'pendiente',
+        'tipo_estado': resultado['ya_asignado'] ?? widget.datos['ya_asignado'] == true
+            ? 'asignado'
+            : 'pendiente',
       };
+
+      debugPrint('✅ equipoCliente construido: $equipoCliente');
+      debugPrint('🚀 Ejecutando navegación...');
 
       // Esto te deja en ClienteDetailScreen
       Navigator.of(context).pop(); // Cierra PreviewScreen
+      debugPrint('✅ Pop 1 ejecutado');
+
       Navigator.of(context).pop(); // Cierra FormsScreen
+      debugPrint('✅ Pop 2 ejecutado');
 
       // Ahora navega a EquiposClientesDetailScreen
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => EquiposClientesDetailScreen(
@@ -318,7 +341,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
           ),
         ),
       );
+
+      debugPrint('✅ Push ejecutado - navegación completada');
+
     } catch (e, stackTrace) {
+      debugPrint('❌ EXCEPCIÓN en navegación: $e');
+      debugPrint('📍 StackTrace: $stackTrace');
       Navigator.of(context).pop(true);
     }
   }
