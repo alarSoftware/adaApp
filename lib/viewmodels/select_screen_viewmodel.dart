@@ -11,7 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ada_app/services/sync/full_sync_service.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/models/usuario.dart';
-import 'package:ada_app/services/database_validation_service.dart'; // 🆕 NUEVO
+import 'package:ada_app/services/database_validation_service.dart';
 
 // ========== CLASES DE VALIDACIÓN ==========
 class SyncValidationResult {
@@ -78,6 +78,14 @@ class SyncProgressEvent extends UIEvent {
     required this.currentStep,
     required this.completedSteps,
   });
+}
+
+// 🆕 NUEVO: Evento para errores de sincronización
+class SyncErrorEvent extends UIEvent {
+  final String message;
+  final String? details;
+
+  SyncErrorEvent(this.message, {this.details});
 }
 
 // ========== DATOS PUROS (SIN UI) ==========
@@ -558,7 +566,12 @@ class SelectScreenViewModel extends ChangeNotifier {
       );
 
       if (!result.exito) {
-        throw Exception(result.mensaje);
+        // 🆕 NUEVO: Emitir evento de error en lugar de throw
+        _eventController.add(SyncErrorEvent(
+          'No se pudo completar la sincronización',
+          details: result.mensaje,
+        ));
+        return;
       }
 
       // Sincronización exitosa
@@ -575,9 +588,14 @@ class SelectScreenViewModel extends ChangeNotifier {
 
       _logger.i('✅ Sincronización unificada completada exitosamente');
 
-    } catch (e) {
-      _logger.e('❌ Error en sincronización unificada: $e');
-      _eventController.add(ShowErrorEvent('Error en sincronización: $e'));
+    } catch (e, stackTrace) {
+      _logger.e('❌ Error en sincronización unificada', error: e, stackTrace: stackTrace);
+
+      // 🆕 NUEVO: Emitir evento de error con detalles técnicos
+      _eventController.add(SyncErrorEvent(
+        'Error durante la sincronización',
+        details: e.toString(),
+      ));
     } finally {
       _setSyncLoading(false);
       _resetSyncProgress();
@@ -595,7 +613,10 @@ class SelectScreenViewModel extends ChangeNotifier {
       // Verificar conexión
       final conexion = await SyncService.probarConexion();
       if (!conexion.exito) {
-        _eventController.add(ShowErrorEvent('Sin conexión al servidor: ${conexion.mensaje}'));
+        _eventController.add(SyncErrorEvent(
+          'Sin conexión al servidor',
+          details: conexion.mensaje,
+        ));
         return;
       }
 
@@ -611,7 +632,10 @@ class SelectScreenViewModel extends ChangeNotifier {
 
     } catch (e) {
       _logger.e('Error en sincronización obligatoria: $e');
-      _eventController.add(ShowErrorEvent('Error en sincronización: $e'));
+      _eventController.add(SyncErrorEvent(
+        'Error en sincronización obligatoria',
+        details: e.toString(),
+      ));
     }
   }
 

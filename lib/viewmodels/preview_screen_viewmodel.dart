@@ -169,40 +169,32 @@ class PreviewScreenViewModel extends ChangeNotifier {
         return {'success': false, 'error': 'Proceso cancelado'};
       }
 
-      final cliente = datos['cliente'] as Cliente?;
       final esCenso = datos['es_censo'] as bool? ?? true;
       final esNuevoEquipo = datos['es_nuevo_equipo'] as bool? ?? false;
       var equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
 
-      // VALIDACIONES
-      if (cliente == null) {
-        await ErrorLogService.logValidationError(
-          tableName: 'censo_activo',
-          operation: 'confirmar_registro',
-          errorMessage: 'Cliente no encontrado en los datos',
-        );
-        throw 'Cliente no encontrado';
-      }
-
-      if (cliente.id == null) {
-        await ErrorLogService.logValidationError(
-          tableName: 'censo_activo',
-          operation: 'confirmar_registro',
-          errorMessage: 'El cliente no tiene ID',
-        );
-        throw 'El cliente no tiene ID';
-      }
-
       final usuarioId = await _getUsuarioId;
       userId = usuarioId.toString();
-      final clienteId = _convertirAInt(cliente.id, 'cliente_id');
 
-      // CREAR EQUIPO NUEVO SI CORRESPONDE
+      // ✅ PASO 1: CREAR EQUIPO NUEVO **PRIMERO** (antes de cualquier validación)
+      // Esto garantiza que el equipo existe en la tabla equipos INMEDIATAMENTE
       String equipoId;
       if (esNuevoEquipo) {
-        equipoId = await _crearEquipoNuevo(datos, clienteId, processId, userId);
-        equipoCompleto = _construirEquipoCompleto(datos, equipoId, clienteId);
+        _logger.i('🆕 === PASO 1: CREAR EQUIPO NUEVO PRIMERO ===');
+        equipoId = await _crearEquipoNuevo(
+            datos,
+            null, // cliente_id null por ahora - se actualizará después
+            processId,
+            userId
+        );
+
+        // Construir equipoCompleto temporalmente sin cliente
+        equipoCompleto = _construirEquipoCompleto(datos, equipoId, null);
+
+        _logger.i('✅ Equipo nuevo insertado en tabla equipos: $equipoId');
+        _logger.i('✅ Ahora el equipo puede mostrar historial');
       } else {
+        // Equipo existente - validar que existe
         if (equipoCompleto == null) {
           await ErrorLogService.logValidationError(
             tableName: 'censo_activo',
@@ -226,15 +218,46 @@ class PreviewScreenViewModel extends ChangeNotifier {
         equipoId = equipoCompleto['id'].toString();
       }
 
-      // VERIFICAR Y REGISTRAR ASIGNACIÓN
+      // ✅ PASO 2: VALIDAR CLIENTE (después de crear el equipo)
+      final cliente = datos['cliente'] as Cliente?;
+
+      if (cliente == null) {
+        await ErrorLogService.logValidationError(
+          tableName: 'censo_activo',
+          operation: 'confirmar_registro',
+          errorMessage: 'Cliente no encontrado en los datos',
+        );
+        throw 'Cliente no encontrado';
+      }
+
+      if (cliente.id == null) {
+        await ErrorLogService.logValidationError(
+          tableName: 'censo_activo',
+          operation: 'confirmar_registro',
+          errorMessage: 'El cliente no tiene ID',
+        );
+        throw 'El cliente no tiene ID';
+      }
+
+      final clienteId = _convertirAInt(cliente.id, 'cliente_id');
+
+      // ✅ PASO 3: ACTUALIZAR equipoCompleto con clienteId (solo si es nuevo)
+      if (esNuevoEquipo) {
+        equipoCompleto = _construirEquipoCompleto(datos, equipoId, clienteId);
+        _logger.i('✅ equipoCompleto actualizado con cliente: $clienteId');
+      }
+
+      // ✅ PASO 4: VERIFICAR Y REGISTRAR ASIGNACIÓN
       final yaAsignado = await _verificarYRegistrarAsignacion(
         equipoId,
         clienteId,
         processId,
         userId,
+        esNuevoEquipo, // ✅ Pasar flag
+        datos,         // ✅ Pasar datos del equipo
       );
 
-      // CREAR CENSO EN BD LOCAL
+      // ✅ PASO 5: CREAR CENSO EN BD LOCAL
       estadoIdActual = await _crearCensoLocal(
         equipoId: equipoId,
         clienteId: clienteId,
@@ -252,13 +275,13 @@ class PreviewScreenViewModel extends ChangeNotifier {
         throw 'No se pudo crear el estado en la base de datos';
       }
 
-      // GUARDAR FOTOS Y OBTENER IDs
+      // ✅ PASO 6: GUARDAR FOTOS Y OBTENER IDs
       final idsImagenes = await _fotoService.guardarFotosDelCenso(estadoIdActual, datos);
       _logger.i('🔍 FOTO SERVICE: Fotos guardadas para censo: $estadoIdActual');
 
       await Future.delayed(Duration(milliseconds: 500));
 
-      // PREPARAR DATOS COMPLETOS
+      // ✅ PASO 7: PREPARAR DATOS COMPLETOS
       final datosCompletos = CensoApiMapper.prepararDatosCompletos(
         estadoId: estadoIdActual,
         equipoId: equipoId,
@@ -275,10 +298,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       _logger.i('🔍 DATOS COMPLETOS: ID en datosCompletos: ${datosCompletos['id']}');
 
-      // GUARDAR REGISTRO LOCAL
+      // ✅ PASO 8: GUARDAR REGISTRO LOCAL
       await _guardarRegistroLocal(datosCompletos, userId);
 
-      // SINCRONIZAR EN BACKGROUND
+      // ✅ PASO 9: SINCRONIZAR EN BACKGROUND
       _logger.i('🔍 SYNC: Pasando estadoId: $estadoIdActual');
       _uploadService.sincronizarCensoEnBackground(estadoIdActual, datosCompletos);
 
@@ -318,7 +341,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Future<String> _crearEquipoNuevo(
       Map<String, dynamic> datos,
-      int clienteId,
+      int? clienteId, // ✅ Ahora es nullable
       String processId,
       String? userId,
       ) async {
@@ -332,6 +355,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
     try {
       // 1️⃣ GUARDAR LOCALMENTE PRIMERO (offline-first)
+      // ✅ SIN cliente_id en esta etapa - solo crear el equipo como DISPONIBLE
       equipoId = await _equipoRepository.crearEquipoNuevo(
         codigoBarras: datos['codigo_barras']?.toString() ?? '',
         marcaId: _safeCastToInt(datos['marca_id'], 'marca_id') ?? 1,
@@ -340,19 +364,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
         logoId: _safeCastToInt(datos['logo_id'], 'logo_id') ?? 1,
       );
 
-      _logger.i('✅ Equipo creado localmente: $equipoId');
+      _logger.i('✅ Equipo creado localmente (disponible): $equipoId');
 
-      // 2️⃣ INTENTAR ENVIAR AL SERVIDOR (en background, no bloquea el flujo)
-      _enviarEquipoAlServidorAsync(
-        equipoId: equipoId,
-        codigoBarras: datos['codigo_barras']?.toString() ?? '',
-        marcaId: _safeCastToInt(datos['marca_id'], 'marca_id') ?? 1,
-        modeloId: _safeCastToInt(datos['modelo_id'], 'modelo_id') ?? 1,
-        logoId: _safeCastToInt(datos['logo_id'], 'logo_id') ?? 1,
-        numeroSerie: datos['numero_serie']?.toString(),
-        clienteId: clienteId,
-        userId: userId,
-      );
+      // ⚠️ NO ENVIAR AL SERVIDOR AÚN
+      // Se enviará después de asignar el cliente en _verificarYRegistrarAsignacion
 
       return equipoId;
 
@@ -370,7 +385,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// 🆕 NUEVO: Enviar equipo al servidor en background (sin bloquear)
+  /// 🆕 Enviar equipo al servidor en background (sin bloquear)
   void _enviarEquipoAlServidorAsync({
     required String equipoId,
     required String codigoBarras,
@@ -378,7 +393,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     required int modeloId,
     required int logoId,
     String? numeroSerie,
-    required int clienteId,
+    int? clienteId, // ✅ Ahora es nullable
     String? userId,
   }) {
     // Ejecutar en background
@@ -417,7 +432,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
           modeloId: modeloId,
           logoId: logoId,
           numeroSerie: numeroSerie,
-          clienteId: clienteId.toString(),
+          clienteId: clienteId?.toString(), // ✅ Convertir a string o null
           edfVendedorId: edfVendedorId,
         );
 
@@ -484,7 +499,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   Map<String, dynamic> _construirEquipoCompleto(
       Map<String, dynamic> datos,
       String equipoId,
-      int clienteId,
+      int? clienteId, // ✅ Ahora es nullable
       ) {
     return {
       'id': equipoId,
@@ -496,7 +511,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'logo_id': datos['logo_id'],
       'logo_nombre': datos['logo'],
       'marca_nombre': datos['marca'] ?? 'Sin marca',
-      'cliente_id': clienteId,
+      'cliente_id': clienteId, // ✅ Puede ser null inicialmente
       'app_insert': 1,
     };
   }
@@ -506,6 +521,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
       int clienteId,
       String processId,
       String? userId,
+      bool esNuevoEquipo, // ✅ NUEVO PARÁMETRO
+      Map<String, dynamic>? datosEquipo, // ✅ NUEVO PARÁMETRO
       ) async {
     _setStatusMessage('Verificando estado del equipo...');
 
@@ -522,26 +539,54 @@ class PreviewScreenViewModel extends ChangeNotifier {
       _logger.i('Equipo $equipoId ya asignado: $yaAsignado');
 
       if (!yaAsignado) {
-        _setStatusMessage('Registrando equipo pendiente...');
+        _setStatusMessage('Asignando equipo al cliente...');
 
         if (_currentProcessId != processId) {
           throw 'Proceso cancelado';
         }
 
         try {
+          // ✅ PASO 1: Actualizar cliente_id en tabla equipos
+          await _equipoRepository.dbHelper.actualizar(
+            'equipos',
+            {
+              'cliente_id': clienteId.toString(),
+              'fecha_actualizacion': DateTime.now().toIso8601String(),
+            },
+            where: 'id = ?',
+            whereArgs: [equipoId],
+          );
+          _logger.i('✅ Equipo $equipoId asignado al cliente $clienteId en tabla equipos');
+
+          // ✅ PASO 2: Registrar en equipos_pendientes
           await _equipoPendienteRepository.procesarEscaneoCenso(
             equipoId: equipoId,
             clienteId: clienteId,
           );
           _logger.i('✅ Registro pendiente creado');
 
+          // ✅ PASO 3: ENVIAR AL SERVIDOR AHORA (con cliente asignado)
+          if (esNuevoEquipo && datosEquipo != null) {
+            _logger.i('📤 Enviando equipo nuevo al servidor CON cliente asignado');
+            _enviarEquipoAlServidorAsync(
+              equipoId: equipoId,
+              codigoBarras: datosEquipo['codigo_barras']?.toString() ?? '',
+              marcaId: _safeCastToInt(datosEquipo['marca_id'], 'marca_id') ?? 1,
+              modeloId: _safeCastToInt(datosEquipo['modelo_id'], 'modelo_id') ?? 1,
+              logoId: _safeCastToInt(datosEquipo['logo_id'], 'logo_id') ?? 1,
+              numeroSerie: datosEquipo['numero_serie']?.toString(),
+              clienteId: clienteId, // ✅ AHORA SÍ TIENE CLIENTE
+              userId: userId,
+            );
+          }
+
         } catch (e) {
-          _logger.w('⚠️ Error registrando pendiente: $e');
+          _logger.w('⚠️ Error en asignación: $e');
 
           await ErrorLogService.logDatabaseError(
             tableName: 'equipos_pendientes',
-            operation: 'registrar_pendiente',
-            errorMessage: 'Error registrando equipo pendiente: $e',
+            operation: 'asignar_equipo',
+            errorMessage: 'Error asignando equipo: $e',
             registroFailId: equipoId,
           );
         }

@@ -1,4 +1,3 @@
-
 import 'package:ada_app/ui/screens/pending_data_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
@@ -229,8 +228,191 @@ class _SelectScreenState extends State<SelectScreen> {
         _mostrarExito(event.result.message);
         // 🆕 NUEVO: Refrescar contador después de sync
         _checkPendingData();
+      } else if (event is SyncErrorEvent) {
+        // 🆕 NUEVO: Mostrar diálogo de error de sincronización
+        _mostrarDialogoErrorSync(event);
       }
     });
+  }
+
+  // 🆕 NUEVO: Diálogo para mostrar errores de sincronización
+  Future<void> _mostrarDialogoErrorSync(SyncErrorEvent event) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: Row(
+            children: [
+              Icon(Icons.error_outline, color: AppColors.error, size: 28),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '❌ Error de Sincronización',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Mensaje principal
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          color: AppColors.error,
+                          size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          event.message,
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Detalles técnicos si existen
+                if (event.details != null && event.details!.isNotEmpty) ...[
+                  SizedBox(height: 16),
+                  Text(
+                    'Detalles técnicos:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Text(
+                      event.details!,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                ],
+
+                SizedBox(height: 16),
+
+                // Recomendaciones
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.lightbulb_outline,
+                              color: AppColors.info,
+                              size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Recomendaciones:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.info,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                      _buildRecommendation('Verifica tu conexión a internet'),
+                      _buildRecommendation('Intenta nuevamente en unos momentos'),
+                      _buildRecommendation('Si el problema persiste, contacta a soporte'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cerrar',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _viewModel.requestSync(); // Reintentar sincronización
+              },
+              icon: Icon(Icons.refresh),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
+              ),
+              label: Text('Reintentar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 🆕 NUEVO: Widget helper para recomendaciones
+  Widget _buildRecommendation(String text) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 4, left: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '•  ',
+            style: TextStyle(
+              color: AppColors.info,
+              fontSize: 13,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _handleDeleteValidationFailed(DatabaseValidationResult validation) async {
