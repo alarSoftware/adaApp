@@ -51,22 +51,43 @@ class _SearchableDropdownState<T> extends State<SearchableDropdown<T>> {
   @override
   void didUpdateWidget(SearchableDropdown<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.value != widget.value) {
-      _updateDisplayText();
-    }
+
+    // ✅ PRIMERO: Actualizar la lista de items filtrados
     if (oldWidget.items != widget.items) {
       _filteredItems = widget.items;
-      _filterItems(_searchController.text);
+
+      // Si el overlay está abierto, actualizar el filtro
+      if (_isOpen) {
+        _filterItems(_searchController.text);
+      }
+    }
+
+    // ✅ SEGUNDO: Actualizar el texto mostrado solo si el valor cambió
+    // y si el dropdown NO está abierto (para no interferir con la búsqueda)
+    if (oldWidget.value != widget.value && !_isOpen) {
+      _updateDisplayText();
     }
   }
 
   void _updateDisplayText() {
+    // ✅ Verificar que el valor existe en la lista de items
     if (widget.value != null) {
-      final selectedItem = widget.items.firstWhere(
-            (item) => item.value == widget.value,
-        orElse: () => DropdownItem(value: widget.value as T, label: ''),
-      );
-      _searchController.text = selectedItem.label;
+      try {
+        final selectedItem = widget.items.firstWhere(
+              (item) => item.value == widget.value,
+          orElse: () => DropdownItem(value: widget.value as T, label: ''),
+        );
+
+        // Solo actualizar si encontramos un label válido
+        if (selectedItem.label.isNotEmpty) {
+          _searchController.text = selectedItem.label;
+        } else {
+          _searchController.clear();
+        }
+      } catch (e) {
+        // Si hay algún error, limpiar el campo
+        _searchController.clear();
+      }
     } else {
       _searchController.clear();
     }
@@ -88,13 +109,21 @@ class _SearchableDropdownState<T> extends State<SearchableDropdown<T>> {
   void _openDropdown() {
     if (!widget.enabled || _isOpen) return;
 
+    // ✅ Cerrar cualquier overlay previo antes de abrir uno nuevo
+    _closeDropdown();
+
     setState(() {
       _isOpen = true;
     });
 
-    _overlayEntry = _createOverlayEntry();
-    Overlay.of(context).insert(_overlayEntry!);
-    _focusNode.requestFocus();
+    // ✅ Usar addPostFrameCallback para asegurar que el widget está montado
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _isOpen) {
+        _overlayEntry = _createOverlayEntry();
+        Overlay.of(context).insert(_overlayEntry!);
+        _focusNode.requestFocus();
+      }
+    });
   }
 
   void _closeDropdown() {
@@ -104,17 +133,31 @@ class _SearchableDropdownState<T> extends State<SearchableDropdown<T>> {
       _isOpen = false;
     });
 
+    // ✅ Remover el overlay de forma segura
     _overlayEntry?.remove();
+    _overlayEntry?.dispose();
     _overlayEntry = null;
+
     _focusNode.unfocus();
-    _updateDisplayText(); // Restaurar el texto original si no se seleccionó nada
+
+    // Restaurar el texto original si no se seleccionó nada
+    if (!_focusNode.hasFocus) {
+      _updateDisplayText();
+    }
   }
 
   void _selectItem(DropdownItem<T> item) {
     _searchController.text = item.label;
     _closeDropdown();
-    if (widget.onChanged != null) {
-      widget.onChanged!(item.value);
+
+    // ✅ Llamar a onChanged después de cerrar el dropdown
+    if (widget.onChanged != null && widget.value != item.value) {
+      // Usar addPostFrameCallback para evitar llamadas durante el build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          widget.onChanged!(item.value);
+        }
+      });
     }
   }
 
@@ -125,7 +168,6 @@ class _SearchableDropdownState<T> extends State<SearchableDropdown<T>> {
 
     // Obtener el tamaño de la pantalla
     final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
 
     // Calcular si hay espacio suficiente abajo
     final spaceBelow = screenHeight - (offset.dy + size.height);
@@ -281,7 +323,7 @@ class _SearchableDropdownState<T> extends State<SearchableDropdown<T>> {
   }
 
   void _updateOverlay() {
-    if (_overlayEntry != null) {
+    if (_overlayEntry != null && mounted) {
       _overlayEntry!.markNeedsBuild();
     }
   }
@@ -311,11 +353,21 @@ class _SearchableDropdownState<T> extends State<SearchableDropdown<T>> {
         CompositedTransformTarget(
           link: _layerLink,
           child: FormField<T>(
-            // ✅ AGREGAR: Key que cambia cuando cambia el valor
-            key: ValueKey(widget.value),
+            // ✅ REMOVIDO: Ya no usar ValueKey que causa reconstrucciones
             initialValue: widget.value,
             validator: widget.validator,
+            // ✅ NUEVO: Forzar revalidación cuando cambia el valor
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             builder: (FormFieldState<T> field) {
+              // ✅ Actualizar el valor del field cuando cambia externamente
+              if (field.value != widget.value) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    field.didChange(widget.value);
+                  }
+                });
+              }
+
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -408,11 +460,13 @@ class _SearchableDropdownState<T> extends State<SearchableDropdown<T>> {
                           color: AppColors.error,
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          field.errorText!,
-                          style: TextStyle(
-                            color: AppColors.error,
-                            fontSize: 12,
+                        Expanded(
+                          child: Text(
+                            field.errorText!,
+                            style: TextStyle(
+                              color: AppColors.error,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ],

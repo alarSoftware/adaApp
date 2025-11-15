@@ -384,14 +384,19 @@ class PreviewScreenViewModel extends ChangeNotifier {
     // Ejecutar en background
     Future(() async {
       try {
-        _logger.i('📤 Intentando enviar equipo al servidor: $equipoId');
+        _logger.i('📤 === INICIANDO ENVÍO DE EQUIPO ===');
+        _logger.i('   - equipoId: $equipoId');
+        _logger.i('   - codigoBarras: "$codigoBarras"');
+        _logger.i('   - marcaId: $marcaId (${marcaId.runtimeType})');
+        _logger.i('   - modeloId: $modeloId (${modeloId.runtimeType})');
+        _logger.i('   - logoId: $logoId (${logoId.runtimeType})');
+        _logger.i('   - numeroSerie: "$numeroSerie"');
+        _logger.i('   - clienteId: $clienteId');
 
-        // Obtener edfVendedorId
         final edfVendedorId = await _getEdfVendedorId;
 
         if (edfVendedorId == null || edfVendedorId.isEmpty) {
-          _logger.w('⚠️ No se pudo obtener edfVendedorId, no se enviará al servidor');
-
+          _logger.e('❌ edfVendedorId no disponible');
           await ErrorLogService.logValidationError(
             tableName: 'equipments',
             operation: 'POST',
@@ -402,7 +407,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
           return;
         }
 
-        // Intentar enviar al servidor
+        _logger.i('✅ edfVendedorId: $edfVendedorId');
+
+        // LLAMADA AL SERVICIO
         final resultado = await EquipoPostService.enviarEquipoNuevo(
           equipoId: equipoId,
           codigoBarras: codigoBarras,
@@ -414,13 +421,17 @@ class PreviewScreenViewModel extends ChangeNotifier {
           edfVendedorId: edfVendedorId,
         );
 
+        _logger.i('📥 === RESPUESTA RECIBIDA ===');
+        _logger.i('Resultado completo: $resultado');
+
         if (resultado['exito'] == true) {
-          // ✅ Éxito - marcar como sincronizado
           await _equipoRepository.marcarEquipoComoSincronizado(equipoId);
-          _logger.i('✅ Equipo $equipoId enviado y sincronizado correctamente');
+          _logger.i('✅ Equipo $equipoId sincronizado exitosamente');
         } else {
-          // ⚠️ Error del servidor
-          _logger.w('⚠️ Error enviando equipo $equipoId: ${resultado['mensaje']}');
+          _logger.e('❌ Error del servidor:');
+          _logger.e('   mensaje: ${resultado['mensaje']}');
+          _logger.e('   error: ${resultado['error']}');
+          _logger.e('   status_code: ${resultado['status_code']}');
 
           await ErrorLogService.logError(
             tableName: 'equipments',
@@ -433,7 +444,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
         }
 
       } on SocketException catch (e) {
-        // 📡 Sin conexión (no es error crítico)
         _logger.w('📡 Sin conexión - equipo $equipoId quedó local: $e');
 
         await ErrorLogService.logNetworkError(
@@ -445,7 +455,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
         );
 
       } on TimeoutException catch (e) {
-        // ⏰ Timeout
         _logger.w('⏰ Timeout enviando equipo $equipoId: $e');
 
         await ErrorLogService.logNetworkError(
@@ -456,9 +465,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
           userId: userId,
         );
 
-      } catch (e) {
-        // ❌ Error general
-        _logger.e('❌ Error enviando equipo $equipoId: $e');
+      } catch (e, stackTrace) {
+        _logger.e('💥 Excepción en envío de equipo: $e');
+        _logger.e('StackTrace: $stackTrace');
 
         await ErrorLogService.logError(
           tableName: 'equipments',
