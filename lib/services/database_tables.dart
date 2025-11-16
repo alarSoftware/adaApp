@@ -182,20 +182,22 @@ class DatabaseTables {
 ''';
 
   String _sqlErrorLog() => '''
-    CREATE TABLE error_log (
-      id TEXT PRIMARY KEY,
-      timestamp TEXT NOT NULL,
-      table_name TEXT NOT NULL,
-      operation TEXT NOT NULL,
-      registro_fail_id TEXT,
-      error_code TEXT,
-      error_message TEXT NOT NULL,
-      error_type TEXT,
-      sync_attempt INTEGER DEFAULT 1,
-      user_id TEXT,
-      endpoint TEXT
-    )
-  ''';
+  CREATE TABLE error_log (
+    id TEXT PRIMARY KEY,
+    timestamp TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    registro_fail_id TEXT,
+    error_code TEXT,
+    error_message TEXT NOT NULL,
+    error_type TEXT,
+    sync_attempt INTEGER DEFAULT 1,
+    user_id TEXT,
+    endpoint TEXT,
+    sincronizado INTEGER DEFAULT 0,          
+    fecha_sincronizacion TEXT
+  )
+''';
 
   // ==================== TABLAS DE FORMULARIOS DINÁMICOS ====================
 

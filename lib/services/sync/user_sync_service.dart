@@ -1,19 +1,24 @@
 import 'dart:convert';
+import 'dart:async';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart';
 
 class UserSyncService {
   static final _dbHelper = DatabaseHelper();
 
   static Future<SyncResult> sincronizarUsuarios() async {
+    String? currentEndpoint;
+
     try {
-      // CAMBIO AQUÍ: Obtener la URL dinámica
       final baseUrl = await BaseSyncService.getBaseUrl();
+      currentEndpoint = '$baseUrl/api/getUsers';
 
       final response = await http.get(
-        Uri.parse('$baseUrl/api/getUsers'),
+        Uri.parse(currentEndpoint),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
@@ -68,7 +73,20 @@ class UserSyncService {
           BaseSyncService.logger.i('Usuario ${i + 1}: ${usuariosProcesados[i]}');
         }
 
-        await _dbHelper.sincronizarUsuarios(usuariosProcesados);
+        try {
+          await _dbHelper.sincronizarUsuarios(usuariosProcesados);
+        } catch (dbError) {
+          BaseSyncService.logger.e('Error guardando usuarios en BD: $dbError');
+
+          // 🚨 LOG ERROR: Error de BD local
+          await ErrorLogService.logDatabaseError(
+            tableName: 'Users',
+            operation: 'bulk_insert',
+            errorMessage: 'Error guardando usuarios: $dbError',
+          );
+
+          // No fallar, los datos se descargaron correctamente
+        }
 
         return SyncResult(
           exito: true,
@@ -78,14 +96,70 @@ class UserSyncService {
         );
       } else {
         final mensaje = BaseSyncService.extractErrorMessage(response);
+
+        // 🚨 LOG ERROR: Error del servidor
+        await ErrorLogService.logServerError(
+          tableName: 'Users',
+          operation: 'sync_from_server',
+          errorMessage: mensaje,
+          errorCode: response.statusCode.toString(),
+          endpoint: currentEndpoint,
+        );
+
         return SyncResult(
           exito: false,
           mensaje: 'Error del servidor: $mensaje',
           itemsSincronizados: 0,
         );
       }
+
+    } on TimeoutException catch (timeoutError) {
+      BaseSyncService.logger.e('⏰ Timeout sincronizando usuarios: $timeoutError');
+
+      // 🚨 LOG ERROR: Timeout
+      await ErrorLogService.logNetworkError(
+        tableName: 'Users',
+        operation: 'sync_from_server',
+        errorMessage: 'Timeout de conexión: $timeoutError',
+        endpoint: currentEndpoint,
+      );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Timeout de conexión al servidor',
+        itemsSincronizados: 0,
+      );
+
+    } on SocketException catch (socketError) {
+      BaseSyncService.logger.e('📡 Error de red: $socketError');
+
+      // 🚨 LOG ERROR: Sin conexión de red
+      await ErrorLogService.logNetworkError(
+        tableName: 'Users',
+        operation: 'sync_from_server',
+        errorMessage: 'Sin conexión de red: $socketError',
+        endpoint: currentEndpoint,
+      );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Sin conexión de red',
+        itemsSincronizados: 0,
+      );
+
     } catch (e) {
-      BaseSyncService.logger.e('Error en sincronizarUsuarios: $e');
+      BaseSyncService.logger.e('💥 Error en sincronizarUsuarios: $e');
+
+      // 🚨 LOG ERROR: Error general
+      await ErrorLogService.logError(
+        tableName: 'Users',
+        operation: 'sync_from_server',
+        errorMessage: 'Error general: $e',
+        errorType: 'unknown',
+        errorCode: 'GENERAL_ERROR',
+        endpoint: currentEndpoint,
+      );
+
       return SyncResult(
         exito: false,
         mensaje: BaseSyncService.getErrorMessage(e),
@@ -101,6 +175,14 @@ class UserSyncService {
 
       if (username == null) {
         BaseSyncService.logger.e('No hay usuario logueado');
+
+        // 🚨 LOG ERROR: Validación - no hay usuario
+        await ErrorLogService.logValidationError(
+          tableName: 'Users',
+          operation: 'get_edf_vendedor_id',
+          errorMessage: 'No hay usuario logueado',
+        );
+
         return null;
       }
 
@@ -117,6 +199,14 @@ class UserSyncService {
 
       if (result.isEmpty) {
         BaseSyncService.logger.e('Usuario $username no encontrado en base de datos local');
+
+        // 🚨 LOG ERROR: Usuario no encontrado en BD
+        await ErrorLogService.logDatabaseError(
+          tableName: 'Users',
+          operation: 'query_user',
+          errorMessage: 'Usuario $username no encontrado en base de datos local',
+        );
+
         return null;
       }
 
@@ -125,10 +215,29 @@ class UserSyncService {
       BaseSyncService.logger.i('Usuario encontrado: $username');
       BaseSyncService.logger.i('edf_vendedor_id: $edfVendedorId');
 
+      if (edfVendedorId == null || edfVendedorId.trim().isEmpty) {
+        // 🚨 LOG ERROR: Usuario sin edf_vendedor_id
+        await ErrorLogService.logValidationError(
+          tableName: 'Users',
+          operation: 'get_edf_vendedor_id',
+          errorMessage: 'Usuario $username no tiene edf_vendedor_id configurado',
+          userId: username,
+        );
+      }
+
       return edfVendedorId;
 
     } catch (e) {
       BaseSyncService.logger.e('Error obteniendo edf_vendedor_id: $e');
+
+      // 🚨 LOG ERROR: Error general
+      await ErrorLogService.logError(
+        tableName: 'Users',
+        operation: 'get_edf_vendedor_id',
+        errorMessage: 'Error obteniendo edf_vendedor_id: $e',
+        errorType: 'database',
+      );
+
       return null;
     }
   }
@@ -145,9 +254,26 @@ class UserSyncService {
         return result.first['edf_vendedor_id'].toString();
       }
 
+      // 🚨 LOG ERROR: Usuario no encontrado
+      await ErrorLogService.logDatabaseError(
+        tableName: 'Users',
+        operation: 'query_user_direct',
+        errorMessage: 'Usuario $username no encontrado o sin edf_vendedor_id',
+      );
+
       return null;
+
     } catch (e) {
       BaseSyncService.logger.e('Error en obtenerEdfVendedorIdDirecto: $e');
+
+      // 🚨 LOG ERROR: Error general
+      await ErrorLogService.logError(
+        tableName: 'Users',
+        operation: 'query_user_direct',
+        errorMessage: 'Error: $e',
+        errorType: 'database',
+      );
+
       return null;
     }
   }

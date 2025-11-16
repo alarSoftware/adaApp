@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/sync/base_sync_service.dart';
+import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
 
@@ -6,7 +9,9 @@ class ErrorLogService {
   static final Logger _logger = Logger();
   static const _uuid = Uuid();
 
-  /// Registra un error en la tabla error_log
+  // ==================== REGISTRO DE ERRORES LOCAL ====================
+
+  /// Registra un error en la tabla error_log LOCAL
   static Future<void> logError({
     required String tableName,
     required String operation,
@@ -45,6 +50,142 @@ class ErrorLogService {
       // No re-throw para evitar loops infinitos de errores
     }
   }
+
+  // ==================== ENVÍO AL SERVIDOR ====================
+
+  /// Envía todos los error logs pendientes al servidor
+  static Future<SyncErrorLogsResult> enviarErrorLogsAlServidor({
+    int limit = 50,
+  }) async {
+    try {
+      _logger.i('📤 Iniciando envío de error logs al servidor...');
+
+      // 1. Obtener errores de la BD local
+      final errores = await getAllErrors(limit: limit);
+
+      if (errores.isEmpty) {
+        _logger.i('✅ No hay error logs para enviar');
+        return SyncErrorLogsResult(
+          exito: true,
+          mensaje: 'No hay error logs para enviar',
+          logsEnviados: 0,
+        );
+      }
+
+      _logger.i('📊 Encontrados ${errores.length} error logs para enviar');
+
+      // 2. Enviar cada error al servidor
+      int enviados = 0;
+      int fallidos = 0;
+      final erroresEnviados = <String>[];
+
+      for (final error in errores) {
+        try {
+          final enviado = await _enviarErrorLogIndividual(error);
+
+          if (enviado) {
+            enviados++;
+            erroresEnviados.add(error['id'] as String);
+          } else {
+            fallidos++;
+          }
+        } catch (e) {
+          fallidos++;
+          _logger.e('Error enviando log ${error['id']}: $e');
+        }
+      }
+
+      // 3. Eliminar errores enviados exitosamente de la BD local
+      if (erroresEnviados.isNotEmpty) {
+        await _eliminarErrorsEnviados(erroresEnviados);
+        _logger.i('🗑️ Eliminados $enviados error logs de la BD local');
+      }
+
+      _logger.i('✅ Envío completado: $enviados enviados, $fallidos fallidos');
+
+      return SyncErrorLogsResult(
+        exito: true,
+        mensaje: 'Error logs enviados: $enviados exitosos, $fallidos fallidos',
+        logsEnviados: enviados,
+        logsFallidos: fallidos,
+      );
+
+    } catch (e) {
+      _logger.e('💥 Error general enviando error logs: $e');
+      return SyncErrorLogsResult(
+        exito: false,
+        mensaje: 'Error enviando logs: $e',
+        logsEnviados: 0,
+      );
+    }
+  }
+
+  /// Envía un error log individual al servidor
+  static Future<bool> _enviarErrorLogIndividual(Map<String, dynamic> errorLog) async {
+    try {
+      final baseUrl = await BaseSyncService.getBaseUrl();
+      final endpoint = '$baseUrl/appErrorLog/insertAppErrorLog';
+
+      // Preparar payload según el formato del servidor
+      final payload = {
+        'id': errorLog['id'],
+        'timestamp': errorLog['timestamp'],
+        'tableName': errorLog['table_name'],
+        'operation': errorLog['operation'],
+        'registroFailId': errorLog['registro_fail_id'],
+        'errorCode': errorLog['error_code'],
+        'errorMessage': errorLog['error_message'],
+        'errorType': errorLog['error_type'],
+        'syncAttempt': errorLog['sync_attempt'],
+        'userId': errorLog['user_id'],
+        'endpoint': errorLog['endpoint'],
+      };
+
+      _logger.d('📤 Enviando error log: ${errorLog['id']}');
+
+      final response = await http.post(
+        Uri.parse(endpoint),
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _logger.d('✅ Error log enviado: ${errorLog['id']}');
+        return true;
+      } else {
+        _logger.w('⚠️ Error del servidor al enviar log: ${response.statusCode}');
+        return false;
+      }
+
+    } catch (e) {
+      _logger.e('❌ Error enviando log individual: $e');
+      return false;
+    }
+  }
+
+  /// Elimina error logs que fueron enviados exitosamente
+  static Future<void> _eliminarErrorsEnviados(List<String> ids) async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final db = await dbHelper.database;
+
+      final placeholders = List.filled(ids.length, '?').join(',');
+      await db.delete(
+        'error_log',
+        where: 'id IN ($placeholders)',
+        whereArgs: ids,
+      );
+
+      _logger.i('🗑️ ${ids.length} error logs eliminados de BD local');
+    } catch (e) {
+      _logger.e('❌ Error eliminando logs enviados: $e');
+    }
+  }
+
+  // ==================== CONSULTAS LOCALES ====================
 
   /// Obtiene todos los errores
   static Future<List<Map<String, dynamic>>> getAllErrors({int? limit}) async {
@@ -110,27 +251,6 @@ class ErrorLogService {
     }
   }
 
-  // /// Limpia errores antiguos (más de 30 días)
-  // static Future<void> cleanOldErrors() async {
-  //   try {
-  //     final dbHelper = DatabaseHelper();
-  //     final db = await dbHelper.database;
-  //
-  //     final thirtyDaysAgo = DateTime.now().subtract(Duration(days: 30)).toIso8601String();
-  //
-  //     final deletedCount = await db.delete(
-  //       'error_log',
-  //       where: 'timestamp < ?',
-  //       whereArgs: [thirtyDaysAgo],
-  //     );
-  //
-  //     _logger.i('🧹 Limpiados $deletedCount errores antiguos');
-  //
-  //   } catch (e) {
-  //     _logger.e('❌ Error limpiando errores antiguos: $e');
-  //   }
-  // }
-
   /// Obtiene estadísticas de errores
   static Future<Map<String, dynamic>> getErrorStats() async {
     try {
@@ -184,7 +304,46 @@ class ErrorLogService {
     }
   }
 
-  /// Métodos de conveniencia para tipos específicos de errores
+  // ==================== LIMPIEZA ====================
+
+  /// Limpia errores antiguos (más de 30 días)
+  static Future<int> cleanOldErrors({int days = 30}) async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final db = await dbHelper.database;
+
+      final cutoffDate = DateTime.now().subtract(Duration(days: days)).toIso8601String();
+
+      final deletedCount = await db.delete(
+        'error_log',
+        where: 'timestamp < ?',
+        whereArgs: [cutoffDate],
+      );
+
+      _logger.i('🧹 Limpiados $deletedCount errores antiguos (> $days días)');
+      return deletedCount;
+
+    } catch (e) {
+      _logger.e('❌ Error limpiando errores antiguos: $e');
+      return 0;
+    }
+  }
+
+  /// Limpia TODOS los errores (usar con precaución)
+  static Future<void> clearAllErrors() async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final db = await dbHelper.database;
+
+      await db.delete('error_log');
+      _logger.i('🗑️ Todos los error logs eliminados');
+
+    } catch (e) {
+      _logger.e('❌ Error limpiando todos los errores: $e');
+    }
+  }
+
+  // ==================== MÉTODOS DE CONVENIENCIA ====================
 
   static Future<void> logNetworkError({
     required String tableName,
@@ -259,5 +418,26 @@ class ErrorLogService {
       errorType: 'database',
       errorCode: 'DATABASE_ERROR',
     );
+  }
+}
+
+// ==================== CLASE DE RESULTADO ====================
+
+class SyncErrorLogsResult {
+  final bool exito;
+  final String mensaje;
+  final int logsEnviados;
+  final int logsFallidos;
+
+  SyncErrorLogsResult({
+    required this.exito,
+    required this.mensaje,
+    required this.logsEnviados,
+    this.logsFallidos = 0,
+  });
+
+  @override
+  String toString() {
+    return 'SyncErrorLogsResult(exito: $exito, mensaje: $mensaje, enviados: $logsEnviados, fallidos: $logsFallidos)';
   }
 }

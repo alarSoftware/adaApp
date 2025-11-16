@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'dart:async';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/models/equipos.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart';
 
 class EquipmentSyncService extends BaseSyncService {
   static final _dbHelper = DatabaseHelper();
@@ -12,12 +15,14 @@ class EquipmentSyncService extends BaseSyncService {
   static final _equipoClienteRepo = EquipoPendienteRepository();
 
   static Future<SyncResult> sincronizarMarcas() async {
+    String? currentEndpoint;
+
     try {
-      // CAMBIO AQUÍ: Obtener la URL dinámica
       final baseUrl = await BaseSyncService.getBaseUrl();
+      currentEndpoint = '$baseUrl/api/getEdfMarcas';
 
       final response = await http.get(
-        Uri.parse('$baseUrl/api/getEdfMarcas'),
+        Uri.parse(currentEndpoint),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
@@ -45,8 +50,19 @@ class EquipmentSyncService extends BaseSyncService {
         }).toList();
 
         if (marcasValidas.isNotEmpty) {
-          await _dbHelper.sincronizarMarcas(marcasValidas);
-          BaseSyncService.logger.i('Marcas sincronizadas: ${marcasValidas.length} de ${marcasAPI.length}');
+          try {
+            await _dbHelper.sincronizarMarcas(marcasValidas);
+            BaseSyncService.logger.i('Marcas sincronizadas: ${marcasValidas.length} de ${marcasAPI.length}');
+          } catch (dbError) {
+            BaseSyncService.logger.e('Error guardando marcas en BD: $dbError');
+
+            // 🚨 LOG ERROR: Error de BD local
+            await ErrorLogService.logDatabaseError(
+              tableName: 'marcas',
+              operation: 'bulk_insert',
+              errorMessage: 'Error guardando marcas: $dbError',
+            );
+          }
 
           return SyncResult(
             exito: true,
@@ -64,14 +80,62 @@ class EquipmentSyncService extends BaseSyncService {
         }
       } else {
         final mensaje = BaseSyncService.extractErrorMessage(response);
+
+        // 🚨 LOG ERROR: Error del servidor
+        await ErrorLogService.logServerError(
+          tableName: 'marcas',
+          operation: 'sync_from_server',
+          errorMessage: mensaje,
+          errorCode: response.statusCode.toString(),
+          endpoint: currentEndpoint,
+        );
+
         return SyncResult(
           exito: false,
           mensaje: mensaje,
           itemsSincronizados: 0,
         );
       }
+
+    } on TimeoutException catch (timeoutError) {
+      await ErrorLogService.logNetworkError(
+        tableName: 'marcas',
+        operation: 'sync_from_server',
+        errorMessage: 'Timeout: $timeoutError',
+        endpoint: currentEndpoint,
+      );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Timeout de conexión',
+        itemsSincronizados: 0,
+      );
+
+    } on SocketException catch (socketError) {
+      await ErrorLogService.logNetworkError(
+        tableName: 'marcas',
+        operation: 'sync_from_server',
+        errorMessage: 'Sin conexión: $socketError',
+        endpoint: currentEndpoint,
+      );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Sin conexión de red',
+        itemsSincronizados: 0,
+      );
+
     } catch (e) {
       BaseSyncService.logger.e('Error sincronizando marcas: $e');
+
+      await ErrorLogService.logError(
+        tableName: 'marcas',
+        operation: 'sync_from_server',
+        errorMessage: 'Error: $e',
+        errorType: 'unknown',
+        endpoint: currentEndpoint,
+      );
+
       return SyncResult(
         exito: false,
         mensaje: BaseSyncService.getErrorMessage(e),
@@ -81,12 +145,14 @@ class EquipmentSyncService extends BaseSyncService {
   }
 
   static Future<SyncResult> sincronizarModelos() async {
+    String? currentEndpoint;
+
     try {
-      // CAMBIO AQUÍ: Obtener la URL dinámica
       final baseUrl = await BaseSyncService.getBaseUrl();
+      currentEndpoint = '$baseUrl/api/getEdfModelos';
 
       final response = await http.get(
-        Uri.parse('$baseUrl/api/getEdfModelos'),
+        Uri.parse(currentEndpoint),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
@@ -119,8 +185,19 @@ class EquipmentSyncService extends BaseSyncService {
         }).toList();
 
         if (modelosValidos.isNotEmpty) {
-          await _dbHelper.sincronizarModelos(modelosValidos);
-          BaseSyncService.logger.i('Modelos sincronizados: ${modelosValidos.length} de ${modelosAPI.length}');
+          try {
+            await _dbHelper.sincronizarModelos(modelosValidos);
+            BaseSyncService.logger.i('Modelos sincronizados: ${modelosValidos.length} de ${modelosAPI.length}');
+          } catch (dbError) {
+            BaseSyncService.logger.e('Error guardando modelos en BD: $dbError');
+
+            // 🚨 LOG ERROR: Error de BD local
+            await ErrorLogService.logDatabaseError(
+              tableName: 'modelos',
+              operation: 'bulk_insert',
+              errorMessage: 'Error guardando modelos: $dbError',
+            );
+          }
 
           return SyncResult(
             exito: true,
@@ -138,14 +215,62 @@ class EquipmentSyncService extends BaseSyncService {
         }
       } else {
         final mensaje = BaseSyncService.extractErrorMessage(response);
+
+        // 🚨 LOG ERROR: Error del servidor
+        await ErrorLogService.logServerError(
+          tableName: 'modelos',
+          operation: 'sync_from_server',
+          errorMessage: mensaje,
+          errorCode: response.statusCode.toString(),
+          endpoint: currentEndpoint,
+        );
+
         return SyncResult(
           exito: false,
           mensaje: mensaje,
           itemsSincronizados: 0,
         );
       }
+
+    } on TimeoutException catch (timeoutError) {
+      await ErrorLogService.logNetworkError(
+        tableName: 'modelos',
+        operation: 'sync_from_server',
+        errorMessage: 'Timeout: $timeoutError',
+        endpoint: currentEndpoint,
+      );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Timeout de conexión',
+        itemsSincronizados: 0,
+      );
+
+    } on SocketException catch (socketError) {
+      await ErrorLogService.logNetworkError(
+        tableName: 'modelos',
+        operation: 'sync_from_server',
+        errorMessage: 'Sin conexión: $socketError',
+        endpoint: currentEndpoint,
+      );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Sin conexión de red',
+        itemsSincronizados: 0,
+      );
+
     } catch (e) {
       BaseSyncService.logger.e('Error sincronizando modelos: $e');
+
+      await ErrorLogService.logError(
+        tableName: 'modelos',
+        operation: 'sync_from_server',
+        errorMessage: 'Error: $e',
+        errorType: 'unknown',
+        endpoint: currentEndpoint,
+      );
+
       return SyncResult(
         exito: false,
         mensaje: BaseSyncService.getErrorMessage(e),
@@ -155,12 +280,14 @@ class EquipmentSyncService extends BaseSyncService {
   }
 
   static Future<SyncResult> sincronizarLogos() async {
+    String? currentEndpoint;
+
     try {
-      // CAMBIO AQUÍ: Obtener la URL dinámica
       final baseUrl = await BaseSyncService.getBaseUrl();
+      currentEndpoint = '$baseUrl/api/getEdfLogos';
 
       final response = await http.get(
-        Uri.parse('$baseUrl/api/getEdfLogos'),
+        Uri.parse(currentEndpoint),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
@@ -182,8 +309,19 @@ class EquipmentSyncService extends BaseSyncService {
         }
 
         if (logosAPI.isNotEmpty) {
-          await _dbHelper.sincronizarLogos(logosAPI);
-          BaseSyncService.logger.i('Logos sincronizados: ${logosAPI.length}');
+          try {
+            await _dbHelper.sincronizarLogos(logosAPI);
+            BaseSyncService.logger.i('Logos sincronizados: ${logosAPI.length}');
+          } catch (dbError) {
+            BaseSyncService.logger.e('Error guardando logos en BD: $dbError');
+
+            // 🚨 LOG ERROR: Error de BD local
+            await ErrorLogService.logDatabaseError(
+              tableName: 'logo',
+              operation: 'bulk_insert',
+              errorMessage: 'Error guardando logos: $dbError',
+            );
+          }
 
           return SyncResult(
             exito: true,
@@ -200,14 +338,62 @@ class EquipmentSyncService extends BaseSyncService {
         }
       } else {
         final mensaje = BaseSyncService.extractErrorMessage(response);
+
+        // 🚨 LOG ERROR: Error del servidor
+        await ErrorLogService.logServerError(
+          tableName: 'logo',
+          operation: 'sync_from_server',
+          errorMessage: mensaje,
+          errorCode: response.statusCode.toString(),
+          endpoint: currentEndpoint,
+        );
+
         return SyncResult(
           exito: false,
           mensaje: mensaje,
           itemsSincronizados: 0,
         );
       }
+
+    } on TimeoutException catch (timeoutError) {
+      await ErrorLogService.logNetworkError(
+        tableName: 'logo',
+        operation: 'sync_from_server',
+        errorMessage: 'Timeout: $timeoutError',
+        endpoint: currentEndpoint,
+      );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Timeout de conexión',
+        itemsSincronizados: 0,
+      );
+
+    } on SocketException catch (socketError) {
+      await ErrorLogService.logNetworkError(
+        tableName: 'logo',
+        operation: 'sync_from_server',
+        errorMessage: 'Sin conexión: $socketError',
+        endpoint: currentEndpoint,
+      );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Sin conexión de red',
+        itemsSincronizados: 0,
+      );
+
     } catch (e) {
       BaseSyncService.logger.e('Error sincronizando logos: $e');
+
+      await ErrorLogService.logError(
+        tableName: 'logo',
+        operation: 'sync_from_server',
+        errorMessage: 'Error: $e',
+        errorType: 'unknown',
+        endpoint: currentEndpoint,
+      );
+
       return SyncResult(
         exito: false,
         mensaje: BaseSyncService.getErrorMessage(e),
@@ -217,14 +403,16 @@ class EquipmentSyncService extends BaseSyncService {
   }
 
   static Future<SyncResult> sincronizarEquipos() async {
+    String? currentEndpoint;
+
     try {
       BaseSyncService.logger.i('🔄 Iniciando sincronización de equipos...');
 
-      // CAMBIO AQUÍ: Obtener la URL dinámica
       final baseUrl = await BaseSyncService.getBaseUrl();
+      currentEndpoint = '$baseUrl/api/getEdfEquipos';
 
       final response = await http.get(
-        Uri.parse('$baseUrl/api/getEdfEquipos'),
+        Uri.parse(currentEndpoint),
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
@@ -273,6 +461,15 @@ class EquipmentSyncService extends BaseSyncService {
           } catch (e) {
             BaseSyncService.logger.w('Error procesando equipo: $e');
             BaseSyncService.logger.w('JSON problemático: ${jsonEncode(equipoJson)}');
+
+            // 🚨 LOG ERROR: Error procesando equipo individual
+            await ErrorLogService.logError(
+              tableName: 'equipos',
+              operation: 'process_item',
+              errorMessage: 'Error procesando equipo: $e',
+              errorType: 'validation',
+              registroFailId: equipoJson['id']?.toString(),
+            );
           }
         }
 
@@ -281,8 +478,20 @@ class EquipmentSyncService extends BaseSyncService {
         BaseSyncService.logger.i('- Con código de barras: $conCodigo');
 
         BaseSyncService.logger.i('💾 Guardando en base de datos...');
-        final equiposMapas = equipos.map((e) => e.toMap()).toList();
-        await _equipoRepo.limpiarYSincronizar(equiposMapas);
+
+        try {
+          final equiposMapas = equipos.map((e) => e.toMap()).toList();
+          await _equipoRepo.limpiarYSincronizar(equiposMapas);
+        } catch (dbError) {
+          BaseSyncService.logger.e('Error guardando equipos en BD: $dbError');
+
+          // 🚨 LOG ERROR: Error de BD local
+          await ErrorLogService.logDatabaseError(
+            tableName: 'equipos',
+            operation: 'bulk_insert',
+            errorMessage: 'Error guardando equipos: $dbError',
+          );
+        }
 
         return SyncResult(
           exito: true,
@@ -292,14 +501,62 @@ class EquipmentSyncService extends BaseSyncService {
         );
       } else {
         final mensaje = BaseSyncService.extractErrorMessage(response);
+
+        // 🚨 LOG ERROR: Error del servidor
+        await ErrorLogService.logServerError(
+          tableName: 'equipos',
+          operation: 'sync_from_server',
+          errorMessage: mensaje,
+          errorCode: response.statusCode.toString(),
+          endpoint: currentEndpoint,
+        );
+
         return SyncResult(
           exito: false,
           mensaje: 'Error del servidor: $mensaje',
           itemsSincronizados: 0,
         );
       }
+
+    } on TimeoutException catch (timeoutError) {
+      await ErrorLogService.logNetworkError(
+        tableName: 'equipos',
+        operation: 'sync_from_server',
+        errorMessage: 'Timeout: $timeoutError',
+        endpoint: currentEndpoint,
+      );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Timeout de conexión',
+        itemsSincronizados: 0,
+      );
+
+    } on SocketException catch (socketError) {
+      await ErrorLogService.logNetworkError(
+        tableName: 'equipos',
+        operation: 'sync_from_server',
+        errorMessage: 'Sin conexión: $socketError',
+        endpoint: currentEndpoint,
+      );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Sin conexión de red',
+        itemsSincronizados: 0,
+      );
+
     } catch (e) {
       BaseSyncService.logger.e('💥 Error en sincronización de equipos: $e');
+
+      await ErrorLogService.logError(
+        tableName: 'equipos',
+        operation: 'sync_from_server',
+        errorMessage: 'Error: $e',
+        errorType: 'unknown',
+        endpoint: currentEndpoint,
+      );
+
       return SyncResult(
         exito: false,
         mensaje: BaseSyncService.getErrorMessage(e),
@@ -321,8 +578,6 @@ class EquipmentSyncService extends BaseSyncService {
       if (registrosPendientes.isEmpty) return 0;
 
       int exitosos = 0;
-
-      // CAMBIO AQUÍ: Obtener la URL dinámica UNA VEZ fuera del loop
       final baseUrl = await BaseSyncService.getBaseUrl();
 
       for (final registro in registrosPendientes) {
@@ -366,15 +621,41 @@ class EquipmentSyncService extends BaseSyncService {
               where: 'id = ?',
               whereArgs: [registro['id']],
             );
+
+            // 🚨 LOG ERROR: Error subiendo registro
+            await ErrorLogService.logServerError(
+              tableName: 'registros_equipos',
+              operation: 'upload',
+              errorMessage: 'Error subiendo registro',
+              errorCode: response.statusCode.toString(),
+              registroFailId: registro['id']?.toString(),
+            );
           }
         } catch (e) {
           BaseSyncService.logger.w('Error subiendo registro ${registro['id']}: $e');
+
+          // 🚨 LOG ERROR
+          await ErrorLogService.logError(
+            tableName: 'registros_equipos',
+            operation: 'upload',
+            errorMessage: 'Error: $e',
+            errorType: 'network',
+            registroFailId: registro['id']?.toString(),
+          );
         }
       }
 
       return exitosos;
     } catch (e) {
       BaseSyncService.logger.e('Error en subida de registros: $e');
+
+      await ErrorLogService.logError(
+        tableName: 'registros_equipos',
+        operation: 'upload_batch',
+        errorMessage: 'Error: $e',
+        errorType: 'unknown',
+      );
+
       return 0;
     }
   }
@@ -439,6 +720,13 @@ class EquipmentSyncService extends BaseSyncService {
       return id;
     } catch (e) {
       BaseSyncService.logger.e('Error creando registro de equipo: $e');
+
+      await ErrorLogService.logDatabaseError(
+        tableName: 'registros_equipos',
+        operation: 'create',
+        errorMessage: 'Error: $e',
+      );
+
       rethrow;
     }
   }

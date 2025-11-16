@@ -258,7 +258,7 @@ class SyncService {
           resultado.erroresEquipos = resultadoEquipos.mensaje;
 
           await ErrorLogService.logServerError(
-            tableName: 'equipments',
+            tableName: 'equipos',
             operation: 'sincronizar',
             errorMessage: resultadoEquipos.mensaje,
             errorCode: 'EQUIPMENT_SYNC_FAILED',
@@ -270,7 +270,7 @@ class SyncService {
         BaseSyncService.logger.i('✅ Equipos sincronizados: ${resultadoEquipos.itemsSincronizados} (Éxito: ${resultadoEquipos.exito})');
       } catch (e) {
         await ErrorLogService.logError(
-          tableName: 'equipments',
+          tableName: 'equipos',
           operation: 'sincronizar',
           errorMessage: e.toString(),
           errorType: 'sync_error',

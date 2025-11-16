@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:async';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart';
 
 /// Servicio para sincronización de imágenes de censos
 /// Simplificado para solo traer fotos del API y guardarlas
@@ -16,6 +19,8 @@ class CensusImageSyncService extends BaseSyncService {
     int? offset,
     bool incluirBase64 = true,
   }) async {
+    String? currentEndpoint;
+
     try {
       final queryParams = _buildQueryParams(
         edfVendedorId: edfVendedorId,
@@ -27,8 +32,19 @@ class CensusImageSyncService extends BaseSyncService {
       );
 
       final response = await _makeHttpRequest(queryParams);
+      currentEndpoint = response.request?.url.toString();
 
       if (!_isSuccessStatusCode(response.statusCode)) {
+        // 🚨 LOG ERROR: Error del servidor
+        await ErrorLogService.logServerError(
+          tableName: 'censo_activo_foto',
+          operation: 'sync_from_server',
+          errorMessage: BaseSyncService.extractErrorMessage(response),
+          errorCode: response.statusCode.toString(),
+          endpoint: currentEndpoint,
+          userId: edfVendedorId,
+        );
+
         return _handleErrorResponse(response);
       }
 
@@ -42,8 +58,56 @@ class CensusImageSyncService extends BaseSyncService {
         totalEnAPI: processedResult.length,
       );
 
+    } on TimeoutException catch (timeoutError) {
+      BaseSyncService.logger.e('⏰ Timeout obteniendo imágenes: $timeoutError');
+
+      // 🚨 LOG ERROR: Timeout
+      await ErrorLogService.logNetworkError(
+        tableName: 'censo_activo_foto',
+        operation: 'sync_from_server',
+        errorMessage: 'Timeout de conexión: $timeoutError',
+        endpoint: currentEndpoint,
+        userId: edfVendedorId,
+      );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Timeout de conexión al servidor',
+        itemsSincronizados: 0,
+      );
+
+    } on SocketException catch (socketError) {
+      BaseSyncService.logger.e('📡 Error de red: $socketError');
+
+      // 🚨 LOG ERROR: Sin conexión de red
+      await ErrorLogService.logNetworkError(
+        tableName: 'censo_activo_foto',
+        operation: 'sync_from_server',
+        errorMessage: 'Sin conexión de red: $socketError',
+        endpoint: currentEndpoint,
+        userId: edfVendedorId,
+      );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Sin conexión de red',
+        itemsSincronizados: 0,
+      );
+
     } catch (e) {
-      BaseSyncService.logger.e('Error obteniendo imágenes de censos: $e');
+      BaseSyncService.logger.e('💥 Error obteniendo imágenes de censos: $e');
+
+      // 🚨 LOG ERROR: Error general
+      await ErrorLogService.logError(
+        tableName: 'censo_activo_foto',
+        operation: 'sync_from_server',
+        errorMessage: 'Error general: $e',
+        errorType: 'unknown',
+        errorCode: 'GENERAL_ERROR',
+        endpoint: currentEndpoint,
+        userId: edfVendedorId,
+      );
+
       return SyncResult(
         exito: false,
         mensaje: BaseSyncService.getErrorMessage(e),
@@ -54,7 +118,7 @@ class CensusImageSyncService extends BaseSyncService {
 
   // ========== MÉTODOS PRIVADOS ==========
 
-  /// Construir parámetros de consulta<
+  /// Construir parámetros de consulta
   static Map<String, String> _buildQueryParams({
     String? edfVendedorId,
     int? censoActivoId,
@@ -122,6 +186,16 @@ class CensusImageSyncService extends BaseSyncService {
             return parsed;
           } catch (e) {
             BaseSyncService.logger.e('Error parseando data como JSON: $e');
+
+            // 🚨 LOG ERROR: Error de parsing
+            await ErrorLogService.logError(
+              tableName: 'censo_activo_foto',
+              operation: 'parse_response',
+              errorMessage: 'Error parseando data string: $e',
+              errorType: 'server',
+              errorCode: 'PARSE_ERROR',
+            );
+
             return [];
           }
         } else if (dataValue is List) {
@@ -136,6 +210,16 @@ class CensusImageSyncService extends BaseSyncService {
       return [];
     } catch (e) {
       BaseSyncService.logger.e('Error parseando respuesta: $e');
+
+      // 🚨 LOG ERROR: Error de parsing general
+      await ErrorLogService.logError(
+        tableName: 'censo_activo_foto',
+        operation: 'parse_response',
+        errorMessage: 'Error parseando respuesta del servidor: $e',
+        errorType: 'server',
+        errorCode: 'PARSE_ERROR',
+      );
+
       throw Exception('Error parseando respuesta del servidor: $e');
     }
   }
@@ -157,13 +241,35 @@ class CensusImageSyncService extends BaseSyncService {
           imagenesParaGuardar.add(imagenParaGuardar);
         } catch (e) {
           BaseSyncService.logger.e('Error procesando imagen ID ${imagen['id']}: $e');
+
+          // 🚨 LOG ERROR: Error procesando imagen individual
+          await ErrorLogService.logError(
+            tableName: 'censo_activo_foto',
+            operation: 'process_item',
+            errorMessage: 'Error procesando imagen: $e',
+            errorType: 'database',
+            registroFailId: imagen['id']?.toString(),
+          );
         }
       }
     }
 
     // Vaciar tabla e insertar todas las imágenes
-    final dbHelper = DatabaseHelper();
-    await dbHelper.vaciarEInsertar('censo_activo_foto', imagenesParaGuardar);
+    try {
+      final dbHelper = DatabaseHelper();
+      await dbHelper.vaciarEInsertar('censo_activo_foto', imagenesParaGuardar);
+    } catch (e) {
+      BaseSyncService.logger.e('❌ Error guardando imágenes en BD: $e');
+
+      // 🚨 LOG ERROR: Error de base de datos local
+      await ErrorLogService.logDatabaseError(
+        tableName: 'censo_activo_foto',
+        operation: 'bulk_insert',
+        errorMessage: 'Error en vaciarEInsertar: $e',
+      );
+
+      // No lanzar excepción, los datos se obtuvieron correctamente del servidor
+    }
 
     return imagenesParaGuardar;
   }
