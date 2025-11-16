@@ -113,12 +113,14 @@ class SendConfiguration {
   final Duration timeout;
   final Duration retryDelay;
   final int batchSize;
+  final Duration autoSyncInterval;
 
   const SendConfiguration({
     this.maxRetries = 3,
     this.timeout = const Duration(seconds: 30),
     this.retryDelay = const Duration(seconds: 2),
     this.batchSize = 10,
+    this.autoSyncInterval = const Duration(minutes: 15),
   });
 }
 
@@ -145,6 +147,10 @@ class PendingDataViewModel extends ChangeNotifier {
   // Control de cancelación
   bool _isCancelled = false;
 
+  // 🆕 Auto-sincronización
+  Timer? _autoSyncTimer;
+  bool _autoSyncEnabled = false;
+
   // ========== STREAMS PARA COMUNICACIÓN ==========
   final StreamController<PendingDataUIEvent> _eventController =
   StreamController<PendingDataUIEvent>.broadcast();
@@ -165,15 +171,169 @@ class PendingDataViewModel extends ChangeNotifier {
   int get sendCompletedCount => _sendCompletedCount;
   int get sendTotalCount => _sendTotalCount;
 
+  // 🆕 Getters de auto-sync
+  bool get autoSyncEnabled => _autoSyncEnabled;
+  Duration get autoSyncInterval => _config.autoSyncInterval;
+
   // ========== CONSTRUCTOR ==========
   PendingDataViewModel() {
     loadPendingData();
+    iniciarSincronizacionAutomatica();
   }
 
   @override
   void dispose() {
+    detenerSincronizacionAutomatica();
     _eventController.close();
     super.dispose();
+  }
+
+  // ========== 🆕 MÉTODOS DE SINCRONIZACIÓN AUTOMÁTICA ==========
+
+  /// Inicia la sincronización automática periódica
+  void iniciarSincronizacionAutomatica() {
+    if (_autoSyncEnabled) {
+      _logger.i('⚠️ Sincronización automática ya está activa');
+      return;
+    }
+
+    _autoSyncEnabled = true;
+    _logger.i('🚀 Iniciando sincronización automática cada ${_config.autoSyncInterval.inMinutes} minutos');
+
+    // Primera sincronización después de 2 minutos (para dar tiempo al inicio)
+    Timer(const Duration(minutes: 2), () async {
+      if (_autoSyncEnabled) {
+        await _ejecutarAutoSync();
+      }
+    });
+
+    // Sincronización periódica
+    _autoSyncTimer = Timer.periodic(_config.autoSyncInterval, (timer) async {
+      await _ejecutarAutoSync();
+    });
+
+    notifyListeners();
+  }
+
+  /// Detiene la sincronización automática
+  void detenerSincronizacionAutomatica() {
+    if (_autoSyncTimer != null) {
+      _autoSyncTimer!.cancel();
+      _autoSyncTimer = null;
+      _autoSyncEnabled = false;
+      _logger.i('⏹️ Sincronización automática detenida');
+      notifyListeners();
+    }
+  }
+
+  /// Toggle para activar/desactivar auto-sync manualmente
+  void toggleAutoSync() {
+    if (_autoSyncEnabled) {
+      detenerSincronizacionAutomatica();
+      _eventController.add(ShowSuccessEvent('Sincronización automática desactivada'));
+    } else {
+      iniciarSincronizacionAutomatica();
+      _eventController.add(ShowSuccessEvent('Sincronización automática activada'));
+    }
+  }
+
+  /// Ejecuta la sincronización automática en background
+  Future<void> _ejecutarAutoSync() async {
+    // No ejecutar si ya hay un envío en progreso
+    if (_isSending) {
+      _logger.i('⏭️ Auto-sync saltado: envío manual en progreso');
+      return;
+    }
+
+    // No ejecutar si no hay conexión
+    final connected = await _checkConnectivity();
+    if (!connected) {
+      _logger.i('⏭️ Auto-sync saltado: sin conexión');
+      return;
+    }
+
+    // Recargar datos para ver si hay pendientes
+    await loadPendingData();
+
+    if (!hasPendingData) {
+      _logger.i('✅ Auto-sync: No hay datos pendientes');
+      return;
+    }
+
+    _logger.i('🔄 Ejecutando auto-sync: $_totalPendingItems elementos pendientes');
+
+    try {
+      await _executarAutoSyncSilencioso();
+    } catch (e) {
+      _logger.e('❌ Error en auto-sync: $e');
+    }
+  }
+
+  /// Ejecuta el envío automático de forma silenciosa (sin mostrar todos los diálogos)
+  Future<void> _executarAutoSyncSilencioso() async {
+    _setSending(true);
+    _resetSendProgress();
+    _isCancelled = false;
+
+    try {
+      final results = <SendResult>[];
+      int totalSent = 0;
+
+      _sendTotalCount = _pendingGroups.length;
+      _sendCompletedCount = 0;
+
+      for (int i = 0; i < _pendingGroups.length; i++) {
+        if (_isCancelled) break;
+
+        final group = _pendingGroups[i];
+
+        _updateSendProgress(
+          progress: (i / _pendingGroups.length),
+          currentStep: 'Auto-sync: ${group.displayName}...',
+          completedCount: i,
+        );
+
+        try {
+          // Solo intentar una vez (sin reintentos) en auto-sync
+          final result = await _sendDataGroup(group);
+          results.add(result);
+
+          if (result.success) {
+            totalSent += result.itemsSent;
+            _logger.i('✅ Auto-sync ${group.displayName}: ${result.itemsSent} elementos');
+          }
+        } catch (e) {
+          _logger.w('⚠️ Auto-sync error en ${group.displayName}: $e');
+        }
+
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+
+      _updateSendProgress(
+        progress: 1.0,
+        currentStep: 'Auto-sync completado',
+        completedCount: _pendingGroups.length,
+      );
+
+      // Recargar datos
+      await loadPendingData();
+
+      // Solo mostrar mensaje si se envió algo
+      if (totalSent > 0) {
+        final successCount = results.where((r) => r.success).length;
+        _eventController.add(ShowSuccessEvent(
+            '🔄 Auto-sync: $totalSent elementos enviados ($successCount/${results.length} categorías)'
+        ));
+      }
+
+      _logger.i('✅ Auto-sync completado: $totalSent elementos enviados');
+
+    } catch (e) {
+      _logger.e('💥 Error en auto-sync: $e');
+    } finally {
+      _setSending(false);
+      _resetSendProgress();
+    }
   }
 
   // ========== MÉTODOS PÚBLICOS ==========
@@ -232,9 +392,11 @@ class PendingDataViewModel extends ChangeNotifier {
     try {
       final conexion = await SyncService.probarConexion();
       _isConnected = conexion.exito;
+      notifyListeners();
       return _isConnected;
     } catch (e) {
       _isConnected = false;
+      notifyListeners();
       return false;
     }
   }
@@ -795,21 +957,13 @@ class PendingDataViewModel extends ChangeNotifier {
     }
   }
 
-  /// SIMULACIÓN: Envío de equipos (preparado para implementación futura)
-  ///
-  /// NOTA: Este método está simulando el envío por ahora.
-  /// Para implementar realmente:
-  /// 1. Reemplazar la simulación con: await EquiposPendientesApiService.enviarEquipoPendiente(...)
-  /// 2. Usar response['exito'] en lugar de simulatedSuccess
-  /// 3. Manejar response['mensaje'] para errores reales
-  /// 4. Quitar los delays artificiales y logs de simulación
   Future<SendResult> _sendEquipment(PendingDataGroup group) async {
     try {
       final db = await _dbHelper.database;
 
-      _logger.i('🎭 Simulando envío de equipos...');
+      _logger.i('📤 Enviando equipos pendientes...');
 
-      // Obtener equipos pendientes (simulación)
+      // Obtener equipos pendientes reales
       final pendingEquipment = await db.query(
         'equipos_pendientes',
         where: 'sincronizado = ?',
@@ -833,45 +987,73 @@ class PendingDataViewModel extends ChangeNotifier {
         if (_isCancelled) break;
 
         try {
-          _logger.i('🎭 Simulando envío de equipo: ${equipo['equipo_id']}');
+          _logger.i('📤 Enviando equipo: ${equipo['equipo_id']}');
 
-          // SIMULACIÓN: Esperar un poco para simular red
-          await Future.delayed(Duration(milliseconds: 300 + (equipo.hashCode % 200)));
+          // ✅ USAR EL SERVICIO REAL
+          final response = await EquiposPendientesApiService.enviarEquipoPendiente(
+            equipoId: equipo['equipo_id'] as String,
+            clienteId: int.parse(equipo['cliente_id'] as String),
+            edfVendedorId: equipo['usuario_censo_id']?.toString() ?? '',
+          );
 
-          // SIMULACIÓN: 95% de éxito
-          final simulatedSuccess = (DateTime.now().millisecondsSinceEpoch % 100) < 95;
-
-          if (simulatedSuccess) {
-            // SIMULACIÓN: Marcar como enviado
+          if (response['exito'] == true) {
+            // Marcar como sincronizado
             await db.update(
               'equipos_pendientes',
               {
                 'sincronizado': 1,
                 'fecha_sincronizacion': DateTime.now().toIso8601String(),
                 'fecha_actualizacion': DateTime.now().toIso8601String(),
+                'error_mensaje': null, // Limpiar error previo
               },
               where: 'id = ?',
               whereArgs: [equipo['id']],
             );
 
             sentCount++;
-            _logger.i('✅ Equipo ${equipo['equipo_id']} enviado (simulación exitosa)');
+            _logger.i('✅ Equipo ${equipo['equipo_id']} enviado exitosamente');
           } else {
-            errors.add('Equipo ${equipo['equipo_id']}: Error simulado de red');
-            _logger.w('❌ Equipo ${equipo['equipo_id']} falló (simulación de error)');
+            // Incrementar intentos y guardar error
+            final intentosActuales = (equipo['intentos_sync'] as int? ?? 0);
+            await db.update(
+              'equipos_pendientes',
+              {
+                'intentos_sync': intentosActuales + 1,
+                'ultimo_intento': DateTime.now().toIso8601String(),
+                'error_mensaje': response['mensaje'] ?? 'Error desconocido',
+              },
+              where: 'id = ?',
+              whereArgs: [equipo['id']],
+            );
+
+            errors.add('Equipo ${equipo['equipo_id']}: ${response['mensaje'] ?? 'Error desconocido'}');
+            _logger.w('⚠️ Equipo ${equipo['equipo_id']} falló: ${response['mensaje']}');
           }
 
         } catch (e) {
-          errors.add('Equipo ${equipo['id']}: $e');
+          // Guardar error de excepción
+          await db.update(
+            'equipos_pendientes',
+            {
+              'intentos_sync': ((equipo['intentos_sync'] as int? ?? 0) + 1),
+              'ultimo_intento': DateTime.now().toIso8601String(),
+              'error_mensaje': e.toString(),
+            },
+            where: 'id = ?',
+            whereArgs: [equipo['id']],
+          );
+
+          errors.add('Equipo ${equipo['equipo_id']}: $e');
+          _logger.e('❌ Error enviando equipo ${equipo['equipo_id']}: $e');
         }
       }
 
       final success = sentCount > 0;
       final message = success
-          ? '$sentCount de ${pendingEquipment.length} equipos enviados (simulación)'
-          : 'No se pudieron enviar equipos (simulación): ${errors.join(', ')}';
+          ? '$sentCount de ${pendingEquipment.length} equipos enviados'
+          : 'No se pudieron enviar equipos: ${errors.join(', ')}';
 
-      _logger.i('📊 Simulación equipos completada: $sentCount exitosos, ${errors.length} errores');
+      _logger.i('📊 Equipos completados: $sentCount exitosos, ${errors.length} errores');
 
       return SendResult(
         success: success,
@@ -886,7 +1068,7 @@ class PendingDataViewModel extends ChangeNotifier {
         success: false,
         tableName: group.tableName,
         itemsSent: 0,
-        message: 'Error en simulación de envío de equipos',
+        message: 'Error en envío de equipos',
         error: e.toString(),
       );
     }
@@ -896,7 +1078,6 @@ class PendingDataViewModel extends ChangeNotifier {
     try {
       final db = await _dbHelper.database;
 
-      // Obtener imágenes pendientes que tengan sync_status = 'pending'
       final pendingImages = await db.query(
         'dynamic_form_response_image',
         where: 'sync_status = ? AND imagen_base64 IS NOT NULL',
@@ -913,13 +1094,9 @@ class PendingDataViewModel extends ChangeNotifier {
         );
       }
 
-      // Las imágenes normalmente se envían junto con los formularios
-      // Este método puede ser usado para imágenes independientes o reintentos
-
       int sentCount = 0;
       final errors = <String>[];
 
-      // Procesamos imágenes en lotes pequeños
       for (int i = 0; i < pendingImages.length; i += _config.batchSize) {
         if (_isCancelled) break;
 
@@ -927,7 +1104,6 @@ class PendingDataViewModel extends ChangeNotifier {
 
         for (final image in batch) {
           try {
-            // Usar BasePostService directamente para imágenes independientes
             final response = await BasePostService.post(
               endpoint: '/api/upload-image',
               body: {
@@ -937,16 +1113,13 @@ class PendingDataViewModel extends ChangeNotifier {
                 'mime_type': image['mime_type'],
                 'orden': image['orden'],
               },
-              timeout: const Duration(seconds: 60), // Timeout mayor para imágenes
+              timeout: const Duration(seconds: 60),
             );
 
             if (response['exito'] == true) {
-              // Marcar como enviada
               await db.update(
                 'dynamic_form_response_image',
-                {
-                  'sync_status': 'sent',
-                },
+                {'sync_status': 'sent'},
                 where: 'id = ?',
                 whereArgs: [image['id']],
               );
@@ -961,7 +1134,6 @@ class PendingDataViewModel extends ChangeNotifier {
           }
         }
 
-        // Pausa entre lotes
         await Future.delayed(const Duration(milliseconds: 200));
       }
 
@@ -993,13 +1165,12 @@ class PendingDataViewModel extends ChangeNotifier {
     try {
       final db = await _dbHelper.database;
 
-      // Obtener logs pendientes (solo los más recientes por eficiencia)
       final pendingLogsData = await db.query(
         'device_log',
         where: 'sincronizado = ?',
         whereArgs: [0],
         orderBy: 'fecha_registro DESC',
-        limit: 1000, // Limitar para no enviar demasiados logs de una vez
+        limit: 1000,
       );
 
       if (pendingLogsData.isEmpty) {
@@ -1011,19 +1182,14 @@ class PendingDataViewModel extends ChangeNotifier {
         );
       }
 
-      // Convertir a objetos DeviceLog
       final pendingLogs = pendingLogsData.map((logData) => DeviceLog.fromMap(logData)).toList();
 
-      // Usar tu servicio existente DeviceLogPostService
       final resultado = await DeviceLogPostService.enviarDeviceLogsBatch(pendingLogs);
 
       final sentCount = resultado['exitosos'] ?? 0;
       final failedCount = resultado['fallidos'] ?? 0;
 
       if (sentCount > 0) {
-        // Marcar los logs exitosos como enviados
-        // Como el servicio no nos devuelve cuáles fueron exitosos específicamente,
-        // marcamos todos si la mayoría fue exitosa
         if (sentCount > failedCount) {
           await db.update(
             'device_log',

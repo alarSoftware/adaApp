@@ -71,6 +71,22 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
           backgroundColor: Theme.of(context).primaryColor,
           foregroundColor: Colors.white,
           actions: [
+            // 🆕 Indicador de auto-sync
+            Consumer<PendingDataViewModel>(
+              builder: (context, viewModel, child) {
+                return IconButton(
+                  icon: Icon(
+                    viewModel.autoSyncEnabled
+                        ? Icons.sync
+                        : Icons.sync_disabled,
+                  ),
+                  onPressed: viewModel.toggleAutoSync,
+                  tooltip: viewModel.autoSyncEnabled
+                      ? 'Auto-sync activado (cada ${viewModel.autoSyncInterval.inMinutes} min)'
+                      : 'Auto-sync desactivado - Toca para activar',
+                );
+              },
+            ),
             Consumer<PendingDataViewModel>(
               builder: (context, viewModel, child) {
                 if (viewModel.isLoading || viewModel.isSending) {
@@ -100,6 +116,9 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
             return Column(
               children: [
                 _buildHeader(viewModel),
+                // 🆕 Barra de estado de auto-sync
+                if (viewModel.autoSyncEnabled)
+                  _buildAutoSyncBanner(viewModel),
                 if (viewModel.isSending) _buildSendingProgress(viewModel),
                 Expanded(
                   child: _buildContent(viewModel),
@@ -109,6 +128,42 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  // 🆕 Banner de auto-sync
+  Widget _buildAutoSyncBanner(PendingDataViewModel viewModel) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.1),
+        border: Border(
+          bottom: BorderSide(
+            color: Theme.of(context).dividerColor,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.sync,
+            size: 16,
+            color: Colors.blue,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Sincronización automática activa (cada ${viewModel.autoSyncInterval.inMinutes} min)',
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.blue,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -225,7 +280,6 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          // Botón de cancelar
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -717,7 +771,7 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
             TextButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();
-                _viewModel.refresh(); // Refrescar para ver qué queda pendiente
+                _viewModel.refresh();
               },
               icon: const Icon(Icons.refresh),
               label: const Text('Reintentar Pendientes'),

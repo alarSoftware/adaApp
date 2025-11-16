@@ -5,7 +5,7 @@ import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/repositories/logo_repository.dart';
 import 'package:ada_app/repositories/models_repository.dart';
-import 'package:ada_app/repositories/marca_repository.dart'; // NUEVO: Importar MarcaRepository
+import 'package:ada_app/repositories/marca_repository.dart';
 import 'package:logger/logger.dart';
 import 'package:barcode_scan2/barcode_scan2.dart';
 import 'package:ada_app/services/image_service.dart';
@@ -65,7 +65,6 @@ class FormsScreenViewModel extends ChangeNotifier {
   final TextEditingController numeroSerieController = TextEditingController();
   final TextEditingController observacionesController = TextEditingController();
 
-  // ✅ NUEVO: Variable para rastrear el último código buscado
   String _ultimoCodigoBuscado = '';
 
   // Estado privado
@@ -74,11 +73,9 @@ class FormsScreenViewModel extends ChangeNotifier {
   bool _isScanning = false;
   bool _isTakingPhoto = false;
 
-  // NUEVO: Lista de marcas y marca seleccionada
   List<Map<String, dynamic>> _marcas = [];
   int? _marcaSeleccionada;
 
-  // Lista de modelos y modelo seleccionado
   List<Map<String, dynamic>> _modelos = [];
   int? _modeloSeleccionado;
 
@@ -88,7 +85,6 @@ class FormsScreenViewModel extends ChangeNotifier {
   File? _imagenSeleccionada;
   File? _imagenSeleccionada2;
 
-  // VARIABLES PARA PASAR AL PREVIEW
   Map<String, dynamic>? _equipoCompleto;
   bool _equipoYaAsignado = false;
 
@@ -97,27 +93,21 @@ class FormsScreenViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isScanning => _isScanning;
 
-  // NUEVO: Getters para marcas
   List<Map<String, dynamic>> get marcas => _marcas;
   int? get marcaSeleccionada => _marcaSeleccionada;
 
-  // ✅ NUEVO: Getter para mostrar marcas sin IDs en la UI
   List<String> get marcasParaUI => _marcas.map((m) => m['nombre'] as String).toList();
 
-  // Getters para modelos
   List<Map<String, dynamic>> get modelos => _modelos;
   int? get modeloSeleccionado => _modeloSeleccionado;
 
-  // ✅ NUEVO: Getter para mostrar modelos sin IDs en la UI
   List<String> get modelosParaUI => _modelos.map((m) => m['nombre'] as String).toList();
 
   List<Map<String, dynamic>> get logos => _logos;
   int? get logoSeleccionado => _logoSeleccionado;
 
-  // ✅ NUEVO: Getter para mostrar logos sin IDs en la UI
   List<String> get logosParaUI => _logos.map((l) => l['nombre'] as String).toList();
 
-  // ✅ NUEVOS: Getters para obtener el nombre del elemento seleccionado
   String? get marcaSeleccionadaNombre {
     if (_marcaSeleccionada == null) return null;
     final marca = _marcas.firstWhere(
@@ -144,6 +134,7 @@ class FormsScreenViewModel extends ChangeNotifier {
     );
     return logo['nombre'] as String?;
   }
+
   File? get imagenSeleccionada => _imagenSeleccionada;
   File? get imagenSeleccionada2 => _imagenSeleccionada2;
 
@@ -161,9 +152,8 @@ class FormsScreenViewModel extends ChangeNotifier {
     _cliente = cliente;
     _logger.i('Inicializando FormsScreenViewModel para cliente: ${cliente.nombre}');
 
-    // MODIFICADO: Ahora cargamos marcas, logos y modelos
     await Future.wait([
-      _cargarMarcas(), // NUEVO
+      _cargarMarcas(),
       _cargarLogos(),
       _cargarModelos(),
     ]);
@@ -201,7 +191,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   // ===============================
-  // NUEVO: LÓGICA DE NEGOCIO - MARCAS
+  // LÓGICA DE NEGOCIO - MARCAS
   // ===============================
 
   Future<void> _cargarMarcas() async {
@@ -212,7 +202,7 @@ class FormsScreenViewModel extends ChangeNotifier {
 
       _marcas = marcas.map((marca) => {
         'id': marca.id,
-        'nombre': marca.nombre, // Solo mostrar el nombre, sin el ID
+        'nombre': marca.nombre,
       }).toList();
 
       _logger.i('Marcas cargadas exitosamente: ${_marcas.length}');
@@ -332,9 +322,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   // LÓGICA DE NEGOCIO - BÚSQUEDA EQUIPOS
   // ===============================
 
-  // ✅ NUEVO: Busca el equipo SOLO si el código es diferente al último buscado
   Future<void> buscarEquipoSiHuboCambios() async {
-    // ✅ NO BUSCAR si estamos en modo "Nuevo Equipo"
     if (!_isCensoMode) {
       _logger.i('Modo nuevo equipo activo - búsqueda deshabilitada');
       return;
@@ -342,30 +330,25 @@ class FormsScreenViewModel extends ChangeNotifier {
 
     final codigoActual = codigoBarrasController.text.trim();
 
-    // Validar longitud mínima
     if (codigoActual.length < 3) {
       _logger.i('Código muy corto para buscar: ${codigoActual.length} caracteres');
       return;
     }
 
-    // Verificar si hay cambios
     if (codigoActual == _ultimoCodigoBuscado) {
       _logger.i('No hay cambios en el código de barras, búsqueda omitida');
       return;
     }
 
-    // Si hay cambios, ejecutar la búsqueda
     await buscarEquipoPorCodigo(codigoActual);
   }
 
   Future<void> buscarEquipoPorCodigo(String codigo) async {
-    // ✅ NO BUSCAR si estamos en modo "Nuevo Equipo"
     if (!_isCensoMode) {
       _logger.i('Modo nuevo equipo activo - búsqueda deshabilitada');
       return;
     }
 
-    // ✅ ACTUALIZAR el último código buscado
     _ultimoCodigoBuscado = codigo.trim();
 
     try {
@@ -398,6 +381,8 @@ class FormsScreenViewModel extends ChangeNotifier {
       _llenarCamposFormulario(equipoCompleto);
       _prepararDatosPreview(equipoCompleto);
       _mostrarEstadoEquipo(equipoCompleto);
+
+      // ✅ NUEVO: Notificar cambios inmediatamente
       notifyListeners();
 
     } catch (e) {
@@ -436,11 +421,9 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   void _llenarCamposFormulario(Map<String, dynamic> equipoCompleto) {
-    // NUEVO: Llenar marca seleccionada
     _marcaSeleccionada = equipoCompleto['marca_id'];
     _logger.i('Marca seleccionada del equipo: $_marcaSeleccionada');
 
-    // Llenar modelo seleccionado
     _modeloSeleccionado = equipoCompleto['modelo_id'];
     _logger.i('Modelo seleccionado del equipo: $_modeloSeleccionado');
 
@@ -448,6 +431,9 @@ class FormsScreenViewModel extends ChangeNotifier {
     _logoSeleccionado = equipoCompleto['logo_id'];
 
     _logger.i('Campos autocompletados: Marca ID=$_marcaSeleccionada, Modelo ID=$_modeloSeleccionado, Serie=${numeroSerieController.text}, Logo ID=$_logoSeleccionado');
+
+    // ✅ NUEVO: Notificar cambios inmediatamente
+    notifyListeners();
   }
 
   void _prepararDatosPreview(Map<String, dynamic> equipoCompleto) {
@@ -599,7 +585,6 @@ class FormsScreenViewModel extends ChangeNotifier {
       notifyListeners();
     }
 
-    // ✅ RESETEAR el último código buscado si se borra el campo
     if (codigo.trim().isEmpty) {
       _ultimoCodigoBuscado = '';
     }
@@ -617,7 +602,6 @@ class FormsScreenViewModel extends ChangeNotifier {
   void habilitarModoNuevoEquipo() {
     _isCensoMode = false;
 
-    // MODIFICADO: Limpiar marca y modelo seleccionados
     _marcaSeleccionada = null;
     _modeloSeleccionado = null;
     numeroSerieController.clear();
@@ -626,7 +610,6 @@ class FormsScreenViewModel extends ChangeNotifier {
     _equipoCompleto = null;
     _equipoYaAsignado = false;
 
-    // ✅ RESETEAR el último código buscado
     _ultimoCodigoBuscado = '';
 
     _showInfo('Ahora puede registrar un equipo nuevo completando todos los campos');
@@ -639,14 +622,12 @@ class FormsScreenViewModel extends ChangeNotifier {
     _limpiarDatosAutocompletados();
     _isCensoMode = true;
 
-    // ✅ RESETEAR el último código buscado
     _ultimoCodigoBuscado = '';
 
     notifyListeners();
   }
 
   void _limpiarDatosAutocompletados() {
-    // MODIFICADO: Limpiar marca y modelo seleccionados
     _marcaSeleccionada = null;
     _modeloSeleccionado = null;
     numeroSerieController.clear();
@@ -673,7 +654,6 @@ class FormsScreenViewModel extends ChangeNotifier {
 
   String? validarCodigoBarras(String? value) => _validarCampo(value, 'El código de barras', minLength: 3);
 
-  // NUEVO: Validar marca
   String? validarMarca(int? value) {
     if (value == null) {
       return 'La marca es requerida';
@@ -714,6 +694,9 @@ class FormsScreenViewModel extends ChangeNotifier {
   // ===============================
 
   Future<void> continuarAPreview(GlobalKey<FormState> formKey) async {
+    // ✅ NUEVO: Esperar un momento para que la UI se actualice después del autocompletado
+    await Future.delayed(const Duration(milliseconds: 150));
+
     if (!formKey.currentState!.validate()) {
       return;
     }
@@ -744,7 +727,6 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   Map<String, dynamic> _construirDatosCompletos(Map<String, double> ubicacion) {
-    // NUEVO: Obtener el nombre de la marca seleccionada
     final marcaSeleccionadaData = _marcas.firstWhere(
             (marca) => marca['id'] == _marcaSeleccionada,
         orElse: () => {'nombre': ''}
@@ -764,7 +746,6 @@ class FormsScreenViewModel extends ChangeNotifier {
       'cliente': _cliente,
       'codigo_barras': codigoBarrasController.text.trim(),
 
-      // NUEVO: Incluir datos de marca
       'marca': marcaSeleccionadaData['nombre'],
       'marca_id': _marcaSeleccionada,
 
@@ -855,7 +836,6 @@ class FormsScreenViewModel extends ChangeNotifier {
       ? 'Escanea o ingresa y presiona Enter'
       : 'Código del nuevo equipo';
 
-  // NUEVO: Hint para el dropdown de marca
   String get marcaHint => _isCensoMode
       ? 'Se completará automáticamente'
       : 'Seleccionar marca';

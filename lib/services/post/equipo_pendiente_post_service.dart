@@ -9,22 +9,28 @@ import 'package:ada_app/services/error_log/error_log_service.dart';
 class EquiposPendientesApiService {
   static const String _tableName = 'equipos_pendientes';
   static const String _endpoint = '/edfEquipoPendiente/insertEquipoPendiente';
-  static const _uuid = Uuid();
 
   static Future<Map<String, dynamic>> enviarEquipoPendiente({
     required String equipoId,
     required int clienteId,
     required String edfVendedorId,
+    String? appId, // UUID local del registro
   }) async {
     String? fullEndpoint;
 
     try {
       BaseSyncService.logger.i('💡 Enviando equipo pendiente...');
+      BaseSyncService.logger.i('📱 AppId recibido: $appId');
 
-      final payload = _construirPayload(equipoId, clienteId, edfVendedorId);
+      final payload = _construirPayload(
+        equipoId,
+        clienteId,
+        edfVendedorId,
+        appId,
+      );
 
       BaseSyncService.logger.i('📦 Payload completo: $payload');
-      print(jsonEncode(payload));
+      BaseSyncService.logger.i('📤 JSON a enviar:\n${JsonEncoder.withIndent('  ').convert(payload)}');
 
       final baseUrl = await BaseSyncService.getBaseUrl();
       fullEndpoint = '$baseUrl$_endpoint';
@@ -40,7 +46,6 @@ class EquiposPendientesApiService {
 
       final result = _procesarRespuesta(response);
 
-      // 🚨 LOG: Si hubo error del servidor
       if (!result['exito'] && response.statusCode >= 400) {
         await ErrorLogService.logServerError(
           tableName: _tableName,
@@ -58,7 +63,6 @@ class EquiposPendientesApiService {
     } on TimeoutException catch (e) {
       BaseSyncService.logger.e('⏰ Timeout: $e');
 
-      // 🚨 LOG: Timeout
       await ErrorLogService.logNetworkError(
         tableName: _tableName,
         operation: 'POST',
@@ -76,7 +80,6 @@ class EquiposPendientesApiService {
     } on SocketException catch (e) {
       BaseSyncService.logger.e('📡 Error de red: $e');
 
-      // 🚨 LOG: Error de red
       await ErrorLogService.logNetworkError(
         tableName: _tableName,
         operation: 'POST',
@@ -94,7 +97,6 @@ class EquiposPendientesApiService {
     } on http.ClientException catch (e) {
       BaseSyncService.logger.e('🌐 Error de cliente HTTP: $e');
 
-      // 🚨 LOG: Error de cliente HTTP
       await ErrorLogService.logNetworkError(
         tableName: _tableName,
         operation: 'POST',
@@ -112,7 +114,6 @@ class EquiposPendientesApiService {
     } on FormatException catch (e) {
       BaseSyncService.logger.e('📄 Error de formato JSON: $e');
 
-      // 🚨 LOG: Error de formato
       await ErrorLogService.logError(
         tableName: _tableName,
         operation: 'POST',
@@ -132,7 +133,6 @@ class EquiposPendientesApiService {
     } catch (e) {
       BaseSyncService.logger.e('❌ Error general: $e');
 
-      // 🚨 LOG: Error general
       await ErrorLogService.logError(
         tableName: _tableName,
         operation: 'POST',
@@ -155,13 +155,43 @@ class EquiposPendientesApiService {
       String equipoId,
       int clienteId,
       String edfVendedorId,
+      String? appId,
       ) {
-    return {
-      'equipoId': equipoId,
-      'clienteId': clienteId.toString(),
-      'appId': _uuid.v4(),
-      'vendedorSucursalId': edfVendedorId,
+    // Si no se proporciona appId, generar uno nuevo
+    final uuidValue = appId ?? Uuid().v4();
+
+    BaseSyncService.logger.i('🔑 UUID generado/usado: $uuidValue');
+
+    // Extraer vendedorId y sucursalId del edfVendedorId (formato: "vendedorId_sucursalId")
+    final partes = edfVendedorId.split('_');
+    final vendedorIdValue = partes.isNotEmpty ? partes[0] : edfVendedorId;
+
+    // ✅ IMPORTANTE: sucursalId debe ser Long/int, no String
+    int? sucursalIdValue;
+    if (partes.length > 1) {
+      sucursalIdValue = int.tryParse(partes[1]);
+    }
+
+    BaseSyncService.logger.i('📊 Datos parseados:');
+    BaseSyncService.logger.i('   - VendedorId: $vendedorIdValue');
+    BaseSyncService.logger.i('   - SucursalId: $sucursalIdValue');
+
+    // ✅ Usar Map<String, dynamic> para permitir diferentes tipos
+    final Map<String, dynamic> payload = {
+      'edfEquipoId': equipoId,                      // String
+      'edfClienteId': clienteId.toString(),         // String
+      'uuid': uuidValue,                            // String
+      'edfVendedorSucursalId': edfVendedorId,       // String
+      'edfVendedorId': vendedorIdValue,             // String
+      'estado': 'pendiente',                        // String
     };
+
+    // ✅ Agregar sucursalId si existe (como int, no String)
+    if (sucursalIdValue != null) {
+      payload['edfSucursalId'] = sucursalIdValue;   // int
+    }
+
+    return payload;
   }
 
   static Map<String, dynamic> _procesarRespuesta(http.Response response) {
@@ -182,11 +212,11 @@ class EquiposPendientesApiService {
     }
   }
 
-  /// 🆕 Método para reintentar envío
   static Future<Map<String, dynamic>> reintentarEnvio({
     required String equipoId,
     required int clienteId,
     required String edfVendedorId,
+    String? appId,
     int intentoNumero = 1,
   }) async {
     BaseSyncService.logger.i('🔁 Reintentando equipo pendiente: $equipoId (Intento #$intentoNumero)');
@@ -195,9 +225,9 @@ class EquiposPendientesApiService {
       equipoId: equipoId,
       clienteId: clienteId,
       edfVendedorId: edfVendedorId,
+      appId: appId,
     );
 
-    // Loguear reintento fallido
     if (!result['exito']) {
       await ErrorLogService.logError(
         tableName: _tableName,

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:ada_app/services/app_services.dart';
 import 'package:ada_app/services/auth_service.dart';
-import 'package:ada_app/services/device_log/device_log_background_extension.dart';
 import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
 import 'ui/screens/login_screen.dart';
 import 'ui/screens/clients_screen.dart';
@@ -120,22 +119,14 @@ class _InitializationScreenState extends State<InitializationScreen> {
 
         try {
           print('🔐 Sesión activa detectada - Iniciando servicios automáticamente');
+
+          // ✅ SOLO inicializar servicios (Background Extension ya crea el primer log)
           await AppServices().inicializarEnLogin();
           print('✅ Servicios de logging iniciados automáticamente');
 
-          // 🎯 NUEVO: Crear log inicial inmediatamente
-          setState(() {
-            _loadingMessage = 'Creando log inicial...';
-          });
-
-          try {
-            print('🎯 Creando device log inicial...');
-            await DeviceLogBackgroundExtension.ejecutarManual();
-            print('✅ Log inicial creado exitosamente');
-          } catch (e) {
-            print('💥 Error creando log inicial: $e');
-            // No fallar por esto
-          }
+          // ❌ REMOVER ESTA LÍNEA - Ya no es necesaria
+          // El BackgroundExtension ahora crea el primer log automáticamente
+          // await DeviceLogBackgroundExtension.ejecutarManual();
 
         } catch (e) {
           print('💥 Error iniciando servicios automáticamente: $e');

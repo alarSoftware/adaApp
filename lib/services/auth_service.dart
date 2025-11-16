@@ -396,16 +396,16 @@ class AuthService {
         // No fallar el login por error en logging
       }
 
-      // ✅ NUEVA SECCIÓN: INICIAR SINCRONIZACIÓN AUTOMÁTICA
+      // ✅ NUEVA SECCIÓN: INICIAR SINCRONIZACIÓN AUTOMÁTICA DE CENSOS
       try {
         if (usuario.id != null) {
           CensoUploadService.iniciarSincronizacionAutomatica(usuario.id!);
-          logger.i('🚀 Sincronización automática iniciada para usuario ${usuario.id}');
+          logger.i('🚀 Sincronización automática de censos iniciada para usuario ${usuario.id}');
         } else {
-          logger.w('⚠️ Usuario sin ID, no se puede iniciar sincronización automática');
+          logger.w('⚠️ Usuario sin ID, no se puede iniciar sincronización automática de censos');
         }
       } catch (e) {
-        logger.e('💥 Error iniciando sincronización automática: $e');
+        logger.e('💥 Error iniciando sincronización automática de censos: $e');
         // No fallar el login por error en sincronización
       }
       // ✅ FIN NUEVA SECCIÓN
@@ -541,16 +541,16 @@ class AuthService {
 
       final usuarioAuth = UsuarioAuth.fromUsuario(currentUser);
 
-      // ✅ NUEVO: INICIAR SINCRONIZACIÓN AUTOMÁTICA
+      // ✅ NUEVO: INICIAR SINCRONIZACIÓN AUTOMÁTICA DE CENSOS
       try {
         if (currentUser.id != null) {
           CensoUploadService.iniciarSincronizacionAutomatica(currentUser.id!);
-          logger.i('🚀 Sincronización automática iniciada para usuario ${currentUser.id}');
+          logger.i('🚀 Sincronización automática de censos iniciada para usuario ${currentUser.id}');
         } else {
-          logger.w('⚠️ Usuario sin ID, no se puede iniciar sincronización automática');
+          logger.w('⚠️ Usuario sin ID, no se puede iniciar sincronización automática de censos');
         }
       } catch (e) {
-        logger.e('💥 Error iniciando sincronización automática: $e');
+        logger.e('💥 Error iniciando sincronización automática de censos: $e');
         // No fallar el login por error en sincronización
       }
       // ✅ FIN NUEVO

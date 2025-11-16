@@ -992,6 +992,13 @@ class _FormsScreenState extends State<FormsScreen> {
     });
 
     await _viewModel.buscarEquipoSiHuboCambios();
+
+    // ✅ NUEVO: Esperar que se actualice la UI
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    // ✅ NUEVO: Forzar revalidación antes de continuar
+    _formKey.currentState?.validate();
+
     _viewModel.continuarAPreview(_formKey);
 
     Future.delayed(const Duration(milliseconds: 500), () {

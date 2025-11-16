@@ -9,43 +9,53 @@ import 'package:ada_app/services/api_config_service.dart';
 import 'package:ada_app/utils/device_info_helper.dart';
 import 'package:logger/logger.dart';
 
-// 🔧 CONFIGURACIÓN CENTRALIZADA
+//  CONFIGURACIÓN CENTRALIZADA
 class BackgroundLogConfig {
-  /// ⏰ HORARIO DE TRABAJO
+  ///  HORARIO DE TRABAJO
   static const int horaInicio = 9;  // 9 AM
   static const int horaFin = 17;    // 5 PM
 
-  /// 🔄 INTERVALO ENTRE REGISTROS
+  ///  INTERVALO ENTRE REGISTROS
   static const Duration intervalo = Duration(minutes: 10);
 
-  /// 🔁 NÚMERO MÁXIMO DE REINTENTOS
+  /// NÚMERO MÁXIMO DE REINTENTOS
   static const int maxReintentos = 3;
 
-  /// ⏳ DURACIÓN BASE PARA BACKOFF EXPONENCIAL (en segundos)
+  ///  DURACIÓN BASE PARA BACKOFF EXPONENCIAL (en segundos)
   static const int backoffBase = 2;
+
+  ///  MINUTOS MÍNIMOS ENTRE LOGS (prevenir duplicados)
+  static const int minutosMinimosEntreLogs = 8;
 }
 
-/// 🎯 SERVICIO PRINCIPAL DE LOGGING EN BACKGROUND
-/// - Ejecuta cada X minutos en horario laboral
+///  SERVICIO PRINCIPAL DE LOGGING EN BACKGROUND
+/// - Ejecuta cada 10 minutos en horario laboral
 /// - Crea logs automáticamente
 /// - Intenta enviar con reintentos
 /// - Marca como sincronizado si tiene éxito
+/// - CON PROTECCIÓN ANTI-DUPLICADOS Y LOCK DE CONCURRENCIA
 class DeviceLogBackgroundExtension {
   static final _logger = Logger();
   static Timer? _backgroundTimer;
   static bool _isInitialized = false;
+  static bool _isExecuting = false; // 🆕 LOCK DE CONCURRENCIA
 
-  /// 🚀 Inicializar servicio de logging en background
+  /// Inicializar servicio de logging en background
   static Future<void> inicializar() async {
     try {
       _logger.i('═══════════════════════════════════════');
-      _logger.i('🚀 INICIALIZANDO BACKGROUND LOGGING');
+      _logger.i('INICIALIZANDO BACKGROUND LOGGING');
       _logger.i('═══════════════════════════════════════');
 
       // Detener timer previo si existe
       _backgroundTimer?.cancel();
 
-      // Crear timer periódico
+      // CREAR LOG INMEDIATAMENTE AL INICIAR
+      _logger.i(' Creando primer log inmediatamente...');
+      await _ejecutarLogging();
+      _logger.i(' Primer log creado y enviado');
+
+      // Crear timer periódico para los siguientes logs
       _backgroundTimer = Timer.periodic(
         BackgroundLogConfig.intervalo,
             (timer) async => await _ejecutarLoggingConHorario(),
@@ -55,18 +65,19 @@ class DeviceLogBackgroundExtension {
 
       // Mostrar configuración
       final urlActual = await ApiConfigService.getBaseUrl();
-      _logger.i('✅ Extensión de logging configurada');
-      _logger.i('🌐 URL del servidor: $urlActual');
-      _logger.i('⏰ Horario: ${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00');
-      _logger.i('🔄 Intervalo: ${BackgroundLogConfig.intervalo.inMinutes} minutos');
-      _logger.i('🔁 Reintentos máximos: ${BackgroundLogConfig.maxReintentos}');
+      _logger.i(' Extensión de logging configurada');
+      _logger.i('URL del servidor: $urlActual');
+      _logger.i(' Horario: ${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00');
+      _logger.i(' Intervalo: ${BackgroundLogConfig.intervalo.inMinutes} minutos');
+      _logger.i(' Reintentos máximos: ${BackgroundLogConfig.maxReintentos}');
+      _logger.i(' Mínimo entre logs: ${BackgroundLogConfig.minutosMinimosEntreLogs} min');
       _logger.i('═══════════════════════════════════════');
 
       // Verificar disponibilidad de servicios
       await DeviceInfoHelper.mostrarEstadoDisponibilidad();
 
     } catch (e) {
-      _logger.e('💥 Error inicializando extensión: $e');
+      _logger.e(' Error inicializando extensión: $e');
     }
   }
 
@@ -80,56 +91,84 @@ class DeviceLogBackgroundExtension {
       }
 
       _logger.i('═══════════════════════════════════════');
-      _logger.i('🔄 EJECUTANDO LOGGING EN HORARIO LABORAL');
+      _logger.i('EJECUTANDO LOGGING EN HORARIO LABORAL');
       _logger.i('═══════════════════════════════════════');
 
       await _ejecutarLogging();
 
       _logger.i('═══════════════════════════════════════');
     } catch (e) {
-      _logger.e('💥 Error en logging con horario: $e');
+      _logger.e(' Error en logging con horario: $e');
     }
   }
 
-  /// 📊 Ejecutar proceso completo de logging
+  /// Ejecutar proceso completo de logging
   static Future<void> _ejecutarLogging() async {
+    // LOCK DE CONCURRENCIA - Prevenir ejecución simultánea
+    if (_isExecuting) {
+      _logger.w('⚠ Ya hay un proceso de logging en ejecución - saltando...');
+      return;
+    }
+
+    _isExecuting = true;
+
     try {
-      // 🔐 Verificar permisos de ubicación
+      // Verificar permisos de ubicación
       final hasPermission = await Permission.location.isGranted;
       if (!hasPermission) {
-        _logger.w('⚠️ Sin permisos de ubicación - solicitando...');
+        _logger.w('⚠Sin permisos de ubicación - solicitando...');
         final status = await Permission.location.request();
         if (!status.isGranted) {
-          _logger.e('❌ Permisos de ubicación denegados');
+          _logger.e('Permisos de ubicación denegados');
           return;
         }
       }
 
-      // 📦 Crear log usando helper compartido (sin duplicación)
-      _logger.i('📦 Creando device log...');
-      final log = await DeviceInfoHelper.crearDeviceLog();
+      // VALIDAR QUE NO EXISTA UN LOG MUY RECIENTE (prevenir duplicados)
+      final db = await DatabaseHelper().database;
+      final repository = DeviceLogRepository(db);
 
-      if (log == null) {
-        _logger.w('⚠️ No se pudo crear el device log');
+      // Obtener vendedor actual (puede ser null en algunas situaciones)
+      final log = await DeviceInfoHelper.crearDeviceLog();
+      final vendedorId = log?.edfVendedorId;
+
+      final existeReciente = await repository.existeLogReciente(
+        vendedorId,
+        minutos: BackgroundLogConfig.minutosMinimosEntreLogs,
+      );
+
+      if (existeReciente) {
+        _logger.i('⏭ Ya existe un log reciente (últimos ${BackgroundLogConfig.minutosMinimosEntreLogs} min) - saltando creación');
         return;
       }
 
-      // 💾 Guardar en base de datos local
-      _logger.i('💾 Guardando en base de datos local...');
+      // Crear log usando helper compartido
+      _logger.i('Creando device log...');
+
+      if (log == null) {
+        _logger.w('⚠No se pudo crear el device log');
+        return;
+      }
+
+      //  Guardar en base de datos local
+      _logger.i(' Guardando en base de datos local...');
       await _guardarEnBD(log);
 
-      // 🌐 Intentar enviar al servidor con reintentos automáticos
-      _logger.i('🌐 Intentando enviar al servidor...');
+      //  Intentar enviar al servidor con reintentos automáticos
+      _logger.i(' Intentando enviar al servidor...');
       await _intentarEnviarConReintentos(log);
 
-      _logger.i('✅ Proceso de logging completado para: ${log.id}');
+      _logger.i(' Proceso de logging completado para: ${log.id}');
 
     } catch (e) {
-      _logger.e('💥 Error en proceso de logging: $e');
+      _logger.e(' Error en proceso de logging: $e');
+    } finally {
+      // LIBERAR LOCK SIEMPRE
+      _isExecuting = false;
     }
   }
 
-  /// ⏰ Verificar si estamos en horario de trabajo
+  ///  Verificar si estamos en horario de trabajo
   static bool estaEnHorarioTrabajo() {
     final now = DateTime.now();
     final hora = now.hour;
@@ -144,7 +183,7 @@ class DeviceLogBackgroundExtension {
     return esDiaLaboral && esHorarioTrabajo;
   }
 
-  /// 💾 Guardar log en base de datos local
+  ///  Guardar log en base de datos local
   static Future<void> _guardarEnBD(DeviceLog log) async {
     try {
       final db = await DatabaseHelper().database;
@@ -165,7 +204,7 @@ class DeviceLogBackgroundExtension {
     }
   }
 
-  /// 🔁 Enviar al servidor con reintentos automáticos
+  /// Enviar al servidor con reintentos automáticos
   static Future<void> _intentarEnviarConReintentos(DeviceLog log) async {
     int intento = 0;
 
@@ -243,6 +282,7 @@ class DeviceLogBackgroundExtension {
       _backgroundTimer?.cancel();
       _backgroundTimer = null;
       _isInitialized = false;
+      _isExecuting = false; // 🆕 Limpiar lock también
 
       _logger.i('✅ Extensión de logging detenida');
     } catch (e) {
@@ -282,6 +322,7 @@ class DeviceLogBackgroundExtension {
       'activo': estaActivo,
       'inicializado': _isInitialized,
       'timer_activo': _backgroundTimer?.isActive ?? false,
+      'ejecutando': _isExecuting, // 🆕 Estado del lock
       'en_horario': estaEnHorarioTrabajo(),
       'hora_actual': now.hour,
       'minuto_actual': now.minute,
@@ -292,6 +333,7 @@ class DeviceLogBackgroundExtension {
       'url_servidor': urlActual,
       'max_reintentos': BackgroundLogConfig.maxReintentos,
       'backoff_base': BackgroundLogConfig.backoffBase,
+      'minutos_minimos_entre_logs': BackgroundLogConfig.minutosMinimosEntreLogs, // 🆕
     };
   }
 
@@ -306,6 +348,7 @@ class DeviceLogBackgroundExtension {
     _logger.i('   • Activo: ${estado['activo'] ? "✅ SÍ" : "❌ NO"}');
     _logger.i('   • Inicializado: ${estado['inicializado'] ? "✅ SÍ" : "❌ NO"}');
     _logger.i('   • Timer: ${estado['timer_activo'] ? "✅ ACTIVO" : "❌ INACTIVO"}');
+    _logger.i('   • Ejecutando: ${estado['ejecutando'] ? "🔄 SÍ" : "⏸️ NO"}'); // 🆕
     _logger.i('');
     _logger.i('🕐 Horario Actual:');
     _logger.i('   • Día: ${estado['dia_nombre']}');
@@ -316,6 +359,7 @@ class DeviceLogBackgroundExtension {
     _logger.i('   • Horario: ${estado['horario']}');
     _logger.i('   • Días: Lunes a Viernes');
     _logger.i('   • Intervalo: ${estado['intervalo_minutos']} minutos');
+    _logger.i('   • Mínimo entre logs: ${estado['minutos_minimos_entre_logs']} min'); // 🆕
     _logger.i('');
     _logger.i('🌐 Configuración de Red:');
     _logger.i('   • URL Servidor: ${estado['url_servidor']}');
