@@ -9,6 +9,7 @@ import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/services/censo/censo_api_mapper.dart';
 import 'package:ada_app/services/post/base_post_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart'; // ✅ NUEVO IMPORT
 import 'censo_log_service.dart';
 
 class CensoUploadService {
@@ -44,8 +45,11 @@ class CensoUploadService {
         int timeoutSegundos = 60,
         bool guardarLog = false,
       }) async {
+    String? censoId;
+
     try {
-      _logger.i('📤 Preparando envío de censo...');
+      censoId = datos['id'] ?? datos['id_local'];
+      _logger.i('📤 Preparando envío de censo: $censoId');
 
       final timestamp = DateTime.now().toIso8601String();
 
@@ -55,7 +59,7 @@ class CensoUploadService {
           headers: {'Content-Type': 'application/json'},
           body: datos,
           timestamp: timestamp,
-          censoActivoId: datos['id'] ?? datos['id_local'],
+          censoActivoId: censoId,
         );
       }
 
@@ -66,10 +70,43 @@ class CensoUploadService {
       );
 
       _logger.i('✅ Respuesta recibida: ${resultado['exito']}');
+
+      // 🚨 Si el servidor responde con error, registrarlo
+      if (resultado['exito'] != true) {
+        try {
+          await ErrorLogService.logServerError(
+            tableName: 'censo_activo',
+            operation: 'upload',
+            errorMessage: resultado['mensaje'] ?? 'Error desconocido del servidor',
+            errorCode: resultado['codigo']?.toString() ?? 'UNKNOWN',
+            registroFailId: censoId,
+            endpoint: '/censoActivo/insertCensoActiv',
+            userId: datos['usuario_id']?.toString(),
+          );
+        } catch (logError) {
+          _logger.e('Error logging server error: $logError');
+        }
+      }
+
       return resultado;
 
     } catch (e) {
       _logger.e('❌ Error en envío: $e');
+
+      // 🚨 LOG ERROR: Error de conexión/red
+      try {
+        await ErrorLogService.logNetworkError(
+          tableName: 'censo_activo',
+          operation: 'upload',
+          errorMessage: 'Error de conexión: $e',
+          registroFailId: censoId,
+          endpoint: '/censoActivo/insertCensoActiv',
+          userId: datos['usuario_id']?.toString(),
+        );
+      } catch (logError) {
+        _logger.e('Error logging network error: $logError');
+      }
+
       return {
         'exito': false,
         'mensaje': 'Error de conexión: $e',
@@ -127,6 +164,19 @@ class CensoUploadService {
       return payload;
     } catch (e) {
       _logger.e('❌ Error preparando payload: $e');
+
+      // 🚨 LOG ERROR: Error preparando datos
+      try {
+        await ErrorLogService.logValidationError(
+          tableName: 'censo_activo',
+          operation: 'prepare_payload',
+          errorMessage: 'Error preparando payload: $e',
+          registroFailId: estadoId,
+        );
+      } catch (logError) {
+        _logger.e('Error logging validation error: $logError');
+      }
+
       rethrow;
     }
   }
@@ -200,6 +250,19 @@ class CensoUploadService {
         _logger.e('💥 Excepción en sincronización: $e');
         await _actualizarUltimoIntento(estadoId, 1);
         await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción: $e');
+
+        // 🚨 LOG ERROR: Excepción general
+        try {
+          await ErrorLogService.logError(
+            tableName: 'censo_activo',
+            operation: 'background_sync',
+            errorMessage: 'Excepción en sincronización background: $e',
+            errorType: 'unknown',
+            registroFailId: estadoId,
+          );
+        } catch (logError) {
+          _logger.e('Error logging exception: $logError');
+        }
       } finally {
         _censosEnProceso.remove(estadoId);
       }
@@ -239,6 +302,20 @@ class CensoUploadService {
               registro.id!,
               'Excepción: $e',
             );
+
+            // 🚨 LOG ERROR
+            try {
+              await ErrorLogService.logError(
+                tableName: 'censo_activo',
+                operation: 'sync_individual',
+                errorMessage: 'Error sincronizando registro: $e',
+                errorType: 'unknown',
+                registroFailId: registro.id,
+                userId: usuarioId.toString(),
+              );
+            } catch (logError) {
+              _logger.e('Error logging sync error: $logError');
+            }
           }
         }
       }
@@ -252,6 +329,20 @@ class CensoUploadService {
       };
     } catch (e) {
       _logger.e('💥 Error en sincronización: $e');
+
+      // 🚨 LOG ERROR: Error general en batch
+      try {
+        await ErrorLogService.logError(
+          tableName: 'censo_activo',
+          operation: 'sync_batch',
+          errorMessage: 'Error general en sincronización de pendientes: $e',
+          errorType: 'unknown',
+          userId: usuarioId.toString(),
+        );
+      } catch (logError) {
+        _logger.e('Error logging batch error: $logError');
+      }
+
       return {'exitosos': 0, 'fallidos': 0, 'total': 0};
     }
   }
@@ -301,6 +392,21 @@ class CensoUploadService {
     } catch (e) {
       _logger.e('💥 Error en reintento: $e');
       await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción: $e');
+
+      // 🚨 LOG ERROR
+      try {
+        await ErrorLogService.logError(
+          tableName: 'censo_activo',
+          operation: 'manual_retry',
+          errorMessage: 'Error en reintento manual: $e',
+          errorType: 'unknown',
+          registroFailId: estadoId,
+          userId: usuarioId.toString(),
+        );
+      } catch (logError) {
+        _logger.e('Error logging retry error: $logError');
+      }
+
       return {'success': false, 'error': 'Error: $e'};
     }
   }
@@ -374,6 +480,19 @@ class CensoUploadService {
       }
     } catch (e) {
       Logger().e('❌ Error en sincronización automática: $e');
+
+      // 🚨 LOG ERROR
+      try {
+        await ErrorLogService.logError(
+          tableName: 'censo_activo',
+          operation: 'auto_sync',
+          errorMessage: 'Error en sincronización automática: $e',
+          errorType: 'unknown',
+          userId: _usuarioActual?.toString(),
+        );
+      } catch (logError) {
+        Logger().e('Error logging auto-sync error: $logError');
+      }
     } finally {
       _syncEnProgreso = false;
     }
@@ -413,6 +532,21 @@ class CensoUploadService {
         registro.id!,
         'Fallo permanente: máximo de intentos alcanzado',
       );
+
+      // 🚨 LOG ERROR: Máximo de intentos alcanzado
+      try {
+        await ErrorLogService.logError(
+          tableName: 'censo_activo',
+          operation: 'sync_max_retries',
+          errorMessage: 'Máximo de intentos ($MAX_INTENTOS) alcanzado',
+          errorType: 'max_retries',
+          registroFailId: registro.id,
+          userId: usuarioId.toString(),
+        );
+      } catch (logError) {
+        _logger.e('Error logging max retries: $logError');
+      }
+
       return;
     }
 
