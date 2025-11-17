@@ -176,25 +176,21 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final usuarioId = await _getUsuarioId;
       userId = usuarioId.toString();
 
-      // ✅ PASO 1: CREAR EQUIPO NUEVO **PRIMERO** (antes de cualquier validación)
-      // Esto garantiza que el equipo existe en la tabla equipos INMEDIATAMENTE
       String equipoId;
       if (esNuevoEquipo) {
         _logger.i('🆕 === PASO 1: CREAR EQUIPO NUEVO PRIMERO ===');
         equipoId = await _crearEquipoNuevo(
             datos,
-            null, // cliente_id null por ahora - se actualizará después
+            null,
             processId,
             userId
         );
 
-        // Construir equipoCompleto temporalmente sin cliente
         equipoCompleto = _construirEquipoCompleto(datos, equipoId, null);
 
         _logger.i('✅ Equipo nuevo insertado en tabla equipos: $equipoId');
         _logger.i('✅ Ahora el equipo puede mostrar historial');
       } else {
-        // Equipo existente - validar que existe
         if (equipoCompleto == null) {
           await ErrorLogService.logValidationError(
             tableName: 'censo_activo',
@@ -218,7 +214,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
         equipoId = equipoCompleto['id'].toString();
       }
 
-      // ✅ PASO 2: VALIDAR CLIENTE (después de crear el equipo)
       final cliente = datos['cliente'] as Cliente?;
 
       if (cliente == null) {
@@ -241,23 +236,20 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       final clienteId = _convertirAInt(cliente.id, 'cliente_id');
 
-      // ✅ PASO 3: ACTUALIZAR equipoCompleto con clienteId (solo si es nuevo)
       if (esNuevoEquipo) {
         equipoCompleto = _construirEquipoCompleto(datos, equipoId, clienteId);
         _logger.i('✅ equipoCompleto actualizado con cliente: $clienteId');
       }
 
-      // ✅ PASO 4: VERIFICAR Y REGISTRAR ASIGNACIÓN
       final yaAsignado = await _verificarYRegistrarAsignacion(
         equipoId,
         clienteId,
         processId,
         userId,
-        esNuevoEquipo, // ✅ Pasar flag
-        datos,         // ✅ Pasar datos del equipo
+        esNuevoEquipo,
+        datos,
       );
 
-      // ✅ PASO 5: CREAR CENSO EN BD LOCAL
       estadoIdActual = await _crearCensoLocal(
         equipoId: equipoId,
         clienteId: clienteId,
@@ -276,13 +268,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
         throw 'No se pudo crear el estado en la base de datos';
       }
 
-      // ✅ PASO 6: GUARDAR FOTOS Y OBTENER IDs
       final idsImagenes = await _fotoService.guardarFotosDelCenso(estadoIdActual, datos);
       _logger.i('🔍 FOTO SERVICE: Fotos guardadas para censo: $estadoIdActual');
 
       await Future.delayed(Duration(milliseconds: 500));
 
-      // ✅ PASO 7: PREPARAR DATOS COMPLETOS
       final datosCompletos = CensoApiMapper.prepararDatosCompletos(
         estadoId: estadoIdActual,
         equipoId: equipoId,
@@ -299,10 +289,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       _logger.i('🔍 DATOS COMPLETOS: ID en datosCompletos: ${datosCompletos['id']}');
 
-      // ✅ PASO 8: GUARDAR REGISTRO LOCAL
       await _guardarRegistroLocal(datosCompletos, userId);
 
-      // ✅ PASO 9: SINCRONIZAR EN BACKGROUND
       _logger.i('🔍 SYNC: Pasando estadoId: $estadoIdActual');
       _uploadService.sincronizarCensoEnBackground(estadoIdActual, datosCompletos);
 
@@ -338,11 +326,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ==================== MÉTODOS AUXILIARES ====================
-
   Future<String> _crearEquipoNuevo(
       Map<String, dynamic> datos,
-      int? clienteId, // ✅ Ahora es nullable
+      int? clienteId,
       String processId,
       String? userId,
       ) async {
@@ -355,8 +341,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     String? equipoId;
 
     try {
-      // 1️⃣ GUARDAR LOCALMENTE PRIMERO (offline-first)
-      // ✅ SIN cliente_id en esta etapa - solo crear el equipo como DISPONIBLE
       equipoId = await _equipoRepository.crearEquipoNuevo(
         codigoBarras: datos['codigo_barras']?.toString() ?? '',
         marcaId: _safeCastToInt(datos['marca_id'], 'marca_id') ?? 1,
@@ -366,9 +350,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       );
 
       _logger.i('✅ Equipo creado localmente (disponible): $equipoId');
-
-      // ⚠️ NO ENVIAR AL SERVIDOR AÚN
-      // Se enviará después de asignar el cliente en _verificarYRegistrarAsignacion
 
       return equipoId;
 
@@ -386,7 +367,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// 🆕 Enviar equipo al servidor en background (sin bloquear)
   void _enviarEquipoAlServidorAsync({
     required String equipoId,
     required String codigoBarras,
@@ -394,10 +374,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
     required int modeloId,
     required int logoId,
     String? numeroSerie,
-    int? clienteId, // ✅ Ahora es nullable
+    int? clienteId,
     String? userId,
   }) {
-    // Ejecutar en background
     Future(() async {
       try {
         _logger.i('📤 === INICIANDO ENVÍO DE EQUIPO ===');
@@ -425,7 +404,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
         _logger.i('✅ edfVendedorId: $edfVendedorId');
 
-        // LLAMADA AL SERVICIO
         final resultado = await EquipoPostService.enviarEquipoNuevo(
           equipoId: equipoId,
           codigoBarras: codigoBarras,
@@ -433,7 +411,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
           modeloId: modeloId,
           logoId: logoId,
           numeroSerie: numeroSerie,
-          clienteId: clienteId?.toString(), // ✅ Convertir a string o null
+          clienteId: clienteId?.toString(),
           edfVendedorId: edfVendedorId,
         );
 
@@ -500,7 +478,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   Map<String, dynamic> _construirEquipoCompleto(
       Map<String, dynamic> datos,
       String equipoId,
-      int? clienteId, // ✅ Ahora es nullable
+      int? clienteId,
       ) {
     return {
       'id': equipoId,
@@ -512,7 +490,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       'logo_id': datos['logo_id'],
       'logo_nombre': datos['logo'],
       'marca_nombre': datos['marca'] ?? 'Sin marca',
-      'cliente_id': clienteId, // ✅ Puede ser null inicialmente
+      'cliente_id': clienteId,
       'app_insert': 1,
     };
   }
@@ -522,8 +500,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
       int clienteId,
       String processId,
       String? userId,
-      bool esNuevoEquipo, // ✅ NUEVO PARÁMETRO
-      Map<String, dynamic>? datosEquipo, // ✅ NUEVO PARÁMETRO
+      bool esNuevoEquipo,
+      Map<String, dynamic>? datosEquipo,
       ) async {
     _setStatusMessage('Verificando estado del equipo...');
 
@@ -547,7 +525,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
         }
 
         try {
-          // ✅ PASO 1: Actualizar cliente_id en tabla equipos
           await _equipoRepository.dbHelper.actualizar(
             'equipos',
             {
@@ -559,14 +536,15 @@ class PreviewScreenViewModel extends ChangeNotifier {
           );
           _logger.i('✅ Equipo $equipoId asignado al cliente $clienteId en tabla equipos');
 
-          // ✅ PASO 2: Registrar en equipos_pendientes
+          final userIdInt = userId != null ? int.tryParse(userId) : null;
+
           await _equipoPendienteRepository.procesarEscaneoCenso(
             equipoId: equipoId,
             clienteId: clienteId,
+            usuarioId: userIdInt,
           );
-          _logger.i('✅ Registro pendiente creado');
+          _logger.i('✅ Registro pendiente creado con usuario: $userIdInt');
 
-          // ✅ PASO 3: ENVIAR AL SERVIDOR AHORA (con cliente asignado)
           if (esNuevoEquipo && datosEquipo != null) {
             _logger.i('📤 Enviando equipo nuevo al servidor CON cliente asignado');
             _enviarEquipoAlServidorAsync(
@@ -576,7 +554,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
               modeloId: _safeCastToInt(datosEquipo['modelo_id'], 'modelo_id') ?? 1,
               logoId: _safeCastToInt(datosEquipo['logo_id'], 'logo_id') ?? 1,
               numeroSerie: datosEquipo['numero_serie']?.toString(),
-              clienteId: clienteId, // ✅ AHORA SÍ TIENE CLIENTE
+              clienteId: clienteId,
               userId: userId,
             );
           }
@@ -715,8 +693,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       throw 'Error guardando datos localmente: $e';
     }
   }
-
-  // ==================== MÉTODOS PÚBLICOS DE SINCRONIZACIÓN ====================
 
   Future<Map<String, dynamic>> verificarSincronizacionPendiente(String? estadoId) async {
     if (estadoId == null) return {'pendiente': false};
@@ -867,13 +843,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ==================== LOGS ====================
-
   Future<List<String>> obtenerLogsGuardados() async {
     return await _logService.obtenerLogsGuardados();
   }
-
-  // ==================== HELPERS ====================
 
   int _convertirAInt(dynamic valor, String nombreCampo) {
     if (valor == null) throw 'El campo $nombreCampo es null';
