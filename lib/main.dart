@@ -11,6 +11,8 @@ import 'ui/screens/cliente_detail_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'ui/screens/api_settings_screen.dart';
 import 'models/cliente.dart';
+//IMPORTS PARA EL RESET TEMPORAL - COMENTADOS PARA PRODUCCIÓN
+// import 'package:ada_app/services/database_helper.dart';
 
 var logger = Logger();
 
@@ -20,11 +22,32 @@ void main() async {
   print('🚀 ==================== APP INICIADA ====================');
   print('🚀 Timestamp: ${DateTime.now()}');
 
-  // ✅ NO inicializamos servicios aquí para evitar freeze
-  // await AppServices().inicializar(); // ❌ Removido de aquí
+  // RESET TEMPORAL - COMENTADO PARA PRODUCCIÓN
+  // await _resetCompleteApp();
 
   runApp(const MyApp());
 }
+
+//  FUNCIÓN DE RESET TEMPORAL - COMENTADA PARA PRODUCCIÓN
+/*
+Future<void> _resetCompleteApp() async {
+  try {
+    print(' === RESET TOTAL DE ADA APP ===');
+
+    //  Usar el método específico del DatabaseHelper
+    await DatabaseHelper.resetCompleteDatabase();
+
+    //  Verificar estado después del reset (opcional)
+    final estado = await DatabaseHelper.verificarEstadoPostReset();
+    print('Estado después del reset: $estado');
+
+    print(' RESET COMPLETO EXITOSO');
+
+  } catch (e) {
+    print(' Error durante reset total: $e');
+  }
+}
+*/
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -50,7 +73,6 @@ class MyApp extends StatelessWidget {
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       debugShowCheckedModeBanner: false,
-      // ✅ Cambiamos a la pantalla de inicialización
       home: const InitializationScreen(),
       navigatorObservers: [routeObserver],
       routes: {
@@ -73,7 +95,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// ✅ Nueva pantalla de inicialización que previene el freeze
 class InitializationScreen extends StatefulWidget {
   const InitializationScreen({super.key});
 
@@ -93,16 +114,13 @@ class _InitializationScreenState extends State<InitializationScreen> {
 
   Future<void> _initializeApp() async {
     try {
-      // ✅ Actualizamos el mensaje de carga
       setState(() {
         _loadingMessage = 'Inicializando servicios...';
       });
 
-      // ✅ Ahora la inicialización es asíncrona y no bloquea la UI
       await AppServices().inicializar();
       print('✅ AppServices inicializado correctamente');
 
-      // ✅ Verificamos autenticación
       setState(() {
         _loadingMessage = 'Verificando autenticación...';
       });
@@ -114,30 +132,15 @@ class _InitializationScreenState extends State<InitializationScreen> {
 
       if (estaAutenticado) {
         setState(() {
-          _loadingMessage = 'Iniciando servicios de logging...';
+          _loadingMessage = 'Preparando acceso...';
         });
 
-        try {
-          print('🔐 Sesión activa detectada - Iniciando servicios automáticamente');
-
-          // ✅ SOLO inicializar servicios (Background Extension ya crea el primer log)
-          await AppServices().inicializarEnLogin();
-          print('✅ Servicios de logging iniciados automáticamente');
-
-          // ❌ REMOVER ESTA LÍNEA - Ya no es necesaria
-          // El BackgroundExtension ahora crea el primer log automáticamente
-          // await DeviceLogBackgroundExtension.ejecutarManual();
-
-        } catch (e) {
-          print('💥 Error iniciando servicios automáticamente: $e');
-          // No fallar la app por error en logging
-        }
+        print('🔐 Sesión activa detectada - NO iniciando servicios automáticamente');
+        print('📝 Los servicios se iniciarán después de la primera sincronización');
       }
 
-      // ✅ Pequeña pausa para que se vea la pantalla de carga (opcional)
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // 🔋 DEBUG: Verificar optimización de batería antes de continuar
       if (mounted && estaAutenticado) {
         print('🔋 INICIANDO verificación de batería...');
         print('🔋 Usuario autenticado: $estaAutenticado, mounted: $mounted');
@@ -157,7 +160,6 @@ class _InitializationScreenState extends State<InitializationScreen> {
         print('🔋 ⏭️ SALTANDO verificación de batería. Autenticado: $estaAutenticado, Mounted: $mounted');
       }
 
-      // ✅ Navegamos a la pantalla correspondiente
       if (mounted) {
         Navigator.pushReplacementNamed(
             context,
@@ -169,14 +171,12 @@ class _InitializationScreenState extends State<InitializationScreen> {
       print('❌ Error inicializando la aplicación: $e');
       print('❌ Stack trace: $stackTrace');
 
-      // ✅ En caso de error, mostramos mensaje y vamos a login
       if (mounted) {
         setState(() {
           _isLoading = false;
           _loadingMessage = 'Error al inicializar. Toca para reintentar.';
         });
 
-        // Opcional: mostrar diálogo de error
         _showErrorDialog(e.toString());
       }
     }
@@ -234,7 +234,6 @@ class _InitializationScreenState extends State<InitializationScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // ✅ Logo o icono de la app (opcional)
             Container(
               width: 120,
               height: 120,
@@ -250,7 +249,6 @@ class _InitializationScreenState extends State<InitializationScreen> {
             ),
             const SizedBox(height: 40),
 
-            // ✅ Título de la app
             const Text(
               'AdaApp',
               style: TextStyle(
@@ -261,7 +259,6 @@ class _InitializationScreenState extends State<InitializationScreen> {
             ),
             const SizedBox(height: 40),
 
-            // ✅ Indicador de carga o mensaje de error
             if (_isLoading) ...[
               const CircularProgressIndicator(),
               const SizedBox(height: 24),
@@ -296,7 +293,6 @@ class _InitializationScreenState extends State<InitializationScreen> {
 
             const SizedBox(height: 60),
 
-            // ✅ Información de versión (opcional)
             Text(
               'Versión 1.0.0',
               style: TextStyle(

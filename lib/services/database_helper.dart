@@ -1,4 +1,4 @@
-// database_helper.dart (CORREGIDO)
+// database_helper.dart (COMPLETO CON RESET)
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -7,6 +7,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:logger/logger.dart';
 import 'package:ada_app/models/usuario.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // 🔥 AGREGADO PARA RESET
 
 // ✅ Importar con alias para evitar conflictos
 import 'database_tables.dart' as tables;
@@ -60,8 +61,6 @@ class DatabaseHelper {
       rethrow;
     }
   }
-
-
 
   // ================================================================
   // MÉTODOS CRUD GENÉRICOS SIMPLIFICADOS
@@ -181,8 +180,6 @@ class DatabaseHelper {
   Future<int> eliminarPorId(String tableName, int id) async {
     return await eliminar(tableName, where: 'id = ?', whereArgs: [id]);
   }
-
-
 
   // ================================================================
   // MÉTODOS DE SINCRONIZACIÓN (DELEGADOS)
@@ -397,6 +394,106 @@ class DatabaseHelper {
     } catch (e) {
       logger.e('Error en respaldo: $e');
       rethrow;
+    }
+  }
+
+  // ================================================================
+  // 🔥 MÉTODOS DE RESET TEMPORAL - ELIMINAR DESPUÉS DE USAR
+  // ================================================================
+
+  /// Reset completo de la base de datos y configuración
+  /// ⚠️ SOLO PARA DEBUG - ELIMINAR EN PRODUCCIÓN
+  static Future<void> resetCompleteDatabase() async {
+    try {
+      logger.w('🔥 === RESET COMPLETO DE BASE DE DATOS ===');
+
+      // 1. Cerrar instancia actual si existe
+      if (_instance != null) {
+        await _instance!.cerrarBaseDatos();
+        _instance = null;
+        _database = null;
+        logger.i('📴 Instancia actual cerrada');
+      }
+
+      // 2. Eliminar archivo de base de datos
+      final path = join(await getDatabasesPath(), _databaseName);
+
+      try {
+        await deleteDatabase(path);
+        logger.w('🗑️ Base de datos eliminada: $path');
+      } catch (e) {
+        logger.e('❌ Error eliminando BD: $e');
+      }
+
+      // 3. Eliminar archivos auxiliares
+      try {
+        await deleteDatabase('$path-journal');
+        await deleteDatabase('$path-wal');
+        await deleteDatabase('$path-shm');
+        logger.i('🗑️ Archivos auxiliares eliminados');
+      } catch (e) {
+        // No importa si no existen
+        logger.d('Archivos auxiliares no existían o ya eliminados');
+      }
+
+      // 4. Limpiar SharedPreferences
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.clear();
+        logger.w('🧹 SharedPreferences limpiado');
+      } catch (e) {
+        logger.e('❌ Error limpiando SharedPreferences: $e');
+      }
+
+      logger.w('✅ RESET COMPLETO EXITOSO');
+      logger.w('   - $_databaseName eliminada completamente');
+      logger.w('   - Todas las ${_getTableCount()} tablas serán recreadas');
+      logger.w('   - SharedPreferences limpiado');
+
+    } catch (e, stackTrace) {
+      logger.e('❌ Error durante reset completo: $e');
+      logger.e('❌ StackTrace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Obtener número aproximado de tablas (para logging)
+  static int _getTableCount() {
+    // Número aproximado basado en las tablas que vimos
+    return 20; // clientes, equipos, usuarios, marcas, modelos, etc.
+  }
+
+  /// Verificar que la base de datos esté completamente limpia
+  static Future<Map<String, dynamic>> verificarEstadoPostReset() async {
+    try {
+      final helper = DatabaseHelper();
+      final stats = await helper.obtenerEstadisticasBaseDatos();
+      final tables = await helper.obtenerNombresTablas();
+
+      logger.i('📊 === ESTADO POST-RESET ===');
+      logger.i('   - Tablas creadas: ${tables.length}');
+
+      int totalRegistros = 0;
+      for (final entry in stats.entries) {
+        final count = entry.value as int;
+        totalRegistros += count;
+        logger.i('   - ${entry.key}: $count registros');
+      }
+
+      logger.i('   - Total registros: $totalRegistros');
+
+      return {
+        'tablas_creadas': tables.length,
+        'total_registros': totalRegistros,
+        'estadisticas': stats,
+        'tablas': tables,
+      };
+
+    } catch (e) {
+      logger.e('❌ Error verificando estado: $e');
+      return {
+        'error': e.toString(),
+      };
     }
   }
 

@@ -7,6 +7,7 @@ import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/post/device_log_post_service.dart';
 import 'package:ada_app/services/api_config_service.dart';
 import 'package:ada_app/utils/device_info_helper.dart';
+import 'package:ada_app/services/auth_service.dart'; // 🆕 AGREGAR
 import 'package:logger/logger.dart';
 
 //  CONFIGURACIÓN CENTRALIZADA
@@ -29,6 +30,7 @@ class BackgroundLogConfig {
 }
 
 ///  SERVICIO PRINCIPAL DE LOGGING EN BACKGROUND
+/// - SOLO FUNCIONA CON SESIÓN ACTIVA
 /// - Ejecuta cada 10 minutos en horario laboral
 /// - Crea logs automáticamente
 /// - Intenta enviar con reintentos
@@ -40,20 +42,46 @@ class DeviceLogBackgroundExtension {
   static bool _isInitialized = false;
   static bool _isExecuting = false; // 🆕 LOCK DE CONCURRENCIA
 
+  /// 🆕 Verificar si hay una sesión activa antes de proceder
+  static Future<bool> _verificarSesionActiva() async {
+    try {
+      final authService = AuthService();
+      final tieneSession = await authService.hasUserLoggedInBefore();
+
+      if (!tieneSession) {
+        _logger.w('⚠️ No hay sesión activa - deteniendo logging automático');
+        await detener();
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      _logger.e('❌ Error verificando sesión: $e');
+      return false;
+    }
+  }
+
   /// Inicializar servicio de logging en background
-  static Future<void> inicializar() async {
+  /// 🆕 SOLO INICIA CON SESIÓN ACTIVA
+  static Future<void> inicializar({bool verificarSesion = true}) async {
     try {
       _logger.i('═══════════════════════════════════════');
       _logger.i('INICIALIZANDO BACKGROUND LOGGING');
       _logger.i('═══════════════════════════════════════');
 
+      // 🆕 Verificar sesión antes de inicializar
+      if (verificarSesion && !await _verificarSesionActiva()) {
+        _logger.w('❌ No se puede inicializar sin sesión activa');
+        return;
+      }
+
       // Detener timer previo si existe
       _backgroundTimer?.cancel();
 
-      // CREAR LOG INMEDIATAMENTE AL INICIAR
-      _logger.i(' Creando primer log inmediatamente...');
+      // 🆕 CREAR LOG INMEDIATAMENTE AL INICIAR (solo si hay sesión)
+      _logger.i('📝 Creando primer log inmediatamente...');
       await _ejecutarLogging();
-      _logger.i(' Primer log creado y enviado');
+      _logger.i('✅ Primer log creado y enviado');
 
       // Crear timer periódico para los siguientes logs
       _backgroundTimer = Timer.periodic(
@@ -65,25 +93,31 @@ class DeviceLogBackgroundExtension {
 
       // Mostrar configuración
       final urlActual = await ApiConfigService.getBaseUrl();
-      _logger.i(' Extensión de logging configurada');
-      _logger.i('URL del servidor: $urlActual');
-      _logger.i(' Horario: ${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00');
-      _logger.i(' Intervalo: ${BackgroundLogConfig.intervalo.inMinutes} minutos');
-      _logger.i(' Reintentos máximos: ${BackgroundLogConfig.maxReintentos}');
-      _logger.i(' Mínimo entre logs: ${BackgroundLogConfig.minutosMinimosEntreLogs} min');
+      _logger.i('✅ Extensión de logging configurada');
+      _logger.i('🌐 URL del servidor: $urlActual');
+      _logger.i('⏰ Horario: ${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00');
+      _logger.i('🔄 Intervalo: ${BackgroundLogConfig.intervalo.inMinutes} minutos');
+      _logger.i('🔁 Reintentos máximos: ${BackgroundLogConfig.maxReintentos}');
+      _logger.i('⏱️ Mínimo entre logs: ${BackgroundLogConfig.minutosMinimosEntreLogs} min');
+      _logger.i('🔒 Verificación de sesión: ${verificarSesion ? "ACTIVADA" : "DESACTIVADA"}');
       _logger.i('═══════════════════════════════════════');
 
       // Verificar disponibilidad de servicios
       await DeviceInfoHelper.mostrarEstadoDisponibilidad();
 
     } catch (e) {
-      _logger.e(' Error inicializando extensión: $e');
+      _logger.e('💥 Error inicializando extensión: $e');
     }
   }
 
-  /// 🔄 Ejecutar logging con verificación de horario
+  /// 🔄 Ejecutar logging con verificación de horario y sesión
   static Future<void> _ejecutarLoggingConHorario() async {
     try {
+      // 🆕 Verificar sesión antes de cada ejecución
+      if (!await _verificarSesionActiva()) {
+        return; // Ya se maneja el stop dentro de _verificarSesionActiva
+      }
+
       // Verificar si estamos en horario laboral
       if (!estaEnHorarioTrabajo()) {
         _logger.i('⏰ Fuera del horario de trabajo (${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00)');
@@ -91,14 +125,14 @@ class DeviceLogBackgroundExtension {
       }
 
       _logger.i('═══════════════════════════════════════');
-      _logger.i('EJECUTANDO LOGGING EN HORARIO LABORAL');
+      _logger.i('🔄 EJECUTANDO LOGGING EN HORARIO LABORAL');
       _logger.i('═══════════════════════════════════════');
 
       await _ejecutarLogging();
 
       _logger.i('═══════════════════════════════════════');
     } catch (e) {
-      _logger.e(' Error en logging con horario: $e');
+      _logger.e('💥 Error en logging con horario: $e');
     }
   }
 
@@ -106,20 +140,25 @@ class DeviceLogBackgroundExtension {
   static Future<void> _ejecutarLogging() async {
     // LOCK DE CONCURRENCIA - Prevenir ejecución simultánea
     if (_isExecuting) {
-      _logger.w('⚠ Ya hay un proceso de logging en ejecución - saltando...');
+      _logger.w('⚠️ Ya hay un proceso de logging en ejecución - saltando...');
       return;
     }
 
     _isExecuting = true;
 
     try {
+      // 🆕 Verificar sesión al inicio del proceso
+      if (!await _verificarSesionActiva()) {
+        return; // Ya se maneja el stop dentro de _verificarSesionActiva
+      }
+
       // Verificar permisos de ubicación
       final hasPermission = await Permission.location.isGranted;
       if (!hasPermission) {
-        _logger.w('⚠Sin permisos de ubicación - solicitando...');
+        _logger.w('⚠️ Sin permisos de ubicación - solicitando...');
         final status = await Permission.location.request();
         if (!status.isGranted) {
-          _logger.e('Permisos de ubicación denegados');
+          _logger.e('❌ Permisos de ubicación denegados');
           return;
         }
       }
@@ -132,36 +171,36 @@ class DeviceLogBackgroundExtension {
       final log = await DeviceInfoHelper.crearDeviceLog();
       final vendedorId = log?.edfVendedorId;
 
+      if (log == null) {
+        _logger.w('⚠️ No se pudo crear el device log - posiblemente sin sesión activa');
+        return;
+      }
+
       final existeReciente = await repository.existeLogReciente(
         vendedorId,
         minutos: BackgroundLogConfig.minutosMinimosEntreLogs,
       );
 
       if (existeReciente) {
-        _logger.i('⏭ Ya existe un log reciente (últimos ${BackgroundLogConfig.minutosMinimosEntreLogs} min) - saltando creación');
+        _logger.i('⏭️ Ya existe un log reciente (últimos ${BackgroundLogConfig.minutosMinimosEntreLogs} min) - saltando creación');
         return;
       }
 
       // Crear log usando helper compartido
-      _logger.i('Creando device log...');
-
-      if (log == null) {
-        _logger.w('⚠No se pudo crear el device log');
-        return;
-      }
+      _logger.i('📝 Creando device log...');
 
       //  Guardar en base de datos local
-      _logger.i(' Guardando en base de datos local...');
+      _logger.i('💾 Guardando en base de datos local...');
       await _guardarEnBD(log);
 
       //  Intentar enviar al servidor con reintentos automáticos
-      _logger.i(' Intentando enviar al servidor...');
+      _logger.i('🌐 Intentando enviar al servidor...');
       await _intentarEnviarConReintentos(log);
 
-      _logger.i(' Proceso de logging completado para: ${log.id}');
+      _logger.i('✅ Proceso de logging completado para: ${log.id}');
 
     } catch (e) {
-      _logger.e(' Error en proceso de logging: $e');
+      _logger.e('💥 Error en proceso de logging: $e');
     } finally {
       // LIBERAR LOCK SIEMPRE
       _isExecuting = false;
@@ -290,12 +329,19 @@ class DeviceLogBackgroundExtension {
     }
   }
 
-  /// 🔧 Ejecutar logging manualmente (para testing)
-  static Future<void> ejecutarManual() async {
+  /// 🔧 Ejecutar logging manualmente (para testing o primer login)
+  /// 🆕 Verificar sesión por defecto para evitar logs sin usuario
+  static Future<void> ejecutarManual({bool verificarSesion = true}) async {
     try {
       _logger.i('═══════════════════════════════════════');
       _logger.i('🔧 EJECUCIÓN MANUAL DE LOGGING');
       _logger.i('═══════════════════════════════════════');
+
+      // 🆕 Verificar sesión si está habilitado
+      if (verificarSesion && !await _verificarSesionActiva()) {
+        _logger.w('❌ No se puede ejecutar sin sesión activa');
+        return;
+      }
 
       final urlActual = await ApiConfigService.getBaseUrl();
       _logger.i('🌐 URL configurada: $urlActual');
@@ -310,6 +356,20 @@ class DeviceLogBackgroundExtension {
     }
   }
 
+  /// 🆕 Método para inicializar desde login exitoso
+  static Future<void> inicializarDespuesDeLogin() async {
+    try {
+      _logger.i('🔐 Inicializando logging después de login exitoso...');
+
+      // Inicializar con verificación de sesión
+      await inicializar(verificarSesion: true);
+
+      _logger.i('✅ Logging post-login inicializado correctamente');
+    } catch (e) {
+      _logger.e('💥 Error inicializando logging post-login: $e');
+    }
+  }
+
   /// ℹ️ Verificar si el servicio está activo
   static bool get estaActivo => _isInitialized && (_backgroundTimer?.isActive ?? false);
 
@@ -317,12 +377,14 @@ class DeviceLogBackgroundExtension {
   static Future<Map<String, dynamic>> obtenerEstado() async {
     final now = DateTime.now();
     final urlActual = await ApiConfigService.getBaseUrl();
+    final tieneSesion = await _verificarSesionActiva();
 
     return {
       'activo': estaActivo,
       'inicializado': _isInitialized,
       'timer_activo': _backgroundTimer?.isActive ?? false,
       'ejecutando': _isExecuting, // 🆕 Estado del lock
+      'sesion_activa': tieneSesion, // 🆕 Estado de la sesión
       'en_horario': estaEnHorarioTrabajo(),
       'hora_actual': now.hour,
       'minuto_actual': now.minute,
@@ -349,6 +411,7 @@ class DeviceLogBackgroundExtension {
     _logger.i('   • Inicializado: ${estado['inicializado'] ? "✅ SÍ" : "❌ NO"}');
     _logger.i('   • Timer: ${estado['timer_activo'] ? "✅ ACTIVO" : "❌ INACTIVO"}');
     _logger.i('   • Ejecutando: ${estado['ejecutando'] ? "🔄 SÍ" : "⏸️ NO"}'); // 🆕
+    _logger.i('   • Sesión activa: ${estado['sesion_activa'] ? "🔐 SÍ" : "❌ NO"}'); // 🆕
     _logger.i('');
     _logger.i('🕐 Horario Actual:');
     _logger.i('   • Día: ${estado['dia_nombre']}');

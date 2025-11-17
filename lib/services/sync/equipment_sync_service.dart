@@ -12,7 +12,6 @@ import 'package:ada_app/services/error_log/error_log_service.dart';
 class EquipmentSyncService extends BaseSyncService {
   static final _dbHelper = DatabaseHelper();
   static final _equipoRepo = EquipoRepository();
-  static final _equipoClienteRepo = EquipoPendienteRepository();
 
   static Future<SyncResult> sincronizarMarcas() async {
     final baseUrl = await BaseSyncService.getBaseUrl();
@@ -74,8 +73,26 @@ class EquipmentSyncService extends BaseSyncService {
         );
       }
 
-      await _dbHelper.sincronizarMarcas(marcasValidas);
-      BaseSyncService.logger.i('Marcas sincronizadas: ${marcasValidas.length} de ${marcasAPI.length}');
+      // Envolver operación de base de datos en try-catch
+      try {
+        await _dbHelper.sincronizarMarcas(marcasValidas);
+        BaseSyncService.logger.i('Marcas sincronizadas: ${marcasValidas.length} de ${marcasAPI.length}');
+      } catch (dbError) {
+        BaseSyncService.logger.e('Error insertando marcas en BD: $dbError');
+
+        await ErrorLogService.logError(
+          tableName: 'marcas',
+          operation: 'database_insert',
+          errorMessage: dbError.toString(),
+          errorType: 'database',
+        );
+
+        return SyncResult(
+          exito: false,
+          mensaje: 'Error guardando marcas en base de datos',
+          itemsSincronizados: 0,
+        );
+      }
 
       return SyncResult(
         exito: true,
@@ -189,8 +206,26 @@ class EquipmentSyncService extends BaseSyncService {
         );
       }
 
-      await _dbHelper.sincronizarModelos(modelosValidos);
-      BaseSyncService.logger.i('Modelos sincronizados: ${modelosValidos.length} de ${modelosAPI.length}');
+      // Envolver operación de base de datos en try-catch
+      try {
+        await _dbHelper.sincronizarModelos(modelosValidos);
+        BaseSyncService.logger.i('Modelos sincronizados: ${modelosValidos.length} de ${modelosAPI.length}');
+      } catch (dbError) {
+        BaseSyncService.logger.e('Error insertando modelos en BD: $dbError');
+
+        await ErrorLogService.logError(
+          tableName: 'modelos',
+          operation: 'database_insert',
+          errorMessage: dbError.toString(),
+          errorType: 'database',
+        );
+
+        return SyncResult(
+          exito: false,
+          mensaje: 'Error guardando modelos en base de datos',
+          itemsSincronizados: 0,
+        );
+      }
 
       return SyncResult(
         exito: true,
@@ -292,8 +327,26 @@ class EquipmentSyncService extends BaseSyncService {
         );
       }
 
-      await _dbHelper.sincronizarLogos(logosAPI);
-      BaseSyncService.logger.i('Logos sincronizados: ${logosAPI.length}');
+      // Envolver operación de base de datos en try-catch
+      try {
+        await _dbHelper.sincronizarLogos(logosAPI);
+        BaseSyncService.logger.i('Logos sincronizados: ${logosAPI.length}');
+      } catch (dbError) {
+        BaseSyncService.logger.e('Error insertando logos en BD: $dbError');
+
+        await ErrorLogService.logError(
+          tableName: 'logo',
+          operation: 'database_insert',
+          errorMessage: dbError.toString(),
+          errorType: 'database',
+        );
+
+        return SyncResult(
+          exito: false,
+          mensaje: 'Error guardando logos en base de datos',
+          itemsSincronizados: 0,
+        );
+      }
 
       return SyncResult(
         exito: true,
@@ -432,8 +485,27 @@ class EquipmentSyncService extends BaseSyncService {
 
       BaseSyncService.logger.i('💾 Guardando en base de datos...');
 
-      final equiposMapas = equipos.map((e) => e.toMap()).toList();
-      await _equipoRepo.limpiarYSincronizar(equiposMapas);
+      // Envolver operación de base de datos en try-catch
+      try {
+        final equiposMapas = equipos.map((e) => e.toMap()).toList();
+        await _equipoRepo.limpiarYSincronizar(equiposMapas);
+        BaseSyncService.logger.i('✅ Equipos guardados exitosamente en BD');
+      } catch (dbError) {
+        BaseSyncService.logger.e('Error guardando equipos en BD: $dbError');
+
+        await ErrorLogService.logError(
+          tableName: 'equipos',
+          operation: 'database_insert',
+          errorMessage: dbError.toString(),
+          errorType: 'database',
+        );
+
+        return SyncResult(
+          exito: false,
+          mensaje: 'Error guardando equipos en base de datos',
+          itemsSincronizados: 0,
+        );
+      }
 
       return SyncResult(
         exito: true,
@@ -478,188 +550,6 @@ class EquipmentSyncService extends BaseSyncService {
         mensaje: mensaje,
         itemsSincronizados: 0,
       );
-    }
-  }
-
-  static Future<int> subirRegistrosEquipos() async {
-    try {
-      final registrosPendientes = await _dbHelper.consultar(
-        'registros_equipos',
-        where: 'estado_sincronizacion = ?',
-        whereArgs: ['pendiente'],
-        orderBy: 'fecha_registro ASC',
-        limit: 50,
-      );
-
-      if (registrosPendientes.isEmpty) return 0;
-
-      int exitosos = 0;
-      final baseUrl = await BaseSyncService.getBaseUrl();
-
-      for (final registro in registrosPendientes) {
-        try {
-          final estadoData = {
-            'equipo_id': registro['equipo_id'],
-            'cliente_id': registro['cliente_id'],
-            'usuario_id': 1,
-            'funcionando': registro['funcionando'] ?? 1,
-            'estado_general': registro['estado_general'] ?? 'Revisión móvil',
-            'temperatura_actual': registro['temperatura_actual'],
-            'temperatura_freezer': registro['temperatura_freezer'],
-            'latitud': registro['latitud'],
-            'longitud': registro['longitud'],
-          };
-
-          final response = await http.post(
-            Uri.parse('$baseUrl/estados'),
-            headers: BaseSyncService.headers,
-            body: jsonEncode(estadoData),
-          ).timeout(const Duration(seconds: 15));
-
-          if (response.statusCode == 201) {
-            await _dbHelper.actualizar(
-              'registros_equipos',
-              {
-                'estado_sincronizacion': 'sincronizado',
-                'fecha_actualizacion': DateTime.now().toIso8601String(),
-              },
-              where: 'id = ?',
-              whereArgs: [registro['id']],
-            );
-            exitosos++;
-          } else {
-            await _dbHelper.actualizar(
-              'registros_equipos',
-              {
-                'estado_sincronizacion': 'error',
-                'fecha_actualizacion': DateTime.now().toIso8601String(),
-              },
-              where: 'id = ?',
-              whereArgs: [registro['id']],
-            );
-
-            await ErrorLogService.logError(
-              tableName: 'registros_equipos',
-              operation: 'upload',
-              errorMessage: 'HTTP ${response.statusCode}: ${response.body}',
-              errorType: 'server',
-              errorCode: response.statusCode.toString(),
-              registroFailId: registro['id']?.toString(),
-            );
-          }
-        } catch (e) {
-          BaseSyncService.logger.w('Error subiendo registro ${registro['id']}: $e');
-
-          String errorType;
-          if (e is TimeoutException || e is SocketException || e is http.ClientException) {
-            errorType = 'network';
-          } else {
-            errorType = 'unknown';
-          }
-
-          await ErrorLogService.logError(
-            tableName: 'registros_equipos',
-            operation: 'upload',
-            errorMessage: e.toString(),
-            errorType: errorType,
-            registroFailId: registro['id']?.toString(),
-          );
-        }
-      }
-
-      return exitosos;
-
-    } catch (e) {
-      BaseSyncService.logger.e('Error en subida de registros: $e');
-
-      String errorType;
-      if (e is TimeoutException || e is SocketException || e is http.ClientException) {
-        errorType = 'network';
-      } else {
-        errorType = 'unknown';
-      }
-
-      await ErrorLogService.logError(
-        tableName: 'registros_equipos',
-        operation: 'upload_batch',
-        errorMessage: e.toString(),
-        errorType: errorType,
-      );
-
-      return 0;
-    }
-  }
-
-  static Future<int> crearRegistroEquipo({
-    required int clienteId,
-    String? clienteNombre,
-    String? clienteDireccion,
-    String? clienteTelefono,
-    int? equipoId,
-    String? codigoBarras,
-    String? modelo,
-    int? marcaId,
-    String? numeroSerie,
-    int? logoId,
-    String? observaciones,
-    double? latitud,
-    double? longitud,
-    bool funcionando = true,
-    String? estadoGeneral,
-    double? temperaturaActual,
-    double? temperaturaFreezer,
-    String? versionApp,
-    String? dispositivo,
-  }) async {
-    try {
-      final now = DateTime.now();
-      final idLocal = now.millisecondsSinceEpoch;
-
-      final registroData = {
-        'id_local': idLocal,
-        'servidor_id': null,
-        'estado_sincronizacion': 'pendiente',
-        'cliente_id': clienteId,
-        'cliente_nombre': clienteNombre,
-        'cliente_direccion': clienteDireccion,
-        'cliente_telefono': clienteTelefono,
-        'equipo_id': equipoId,
-        'codigo_barras': codigoBarras,
-        'modelo': modelo,
-        'marca_id': marcaId,
-        'numero_serie': numeroSerie,
-        'logo_id': logoId,
-        'observaciones': observaciones,
-        'latitud': latitud,
-        'longitud': longitud,
-        'fecha_registro': now.toIso8601String(),
-        'timestamp_gps': now.toIso8601String(),
-        'funcionando': funcionando ? 1 : 0,
-        'estado_general': estadoGeneral ?? 'Revisión desde móvil',
-        'temperatura_actual': temperaturaActual,
-        'temperatura_freezer': temperaturaFreezer,
-        'version_app': versionApp,
-        'dispositivo': dispositivo,
-        'fecha_creacion': now.toIso8601String(),
-        'fecha_actualizacion': now.toIso8601String(),
-      };
-
-      final id = await _dbHelper.insertar('registros_equipos', registroData);
-      BaseSyncService.logger.i('Registro de equipo creado con ID local: $idLocal');
-
-      return id;
-
-    } catch (e) {
-      BaseSyncService.logger.e('Error creando registro de equipo: $e');
-
-      await ErrorLogService.logError(
-        tableName: 'registros_equipos',
-        operation: 'create',
-        errorMessage: e.toString(),
-        errorType: 'database',
-      );
-
-      rethrow;
     }
   }
 }

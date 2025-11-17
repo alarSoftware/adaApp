@@ -618,52 +618,6 @@ class SyncService {
   static Future<SyncResult> sincronizarRespuestasFormularios({String? edfVendedorId}) =>
       DynamicFormSyncService.obtenerRespuestasFormularios(edfvendedorId: edfVendedorId);
 
-  // Métodos de envío
-  static Future<SyncResult> enviarClientesPendientes() => ClientSyncService.enviarClientesPendientes();
-  static Future<int> subirRegistrosEquipos() => EquipmentSyncService.subirRegistrosEquipos();
-
-  static Future<int> crearRegistroEquipo({
-    required int clienteId,
-    String? clienteNombre,
-    String? clienteDireccion,
-    String? clienteTelefono,
-    int? equipoId,
-    String? codigoBarras,
-    String? modelo,
-    int? marcaId,
-    String? numeroSerie,
-    int? logoId,
-    String? observaciones,
-    double? latitud,
-    double? longitud,
-    bool funcionando = true,
-    String? estadoGeneral,
-    double? temperaturaActual,
-    double? temperaturaFreezer,
-    String? versionApp,
-    String? dispositivo,
-  }) => EquipmentSyncService.crearRegistroEquipo(
-    clienteId: clienteId,
-    clienteNombre: clienteNombre,
-    clienteDireccion: clienteDireccion,
-    clienteTelefono: clienteTelefono,
-    equipoId: equipoId,
-    codigoBarras: codigoBarras,
-    modelo: modelo,
-    marcaId: marcaId,
-    numeroSerie: numeroSerie,
-    logoId: logoId,
-    observaciones: observaciones,
-    latitud: latitud,
-    longitud: longitud,
-    funcionando: funcionando,
-    estadoGeneral: estadoGeneral,
-    temperaturaActual: temperaturaActual,
-    temperaturaFreezer: temperaturaFreezer,
-    versionApp: versionApp,
-    dispositivo: dispositivo,
-  );
-
   // Métodos de censo esenciales
   static Future<SyncResult> obtenerCensosActivos({
     int? clienteId,

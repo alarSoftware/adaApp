@@ -2,8 +2,6 @@
 
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/repositories/device_log_repository.dart';
-// ❌ REMOVER esta línea:
-// import 'package:ada_app/services/device_log/device_log_service.dart';
 import 'package:ada_app/services/device_log/device_log_background_extension.dart';
 import 'package:ada_app/services/censo/censo_upload_service.dart';
 import 'package:ada_app/services/dynamic_form/dynamic_form_upload_service.dart';
@@ -14,8 +12,6 @@ import 'package:logger/logger.dart';
 
 class AppServices {
   static AppServices? _instance;
-  // ❌ REMOVER esta línea:
-  // static DeviceLogService? _deviceLogService;
   static bool _isUserLoggedIn = false;
 
   final _logger = Logger();
@@ -31,35 +27,53 @@ class AppServices {
   /// Inicializar todos los servicios cuando el usuario hace login
   Future<void> inicializarEnLogin() async {
     try {
-      _logger.i('🔐 Usuario logueado - Inicializando servicios');
+      _logger.i('🔐 Usuario logueado - Inicializando servicios básicos (SIN device logging)');
 
       _isUserLoggedIn = true;
 
-      // 1. Inicializar servicios de logging básicos
-      await _inicializarExtensionLogging();
+      // ❌ REMOVIDO: NO inicializar device logging aquí
+      // await _inicializarExtensionLogging(); // ← COMENTADO
 
-      // 2. Obtener información del usuario
+      // 1. Obtener información del usuario
       final usuario = await _obtenerUsuarioActual();
 
       if (usuario != null) {
         _logger.i('👤 Usuario: ${usuario.username} (ID: ${usuario.id})');
 
-        // 3. Iniciar sincronizaciones automáticas
+        // 2. Iniciar SOLO sincronizaciones automáticas (sin device logging)
         await _iniciarSincronizacionesAutomaticas(usuario);
       } else {
         _logger.w('⚠️ No se pudo obtener información del usuario');
       }
 
-      _logger.i('✅ Todos los servicios iniciados correctamente');
+      _logger.i('✅ Servicios básicos iniciados correctamente');
+      _logger.i('📝 NOTA: Device logging se iniciará después de la primera sincronización exitosa');
     } catch (e) {
       _logger.e('💥 Error al inicializar servicios en login: $e');
     }
   }
 
-  /// Iniciar todas las sincronizaciones automáticas
+  // 🆕 MÉTODO PARA INICIALIZAR DEVICE LOGGING DESPUÉS DE SINCRONIZACIÓN
+  Future<void> inicializarDeviceLoggingDespuesDeSincronizacion() async {
+    try {
+      _logger.i('🎉 Iniciando device logging después de sincronización exitosa...');
+
+      if (!_isUserLoggedIn) {
+        _logger.w('⚠️ No se puede iniciar device logging sin usuario logueado');
+        return;
+      }
+
+      await DeviceLogBackgroundExtension.inicializarDespuesDeLogin();
+      _logger.i('✅ Device logging iniciado exitosamente después de sincronización');
+    } catch (e) {
+      _logger.e('💥 Error iniciando device logging después de sincronización: $e');
+    }
+  }
+
+  /// Iniciar todas las sincronizaciones automáticas (SIN device logging)
   Future<void> _iniciarSincronizacionesAutomaticas(Usuario usuario) async {
     try {
-      _logger.i('🔄 Iniciando sincronizaciones automáticas...');
+      _logger.i('🔄 Iniciando sincronizaciones automáticas (SIN device logging)...');
 
       // Sincronización de Censos (cada 1 minuto)
       if (usuario.id != null) {
@@ -74,10 +88,11 @@ class AppServices {
       }
 
       // Sincronización de Device Logs (cada 10 minutos)
+      // ❌ NOTA: Esto NO inicia el BackgroundExtension, solo sincroniza logs existentes
       DeviceLogUploadService.iniciarSincronizacionAutomatica();
-      _logger.i('  ✅ Device Logs: cada 10 minutos');
+      _logger.i('  ✅ Device Logs Upload: cada 10 minutos (para logs existentes)');
 
-      _logger.i('✅ Sincronizaciones automáticas iniciadas');
+      _logger.i('✅ Sincronizaciones automáticas iniciadas (device logging pendiente)');
     } catch (e) {
       _logger.e('💥 Error iniciando sincronizaciones: $e');
     }
@@ -92,7 +107,7 @@ class AppServices {
 
       _isUserLoggedIn = false;
 
-      // 1. Detener servicios de logging básicos
+      // 1. Detener device logging
       await DeviceLogBackgroundExtension.detener();
 
       // 2. Detener sincronizaciones automáticas
@@ -134,16 +149,19 @@ class AppServices {
       _logger.i('Inicializando servicios de la aplicación');
 
       if (_isUserLoggedIn) {
-        await _inicializarExtensionLogging();
-        _logger.i('Servicios inicializados correctamente');
+        // ❌ CAMBIO: NO inicializar device logging automáticamente
+        // Solo los servicios básicos
+        _logger.i('Servicios básicos inicializados (device logging pendiente)');
       } else {
-        _logger.i('⚠️ Usuario no logueado - servicios de logging no iniciados');
+        _logger.i('⚠️ Usuario no logueado - servicios no iniciados');
       }
     } catch (e) {
       _logger.e('Error al inicializar servicios: $e');
     }
   }
 
+  // ❌ MÉTODO REMOVIDO/RENOMBRADO
+  // Este método SOLO se llamará después de sincronización exitosa
   Future<void> _inicializarExtensionLogging() async {
     try {
       if (!_isUserLoggedIn) {
@@ -158,32 +176,7 @@ class AppServices {
     }
   }
 
-  // ❌ REMOVER este método completo:
-  /*
-  Future<void> _inicializarDeviceLogService() async {
-    try {
-      if (!_isUserLoggedIn) {
-        _logger.w('⚠️ No se puede iniciar DeviceLogService sin usuario logueado');
-        return;
-      }
-
-      final database = await DatabaseHelper().database;
-      final repository = DeviceLogRepository(database);
-      _deviceLogService = DeviceLogService(repository);
-
-      await _deviceLogService!.iniciar(intervalo: const Duration(minutes: 5));
-
-      _logger.i('✅ Servicio de registro de dispositivo iniciado para usuario');
-    } catch (e) {
-      _logger.e('Error al inicializar DeviceLogService: $e');
-    }
-  }
-  */
-
   // ==================== GETTERS ====================
-
-  // ❌ REMOVER este getter:
-  // DeviceLogService? get deviceLogService => _deviceLogService;
 
   bool get usuarioLogueado => _isUserLoggedIn;
 
@@ -214,8 +207,6 @@ class AppServices {
 
       return {
         'usuario_logueado': _isUserLoggedIn,
-        // ❌ REMOVER esta línea:
-        // 'servicio_normal': _deviceLogService?.estaActivo ?? false,
         'extension_activa': DeviceLogBackgroundExtension.estaActivo,
         'censo_sync_activo': CensoUploadService.esSincronizacionActiva,
         'formularios_sync_activo': DynamicFormUploadService.esSincronizacionActiva,
@@ -255,10 +246,11 @@ class AppServices {
       await Future.delayed(const Duration(seconds: 1));
 
       if (_isUserLoggedIn) {
-        await _inicializarExtensionLogging();
+        // ❌ CAMBIO: NO reiniciar automáticamente el device logging
+        _logger.i('⚠️ Device logging NO reiniciado - requiere sincronización previa');
       }
 
-      _logger.i('✅ Servicios reiniciados');
+      _logger.i('✅ Servicios básicos reiniciados');
     } catch (e) {
       _logger.e('Error reiniciando servicios: $e');
     }

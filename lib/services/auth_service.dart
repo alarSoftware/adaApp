@@ -8,6 +8,7 @@ import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/sync/dynamic_form_sync_service.dart';
 import 'package:ada_app/services/censo/censo_upload_service.dart';
 import 'package:ada_app/services/app_services.dart';
+import 'package:ada_app/services/device_log/device_log_background_extension.dart'; // 🆕 AGREGAR ESTE IMPORT
 import 'package:ada_app/models/usuario.dart';
 
 var logger = Logger();
@@ -107,6 +108,17 @@ class AuthService {
       await prefs.setString('last_sync_date', DateTime.now().toIso8601String());
 
       logger.i('Sincronización marcada como completada para vendedor: $edfVendedorId');
+
+      // 🆕 NUEVA FUNCIONALIDAD: Inicializar device logging DESPUÉS de sincronización exitosa
+      try {
+        logger.i('🚀 Sincronización completada exitosamente - Iniciando Device Log Background Extension...');
+        await DeviceLogBackgroundExtension.inicializarDespuesDeLogin();
+        logger.i('✅ Device Log Background Extension iniciado correctamente después de sincronización');
+      } catch (e) {
+        logger.e('💥 Error iniciando Device Log Background Extension después de sincronización: $e');
+        // No fallar por error en device logging
+      }
+
     } catch (e) {
       logger.e('Error marcando sincronización completada: $e');
     }
@@ -125,6 +137,24 @@ class AuthService {
       logger.i('Datos de sincronización limpiados');
     } catch (e) {
       logger.e('Error limpiando datos de sincronización: $e');
+    }
+  }
+
+  // 🆕 MÉTODO PARA INICIALIZAR DEVICE LOGGING DESPUÉS DE SINCRONIZACIÓN
+  Future<void> inicializarDeviceLoggingDespuesDeSincronizacion() async {
+    try {
+      logger.i('═══════════════════════════════════════');
+      logger.i('🎉 INICIANDO DEVICE LOGGING DESPUÉS DE SINCRONIZACIÓN EXITOSA');
+      logger.i('═══════════════════════════════════════');
+
+      await DeviceLogBackgroundExtension.inicializarDespuesDeLogin();
+
+      logger.i('✅ Device Log Background Extension iniciado exitosamente');
+      logger.i('📝 A partir de ahora se crearán device logs automáticamente');
+      logger.i('═══════════════════════════════════════');
+    } catch (e) {
+      logger.e('💥 Error iniciando device logging después de sincronización: $e');
+      rethrow;
     }
   }
 
@@ -350,7 +380,7 @@ class AuthService {
     }
   }
 
-
+  // ✅ MÉTODO LOGIN MODIFICADO - SIN INICIALIZACIÓN DE DEVICE LOGGING
   Future<AuthResult> login(String username, String password) async {
     logger.i('Intentando login para: $username');
 
@@ -386,17 +416,20 @@ class AuthService {
 
       await _saveLoginSuccess(usuarioAuth);
 
-      // 🆕 SECCIÓN DE LOGGING (ya existente)
+      // 🔧 SECCIÓN DE LOGGING BÁSICO (sin device logging)
       try {
-        logger.i('🔐 Login exitoso - Iniciando logging persistente');
+        logger.i('🔐 Login exitoso - Iniciando servicios básicos');
         await AppServices().inicializarEnLogin();
-        logger.i('✅ Logging iniciado para: $username');
+        logger.i('✅ Servicios básicos iniciados para: $username');
       } catch (e) {
-        logger.e('💥 Error iniciando logging: $e');
-        // No fallar el login por error en logging
+        logger.e('💥 Error iniciando servicios básicos: $e');
+        // No fallar el login por error en servicios básicos
       }
 
-      // ✅ NUEVA SECCIÓN: INICIAR SINCRONIZACIÓN AUTOMÁTICA DE CENSOS
+      // ❌ REMOVIDO: NO inicializar Device Log Background Extension aquí
+      // Se iniciará desde markSyncCompleted() después de la primera sincronización exitosa
+
+      // ✅ SECCIÓN DE SINCRONIZACIÓN AUTOMÁTICA DE CENSOS (ya existente)
       try {
         if (usuario.id != null) {
           CensoUploadService.iniciarSincronizacionAutomatica(usuario.id!);
@@ -408,9 +441,10 @@ class AuthService {
         logger.e('💥 Error iniciando sincronización automática de censos: $e');
         // No fallar el login por error en sincronización
       }
-      // ✅ FIN NUEVA SECCIÓN
 
       logger.i('Login exitoso para: $username');
+      logger.i('📝 NOTA: Device logging se iniciará después de la primera sincronización exitosa');
+
       return AuthResult(
         exitoso: true,
         mensaje: 'Bienvenido, ${usuario.fullname}',
@@ -508,22 +542,35 @@ class AuthService {
     }
   }
 
-  // Logout - SIN CAMBIOS (no detiene logging)
+  // 🆕 LOGOUT MODIFICADO - Ahora detiene el device logging
   Future<void> logout() async {
     try {
+      logger.i('🚪 Iniciando logout...');
+
+      // 🆕 DETENER EL DEVICE LOG BACKGROUND EXTENSION
+      try {
+        logger.i('🛑 Deteniendo Device Log Background Extension...');
+        await DeviceLogBackgroundExtension.detener();
+        logger.i('✅ Device Log Background Extension detenido correctamente');
+      } catch (e) {
+        logger.e('💥 Error deteniendo Device Log Background Extension: $e');
+        // No fallar el logout por este error
+      }
+
+      // Limpiar SharedPreferences
       final prefs = await SharedPreferences.getInstance();
 
       await prefs.remove(_keyHasLoggedIn);
       await prefs.remove(_keyCurrentUser);
       await prefs.remove(_keyCurrentUserRole);
 
-      logger.i('Logout exitoso');
+      logger.i('✅ Logout exitoso');
     } catch (e) {
-      logger.e('Error en logout: $e');
+      logger.e('❌ Error en logout: $e');
     }
   }
 
-  // Autenticación biométrica
+  // ✅ AUTENTICACIÓN BIOMÉTRICA MODIFICADA - NO inicia device logging automáticamente
   Future<AuthResult> authenticateWithBiometric() async {
     logger.i('Intentando autenticación biométrica');
 
@@ -541,7 +588,30 @@ class AuthService {
 
       final usuarioAuth = UsuarioAuth.fromUsuario(currentUser);
 
-      // ✅ NUEVO: INICIAR SINCRONIZACIÓN AUTOMÁTICA DE CENSOS
+      // ❌ REMOVIDO: NO inicializar Device Log Background Extension automáticamente
+      // Solo se iniciará si ya hay una sincronización completada
+
+      // Verificar si ya hubo sincronización previa para este vendedor
+      if (currentUser.edfVendedorId != null) {
+        final syncValidation = await validateSyncRequirement(currentUser.edfVendedorId!);
+
+        if (!syncValidation.requiereSincronizacion) {
+          // Si no requiere sincronización, significa que ya hay sincronización previa exitosa
+          // Podemos inicializar el device logging
+          try {
+            logger.i('🔍 Sincronización previa detectada - Iniciando device logging...');
+            await DeviceLogBackgroundExtension.inicializarDespuesDeLogin();
+            logger.i('✅ Device Log Background Extension iniciado para login biométrico');
+          } catch (e) {
+            logger.e('💥 Error iniciando Device Log Background Extension: $e');
+            // No fallar el login por error en device logging
+          }
+        } else {
+          logger.i('📝 Requiere sincronización - Device logging se iniciará después de sincronizar');
+        }
+      }
+
+      // ✅ SINCRONIZACIÓN AUTOMÁTICA DE CENSOS (ya existente)
       try {
         if (currentUser.id != null) {
           CensoUploadService.iniciarSincronizacionAutomatica(currentUser.id!);
@@ -553,7 +623,6 @@ class AuthService {
         logger.e('💥 Error iniciando sincronización automática de censos: $e');
         // No fallar el login por error en sincronización
       }
-      // ✅ FIN NUEVO
 
       logger.i('Autenticación biométrica exitosa para: ${currentUser.username}');
       return AuthResult(
@@ -574,18 +643,29 @@ class AuthService {
   // Limpiar completamente (para testing o reset) - MÉTODO ACTUALIZADO
   Future<void> clearAllData() async {
     try {
+      logger.i('🧹 Limpiando todos los datos...');
+
+      // 🆕 DETENER EL DEVICE LOG BACKGROUND EXTENSION PRIMERO
+      try {
+        await DeviceLogBackgroundExtension.detener();
+        logger.i('✅ Device Log Background Extension detenido antes de limpiar datos');
+      } catch (e) {
+        logger.e('💥 Error deteniendo Device Log Background Extension: $e');
+        // Continuar con la limpieza
+      }
+
       final prefs = await SharedPreferences.getInstance();
 
       await prefs.remove(_keyHasLoggedIn);
       await prefs.remove(_keyCurrentUser);
       await prefs.remove(_keyCurrentUserRole);
       await prefs.remove(_keyLastLoginDate);
-      await prefs.remove(_keyLastSyncedVendedor); // NUEVA LÍNEA
-      await prefs.remove('last_sync_date'); // NUEVA LÍNEA
+      await prefs.remove(_keyLastSyncedVendedor);
+      await prefs.remove('last_sync_date');
 
-      logger.i('Todos los datos limpiados');
+      logger.i('✅ Todos los datos limpiados');
     } catch (e) {
-      logger.e('Error limpiando datos: $e');
+      logger.e('❌ Error limpiando datos: $e');
     }
   }
 
@@ -627,14 +707,22 @@ class AuthService {
     try {
       final prefs = await SharedPreferences.getInstance();
 
+      // 🆕 AGREGAR INFORMACIÓN DEL DEVICE LOG BACKGROUND EXTENSION
+      final deviceLogState = await DeviceLogBackgroundExtension.obtenerEstado();
+
       return {
         'hasLoggedInBefore': prefs.getBool(_keyHasLoggedIn) ?? false,
         'currentUser': prefs.getString(_keyCurrentUser),
         'currentUserRole': prefs.getString(_keyCurrentUserRole),
         'lastLoginDate': prefs.getString(_keyLastLoginDate),
         'hasActiveSession': prefs.getString(_keyCurrentUser) != null,
-        'lastSyncedVendedor': prefs.getString(_keyLastSyncedVendedor), // NUEVA LÍNEA
-        'lastSyncDate': prefs.getString('last_sync_date'), // NUEVA LÍNEA
+        'lastSyncedVendedor': prefs.getString(_keyLastSyncedVendedor),
+        'lastSyncDate': prefs.getString('last_sync_date'),
+        // 🆕 INFORMACIÓN DEL DEVICE LOGGING
+        'deviceLogActivo': deviceLogState['activo'],
+        'deviceLogInicializado': deviceLogState['inicializado'],
+        'deviceLogSesionActiva': deviceLogState['sesion_activa'],
+        'deviceLogEnHorario': deviceLogState['en_horario'],
       };
     } catch (e) {
       logger.e('Error obteniendo info de sesión: $e');
