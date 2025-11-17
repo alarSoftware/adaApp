@@ -263,6 +263,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         clienteId: clienteId,
         datos: datos,
         processId: processId,
+        yaAsignado: yaAsignado,
         userId: userId,
       );
 
@@ -613,6 +614,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     required int clienteId,
     required Map<String, dynamic> datos,
     required String processId,
+    required bool yaAsignado,
     String? userId,
   }) async {
     _setStatusMessage('Registrando censo...');
@@ -624,6 +626,13 @@ class PreviewScreenViewModel extends ChangeNotifier {
     try {
       final now = DateTime.now().toLocal();
 
+      String estadoCenso;
+      if (yaAsignado) {
+        estadoCenso = 'asignado';
+      } else {
+        estadoCenso = 'pendiente';
+      }
+
       final estadoCreado = await _estadoEquipoRepository.crearNuevoEstado(
         equipoId: equipoId,
         clienteId: clienteId,
@@ -632,6 +641,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         fechaRevision: now,
         enLocal: true,
         observaciones: datos['observaciones']?.toString(),
+        estadoCenso: estadoCenso,
       );
 
       if (estadoCreado.id != null) {

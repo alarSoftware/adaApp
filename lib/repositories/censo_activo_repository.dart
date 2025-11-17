@@ -37,7 +37,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   Future<EstadoEquipo> crearNuevoEstado({
     required String equipoId,
     required int clienteId,
-    int? usuarioId,  // ← Nuevo parámetro agregado
+    int? usuarioId,
     required bool enLocal,
     required DateTime fechaRevision,
     double? latitud,

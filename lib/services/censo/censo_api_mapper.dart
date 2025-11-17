@@ -23,6 +23,13 @@ class CensoApiMapper {
     final now = DateTime.now().toLocal();
     final timestampId = _uuid.v4();
 
+    String estadoCenso;
+    if (yaAsignado) {
+      estadoCenso = 'asignado';
+    } else {
+      estadoCenso = 'pendiente';
+    }
+
     return {
       'id': estadoId,  // ✅ CAMBIO: usar 'id' en lugar de 'id_local'
       'timestamp_id': timestampId,
@@ -80,20 +87,11 @@ class CensoApiMapper {
     required Map<String, dynamic> datosLocales,
     required int usuarioId,
     String? edfVendedorId,
-    List<dynamic>? fotosConBase64, // ← NUEVO PARÁMETRO PARA FOTOS CON BASE64
+    List<dynamic>? fotosConBase64,
   }) {
     final now = DateTime.now().toLocal();
-
-    // 🔍 LOGS DE DEBUG PARA RASTREAR FOTOS
-    print('🔍 DEBUG CensoApiMapper.prepararDatosParaApi - Datos de entrada:');
-    print('🔍   datosLocales keys: ${datosLocales.keys.toList()}');
-    print('🔍   fotosConBase64 != null: ${fotosConBase64 != null}');
-    print('🔍   fotosConBase64?.length: ${fotosConBase64?.length ?? 0}');
-
-    // Preparar array de fotos con IDs
     final fotos = <Map<String, dynamic>>[];
 
-    // ✅ SI SE PASAN FOTOS CON BASE64, USAR ESAS (PRIORITARIO)
     if (fotosConBase64 != null && fotosConBase64.isNotEmpty) {
       print('🔍 DEBUG: Usando fotos con base64 (${fotosConBase64.length} fotos)');
 
@@ -143,7 +141,6 @@ class CensoApiMapper {
       }
     }
 
-    print('🔍 DEBUG CensoApiMapper - Array fotos final:');
     print('🔍   fotos.length: ${fotos.length}');
     for (int i = 0; i < fotos.length; i++) {
       final fotoLog = Map<String, dynamic>.from(fotos[i]);
@@ -152,6 +149,16 @@ class CensoApiMapper {
         fotoLog['base64'] = '[BASE64_${fotoLog['base64']?.toString().length ?? 0}_CHARS]';
       }
       print('🔍   Foto $i: $fotoLog');
+    }
+
+    String estadoCenso;
+    if (datosLocales['estado_censo'] != null) {
+      // Si ya viene el estado_censo en los datos locales, usarlo
+      estadoCenso = datosLocales['estado_censo'];
+    } else if (datosLocales['ya_asignado'] == true) {
+      estadoCenso = 'asignado';
+    } else {
+      estadoCenso = 'pendiente';
     }
 
     return {
@@ -165,6 +172,7 @@ class CensoApiMapper {
       'longitud': datosLocales['longitud'] ?? 0.0,
       'enLocal': (datosLocales['en_local'] == 1) || (datosLocales['en_local'] == true),
       'fechaDeRevision': datosLocales['fecha_revision'] ?? _formatearFechaLocal(now),
+      'estadoCenso': estadoCenso,
       'estadoCenso': datosLocales['ya_asignado'] == true ? 'asignado' : 'pendiente',
       'esNuevoEquipo': datosLocales['es_nuevo_equipo'] ?? false,
 

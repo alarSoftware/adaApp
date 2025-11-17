@@ -1,16 +1,8 @@
 import 'package:ada_app/models/producto.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:logger/logger.dart';
 
-/// Repository para manejo de productos
-/// Estructura de tabla productos actualizada:
-/// - id INTEGER PRIMARY KEY
-/// - codigo TEXT
-/// - codigo_barras TEXT
-/// - nombre TEXT NULL
-/// - categoria TEXT
 abstract class ProductoRepository {
   /// Obtener todos los productos disponibles
   Future<List<Producto>> obtenerProductosDisponibles();

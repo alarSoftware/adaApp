@@ -41,53 +41,57 @@ class EquipoRepository extends BaseRepository<Equipo> {
   Future<List<Map<String, dynamic>>> obtenerEquiposAsignados(int clienteId) async {
     try {
       final sql = '''
-      SELECT DISTINCT
-        e.id,
-        e.cod_barras,
-        e.numero_serie,
-        e.marca_id,
-        e.modelo_id,
-        e.logo_id,
-        e.cliente_id,
-        m.nombre as marca_nombre,
-        mo.nombre as modelo_nombre,
-        l.nombre as logo_nombre,
-        c.nombre as cliente_nombre,
-        'asignado' as estado,
-        'asignado' as estado_tipo,
-        (SELECT ca2.fecha_revision 
-         FROM censo_activo ca2 
-         WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
-         ORDER BY ca2.fecha_creacion DESC 
-         LIMIT 1) as fecha_revision,
-        (SELECT ca2.fecha_creacion 
-         FROM censo_activo ca2 
-         WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
-         ORDER BY ca2.fecha_creacion DESC 
-         LIMIT 1) as censo_fecha_creacion,
-        (SELECT ca2.fecha_actualizacion 
-         FROM censo_activo ca2 
-         WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
-         ORDER BY ca2.fecha_creacion DESC 
-         LIMIT 1) as censo_fecha_actualizacion,
-        (SELECT ca2.estado_censo 
-         FROM censo_activo ca2 
-         WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
-         ORDER BY ca2.fecha_creacion DESC 
-         LIMIT 1) as estado_censo,
-        (SELECT ca2.sincronizado 
-         FROM censo_activo ca2 
-         WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
-         ORDER BY ca2.fecha_creacion DESC 
-         LIMIT 1) as sincronizado
-      FROM equipos e
-      INNER JOIN marcas m ON e.marca_id = m.id
-      INNER JOIN modelos mo ON e.modelo_id = mo.id
-      INNER JOIN logo l ON e.logo_id = l.id
-      INNER JOIN clientes c ON e.cliente_id = c.id
-      WHERE e.cliente_id = ?
-      ORDER BY e.id DESC
-    ''';
+    SELECT DISTINCT
+      e.id,
+      e.cod_barras,
+      e.numero_serie,
+      e.marca_id,
+      e.modelo_id,
+      e.logo_id,
+      e.cliente_id,
+      m.nombre as marca_nombre,
+      mo.nombre as modelo_nombre,
+      l.nombre as logo_nombre,
+      c.nombre as cliente_nombre,
+      'asignado' as estado,
+      'asignado' as estado_tipo,
+      (SELECT ca2.fecha_revision 
+       FROM censo_activo ca2 
+       WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
+       ORDER BY ca2.fecha_creacion DESC 
+       LIMIT 1) as fecha_revision,
+      (SELECT ca2.fecha_creacion 
+       FROM censo_activo ca2 
+       WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
+       ORDER BY ca2.fecha_creacion DESC 
+       LIMIT 1) as censo_fecha_creacion,
+      (SELECT ca2.fecha_actualizacion 
+       FROM censo_activo ca2 
+       WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
+       ORDER BY ca2.fecha_creacion DESC 
+       LIMIT 1) as censo_fecha_actualizacion,
+      (SELECT ca2.estado_censo 
+       FROM censo_activo ca2 
+       WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
+       ORDER BY ca2.fecha_creacion DESC 
+       LIMIT 1) as estado_censo,
+      (SELECT ca2.sincronizado 
+       FROM censo_activo ca2 
+       WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
+       ORDER BY ca2.fecha_creacion DESC 
+       LIMIT 1) as sincronizado
+    FROM equipos e
+    INNER JOIN marcas m ON e.marca_id = m.id
+    INNER JOIN modelos mo ON e.modelo_id = mo.id
+    INNER JOIN logo l ON e.logo_id = l.id
+    INNER JOIN clientes c ON e.cliente_id = c.id
+    LEFT JOIN equipos_pendientes ep 
+      ON CAST(e.id AS TEXT) = CAST(ep.equipo_id AS TEXT) 
+      AND CAST(e.cliente_id AS TEXT) = CAST(ep.cliente_id AS TEXT)
+    WHERE e.cliente_id = ?
+      AND ep.id IS NULL
+    ORDER BY e.id DESC
+  ''';
 
       final result = await dbHelper.consultarPersonalizada(
           sql,
@@ -141,6 +145,21 @@ class EquipoRepository extends BaseRepository<Equipo> {
 
   Future<bool> verificarAsignacionEquipoCliente(String equipoId, int clienteId) async {
     try {
+      // ✅ PRIMERO: Verificar si está en equipos_pendientes SIN sincronizar
+      // Si está ahí, significa que la asignación NO está confirmada por el servidor
+      final resultPendientes = await dbHelper.consultar(
+        'equipos_pendientes',
+        where: 'equipo_id = ? AND cliente_id = ? AND sincronizado = 0',
+        whereArgs: [equipoId, clienteId.toString()],
+        limit: 1,
+      );
+
+      if (resultPendientes.isNotEmpty) {
+        _logger.d('✋ Equipo $equipoId está PENDIENTE (no sincronizado) para cliente $clienteId');
+        return false;  // ← NO asignado (pendiente)
+      }
+
+      // ✅ SEGUNDO: Si NO está pendiente, verificar si está asignado en tabla equipos
       final resultEquipos = await dbHelper.consultar(
         'equipos',
         where: 'id = ? AND cliente_id = ?',
@@ -149,27 +168,16 @@ class EquipoRepository extends BaseRepository<Equipo> {
       );
 
       if (resultEquipos.isNotEmpty) {
-        _logger.d('Equipo $equipoId YA está asignado al cliente $clienteId en tabla equipos');
-        return true;
+        _logger.d('✅ Equipo $equipoId YA está asignado y confirmado al cliente $clienteId');
+        return true;  // ← Asignado y confirmado
       }
 
-      final resultPendientes = await dbHelper.consultar(
-        'equipos_pendientes',
-        where: 'equipo_id = ? AND cliente_id = ?',
-        whereArgs: [equipoId, clienteId],
-        limit: 1,
-      );
-
-      if (resultPendientes.isNotEmpty) {
-        _logger.d('Equipo $equipoId está PENDIENTE para el cliente $clienteId');
-        return false;
-      }
-
-      _logger.d('Equipo $equipoId NO tiene relación con cliente $clienteId');
-      return false;
+      // ✅ TERCERO: No tiene ninguna relación con este cliente
+      _logger.d('ℹ️ Equipo $equipoId NO tiene relación con cliente $clienteId');
+      return false;  // ← No asignado
 
     } catch (e) {
-      _logger.e('Error verificando asignación equipo $equipoId - cliente $clienteId: $e');
+      _logger.e('❌ Error verificando asignación equipo $equipoId - cliente $clienteId: $e');
       return false;
     }
   }
