@@ -46,7 +46,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: !_isSyncing, // ✅ No se puede cerrar mientras sincroniza
+      canPop: !_isSyncing,
       child: AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -71,7 +71,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
             children: [
               _buildReasonContainer(),
               const SizedBox(height: 12),
-              _buildVendorInfo(),
+              _buildVendorInfo(), // 👈 Aquí se mostrarán los nombres
               const SizedBox(height: 12),
               _buildWarningContainer(),
               if (_isSyncing) ...[
@@ -144,16 +144,19 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
     );
   }
 
+  // ✅ MODIFICADO: Muestra el NOMBRE en lugar del ID
   Widget _buildVendorInfo() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.validation.vendedorAnterior != null) ...[
-          _buildInfoRow('Anterior:', widget.validation.vendedorAnterior!),
+        if (widget.validation.vendedorAnteriorId != null) ...[
+          // Muestra nombre anterior o 'Desconocido'
+          _buildInfoRow('Anterior:', widget.validation.vendedorAnteriorNombre ?? 'Desconocido'),
           const SizedBox(height: 6),
         ],
-        _buildInfoRow('Actual:', widget.validation.vendedorActual),
+        // Muestra nombre actual
+        _buildInfoRow('Actual:', widget.validation.vendedorActualNombre),
       ],
     );
   }
@@ -248,24 +251,18 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
   }
 
   Future<void> _startSync() async {
-    // ✅ PRIMERO: Validar si hay registros pendientes
     try {
       final db = await DatabaseHelper().database;
       final validationService = DatabaseValidationService(db);
       final validationResult = await validationService.canDeleteDatabase();
 
       if (!validationResult.canDelete) {
-        // ❌ HAY PENDIENTES - Mostrar diálogo y NO sincronizar
         if (!mounted) return;
-
-        // ✅ NO cerrar SyncDialog, mostrar pendientes encima
         await showDialog(
           context: context,
           builder: (context) => _buildPendingRecordsDialog(validationResult),
         );
-
-        // Después de cerrar pendientes, usuario vuelve a SyncDialog
-        return; // ❌ BLOQUEAR sincronización
+        return;
       }
     } catch (e) {
       if (!mounted) return;
@@ -273,7 +270,6 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
       return;
     }
 
-    // ✅ Si llegamos aquí, NO hay pendientes - proceder con sincronización
     setState(() {
       _isSyncing = true;
       _progress = 0.0;
@@ -282,10 +278,10 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
     });
 
     try {
-      // ✅ USAR SERVICIO UNIFICADO
+      // ✅ AQUÍ USAMOS LOS ID PARA LA LÓGICA DE SINCRONIZACIÓN (LA API PIDE IDs)
       final result = await FullSyncService.syncAllDataWithProgress(
-        edfVendedorId: widget.validation.vendedorActual,
-        previousVendedorId: widget.validation.vendedorAnterior,
+        edfVendedorId: widget.validation.vendedorActualId, // Usamos ID
+        previousVendedorId: widget.validation.vendedorAnteriorId, // Usamos ID
         onProgress: ({
           required double progress,
           required String currentStep,
@@ -305,9 +301,12 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
         throw Exception(result.mensaje);
       }
 
-      // ✅ Marcar sincronización como completada usando AuthService directamente
+      // ✅ AQUÍ ESTÁ LA CORRECCIÓN CLAVE PARA EL ERROR DE "MARK SYNC"
       final authService = AuthService();
-      await authService.markSyncCompleted(widget.validation.vendedorActual);
+      await authService.markSyncCompleted(
+        widget.validation.vendedorActualId, // ID
+        widget.validation.vendedorActualNombre, // NOMBRE (Nuevo parámetro requerido)
+      );
 
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -335,6 +334,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
     }
   }
 
+  // ... (El resto de los widgets _buildPendingRecordsDialog, _getIconForTable, etc. quedan igual)
   Widget _buildPendingRecordsDialog(DatabaseValidationResult validationResult) {
     return AlertDialog(
       title: Row(
@@ -359,7 +359,6 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
               style: TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
-            // Mostrar cada tipo de registro pendiente
             ...validationResult.pendingItems.map((item) => _buildPendingItem(
               _getIconForTable(item.tableName),
               item.displayName,

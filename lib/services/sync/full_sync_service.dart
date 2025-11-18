@@ -16,13 +16,14 @@ class FullSyncService {
   /// Sincronizar todos los datos con reporte de progreso
   static Future<SyncResult> syncAllDataWithProgress({
     required String edfVendedorId,
+    String? edfVendedorNombre, // 👈 1. NUEVO PARÁMETRO AGREGADO
     String? previousVendedorId,
     required SyncProgressCallback onProgress,
   }) async {
     final completedSteps = <String>[];
 
     try {
-      // 1. Limpiar datos anteriores si es cambio de vendedor (0% -> 5%)
+      // 1. Limpiar datos anteriores si es cambio de vendedor
       if (previousVendedorId != null && previousVendedorId != edfVendedorId) {
         onProgress(
           progress: 0.05,
@@ -37,7 +38,7 @@ class FullSyncService {
         await Future.delayed(const Duration(milliseconds: 300));
       }
 
-      // 2. Sincronizar usuarios (5% -> 15%)
+      // 2. Sincronizar usuarios
       onProgress(
         progress: 0.1,
         currentStep: 'Sincronizando usuarios...',
@@ -57,7 +58,7 @@ class FullSyncService {
       );
       await Future.delayed(const Duration(milliseconds: 200));
 
-      // 3. Sincronizar todos los datos (15% -> 80%)
+      // 3. Sincronizar todos los datos
       onProgress(
         progress: 0.2,
         currentStep: 'Descargando datos...',
@@ -73,7 +74,7 @@ class FullSyncService {
       // Reportar progreso por cada tipo de dato
       double currentProgress = 0.25;
 
-      // Clientes (25% -> 32%)
+      // Clientes
       if (syncResult.clientesSincronizados > 0) {
         completedSteps.add('${syncResult.clientesSincronizados} clientes');
         currentProgress = 0.32;
@@ -85,7 +86,7 @@ class FullSyncService {
         await Future.delayed(const Duration(milliseconds: 200));
       }
 
-      // Equipos (32% -> 40%)
+      // Equipos
       if (syncResult.equiposSincronizados > 0) {
         completedSteps.add('${syncResult.equiposSincronizados} equipos');
         currentProgress = 0.40;
@@ -97,7 +98,7 @@ class FullSyncService {
         await Future.delayed(const Duration(milliseconds: 200));
       }
 
-      // Censos (40% -> 50%)
+      // Censos
       if (syncResult.censosSincronizados > 0) {
         completedSteps.add('${syncResult.censosSincronizados} censos');
         currentProgress = 0.50;
@@ -109,7 +110,7 @@ class FullSyncService {
         await Future.delayed(const Duration(milliseconds: 200));
       }
 
-      // 🆕 Imágenes de censos (50% -> 55%) - SOLO SI HAY IMÁGENES
+      // Imágenes de censos
       if (syncResult.imagenesCensosSincronizadas > 0) {
         completedSteps.add('${syncResult.imagenesCensosSincronizadas} imágenes de censos');
         currentProgress = 0.55;
@@ -120,7 +121,6 @@ class FullSyncService {
         );
         await Future.delayed(const Duration(milliseconds: 200));
       } else if (syncResult.censosSincronizados > 0) {
-        // Si hay censos pero no imágenes, mostrar mensaje informativo
         completedSteps.add('Imágenes: no disponibles');
         currentProgress = 0.55;
         onProgress(
@@ -131,7 +131,7 @@ class FullSyncService {
         await Future.delayed(const Duration(milliseconds: 100));
       }
 
-      // Equipos Pendientes (55% -> 62%)
+      // Equipos Pendientes
       if (syncResult.equiposPendientesSincronizados > 0) {
         completedSteps.add('${syncResult.equiposPendientesSincronizados} equipos pendientes');
         currentProgress = 0.62;
@@ -143,7 +143,7 @@ class FullSyncService {
         await Future.delayed(const Duration(milliseconds: 200));
       }
 
-      // Formularios (62% -> 70%)
+      // Formularios
       if (syncResult.formulariosSincronizados > 0) {
         completedSteps.add('${syncResult.formulariosSincronizados} formularios');
         currentProgress = 0.70;
@@ -155,7 +155,7 @@ class FullSyncService {
         await Future.delayed(const Duration(milliseconds: 200));
       }
 
-      // Detalles de formularios (70% -> 80%)
+      // Detalles de formularios
       if (syncResult.detallesFormulariosSincronizados > 0) {
         completedSteps.add('${syncResult.detallesFormulariosSincronizados} detalles');
         currentProgress = 0.80;
@@ -167,7 +167,7 @@ class FullSyncService {
         await Future.delayed(const Duration(milliseconds: 200));
       }
 
-      // 4. Sincronizar respuestas de formularios (80% -> 90%)
+      // 4. Sincronizar respuestas de formularios
       onProgress(
         progress: 0.80,
         currentStep: 'Descargando respuestas de formularios...',
@@ -204,7 +204,7 @@ class FullSyncService {
       }
       await Future.delayed(const Duration(milliseconds: 200));
 
-      // 5. Marcar sincronización como completada (90% -> 95%)
+      // 5. Marcar sincronización como completada
       onProgress(
         progress: 0.95,
         currentStep: 'Finalizando...',
@@ -212,12 +212,17 @@ class FullSyncService {
       );
 
       final authService = AuthService();
-      await authService.markSyncCompleted(edfVendedorId);
+
+      // 👈 2. CORRECCIÓN AQUÍ: Se pasan ambos argumentos
+      await authService.markSyncCompleted(
+          edfVendedorId,
+          edfVendedorNombre ?? 'Vendedor' // Si viene null, ponemos un default
+      );
 
       completedSteps.add('Sincronización registrada');
       await Future.delayed(const Duration(milliseconds: 300));
 
-      // 6. Completado (100%)
+      // 6. Completado
       onProgress(
         progress: 1.0,
         currentStep: '¡Completado!',
@@ -232,7 +237,7 @@ class FullSyncService {
         itemsSincronizados: syncResult.clientesSincronizados +
             syncResult.equiposSincronizados +
             syncResult.censosSincronizados +
-            syncResult.imagenesCensosSincronizadas, // 🆕 Incluir imágenes si las hay
+            syncResult.imagenesCensosSincronizadas,
       );
 
     } catch (e) {

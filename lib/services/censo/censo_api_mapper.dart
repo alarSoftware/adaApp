@@ -162,7 +162,7 @@ class CensoApiMapper {
     }
 
     return {
-      'id': datosLocales['id']?.toString() ?? _uuid.v4(), // ✅ USAR EL ID CORRECTO
+      'id': datosLocales['id']?.toString() ?? _uuid.v4(),
       'edfVendedorSucursalId': '$edfVendedorId',
       'edfEquipoId': (datosLocales['equipo_id'] ?? '').toString(),
       'usuarioId': usuarioId,

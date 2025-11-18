@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:ada_app/services/auth_service.dart';  // ✅ Incluye SyncValidationResult
+import 'package:ada_app/services/auth_service.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/services/database_validation_service.dart';
 import 'package:ada_app/services/sync/full_sync_service.dart';
@@ -76,16 +76,13 @@ class LoginScreenViewModel extends ChangeNotifier {
   bool _isSyncing = false;
   String? _errorMessage;
 
-  // Estado del usuario actual
   Usuario? _currentUser;
 
-  // Estado de sincronización
   SyncValidationResult? _syncValidationResult;
   double _syncProgress = 0.0;
   String _syncCurrentStep = '';
   List<String> _syncCompletedSteps = [];
 
-  // ========== STREAM PARA COMUNICACIÓN CON UI ==========
   final StreamController<LoginUIEvent> _eventController =
   StreamController<LoginUIEvent>.broadcast();
   Stream<LoginUIEvent> get uiEvents => _eventController.stream;
@@ -100,7 +97,6 @@ class LoginScreenViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   Usuario? get currentUser => _currentUser;
 
-  // Getters de progreso
   double get syncProgress => _syncProgress;
   String get syncCurrentStep => _syncCurrentStep;
   List<String> get syncCompletedSteps => List.from(_syncCompletedSteps);
@@ -166,28 +162,18 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== VALIDADORES DE FORMULARIO ==========
   String? validateUsername(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'El usuario es requerido';
-    }
-    if (value.length < 3) {
-      return 'Usuario debe tener al menos 3 caracteres';
-    }
+    if (value == null || value.trim().isEmpty) return 'El usuario es requerido';
+    if (value.length < 3) return 'Usuario debe tener al menos 3 caracteres';
     return null;
   }
 
   String? validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'La contraseña es requerida';
-    }
-    if (value.length < 6) {
-      return 'Mínimo 6 caracteres';
-    }
+    if (value == null || value.isEmpty) return 'La contraseña es requerida';
+    if (value.length < 6) return 'Mínimo 6 caracteres';
     return null;
   }
 
-  // ========== ACCIONES PÚBLICAS ==========
   void togglePasswordVisibility() {
     _obscurePassword = !_obscurePassword;
     notifyListeners();
@@ -216,7 +202,6 @@ class LoginScreenViewModel extends ChangeNotifier {
     HapticFeedback.lightImpact();
 
     try {
-      // 1. Autenticar usuario
       final result = await _authService.login(
         usernameController.text.trim(),
         passwordController.text,
@@ -231,7 +216,6 @@ class LoginScreenViewModel extends ChangeNotifier {
 
       HapticFeedback.lightImpact();
 
-      // 2. Obtener usuario completo
       _currentUser = await _authService.getCurrentUser();
 
       if (_currentUser == null) {
@@ -240,27 +224,21 @@ class LoginScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      // 3. Validar asignación de vendedor
       final validationResult = await _validateUserAssignment();
-      if (!validationResult) {
-        return; // El error ya fue emitido
-      }
+      if (!validationResult) return;
 
-      // 4. Verificar sincronización obligatoria
       final syncValidation = await _validateSyncRequirement();
 
       if (syncValidation.requiereSincronizacion) {
         _logger.w('Sincronización obligatoria requerida: ${syncValidation.razon}');
         _syncValidationResult = syncValidation;
 
-        // Emitir evento para mostrar diálogo de sincronización obligatoria
         _eventController.add(
             ShowSyncRequiredDialogEvent(syncValidation, _currentUser!)
         );
         return;
       }
 
-      // 5. No requiere sincronización - navegar al home
       await _checkBiometricAvailability();
       _eventController.add(ShowSuccessEvent(
         'Bienvenido ${_currentUser!.fullname}',
@@ -300,7 +278,6 @@ class LoginScreenViewModel extends ChangeNotifier {
 
       HapticFeedback.lightImpact();
 
-      // 1. Autenticar con biométrico
       final result = await _authService.authenticateWithBiometric();
 
       if (!result.exitoso) {
@@ -308,7 +285,6 @@ class LoginScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      // 2. Obtener usuario completo
       _currentUser = await _authService.getCurrentUser();
 
       if (_currentUser == null) {
@@ -316,13 +292,9 @@ class LoginScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      // 3. Validar asignación de vendedor
       final validationResult = await _validateUserAssignment();
-      if (!validationResult) {
-        return;
-      }
+      if (!validationResult) return;
 
-      // 4. Verificar sincronización obligatoria
       final syncValidation = await _validateSyncRequirement();
 
       if (syncValidation.requiereSincronizacion) {
@@ -335,7 +307,6 @@ class LoginScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      // 5. No requiere sincronización - navegar al home
       _eventController.add(ShowSuccessEvent(
         'Bienvenido ${_currentUser!.fullname}',
         Icons.fingerprint,
@@ -367,60 +338,58 @@ class LoginScreenViewModel extends ChangeNotifier {
         _eventController.add(ShowErrorEvent(errorMsg));
         return false;
       }
-
-      _logger.i('Usuario validado - edf_vendedor_id: ${_currentUser!.edfVendedorId}');
       return true;
-
     } catch (e) {
       _logger.e('Error validando asignación de usuario: $e');
-      final errorMsg = 'Error validando información del usuario. Intente nuevamente.\n\n'
-          'Si el problema persiste, contacte al administrador.';
-
+      final errorMsg = 'Error validando información del usuario.';
       _errorMessage = errorMsg;
       _eventController.add(ShowErrorEvent(errorMsg));
       return false;
     }
   }
 
+  // ✅ MÉTODO CORREGIDO: Pasa ID y NOMBRE
   Future<SyncValidationResult> _validateSyncRequirement() async {
     try {
+      // Obtenemos nombre o usamos fallback
+      final nombreVendedor = _currentUser!.edfVendedorNombre ?? _currentUser!.username;
+
       return await _authService.validateSyncRequirement(
-          _currentUser!.edfVendedorId!
+        _currentUser!.edfVendedorId!,
+        nombreVendedor, // 👈 AQUÍ ESTABA EL ERROR, FALTABA ESTE ARGUMENTO
       );
     } catch (e) {
       _logger.e('Error validando sincronización: $e');
-      // En caso de error, forzar sincronización por seguridad
+      final nombreVendedor = _currentUser?.edfVendedorNombre ?? 'Desconocido';
+
+      // Retorno de error con la estructura nueva
       return SyncValidationResult(
         requiereSincronizacion: true,
         razon: 'Error en validación - sincronización por seguridad',
-        vendedorAnterior: null,
-        vendedorActual: _currentUser!.edfVendedorId ?? '',
+        vendedorAnteriorId: null,
+        vendedorActualId: _currentUser!.edfVendedorId ?? '',
+        vendedorAnteriorNombre: null,
+        vendedorActualNombre: nombreVendedor,
       );
     }
   }
 
-  // ========== 🎯 SINCRONIZACIÓN CON VALIDACIÓN DE PENDIENTES ==========
-  /// Solicita sincronización (valida registros pendientes primero)
   Future<void> requestSync() async {
     if (_isSyncing || _currentUser == null) return;
 
     try {
       _logger.i('🔍 Validando si hay registros pendientes antes de sincronizar...');
 
-      // 1. Validar si hay registros pendientes en la base de datos
       final db = await _dbHelper.database;
       final validationService = DatabaseValidationService(db);
       final validationResult = await validationService.canDeleteDatabase();
 
       if (!validationResult.canDelete) {
         _logger.w('⚠️ Hay registros pendientes de sincronizar');
-
-        // Emitir evento para mostrar diálogo de pendientes
         _eventController.add(ShowPendingRecordsDialogEvent(validationResult));
         return;
       }
 
-      // 2. Si no hay pendientes, ejecutar sincronización
       _logger.i('✅ No hay pendientes - procediendo con sincronización');
       await executeSync();
 
@@ -430,8 +399,7 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== 🎯 EJECUTAR SINCRONIZACIÓN UNIFICADA ==========
-  /// Ejecuta la sincronización usando FullSyncService
+  // ✅ MÉTODO CORREGIDO: Pasa ID y NOMBRE al completar
   Future<void> executeSync() async {
     if (_currentUser == null) {
       _eventController.add(ShowErrorEvent('No hay usuario válido'));
@@ -445,27 +413,23 @@ class LoginScreenViewModel extends ChangeNotifier {
     try {
       _logger.i('🔄 Iniciando sincronización unificada...');
 
-      // Usar el servicio unificado con callbacks de progreso
       final result = await FullSyncService.syncAllDataWithProgress(
         edfVendedorId: _currentUser!.edfVendedorId!,
-        previousVendedorId: _syncValidationResult?.vendedorAnterior,
+        previousVendedorId: _syncValidationResult?.vendedorAnteriorId, // Ojo: Id aquí
         onProgress: ({
           required double progress,
           required String currentStep,
           required List<String> completedSteps,
         }) {
-          // Actualizar estado interno
           _syncProgress = progress;
           _syncCurrentStep = currentStep;
           _syncCompletedSteps = List.from(completedSteps);
 
-          // Emitir evento para la UI
           _eventController.add(SyncProgressEvent(
             progress: progress,
             currentStep: currentStep,
             completedSteps: completedSteps,
           ));
-
           notifyListeners();
         },
       );
@@ -474,12 +438,16 @@ class LoginScreenViewModel extends ChangeNotifier {
         throw Exception(result.mensaje);
       }
 
-      // ✅ Marcar sincronización como completada
-      await _authService.markSyncCompleted(_currentUser!.edfVendedorId!);
+      // ✅ CORRECCIÓN AQUÍ: Pasar el nombre también
+      final nombreVendedor = _currentUser!.edfVendedorNombre ?? _currentUser!.username;
+
+      await _authService.markSyncCompleted(
+        _currentUser!.edfVendedorId!,
+        nombreVendedor, // 👈 FALTABA ESTE ARGUMENTO
+      );
 
       _logger.i('✅ Sincronización completada exitosamente');
 
-      // Emitir eventos de éxito
       _eventController.add(SyncCompletedEvent(
         result.mensaje,
         result.itemsSincronizados,
@@ -490,7 +458,6 @@ class LoginScreenViewModel extends ChangeNotifier {
         Icons.cloud_done,
       ));
 
-      // Navegar al home después de sincronización exitosa
       _eventController.add(NavigateToHomeEvent());
 
     } catch (e) {
@@ -503,26 +470,19 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== 🎯 SINCRONIZACIÓN DE USUARIOS (AppBar) ==========
-  /// Sincroniza la tabla de usuarios (sin validación de pendientes)
   Future<void> syncUsers() async {
     _isSyncing = true;
     notifyListeners();
 
     try {
       _logger.i('🔄 Sincronizando usuarios...');
-
       final resultado = await AuthService.sincronizarSoloUsuarios();
 
       if (resultado.exito) {
-        _eventController.add(ShowSuccessEvent(
-          'Usuarios sincronizados',
-          Icons.cloud_done,
-        ));
+        _eventController.add(ShowSuccessEvent('Usuarios sincronizados', Icons.cloud_done));
       } else {
         _eventController.add(ShowErrorEvent(resultado.mensaje));
       }
-
     } catch (e) {
       _logger.e('Error sincronizando usuarios: $e');
       _eventController.add(ShowErrorEvent('Error: $e'));
@@ -532,19 +492,13 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== 🎯 ELIMINAR TABLA DE USUARIOS ==========
   Future<void> deleteUsersTable() async {
     _isLoading = true;
     notifyListeners();
 
     try {
       await _dbHelper.eliminar('Users');
-
-      _eventController.add(ShowSuccessEvent(
-        'Tabla de usuarios eliminada correctamente',
-        Icons.delete_sweep,
-      ));
-
+      _eventController.add(ShowSuccessEvent('Tabla de usuarios eliminada correctamente', Icons.delete_sweep));
     } catch (e) {
       _logger.e('Error eliminando usuarios: $e');
       _eventController.add(ShowErrorEvent('Error al eliminar usuarios: $e'));
@@ -554,7 +508,6 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== MÉTODOS PRIVADOS ==========
   void _resetSyncProgress() {
     _syncProgress = 0.0;
     _syncCurrentStep = '';

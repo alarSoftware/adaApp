@@ -43,6 +43,7 @@ class UserSyncService {
           );
         }
 
+        // === AQUÍ ES DONDE SE AGREGA LA NUEVA COLUMNA ===
         final usuariosProcesados = usuariosAPI.map((usuario) {
           String password = usuario['password'].toString();
           if (password.startsWith('{bcrypt}')) {
@@ -58,6 +59,8 @@ class UserSyncService {
 
           return {
             'edf_vendedor_id': usuario['edfVendedorId']?.toString(),
+            // 👇 NUEVA LÍNEA AGREGADA:
+            'edfVendedorNombre': usuario['edfVendedorNombre']?.toString(),
             'code': usuarioId,
             'username': usuario['username'],
             'password': password,
@@ -78,14 +81,13 @@ class UserSyncService {
         } catch (dbError) {
           BaseSyncService.logger.e('Error guardando usuarios en BD: $dbError');
 
-          // 🚨 LOG ERROR: Error de BD local
           await ErrorLogService.logDatabaseError(
             tableName: 'Users',
             operation: 'bulk_insert',
             errorMessage: 'Error guardando usuarios: $dbError',
           );
 
-          // No fallar, los datos se descargaron correctamente
+          // No fallar, los datos se descargaron correctamente pero hubo error local
         }
 
         return SyncResult(
@@ -97,7 +99,6 @@ class UserSyncService {
       } else {
         final mensaje = BaseSyncService.extractErrorMessage(response);
 
-        // 🚨 LOG ERROR: Error del servidor
         await ErrorLogService.logServerError(
           tableName: 'Users',
           operation: 'sync_from_server',
@@ -116,7 +117,6 @@ class UserSyncService {
     } on TimeoutException catch (timeoutError) {
       BaseSyncService.logger.e('⏰ Timeout sincronizando usuarios: $timeoutError');
 
-      // 🚨 LOG ERROR: Timeout
       await ErrorLogService.logNetworkError(
         tableName: 'Users',
         operation: 'sync_from_server',
@@ -133,7 +133,6 @@ class UserSyncService {
     } on SocketException catch (socketError) {
       BaseSyncService.logger.e('📡 Error de red: $socketError');
 
-      // 🚨 LOG ERROR: Sin conexión de red
       await ErrorLogService.logNetworkError(
         tableName: 'Users',
         operation: 'sync_from_server',
@@ -150,7 +149,6 @@ class UserSyncService {
     } catch (e) {
       BaseSyncService.logger.e('💥 Error en sincronizarUsuarios: $e');
 
-      // 🚨 LOG ERROR: Error general
       await ErrorLogService.logError(
         tableName: 'Users',
         operation: 'sync_from_server',
@@ -168,6 +166,36 @@ class UserSyncService {
     }
   }
 
+  // ... (obtenerEdfVendedorIdUsuarioActual y obtenerEdfVendedorIdDirecto quedan igual) ...
+  // ... A MENOS QUE QUIERAS AGREGAR UN MÉTODO NUEVO PARA LEER EL NOMBRE 👇 ...
+
+  // Método opcional sugerido: Obtener NOMBRE del vendedor actual
+  static Future<String?> obtenerNombreVendedorUsuarioActual() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('current_user');
+      if (username == null) return null;
+
+      final db = await _dbHelper.database;
+      final result = await db.query(
+        'Users',
+        columns: ['edfVendedorNombre'], // Nombre de la columna nueva
+        where: 'LOWER(username) = ?',
+        whereArgs: [username.toLowerCase()],
+        limit: 1,
+      );
+
+      if (result.isNotEmpty) {
+        return result.first['edfVendedorNombre'] as String?;
+      }
+      return null;
+    } catch (e) {
+      BaseSyncService.logger.e('Error obteniendo nombre vendedor: $e');
+      return null;
+    }
+  }
+
+  // MANTENEMOS TUS MÉTODOS EXISTENTES ABAJO
   static Future<String?> obtenerEdfVendedorIdUsuarioActual() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -175,14 +203,11 @@ class UserSyncService {
 
       if (username == null) {
         BaseSyncService.logger.e('No hay usuario logueado');
-
-        // 🚨 LOG ERROR: Validación - no hay usuario
         await ErrorLogService.logValidationError(
           tableName: 'Users',
           operation: 'get_edf_vendedor_id',
           errorMessage: 'No hay usuario logueado',
         );
-
         return null;
       }
 
@@ -199,14 +224,11 @@ class UserSyncService {
 
       if (result.isEmpty) {
         BaseSyncService.logger.e('Usuario $username no encontrado en base de datos local');
-
-        // 🚨 LOG ERROR: Usuario no encontrado en BD
         await ErrorLogService.logDatabaseError(
           tableName: 'Users',
           operation: 'query_user',
           errorMessage: 'Usuario $username no encontrado en base de datos local',
         );
-
         return null;
       }
 
@@ -216,7 +238,6 @@ class UserSyncService {
       BaseSyncService.logger.i('edf_vendedor_id: $edfVendedorId');
 
       if (edfVendedorId == null || edfVendedorId.trim().isEmpty) {
-        // 🚨 LOG ERROR: Usuario sin edf_vendedor_id
         await ErrorLogService.logValidationError(
           tableName: 'Users',
           operation: 'get_edf_vendedor_id',
@@ -229,15 +250,12 @@ class UserSyncService {
 
     } catch (e) {
       BaseSyncService.logger.e('Error obteniendo edf_vendedor_id: $e');
-
-      // 🚨 LOG ERROR: Error general
       await ErrorLogService.logError(
         tableName: 'Users',
         operation: 'get_edf_vendedor_id',
         errorMessage: 'Error obteniendo edf_vendedor_id: $e',
         errorType: 'database',
       );
-
       return null;
     }
   }
@@ -254,7 +272,6 @@ class UserSyncService {
         return result.first['edf_vendedor_id'].toString();
       }
 
-      // 🚨 LOG ERROR: Usuario no encontrado
       await ErrorLogService.logDatabaseError(
         tableName: 'Users',
         operation: 'query_user_direct',
@@ -265,15 +282,12 @@ class UserSyncService {
 
     } catch (e) {
       BaseSyncService.logger.e('Error en obtenerEdfVendedorIdDirecto: $e');
-
-      // 🚨 LOG ERROR: Error general
       await ErrorLogService.logError(
         tableName: 'Users',
         operation: 'query_user_direct',
         errorMessage: 'Error: $e',
         errorType: 'database',
       );
-
       return null;
     }
   }

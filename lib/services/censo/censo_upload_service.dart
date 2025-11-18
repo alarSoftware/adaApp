@@ -80,7 +80,7 @@ class CensoUploadService {
             errorMessage: resultado['mensaje'] ?? 'Error desconocido del servidor',
             errorCode: resultado['codigo']?.toString() ?? 'UNKNOWN',
             registroFailId: censoId,
-            endpoint: '/censoActivo/insertCensoActiv',
+            endpoint: '/censoActivo/insertCensoActivo',
             userId: datos['usuario_id']?.toString(),
           );
         } catch (logError) {

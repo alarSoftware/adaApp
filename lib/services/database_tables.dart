@@ -126,6 +126,7 @@ class DatabaseTables {
   CREATE TABLE Users (
     id INTEGER PRIMARY KEY,
     edf_vendedor_id TEXT,
+    edfVendedorNombre TEXT,
     code INTEGER,
     username TEXT NOT NULL,
     password TEXT NOT NULL,   
