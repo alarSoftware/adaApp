@@ -150,7 +150,6 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
         );
 
         _logger.i('📅 Fecha actualizada para UUID: $registroId con usuario: $usuarioCensoId');
-        _enviarAlServidorAsync(equipoIdString, clienteId);
         return registroId;
       }
 
@@ -170,7 +169,6 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
       await dbHelper.insertar(tableName, datos);
       _logger.i('✅ Registro pendiente NUEVO creado con UUID: $uuid y usuario: $usuarioCensoId');
 
-      _enviarAlServidorAsync(equipoIdString, clienteId);
       return uuid;
 
     } catch (e) {
@@ -464,43 +462,4 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
     _logger.i('========================================================');
   }
 
-  void _enviarAlServidorAsync(String equipoId, int clienteId) {
-    Future(() async {
-      try {
-        _logger.i('🚀 INICIO envío async: equipo=$equipoId, cliente=$clienteId');
-
-        final authService = AuthService();
-        final usuario = await authService.getCurrentUser();
-        final edfVendedorId = usuario?.edfVendedorId ?? '1_1';
-
-        _logger.i('👤 VendedorId obtenido: $edfVendedorId');
-
-        final resultado = await EquiposPendientesApiService.enviarEquipoPendiente(
-          equipoId: equipoId,
-          clienteId: clienteId,
-          edfVendedorId: edfVendedorId,
-        );
-
-        _logger.i('📨 RESULTADO FINAL: $resultado');
-
-        if (resultado['exito']) {
-          // ✅ Marcar como sincronizado CON fecha
-          await dbHelper.actualizar(
-            tableName,
-            {
-              'sincronizado': 1,
-              'fecha_sincronizacion': DateTime.now().toIso8601String(),
-            },
-            where: 'equipo_id = ? AND cliente_id = ?',
-            whereArgs: [equipoId, clienteId],
-          );
-          _logger.i('✅ Enviado al servidor correctamente y marcado con fecha');
-        } else {
-          _logger.w('⚠️ Fallo: ${resultado['mensaje']}');
-        }
-      } catch (e) {
-        _logger.e('❌ Error completo: $e');
-      }
-    });
-  }
 }

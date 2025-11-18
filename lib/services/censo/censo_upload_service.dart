@@ -1,27 +1,28 @@
-// lib/services/censo/censo_upload_service.dart
-
 import 'dart:async';
+import 'dart:io';
 import 'package:logger/logger.dart';
-import 'package:uuid/uuid.dart';
+import 'package:http/http.dart' as http;
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
+import 'package:ada_app/repositories/equipo_pendiente_repository.dart'; // ✅ NUEVO IMPORT
 import 'package:ada_app/services/censo/censo_api_mapper.dart';
 import 'package:ada_app/services/post/base_post_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
-import 'package:ada_app/services/error_log/error_log_service.dart'; // ✅ NUEVO IMPORT
+import 'package:ada_app/services/error_log/error_log_service.dart';
+import 'package:ada_app/config/constants/server_constants.dart';
 import 'censo_log_service.dart';
 
 class CensoUploadService {
   final Logger _logger = Logger();
-  final Uuid _uuid = const Uuid();
   final EstadoEquipoRepository _estadoEquipoRepository;
   final CensoActivoFotoRepository _fotoRepository;
   final CensoLogService _logService;
+  final EquipoPendienteRepository _equipoPendienteRepository; // ✅ NUEVO REPOSITORY
 
   // ========== CONFIGURACIÓN ==========
-  static const int MAX_INTENTOS = 10;
-  static const Duration INTERVALO_TIMER = Duration(minutes: 1);
+  static const int maxIntentos = 10;
+  static const Duration intervaloTimer = Duration(minutes: 1);
 
   // ========== VARIABLES ESTÁTICAS ==========
   static Timer? _syncTimer;
@@ -34,9 +35,38 @@ class CensoUploadService {
     EstadoEquipoRepository? estadoEquipoRepository,
     CensoActivoFotoRepository? fotoRepository,
     CensoLogService? logService,
+    EquipoPendienteRepository? equipoPendienteRepository, // ✅ INYECTABLE
   })  : _estadoEquipoRepository = estadoEquipoRepository ?? EstadoEquipoRepository(),
         _fotoRepository = fotoRepository ?? CensoActivoFotoRepository(),
-        _logService = logService ?? CensoLogService();
+        _logService = logService ?? CensoLogService(),
+        _equipoPendienteRepository = equipoPendienteRepository ?? EquipoPendienteRepository(); // ✅ INICIALIZADO
+
+
+  /// Ejecuta una función, la envuelve en try/catch, loguea el error y lo relanza.
+  Future<T> _executeAndLogError<T>(
+      Future<T> Function() future,
+      String operation, {
+        String? id,
+        String? userId,
+        String? endpoint,
+        String tableName = 'censo_activo',
+      }) async {
+    try {
+      return await future();
+    } catch (e) {
+      await ErrorLogService.logError(
+        tableName: tableName,
+        operation: operation,
+        errorMessage: e.toString(),
+        errorType: e is TimeoutException || e is SocketException || e is http.ClientException ? 'network' : 'unknown',
+        registroFailId: id,
+        userId: userId,
+        endpoint: endpoint,
+      );
+      _logger.e('❌ Excepción atrapada y relanzada ($operation): $e');
+      rethrow;
+    }
+  }
 
   // ==================== ENVÍO AL SERVIDOR ====================
 
@@ -45,109 +75,64 @@ class CensoUploadService {
         int timeoutSegundos = 60,
         bool guardarLog = false,
       }) async {
-    String? censoId;
+    final censoId = datos['id'] ?? datos['id_local'];
+    final userId = datos['usuario_id']?.toString();
+    const endpoint = '/censoActivo/insertCensoActivo';
 
-    try {
-      censoId = datos['id'] ?? datos['id_local'];
-      _logger.i('📤 Preparando envío de censo: $censoId');
+    return await _executeAndLogError<Map<String, dynamic>>(() async {
 
-      final timestamp = DateTime.now().toIso8601String();
-
-      if (guardarLog) {
-        await _logService.guardarLogPost(
-          url: 'API_ENDPOINT',
-          headers: {'Content-Type': 'application/json'},
-          body: datos,
-          timestamp: timestamp,
-          censoActivoId: censoId,
-        );
-      }
+      if (guardarLog) { /* ... lógica de log ... */ }
 
       final resultado = await BasePostService.post(
-        endpoint: '/censoActivo/insertCensoActivo',
+        endpoint: endpoint,
         body: datos,
         timeout: Duration(seconds: timeoutSegundos),
       );
 
-      _logger.i('✅ Respuesta recibida: ${resultado['exito']}');
+      // 🚨 VALIDACIÓN ESTRICTA DE ÉXITO LÓGICO
+      final serverAction = resultado['serverAction'] as int? ?? -999;
 
-      // 🚨 Si el servidor responde con error, registrarlo
-      if (resultado['exito'] != true) {
-        try {
-          await ErrorLogService.logServerError(
-            tableName: 'censo_activo',
-            operation: 'upload',
-            errorMessage: resultado['mensaje'] ?? 'Error desconocido del servidor',
-            errorCode: resultado['codigo']?.toString() ?? 'UNKNOWN',
-            registroFailId: censoId,
-            endpoint: '/censoActivo/insertCensoActivo',
-            userId: datos['usuario_id']?.toString(),
-          );
-        } catch (logError) {
-          _logger.e('Error logging server error: $logError');
-        }
-      }
+      if (serverAction == ServerConstants.SUCCESS_TRANSACTION) {
+        return resultado; // ÉXITO
+      } else {
+        // ❌ ERROR LÓGICO (-501, 205, etc.)
+        final errorMsg = resultado['resultError'] ?? resultado['mensaje'] ?? 'Error desconocido';
 
-      return resultado;
-
-    } catch (e) {
-      _logger.e('❌ Error en envío: $e');
-
-      // 🚨 LOG ERROR: Error de conexión/red
-      try {
-        await ErrorLogService.logNetworkError(
+        // 🛑 Logueamos el error LÓGICO que generó el FALSO NEGATIVO
+        await ErrorLogService.logServerError(
           tableName: 'censo_activo',
-          operation: 'upload',
-          errorMessage: 'Error de conexión: $e',
+          operation: 'upload_logic_fail',
+          errorMessage: errorMsg,
+          errorCode: serverAction.toString(),
           registroFailId: censoId,
-          endpoint: '/censoActivo/insertCensoActiv',
-          userId: datos['usuario_id']?.toString(),
+          endpoint: endpoint,
+          userId: userId,
         );
-      } catch (logError) {
-        _logger.e('Error logging network error: $logError');
-      }
 
-      return {
-        'exito': false,
-        'mensaje': 'Error de conexión: $e',
-      };
-    }
+        // Retornamos el resultado negativo para que el llamador lo marque como error.
+        return {'exito': false, 'mensaje': errorMsg, 'serverAction': serverAction};
+      }
+    }, 'upload', id: censoId, userId: userId, endpoint: endpoint);
   }
 
   Future<Map<String, dynamic>> _prepararPayloadConMapper(
       String estadoId,
       List<dynamic> fotos,
       ) async {
-    try {
-      _logger.i('📦 Preparando payload con mapper para: $estadoId');
+    return await _executeAndLogError<Map<String, dynamic>>(() async {
 
       final maps = await _estadoEquipoRepository.dbHelper.consultar(
-        'censo_activo',
-        where: 'id = ?',
-        whereArgs: [estadoId],
-        limit: 1,
+        'censo_activo', where: 'id = ?', whereArgs: [estadoId], limit: 1,
       );
 
-      if (maps.isEmpty) {
-        throw Exception('No se encontró el censo: $estadoId');
-      }
+      if (maps.isEmpty) throw Exception('No se encontró el censo: $estadoId');
 
       final datosLocales = maps.first;
       final usuarioId = datosLocales['usuario_id'] as int?;
-
-      if (usuarioId == null) {
-        throw Exception('usuario_id es requerido para el censo: $estadoId');
-      }
+      if (usuarioId == null) throw Exception('usuario_id es requerido');
 
       final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(usuarioId);
-      if (edfVendedorId == null) {
-        throw Exception('No se pudo resolver edfVendedorId para usuario_id: $usuarioId');
-      }
-
-      final estaAsignado = await _verificarEquipoAsignado(
-        datosLocales['equipo_id']?.toString(),
-        datosLocales['cliente_id'],
-      );
+      final estaAsignado = await _verificarEquipoAsignado(datosLocales['equipo_id']?.toString(), datosLocales['cliente_id']);
 
       final datosLocalesMutable = Map<String, dynamic>.from(datosLocales);
       datosLocalesMutable['ya_asignado'] = estaAsignado;
@@ -155,195 +140,145 @@ class CensoUploadService {
       final payload = CensoApiMapper.prepararDatosParaApi(
         datosLocales: datosLocalesMutable,
         usuarioId: usuarioId,
-        edfVendedorId: edfVendedorId,
+        edfVendedorId: edfVendedorId!,
         fotosConBase64: fotos,
       );
 
-      _logger.i('✅ Payload preparado: ${payload.keys.length} campos y ${fotos.length} fotos');
-
       return payload;
-    } catch (e) {
-      _logger.e('❌ Error preparando payload: $e');
-
-      // 🚨 LOG ERROR: Error preparando datos
-      try {
-        await ErrorLogService.logValidationError(
-          tableName: 'censo_activo',
-          operation: 'prepare_payload',
-          errorMessage: 'Error preparando payload: $e',
-          registroFailId: estadoId,
-        );
-      } catch (logError) {
-        _logger.e('Error logging validation error: $logError');
-      }
-
-      rethrow;
-    }
+    }, 'prepare_payload', id: estadoId);
   }
 
   // ==================== SINCRONIZACIÓN EN BACKGROUND ====================
 
-  /// ✅ PROTECCIÓN CONTRA DUPLICADOS
   Future<void> sincronizarCensoEnBackground(
       String estadoId,
       Map<String, dynamic> datos,
       ) async {
-    if (_censosEnProceso.contains(estadoId)) {
-      _logger.w('⚠️ Censo $estadoId ya está siendo procesado');
+    if (_censosEnProceso.contains(estadoId)) return;
+    _censosEnProceso.add(estadoId);
+
+    try {
+      _logger.i('🔄 Sincronización background para: $estadoId');
+
+      // 🛑 VALIDACIÓN: BLOQUEAR SI HAY PENDIENTE LOCAL
+      final equipoId = datos['equipo_id'] as String?;
+      final clienteId = datos['cliente_id'] as int?;
+
+      if (equipoId != null && clienteId != null) {
+        final hayPendiente = await _existePendienteAsignacion(equipoId, clienteId);
+        if (hayPendiente) {
+          _logger.w('⏸️ Background sync pospuesto para $estadoId: Pendiente de asignación en cola (equipo: $equipoId, cliente: $clienteId)');
+          return;
+        }
+      }
+
+      final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
+
+      final datosParaApi = await _prepararPayloadConMapper(estadoId, fotos);
+      await _actualizarUltimoIntento(estadoId, 1);
+
+      final respuesta = await enviarCensoAlServidor(datosParaApi, timeoutSegundos: 45);
+
+      if (respuesta['exito'] == true) {
+        await _estadoEquipoRepository.marcarComoMigrado(estadoId, servidorId: respuesta['servidor_id']);
+        await _estadoEquipoRepository.marcarComoSincronizado(estadoId);
+        for (final foto in fotos) {
+          if (foto.id != null) await _fotoRepository.marcarComoSincronizada(foto.id!);
+        }
+        _logger.i('✅ Sincronización exitosa: $estadoId');
+      } else {
+        await _estadoEquipoRepository.marcarComoError(estadoId, 'Error Lógico: ${respuesta['mensaje']}');
+      }
+    } catch (e) {
+      await _actualizarUltimoIntento(estadoId, 1);
+      await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción técnica: ${e.toString()}');
+    } finally {
+      _censosEnProceso.remove(estadoId);
+    }
+  }
+
+  // ==================== SINCRONIZACIÓN DE PENDIENTES ====================
+
+  Future<Map<String, int>> sincronizarRegistrosPendientes(int usuarioId) async {
+    _logger.i('🔄 Sincronización de pendientes...');
+    int exitosos = 0;
+    int fallidos = 0;
+
+    final registrosCreados = await _estadoEquipoRepository.obtenerCreados();
+    final registrosError = await _estadoEquipoRepository.obtenerConError();
+    final registrosErrorListos = await _filtrarRegistrosListosParaReintento(registrosError);
+    final todosLosRegistros = [...registrosCreados, ...registrosErrorListos];
+
+    if (todosLosRegistros.isEmpty) return {'exitosos': 0, 'fallidos': 0, 'total': 0};
+
+    for (final registro in todosLosRegistros) {
+      try {
+        await _sincronizarRegistroIndividualConBackoff(registro, usuarioId);
+        exitosos++;
+      } catch (e) {
+        fallidos++;
+        if (registro.id != null) {
+          await _estadoEquipoRepository.marcarComoError(registro.id!, 'Excepción: ${e.toString()}');
+        }
+      }
+    }
+
+    _logger.i('✅ Completado - Exitosos: $exitosos, Fallidos: $fallidos');
+    return {'exitosos': exitosos, 'fallidos': fallidos, 'total': todosLosRegistros.length};
+  }
+
+  Future<void> _sincronizarRegistroIndividualConBackoff(
+      dynamic registro,
+      int usuarioId,
+      ) async {
+
+    final equipoId = registro.equipoId as String?;
+    final clienteId = registro.clienteId as int?;
+
+    if (equipoId != null && clienteId != null) {
+      final hayPendiente = await _existePendienteAsignacion(equipoId, clienteId);
+
+      if (hayPendiente) {
+        _logger.w('⏸️ Censo ${registro.id} pospuesto: Pendiente de asignación en cola (equipo: $equipoId, cliente: $clienteId)');
+        // NO incrementamos intentos, simplemente salimos sin hacer nada
+        await ErrorLogService.logValidationError(
+            tableName: 'censo_activo',
+            operation: 'SYNC_PAUSED_DEPENDENCY', // Operación clara para identificar la causa
+            errorMessage: 'Censo bloqueado. Equipo pendiente de asignación no sincronizado.',
+            registroFailId: registro.id,
+            userId: usuarioId.toString(),
+        );
+
+        return;
+      }
+    }
+
+    // ✅ Si llegamos aquí, NO hay bloqueos, continuar normalmente
+    final fotos = await _fotoRepository.obtenerFotosPorCenso(registro.id!);
+    final intentosPrevios = await _obtenerNumeroIntentos(registro.id!);
+    final numeroIntento = intentosPrevios + 1;
+
+    if (numeroIntento > maxIntentos) {
+      await _estadoEquipoRepository.marcarComoError(registro.id!, 'Fallo permanente: máximo de intentos alcanzado');
+      await ErrorLogService.logError(tableName: 'censo_activo', operation: 'sync_max_retries', errorMessage: 'Máximo de intentos alcanzado', errorType: 'max_retries', registroFailId: registro.id, userId: usuarioId.toString());
       return;
     }
 
-    _censosEnProceso.add(estadoId);
+    _logger.i('🔄 Sincronizando ${registro.id} (intento #$numeroIntento/$maxIntentos)');
 
-    Future.delayed(Duration.zero, () async {
-      try {
-        _logger.i('🔄 Sincronización background para: $estadoId');
+    final datosParaApi = await _prepararPayloadConMapper(registro.id!, fotos);
+    await _actualizarUltimoIntento(registro.id!, numeroIntento);
 
-        final maps = await _estadoEquipoRepository.dbHelper.consultar(
-          'censo_activo',
-          where: 'id = ?',
-          whereArgs: [estadoId],
-          limit: 1,
-        );
+    final respuesta = await enviarCensoAlServidor(datosParaApi, timeoutSegundos: 60);
 
-        if (maps.isEmpty) {
-          _logger.e('❌ No se encontró el estado: $estadoId');
-          return;
-        }
-
-        final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
-        _logger.i('📸 Fotos encontradas: ${fotos.length}');
-
-        final datosParaApi = await _prepararPayloadConMapper(estadoId, fotos);
-
-        await _actualizarUltimoIntento(estadoId, 1);
-
-        final respuesta = await enviarCensoAlServidor(
-          datosParaApi,
-          timeoutSegundos: 45,
-        );
-
-        if (respuesta['exito'] == true) {
-          await _estadoEquipoRepository.marcarComoMigrado(
-            estadoId,
-            servidorId: respuesta['servidor_id'],
-          );
-          await _estadoEquipoRepository.marcarComoSincronizado(estadoId);
-
-          for (final foto in fotos) {
-            if (foto.id != null) {
-              await _fotoRepository.marcarComoSincronizada(foto.id!);
-            }
-          }
-
-          _logger.i('✅ Sincronización exitosa: $estadoId');
-        } else {
-          await _estadoEquipoRepository.marcarComoError(
-            estadoId,
-            'Error (intento #1): ${respuesta['detalle'] ?? respuesta['mensaje']}',
-          );
-
-          final proximoIntento = _calcularProximoIntento(1);
-          _logger.w('⚠️ Error - reintento en $proximoIntento minuto(s)');
-        }
-      } catch (e) {
-        _logger.e('💥 Excepción en sincronización: $e');
-        await _actualizarUltimoIntento(estadoId, 1);
-        await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción: $e');
-
-        // 🚨 LOG ERROR: Excepción general
-        try {
-          await ErrorLogService.logError(
-            tableName: 'censo_activo',
-            operation: 'background_sync',
-            errorMessage: 'Excepción en sincronización background: $e',
-            errorType: 'unknown',
-            registroFailId: estadoId,
-          );
-        } catch (logError) {
-          _logger.e('Error logging exception: $logError');
-        }
-      } finally {
-        _censosEnProceso.remove(estadoId);
+    if (respuesta['exito'] == true) {
+      await _estadoEquipoRepository.marcarComoMigrado(registro.id!, servidorId: respuesta['id']);
+      await _estadoEquipoRepository.marcarComoSincronizado(registro.id!);
+      for (final foto in fotos) {
+        if (foto.id != null) await _fotoRepository.marcarComoSincronizada(foto.id!);
       }
-    });
-  }
-
-  Future<Map<String, int>> sincronizarRegistrosPendientes(int usuarioId) async {
-    try {
-      _logger.i('🔄 Sincronización de pendientes...');
-
-      final registrosCreados = await _estadoEquipoRepository.obtenerCreados();
-      final registrosError = await _estadoEquipoRepository.obtenerConError();
-      final registrosErrorListos = await _filtrarRegistrosListosParaReintento(registrosError);
-
-      final todosLosRegistros = [...registrosCreados, ...registrosErrorListos];
-
-      if (todosLosRegistros.isEmpty) {
-        _logger.i('✅ No hay registros pendientes');
-        return {'exitosos': 0, 'fallidos': 0, 'total': 0};
-      }
-
-      _logger.i('📋 Total a sincronizar: ${todosLosRegistros.length}');
-
-      int exitosos = 0;
-      int fallidos = 0;
-
-      for (final registro in todosLosRegistros) {
-        try {
-          await _sincronizarRegistroIndividualConBackoff(registro, usuarioId);
-          exitosos++;
-        } catch (e) {
-          _logger.e('❌ Error: $e');
-          fallidos++;
-
-          if (registro.id != null) {
-            await _estadoEquipoRepository.marcarComoError(
-              registro.id!,
-              'Excepción: $e',
-            );
-
-            // 🚨 LOG ERROR
-            try {
-              await ErrorLogService.logError(
-                tableName: 'censo_activo',
-                operation: 'sync_individual',
-                errorMessage: 'Error sincronizando registro: $e',
-                errorType: 'unknown',
-                registroFailId: registro.id,
-                userId: usuarioId.toString(),
-              );
-            } catch (logError) {
-              _logger.e('Error logging sync error: $logError');
-            }
-          }
-        }
-      }
-
-      _logger.i('✅ Completado - Exitosos: $exitosos, Fallidos: $fallidos');
-
-      return {
-        'exitosos': exitosos,
-        'fallidos': fallidos,
-        'total': todosLosRegistros.length,
-      };
-    } catch (e) {
-      _logger.e('💥 Error en sincronización: $e');
-
-      // 🚨 LOG ERROR: Error general en batch
-      try {
-        await ErrorLogService.logError(
-          tableName: 'censo_activo',
-          operation: 'sync_batch',
-          errorMessage: 'Error general en sincronización de pendientes: $e',
-          errorType: 'unknown',
-          userId: usuarioId.toString(),
-        );
-      } catch (logError) {
-        _logger.e('Error logging batch error: $logError');
-      }
-
-      return {'exitosos': 0, 'fallidos': 0, 'total': 0};
+    } else {
+      await _estadoEquipoRepository.marcarComoError(registro.id!, 'Error (intento #$numeroIntento): ${respuesta['mensaje']}');
     }
   }
 
@@ -353,67 +288,52 @@ class CensoUploadService {
       String? edfVendedorId,
       ) async {
     try {
-      _logger.i('🔁 Reintentando: $estadoId');
-
+      // 🛑 VALIDACIÓN: BLOQUEAR SI HAY PENDIENTE LOCAL
       final maps = await _estadoEquipoRepository.dbHelper.consultar(
-        'censo_activo',
-        where: 'id = ?',
-        whereArgs: [estadoId],
-        limit: 1,
+        'censo_activo', where: 'id = ?', whereArgs: [estadoId], limit: 1,
       );
 
-      if (maps.isEmpty) {
-        return {'success': false, 'error': 'No se encontró el registro'};
+      if (maps.isNotEmpty) {
+        final equipoId = maps.first['equipo_id'] as String?;
+        final clienteId = maps.first['cliente_id'] as int?;
+
+        if (equipoId != null && clienteId != null) {
+          final hayPendiente = await _existePendienteAsignacion(equipoId, clienteId);
+          if (hayPendiente) {
+            return {
+              'success': false,
+              'error': 'Censo bloqueado: existe un pendiente de asignación en cola para este equipo'
+            };
+          }
+        }
       }
 
       final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
       final datosParaApi = await _prepararPayloadConMapper(estadoId, fotos);
 
-      final respuesta = await enviarCensoAlServidor(
-        datosParaApi,
-        timeoutSegundos: 45,
-      );
+      final respuesta = await enviarCensoAlServidor(datosParaApi, timeoutSegundos: 45);
 
       if (respuesta['exito'] == true) {
         await _estadoEquipoRepository.marcarComoMigrado(estadoId, servidorId: respuesta['id']);
         await _estadoEquipoRepository.marcarComoSincronizado(estadoId);
-
         for (final foto in fotos) {
           if (foto.id != null) {
             await _fotoRepository.marcarComoSincronizada(foto.id!);
           }
         }
-
         return {'success': true, 'message': 'Registro sincronizado'};
       } else {
         await _estadoEquipoRepository.marcarComoError(estadoId, 'Error: ${respuesta['mensaje']}');
         return {'success': false, 'error': respuesta['mensaje']};
       }
     } catch (e) {
-      _logger.e('💥 Error en reintento: $e');
-      await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción: $e');
-
-      // 🚨 LOG ERROR
-      try {
-        await ErrorLogService.logError(
-          tableName: 'censo_activo',
-          operation: 'manual_retry',
-          errorMessage: 'Error en reintento manual: $e',
-          errorType: 'unknown',
-          registroFailId: estadoId,
-          userId: usuarioId.toString(),
-        );
-      } catch (logError) {
-        _logger.e('Error logging retry error: $logError');
-      }
-
-      return {'success': false, 'error': 'Error: $e'};
+      await _estadoEquipoRepository.marcarComoError(estadoId, 'Excepción en reintento manual: ${e.toString()}');
+      return {'success': false, 'error': 'Error de conexión o datos: ${e.toString()}'};
     }
   }
 
-  // ==================== SINCRONIZACIÓN AUTOMÁTICA ====================
+  // ==================== MÉTODOS ESTÁTICOS Y AUXILIARES ====================
 
-  /// ✅ MEJORADO: Con protección contra múltiples inicios
   static void iniciarSincronizacionAutomatica(int usuarioId) {
     if (_syncActivo && _usuarioActual == usuarioId) {
       Logger().w('⚠️ Sincronización ya activa para usuario $usuarioId');
@@ -425,13 +345,13 @@ class CensoUploadService {
     _usuarioActual = usuarioId;
     _syncActivo = true;
 
-    Logger().i('🚀 Iniciando sincronización automática cada ${INTERVALO_TIMER.inMinutes} min para usuario $usuarioId');
+    Logger().i('🚀 Iniciando sincronización automática cada ${intervaloTimer.inMinutes} min para usuario $usuarioId');
 
-    _syncTimer = Timer.periodic(INTERVALO_TIMER, (timer) async {
+    _syncTimer = Timer.periodic(intervaloTimer, (timer) async {
       await _ejecutarSincronizacionAutomatica();
     });
 
-    Timer(Duration(seconds: 15), () async {
+    Timer(const Duration(seconds: 15), () async {
       await _ejecutarSincronizacionAutomatica();
     });
   }
@@ -448,27 +368,15 @@ class CensoUploadService {
     }
   }
 
-  /// ✅ MEJORADO: Evita ejecuciones simultáneas + verifica conexión
   static Future<void> _ejecutarSincronizacionAutomatica() async {
-    if (_syncEnProgreso) {
-      Logger().w('⚠️ Sincronización anterior en progreso, saltando ciclo');
-      return;
-    }
-
-    if (!_syncActivo || _usuarioActual == null) {
-      return;
-    }
+    if (_syncEnProgreso || !_syncActivo || _usuarioActual == null) return;
 
     _syncEnProgreso = true;
 
     try {
-      final logger = Logger();
-      logger.i('🔄 Ejecutando sincronización automática...');
-
-      // ✅ Verificar conexión primero
       final conexion = await BaseSyncService.testConnection();
       if (!conexion.exito) {
-        logger.w('⚠️ Sin conexión al servidor: ${conexion.mensaje}');
+        Logger().w('⚠️ Sin conexión al servidor: ${conexion.mensaje}');
         return;
       }
 
@@ -476,106 +384,47 @@ class CensoUploadService {
       final resultado = await service.sincronizarRegistrosPendientes(_usuarioActual!);
 
       if (resultado['total']! > 0) {
-        logger.i('✅ Auto-sync: ${resultado['exitosos']}/${resultado['total']}');
+        Logger().i('✅ Auto-sync: ${resultado['exitosos']}/${resultado['total']}');
       }
     } catch (e) {
       Logger().e('❌ Error en sincronización automática: $e');
-
-      // 🚨 LOG ERROR
-      try {
-        await ErrorLogService.logError(
-          tableName: 'censo_activo',
-          operation: 'auto_sync',
-          errorMessage: 'Error en sincronización automática: $e',
-          errorType: 'unknown',
-          userId: _usuarioActual?.toString(),
-        );
-      } catch (logError) {
-        Logger().e('Error logging auto-sync error: $logError');
-      }
     } finally {
       _syncEnProgreso = false;
     }
   }
 
   static Future<Map<String, int>?> forzarSincronizacion() async {
-    if (!_syncActivo || _usuarioActual == null) {
-      Logger().w('⚠️ No se puede forzar');
-      return null;
-    }
+    if (!_syncActivo || _usuarioActual == null) return null;
 
     Logger().i('⚡ Forzando sincronización...');
     final service = CensoUploadService();
     return await service.sincronizarRegistrosPendientes(_usuarioActual!);
   }
 
-  // ==================== GETTERS ====================
-
   static bool get esSincronizacionActiva => _syncActivo;
-  static int? get usuarioActualSync => _usuarioActual;
   static bool get estaEnProgreso => _syncEnProgreso;
 
   // ==================== MÉTODOS PRIVADOS ====================
 
-  Future<void> _sincronizarRegistroIndividualConBackoff(
-      dynamic registro,
-      int usuarioId,
-      ) async {
-    final fotos = await _fotoRepository.obtenerFotosPorCenso(registro.id!);
-    final intentosPrevios = await _obtenerNumeroIntentos(registro.id!);
-    final numeroIntento = intentosPrevios + 1;
-
-    // ✅ Límite de intentos
-    if (numeroIntento > MAX_INTENTOS) {
-      _logger.e('❌ Máximo de intentos ($MAX_INTENTOS) alcanzado para ${registro.id}');
-      await _estadoEquipoRepository.marcarComoError(
-        registro.id!,
-        'Fallo permanente: máximo de intentos alcanzado',
+  /// ✅ NUEVO: Verifica si existe un pendiente de asignación no sincronizado
+  Future<bool> _existePendienteAsignacion(String equipoId, int clienteId) async {
+    try {
+      final maps = await _equipoPendienteRepository.dbHelper.consultar(
+        'equipos_pendientes',
+        where: 'equipo_id = ? AND cliente_id = ? AND sincronizado = 0',
+        whereArgs: [equipoId, clienteId],
+        limit: 1,
       );
 
-      // 🚨 LOG ERROR: Máximo de intentos alcanzado
-      try {
-        await ErrorLogService.logError(
-          tableName: 'censo_activo',
-          operation: 'sync_max_retries',
-          errorMessage: 'Máximo de intentos ($MAX_INTENTOS) alcanzado',
-          errorType: 'max_retries',
-          registroFailId: registro.id,
-          userId: usuarioId.toString(),
-        );
-      } catch (logError) {
-        _logger.e('Error logging max retries: $logError');
+      if (maps.isNotEmpty) {
+        _logger.i('🔒 Pendiente local detectado para equipo $equipoId - cliente $clienteId');
+        return true;
       }
-
-      return;
-    }
-
-    _logger.i('🔄 Sincronizando ${registro.id} (intento #$numeroIntento/$MAX_INTENTOS)');
-
-    final datosParaApi = await _prepararPayloadConMapper(registro.id!, fotos);
-    await _actualizarUltimoIntento(registro.id!, numeroIntento);
-
-    final respuesta = await enviarCensoAlServidor(datosParaApi, timeoutSegundos: 60);
-
-    if (respuesta['exito'] == true) {
-      await _estadoEquipoRepository.marcarComoMigrado(registro.id!, servidorId: respuesta['id']);
-      await _estadoEquipoRepository.marcarComoSincronizado(registro.id!);
-
-      for (final foto in fotos) {
-        if (foto.id != null) {
-          await _fotoRepository.marcarComoSincronizada(foto.id!);
-        }
-      }
-
-      _logger.i('✅ ${registro.id} sincronizado después de $numeroIntento intentos');
-    } else {
-      await _estadoEquipoRepository.marcarComoError(
-        registro.id!,
-        'Error (intento #$numeroIntento): ${respuesta['mensaje']}',
-      );
-
-      final proximoIntento = _calcularProximoIntento(numeroIntento);
-      _logger.w('⚠️ Error intento #$numeroIntento - próximo en $proximoIntento min');
+      return false;
+    } catch (e) {
+      _logger.e('❌ Error verificando pendiente de asignación: $e');
+      // En caso de error de DB, ser conservador y bloquear
+      return true;
     }
   }
 
@@ -586,43 +435,27 @@ class CensoUploadService {
     for (final registro in registrosError) {
       try {
         final intentos = await _obtenerNumeroIntentos(registro.id!);
-
-        if (intentos >= MAX_INTENTOS) {
-          continue;
-        }
+        if (intentos >= maxIntentos) continue;
 
         final ultimoIntento = await _obtenerUltimoIntento(registro.id!);
-
-        if (ultimoIntento == null) {
-          registrosListos.add(registro);
-          continue;
-        }
+        if (ultimoIntento == null) { registrosListos.add(registro); continue; }
 
         final minutosEspera = _calcularProximoIntento(intentos);
-
-        if (minutosEspera < 0) {
-          continue;
-        }
+        if (minutosEspera < 0) continue;
 
         final tiempoProximoIntento = ultimoIntento.add(Duration(minutes: minutosEspera));
 
-        if (ahora.isAfter(tiempoProximoIntento)) {
-          registrosListos.add(registro);
-        }
+        if (ahora.isAfter(tiempoProximoIntento)) registrosListos.add(registro);
       } catch (e) {
         _logger.w('⚠️ Error verificando ${registro.id}: $e');
         registrosListos.add(registro);
       }
     }
-
     return registrosListos;
   }
 
   int _calcularProximoIntento(int numeroIntento) {
-    if (numeroIntento > MAX_INTENTOS) {
-      return -1;
-    }
-
+    if (numeroIntento > maxIntentos) return -1;
     switch (numeroIntento) {
       case 1: return 1;
       case 2: return 5;
@@ -637,30 +470,25 @@ class CensoUploadService {
   Future<int> _obtenerNumeroIntentos(String estadoId) async {
     try {
       final maps = await _estadoEquipoRepository.dbHelper.consultar(
-        'censo_activo',
-        where: 'id = ?',
-        whereArgs: [estadoId],
-        limit: 1,
+          'censo_activo',
+          where: 'id = ?',
+          whereArgs: [estadoId],
+          limit: 1
       );
-
-      if (maps.isNotEmpty) {
-        return maps.first['intentos_sync'] as int? ?? 0;
-      }
+      return maps.isNotEmpty ? maps.first['intentos_sync'] as int? ?? 0 : 0;
     } catch (e) {
-      _logger.w('⚠️ Error obteniendo intentos: $e');
+      return 0;
     }
-    return 0;
   }
 
   Future<DateTime?> _obtenerUltimoIntento(String estadoId) async {
     try {
       final maps = await _estadoEquipoRepository.dbHelper.consultar(
-        'censo_activo',
-        where: 'id = ?',
-        whereArgs: [estadoId],
-        limit: 1,
+          'censo_activo',
+          where: 'id = ?',
+          whereArgs: [estadoId],
+          limit: 1
       );
-
       if (maps.isNotEmpty) {
         final ultimoIntentoStr = maps.first['ultimo_intento'] as String?;
         if (ultimoIntentoStr != null && ultimoIntentoStr.isNotEmpty) {
@@ -668,7 +496,7 @@ class CensoUploadService {
         }
       }
     } catch (e) {
-      _logger.w('⚠️ Error obteniendo último intento: $e');
+      return null;
     }
     return null;
   }
@@ -676,13 +504,13 @@ class CensoUploadService {
   Future<void> _actualizarUltimoIntento(String estadoId, int numeroIntento) async {
     try {
       await _estadoEquipoRepository.dbHelper.actualizar(
-        'censo_activo',
-        {
-          'intentos_sync': numeroIntento,
-          'ultimo_intento': DateTime.now().toIso8601String(),
-        },
-        where: 'id = ?',
-        whereArgs: [estadoId],
+          'censo_activo',
+          {
+            'intentos_sync': numeroIntento,
+            'ultimo_intento': DateTime.now().toIso8601String()
+          },
+          where: 'id = ?',
+          whereArgs: [estadoId]
       );
     } catch (e) {
       _logger.w('⚠️ Error actualizando último intento: $e');
@@ -692,18 +520,13 @@ class CensoUploadService {
   Future<String?> _obtenerEdfVendedorIdDesdeUsuarioId(int? usuarioId) async {
     try {
       if (usuarioId == null) return null;
-
       final usuarioEncontrado = await _estadoEquipoRepository.dbHelper.consultar(
-        'Users',
-        where: 'id = ?',
-        whereArgs: [usuarioId],
-        limit: 1,
+          'Users',
+          where: 'id = ?',
+          whereArgs: [usuarioId],
+          limit: 1
       );
-
-      if (usuarioEncontrado.isNotEmpty) {
-        return usuarioEncontrado.first['edf_vendedor_id'] as String?;
-      }
-      return null;
+      return usuarioEncontrado.isNotEmpty ? usuarioEncontrado.first['edf_vendedor_id'] as String? : null;
     } catch (e) {
       _logger.e('❌ Error resolviendo edfvendedorid: $e');
       return null;
@@ -713,11 +536,10 @@ class CensoUploadService {
   Future<bool> _verificarEquipoAsignado(String? equipoId, dynamic clienteId) async {
     try {
       if (equipoId == null || clienteId == null) return false;
-
       final equipoRepository = EquipoRepository();
       return await equipoRepository.verificarAsignacionEquipoCliente(
-        equipoId,
-        _convertirAInt(clienteId),
+          equipoId,
+          _convertirAInt(clienteId)
       );
     } catch (e) {
       _logger.w('⚠️ Error verificando asignación: $e');

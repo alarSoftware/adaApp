@@ -195,7 +195,10 @@ class DatabaseTables {
     sync_attempt INTEGER DEFAULT 1,
     user_id TEXT,
     endpoint TEXT,
-    sincronizado INTEGER DEFAULT 0,          
+    retry_count INTEGER DEFAULT 0, 
+    last_retry_at TEXT, 
+    next_retry_at TEXT,  
+    sincronizado INTEGER DEFAULT 0,
     fecha_sincronizacion TEXT
   )
 ''';

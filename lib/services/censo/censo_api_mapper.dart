@@ -82,7 +82,7 @@ class CensoApiMapper {
     };
   }
 
-  /// Prepara los datos para enviar a la API de estados (insertCensoActivo) CON BASE64
+  /// Prepara los datos para enviar a la API de estados CON BASE64
   static Map<String, dynamic> prepararDatosParaApi({
     required Map<String, dynamic> datosLocales,
     required int usuarioId,

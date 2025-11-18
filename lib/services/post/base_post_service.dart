@@ -1,5 +1,3 @@
-// lib/services/post/base_post_service.dart
-
 import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -7,6 +5,7 @@ import 'dart:convert';
 import 'package:logger/logger.dart';
 import 'package:ada_app/services/api_config_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
+import 'package:ada_app/config/constants/server_constants.dart';
 
 class BasePostService {
   static final Logger logger = Logger();
@@ -51,11 +50,14 @@ class BasePostService {
 
       // 🚨 Si hubo error del servidor, loguear
       if (!result['exito'] && tableName != null) {
+        // Usamos el status_code que devuelve el result si existe, sino el HTTP code
+        final errorCode = result['serverAction']?.toString() ?? response.statusCode.toString();
+
         await ErrorLogService.logServerError(
           tableName: tableName,
           operation: 'POST',
           errorMessage: result['mensaje'] ?? 'Error del servidor',
-          errorCode: response.statusCode.toString(),
+          errorCode: errorCode,
           registroFailId: registroId,
           endpoint: fullUrl,
           userId: userId,
@@ -159,6 +161,7 @@ class BasePostService {
   /// Procesar respuesta HTTP
   static Map<String, dynamic> _processResponse(http.Response response, String? url) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
+      // 🛑 Aquí validamos el cuerpo JSON, incluso si el status es 200
       return _processSuccessResponse(response);
     } else {
       logger.e('❌ Error del servidor: ${response.statusCode}');
@@ -174,32 +177,63 @@ class BasePostService {
     }
   }
 
-  /// Procesar respuesta exitosa
+  /// Procesar respuesta exitosa (CORREGIDO PARA VALIDACIÓN SERVER ACTION)
   static Map<String, dynamic> _processSuccessResponse(http.Response response) {
-    dynamic servidorId;
-    String mensaje = 'Operación exitosa';
-
+    // 1. Intentar decodificar JSON
     try {
       final responseBody = json.decode(response.body);
 
-      servidorId = responseBody['estado']?['id'] ??
-          responseBody['id'] ??
-          responseBody['insertId'];
+      // 2. 🛡️ CHECK ESTRICTO DEL FORMATO GROOVY (serverAction)
+      if (responseBody is Map && responseBody.containsKey('serverAction')) {
+        final serverAction = responseBody['serverAction'] as int?;
 
-      if (responseBody['message'] != null) {
-        mensaje = responseBody['message'].toString();
+        if (serverAction == ServerConstants.SUCCESS_TRANSACTION) { // 100
+          // Éxito Lógico confirmado
+          final servidorId = responseBody['resultId'] ?? responseBody['id'];
+          return {
+            'exito': true,
+            'success': true,
+            'mensaje': responseBody['resultMessage'] ?? 'Operación exitosa',
+            'serverAction': serverAction,
+            'servidor_id': servidorId,
+            'id': servidorId,
+          };
+        } else {
+          // Error Lógico (-501, 205, etc.), aun con HTTP 200
+          logger.w('⚠️ Falso Negativo detectado. Action: $serverAction');
+          return {
+            'exito': false,
+            'success': false,
+            'mensaje': responseBody['resultError'] ?? responseBody['resultMessage'] ?? 'Error de lógica del servidor',
+            'serverAction': serverAction,
+            'resultError': responseBody['resultError'],
+            'status_code': response.statusCode,
+          };
+        }
       }
-    } catch (e) {
-      logger.w('⚠️ No se pudo parsear response body: $e');
-    }
 
-    return {
-      'exito': true,
-      'success': true,
-      'id': servidorId,
-      'servidor_id': servidorId,
-      'mensaje': mensaje,
-    };
+      // 3. Fallback genérico (si no tiene serverAction)
+      dynamic servidorId = responseBody['id'] ?? responseBody['insertId'];
+      String mensaje = responseBody['message'] ?? 'Operación exitosa (Formato Genérico)';
+
+      return {
+        'exito': true,
+        'success': true,
+        'id': servidorId,
+        'servidor_id': servidorId,
+        'mensaje': mensaje,
+      };
+
+    } catch (e) {
+      logger.w('⚠️ Error al parsear JSON o respuesta plana: $e. Body: ${response.body}');
+      // Si falla el parseo, pero el status es 2xx, asumimos éxito simple
+      return {
+        'exito': true,
+        'success': true,
+        'mensaje': 'Éxito: Respuesta plana o ilegible.',
+        'body': response.body,
+      };
+    }
   }
 
   /// Método de conveniencia para logs
