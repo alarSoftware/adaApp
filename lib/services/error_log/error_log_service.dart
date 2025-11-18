@@ -10,7 +10,7 @@ class ErrorLogService {
   static const _uuid = Uuid();
 
   // Configuración de reintentos
-  static const int _maxRetriesBeforeBackoff = 5; // Después de 5 intentos, aumenta el delay
+  static const int _maxRetriesBeforeBackoff = 5;
   static const Duration _baseRetryDelay = Duration(minutes: 5);
   static const Duration _maxRetryDelay = Duration(hours: 24);
 
