@@ -676,19 +676,19 @@ class FormsScreenViewModel extends ChangeNotifier {
     return null;
   }
 
-  // String? validarFotos() {
-  //   if (_equipoYaAsignado) {
-  //     return null;
-  //   }
-  //
-  //   if (_imagenSeleccionada == null && _imagenSeleccionada2 == null) {
-  //     return 'Debe capturar al menos una foto del equipo para continuar';
-  //   }
-  //
-  //   return null;
-  // }
+  String? validarFotos() {
+    if (_equipoYaAsignado) {
+      return null;
+    }
 
-  // ===============================
+    if (_imagenSeleccionada == null && _imagenSeleccionada2 == null) {
+      return 'Debe capturar al menos una foto del equipo para continuar';
+    }
+
+    return null;
+  }
+
+  // ===============================0
   // LÓGICA DE NEGOCIO - NAVEGACIÓN
   // ===============================
 
@@ -700,11 +700,11 @@ class FormsScreenViewModel extends ChangeNotifier {
       return;
     }
 
-    // final errorFotos = validarFotos();
-    // if (errorFotos != null) {
-    //   _showError(errorFotos);
-    //   return;
-    // }
+    final errorFotos = validarFotos();
+    if (errorFotos != null) {
+      _showError(errorFotos);
+      return;
+    }
 
     _setLoading(true);
 

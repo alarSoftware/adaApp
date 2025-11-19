@@ -9,6 +9,7 @@ import '../../models/usuario.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/services/post/equipo_post_service.dart';
 import 'package:ada_app/services/post/equipo_pendiente_post_service.dart';
+import 'package:ada_app/services/post/censo_unificado_post_service.dart'; // 🔥 NUEVO SERVICIO
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
@@ -102,7 +103,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   // =================================================================
-  // MÉTODO PRINCIPAL - LOCAL FIRST, SYNC LATER
+  // MÉTODO PRINCIPAL - LOCAL FIRST, SYNC UNIFICADO
   // =================================================================
 
   /// Confirma el registro guardando TODO localmente y sincronizando en background
@@ -119,7 +120,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     _isProcessing = true;
 
     try {
-      return await _guardarYSincronizarEnBackground(datos, processId);
+      return await _guardarYSincronizarUnificado(datos, processId);
     } finally {
       if (_currentProcessId == processId) {
         _isProcessing = false;
@@ -128,8 +129,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// Guarda TODO localmente y lanza sincronización en background
-  Future<Map<String, dynamic>> _guardarYSincronizarEnBackground(
+  /// 🔥 GUARDADO LOCAL Y SINCRONIZACIÓN UNIFICADA (CORREGIDA)
+  Future<Map<String, dynamic>> _guardarYSincronizarUnificado(
       Map<String, dynamic> datos,
       String processId,
       ) async {
@@ -139,7 +140,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     int? usuarioId;
 
     try {
-      _logger.i('🔄 Iniciando guardado local [Process: $processId]');
+      _logger.i('🔄 Iniciando guardado local y sync unificado [Process: $processId]');
 
       // ============================================================
       // VALIDACIONES INICIALES
@@ -195,15 +196,15 @@ class PreviewScreenViewModel extends ChangeNotifier {
         _logger.i('✅ Pendiente registrado localmente');
       }
 
-      // 1C. Crear censo LOCAL
+      // 🔥 1C. CREAR CENSO LOCAL CON USUARIO GARANTIZADO
       _setStatusMessage('Guardando censo...');
-      estadoIdActual = await _crearCensoLocal(
+      estadoIdActual = await _crearCensoLocalConUsuario(
         equipoId: equipoId,
         clienteId: clienteId,
+        usuarioId: usuarioId, // ✅ Pasamos usuario explícitamente
         datos: datos,
         processId: processId,
-        yaAsignado: false, // Siempre false inicialmente
-        userId: usuarioId.toString(),
+        yaAsignado: false,
       );
 
       if (estadoIdActual == null) {
@@ -224,20 +225,18 @@ class PreviewScreenViewModel extends ChangeNotifier {
       _logger.i('✅ Guardado local completado en ${tiempoLocal}s');
 
       // ============================================================
-      // FASE 2: SINCRONIZACIÓN EN BACKGROUND (Fire and Forget)
+      // FASE 2: SINCRONIZACIÓN UNIFICADA EN BACKGROUND
       // ============================================================
 
-      _logger.i('🚀 Lanzando sincronización en background...');
+      _logger.i('🚀 Lanzando sincronización UNIFICADA en background...');
 
-      // TODO: SINCRONIZACIÓN EN BACKGROUND
-      // Esta llamada NO bloquea el retorno al usuario
-      // La sincronización se ejecuta de forma asíncrona
-      _iniciarSincronizacionEnBackground(
-        esNuevoEquipo: esNuevoEquipo,
+      // 🔥 NUEVA SINCRONIZACIÓN UNIFICADA - UNA SOLA LLAMADA AL SERVIDOR
+      _iniciarSincronizacionUnificadaEnBackground(
+        estadoId: estadoIdActual,
         equipoId: equipoId,
         clienteId: clienteId,
-        estadoId: estadoIdActual,
         usuarioId: usuarioId,
+        esNuevoEquipo: esNuevoEquipo,
         datos: datos,
       );
 
@@ -247,10 +246,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       return {
         'success': true,
-        'message': '✅ Registro guardado. Sincronizando en segundo plano...',
+        'message': '✅ Registro guardado. Sincronizando unificado en segundo plano...',
         'estado_id': estadoIdActual,
         'equipo_id': equipoId,
-        'sincronizacion': 'background',
+        'sincronizacion': 'unificada_background',
         'tiempo_guardado': '${tiempoLocal}s',
       };
 
@@ -276,292 +275,146 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   // =================================================================
-  // SINCRONIZACIÓN EN BACKGROUND
+  // 🔥 SINCRONIZACIÓN UNIFICADA EN BACKGROUND (USANDO NUEVO SERVICIO)
   // =================================================================
 
-  /// TODO: PUNTO DE SINCRONIZACIÓN PRINCIPAL
-  /// Lanza sincronización de Equipo → Pendiente → Censo en background
-  /// Sin bloquear el retorno al usuario
-  void _iniciarSincronizacionEnBackground({
-    required bool esNuevoEquipo,
+  /// 🔥 SINCRONIZACIÓN UNIFICADA - UNA SOLA LLAMADA AL SERVIDOR
+  void _iniciarSincronizacionUnificadaEnBackground({
+    required String estadoId,
     required String equipoId,
     required int clienteId,
-    required String estadoId,
     required int usuarioId,
+    required bool esNuevoEquipo,
     required Map<String, dynamic> datos,
   }) {
-    // 🔥 Lanzar en background con Future.microtask (no bloquea)
+    // Lanzar en background con Future.microtask
     Future.microtask(() async {
       try {
         _logger.i('═══════════════════════════════════════════════════════');
-        _logger.i('🚀 INICIANDO SINCRONIZACIÓN EN BACKGROUND');
+        _logger.i('🚀 SINCRONIZACIÓN UNIFICADA EN BACKGROUND');
         _logger.i('═══════════════════════════════════════════════════════');
         _logger.i('📋 Estado ID: $estadoId');
         _logger.i('📋 Equipo ID: $equipoId');
         _logger.i('📋 Cliente ID: $clienteId');
+        _logger.i('📋 Usuario ID: $usuarioId'); // ✅ Verificar que llegue
+        _logger.i('📋 Es nuevo equipo: $esNuevoEquipo');
         _logger.i('═══════════════════════════════════════════════════════');
 
-        // ============================================================
-        // TODO: PASO 1 - SINCRONIZAR EQUIPO (si es nuevo)
-        // ============================================================
-        bool equipoSincronizado = true;
-
-        if (esNuevoEquipo) {
-          _logger.i('📤 PASO 1: Sincronizando EQUIPO...');
-          equipoSincronizado = await _sincronizarEquipoEnBackground(
-            equipoId: equipoId,
-            datos: datos,
-            usuarioId: usuarioId,
-          );
-
-          if (equipoSincronizado) {
-            _logger.i('✅ EQUIPO sincronizado exitosamente');
-          } else {
-            _logger.w('⚠️ EQUIPO NO sincronizado (se reintentará después)');
-          }
-        } else {
-          _logger.i('ℹ️ PASO 1: Equipo existente, omitiendo sincronización');
+        // Obtener datos necesarios
+        final edfVendedorId = await _getEdfVendedorId;
+        if (edfVendedorId == null || edfVendedorId.isEmpty) {
+          _logger.w('⚠️ Sin edfVendedorId, marcando como error');
+          await _estadoEquipoRepository.marcarComoError(estadoId, 'Sin edfVendedorId');
+          return;
         }
 
-        // ============================================================
-        // TODO: PASO 2 - SINCRONIZAR PENDIENTE
-        // ============================================================
-        bool pendienteSincronizado = true;
+        // Obtener fotos del censo
+        final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
+        _logger.i('📸 Fotos encontradas: ${fotos.length}');
 
-        if (esNuevoEquipo || !await _verificarAsignacionLocal(equipoId, clienteId)) {
-          _logger.i('📤 PASO 2: Sincronizando PENDIENTE...');
-          pendienteSincronizado = await _sincronizarPendienteEnBackground(
-            equipoId: equipoId,
-            clienteId: clienteId,
-            usuarioId: usuarioId,
-          );
+        // Determinar si necesita crear pendiente
+        final crearPendiente = esNuevoEquipo || !await _verificarAsignacionLocal(equipoId, clienteId);
 
-          if (pendienteSincronizado) {
-            _logger.i('✅ PENDIENTE sincronizado exitosamente');
-          } else {
-            _logger.w('⚠️ PENDIENTE NO sincronizado (se reintentará después)');
-          }
-        } else {
-          _logger.i('ℹ️ PASO 2: Asignación existente, omitiendo sincronización');
-        }
-
-        // ============================================================
-        // TODO: PASO 3 - SINCRONIZAR CENSO
-        // ============================================================
-        // 🔥 IMPORTANTE: Siempre intentamos enviar el censo
-        // El servidor decidirá si lo acepta o rechaza
-        _logger.i('📤 PASO 3: Sincronizando CENSO...');
-        await _sincronizarCensoEnBackground(
-          estadoId: estadoId,
+        // 🔥 LLAMADA AL NUEVO SERVICIO UNIFICADO
+        final respuesta = await CensoUnificadoPostService.enviarCensoUnificado(
+          // Datos del equipo (si es nuevo)
           equipoId: equipoId,
+          codigoBarras: datos['codigo_barras']?.toString(),
+          marcaId: _safeCastToInt(datos['marca_id'], 'marca_id'),
+          modeloId: _safeCastToInt(datos['modelo_id'], 'modelo_id'),
+          logoId: _safeCastToInt(datos['logo_id'], 'logo_id'),
+          numeroSerie: datos['numero_serie']?.toString(),
+          esNuevoEquipo: esNuevoEquipo,
+
+          // Datos del pendiente
           clienteId: clienteId,
-          usuarioId: usuarioId,
-          datos: datos,
+          edfVendedorId: edfVendedorId,
+          crearPendiente: crearPendiente,
+
+          // Datos del censo activo
+          usuarioId: usuarioId, // ✅ Usuario correcto
+          latitud: datos['latitud']?.toDouble() ?? 0.0,
+          longitud: datos['longitud']?.toDouble() ?? 0.0,
+          observaciones: datos['observaciones']?.toString(),
+          enLocal: true,
+          estadoCenso: 'pendiente',
+
+          // Fotos
+          fotos: fotos,
+
+          // Datos adicionales del equipo
+          clienteNombre: (datos['cliente'] as Cliente?)?.nombre,
+          marca: datos['marca_nombre']?.toString(),
+          modelo: datos['modelo']?.toString(),
+          logo: datos['logo']?.toString(),
+
+          // Control
+          timeoutSegundos: 30,
+          userId: usuarioId.toString(),
+          guardarLog: true, // ✅ Habilita logs TXT
         );
 
+        if (respuesta['exito'] == true) {
+          // ✅ ÉXITO: Marcar todo como sincronizado
+          _logger.i('✅ Sincronización unificada exitosa');
+
+          await _estadoEquipoRepository.marcarComoMigrado(
+            estadoId,
+            servidorId: respuesta['servidor_id']?.toString(),
+          );
+          await _estadoEquipoRepository.marcarComoSincronizado(estadoId);
+
+          // Si era nuevo equipo, marcarlo como sincronizado
+          if (esNuevoEquipo) {
+            await _equipoRepository.marcarEquipoComoSincronizado(equipoId);
+          }
+
+          // Si tenía pendiente, marcarlo como sincronizado
+          if (crearPendiente) {
+            await _equipoPendienteRepository.marcarSincronizadosPorCenso(equipoId, clienteId);
+          }
+
+          // Marcar fotos como sincronizadas
+          for (final foto in fotos) {
+            if (foto.id != null) {
+              await _fotoRepository.marcarComoSincronizada(foto.id!);
+            }
+          }
+
+          _logger.i('🎉 TODO sincronizado correctamente en una sola llamada');
+
+        } else {
+          // ❌ ERROR: Marcar como error para reintentos
+          _logger.e('❌ Error en sincronización unificada: ${respuesta['mensaje']}');
+          await _estadoEquipoRepository.marcarComoError(
+            estadoId,
+            'Error unificado: ${respuesta['mensaje']}',
+          );
+        }
+
         _logger.i('═══════════════════════════════════════════════════════');
-        _logger.i('✅ SINCRONIZACIÓN EN BACKGROUND COMPLETADA');
-        _logger.i('   - Equipo: ${equipoSincronizado ? "✅" : "⚠️"}');
-        _logger.i('   - Pendiente: ${pendienteSincronizado ? "✅" : "⚠️"}');
-        _logger.i('   - Censo: Procesado');
+        _logger.i('✅ SINCRONIZACIÓN UNIFICADA COMPLETADA');
         _logger.i('═══════════════════════════════════════════════════════');
 
       } catch (e, stackTrace) {
-        _logger.e('❌ Error en sincronización background: $e', stackTrace: stackTrace);
+        _logger.e('❌ Error en sincronización unificada: $e', stackTrace: stackTrace);
 
-        // 🔥 No lanzar error, solo loguear
-        // El sistema de reintentos periódicos lo manejará
+        // Marcar como error para que el sistema de reintentos lo tome
+        await _estadoEquipoRepository.marcarComoError(
+          estadoId,
+          'Excepción unificada: $e',
+        );
+
         await ErrorLogService.logError(
           tableName: 'censo_activo',
-          operation: 'sync_background',
-          errorMessage: 'Error en sync background: $e',
+          operation: 'sync_unificado_background',
+          errorMessage: 'Error en sync unificado: $e',
           errorType: 'sync',
           registroFailId: estadoId,
           userId: usuarioId.toString(),
         );
       }
     });
-  }
-
-  /// TODO: SINCRONIZACIÓN DE EQUIPO
-  /// Intenta enviar el equipo al servidor con timeout de 30s
-  Future<bool> _sincronizarEquipoEnBackground({
-    required String equipoId,
-    required Map<String, dynamic> datos,
-    required int usuarioId,
-  }) async {
-    try {
-      _logger.i('─────────────────────────────────────');
-      _logger.i('📤 Sincronizando EQUIPO: $equipoId');
-      _logger.i('─────────────────────────────────────');
-
-      final edfVendedorId = await _getEdfVendedorId;
-      if (edfVendedorId == null || edfVendedorId.isEmpty) {
-        _logger.w('⚠️ Sin edfVendedorId, equipo queda pendiente');
-        return false;
-      }
-
-      final resultado = await EquipoPostService.enviarEquipoNuevo(
-        equipoId: equipoId,
-        codigoBarras: datos['codigo_barras']?.toString() ?? '',
-        marcaId: _safeCastToInt(datos['marca_id'], 'marca_id') ?? 1,
-        modeloId: _safeCastToInt(datos['modelo_id'], 'modelo_id') ?? 1,
-        logoId: _safeCastToInt(datos['logo_id'], 'logo_id') ?? 1,
-        numeroSerie: datos['numero_serie']?.toString(),
-        clienteId: null, // Sin cliente en este momento
-        edfVendedorId: edfVendedorId,
-      ).timeout(
-        Duration(seconds: 30),
-        onTimeout: () {
-          _logger.w('⏱️ Timeout sincronizando equipo (30s)');
-          return {'exito': false, 'mensaje': 'Timeout'};
-        },
-      );
-
-      if (resultado['exito'] == true) {
-        await _equipoRepository.marcarEquipoComoSincronizado(equipoId);
-        _logger.i('✅ Equipo $equipoId sincronizado correctamente');
-        return true;
-      }
-
-      _logger.w('⚠️ Equipo NO sincronizado: ${resultado['mensaje']}');
-      return false;
-
-    } catch (e) {
-      _logger.e('❌ Error sincronizando equipo: $e');
-      return false;
-    }
-  }
-
-  /// TODO: SINCRONIZACIÓN DE PENDIENTE
-  /// Intenta enviar la asignación pendiente al servidor con timeout de 30s
-  Future<bool> _sincronizarPendienteEnBackground({
-    required String equipoId,
-    required int clienteId,
-    required int usuarioId,
-  }) async {
-    try {
-      _logger.i('─────────────────────────────────────');
-      _logger.i('📤 Sincronizando PENDIENTE');
-      _logger.i('   Equipo: $equipoId');
-      _logger.i('   Cliente: $clienteId');
-      _logger.i('─────────────────────────────────────');
-
-      final edfVendedorId = await _getEdfVendedorId;
-      if (edfVendedorId == null || edfVendedorId.isEmpty) {
-        _logger.w('⚠️ Sin edfVendedorId, pendiente queda local');
-        return false;
-      }
-
-      // Obtener el UUID del registro local
-      final pendienteLocal = await _equipoPendienteRepository.dbHelper.consultar(
-        'equipos_pendientes',
-        where: 'equipo_id = ? AND cliente_id = ?',
-        whereArgs: [equipoId, clienteId],
-        limit: 1,
-      );
-
-      final appId = pendienteLocal.isNotEmpty ? pendienteLocal.first['id'] : null;
-
-      _logger.i('   UUID Local: $appId');
-
-      final resultado = await EquiposPendientesApiService.enviarEquipoPendiente(
-        equipoId: equipoId,
-        clienteId: clienteId,
-        edfVendedorId: edfVendedorId,
-        appId: appId,
-      ).timeout(
-        Duration(seconds: 30),
-        onTimeout: () {
-          _logger.w('⏱️ Timeout sincronizando pendiente (30s)');
-          return {'exito': false, 'mensaje': 'Timeout'};
-        },
-      );
-
-      if (resultado['exito'] == true) {
-        await _equipoPendienteRepository.marcarSincronizadosPorCenso(
-          equipoId,
-          clienteId,
-        );
-        _logger.i('✅ Pendiente sincronizado correctamente');
-        return true;
-      }
-
-      _logger.w('⚠️ Pendiente NO sincronizado: ${resultado['mensaje']}');
-      return false;
-
-    } catch (e) {
-      _logger.e('❌ Error sincronizando pendiente: $e');
-      return false;
-    }
-  }
-
-  /// TODO: SINCRONIZACIÓN DE CENSO
-  /// Intenta enviar el censo al servidor con timeout de 30s
-  /// NOTA: Se envía SIEMPRE, sin validar dependencias
-  Future<void> _sincronizarCensoEnBackground({
-    required String estadoId,
-    required String equipoId,
-    required int clienteId,
-    required int usuarioId,
-    required Map<String, dynamic> datos,
-  }) async {
-    try {
-      _logger.i('─────────────────────────────────────');
-      _logger.i('📤 Sincronizando CENSO: $estadoId');
-      _logger.i('─────────────────────────────────────');
-
-      // Obtener fotos del censo
-      final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
-      _logger.i('   Fotos encontradas: ${fotos.length}');
-
-      // Preparar payload
-      final datosParaApi = await _uploadService.prepararPayloadConMapper(
-        estadoId,
-        fotos,
-      );
-
-      // Enviar al servidor
-      final respuesta = await _uploadService.enviarCensoAlServidor(
-        datosParaApi,
-        timeoutSegundos: 30,
-      );
-
-      if (respuesta['exito'] == true) {
-        // Marcar censo como sincronizado
-        await _estadoEquipoRepository.marcarComoMigrado(
-          estadoId,
-          servidorId: respuesta['id'],
-        );
-        await _estadoEquipoRepository.marcarComoSincronizado(estadoId);
-
-        // Marcar fotos como sincronizadas
-        for (final foto in fotos) {
-          if (foto.id != null) {
-            await _fotoRepository.marcarComoSincronizada(foto.id!);
-          }
-        }
-
-        _logger.i('✅ Censo $estadoId sincronizado correctamente');
-      } else {
-        _logger.w('⚠️ Censo NO sincronizado: ${respuesta['mensaje']}');
-
-        // Marcar como error para que el sistema de reintentos lo tome
-        await _estadoEquipoRepository.marcarComoError(
-          estadoId,
-          'Error: ${respuesta['mensaje']}',
-        );
-      }
-
-    } catch (e) {
-      _logger.e('❌ Error sincronizando censo: $e');
-
-      // Marcar como error
-      await _estadoEquipoRepository.marcarComoError(
-        estadoId,
-        'Excepción: $e',
-      );
-    }
   }
 
   // =================================================================
@@ -622,13 +475,14 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<String?> _crearCensoLocal({
+  /// 🔥 MÉTODO CORREGIDO PARA CREAR CENSO CON USUARIO GARANTIZADO
+  Future<String?> _crearCensoLocalConUsuario({
     required String equipoId,
     required int clienteId,
+    required int usuarioId, // ✅ Usuario obligatorio
     required Map<String, dynamic> datos,
     required String processId,
     required bool yaAsignado,
-    String? userId,
   }) async {
     _setStatusMessage('Registrando censo...');
 
@@ -638,6 +492,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final now = DateTime.now().toLocal();
       final estadoCenso = yaAsignado ? 'asignado' : 'pendiente';
 
+      // 🔥 USAR MÉTODO EXISTENTE
       final estadoCreado = await _estadoEquipoRepository.crearNuevoEstado(
         equipoId: equipoId,
         clienteId: clienteId,
@@ -649,7 +504,40 @@ class PreviewScreenViewModel extends ChangeNotifier {
         estadoCenso: estadoCenso,
       );
 
-      if (estadoCreado.id != null) return estadoCreado.id!;
+      if (estadoCreado.id != null) {
+        // 🔥 INMEDIATAMENTE DESPUÉS ACTUALIZAR EL USUARIO_ID
+        await _estadoEquipoRepository.dbHelper.actualizar(
+          'censo_activo',
+          {
+            'usuario_id': usuarioId,
+            'fecha_actualizacion': now.toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [estadoCreado.id!],
+        );
+
+        _logger.i('✅ Censo creado y usuario_id actualizado: $usuarioId');
+
+        // 🔥 VERIFICAR QUE SE GUARDÓ CORRECTAMENTE
+        final verificacion = await _estadoEquipoRepository.dbHelper.consultar(
+          'censo_activo',
+          where: 'id = ?',
+          whereArgs: [estadoCreado.id!],
+          limit: 1,
+        );
+
+        if (verificacion.isNotEmpty) {
+          final usuarioEnBD = verificacion.first['usuario_id'];
+          _logger.i('✅ Verificación - usuario_id en BD: $usuarioEnBD');
+
+          if (usuarioEnBD == null) {
+            _logger.e('❌ usuario_id sigue siendo NULL después de actualizar');
+            throw 'Error: usuario_id no se pudo guardar en la BD';
+          }
+        }
+
+        return estadoCreado.id!;
+      }
 
       await ErrorLogService.logDatabaseError(
         tableName: 'censo_activo',
@@ -671,7 +559,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   // =================================================================
-  // MÉTODOS PÚBLICOS DE UTILIDAD
+  // MÉTODOS PÚBLICOS DE UTILIDAD (sin cambios)
   // =================================================================
 
   String formatearFecha(String? fechaIso) {
@@ -754,7 +642,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       Color color;
 
       if (sincronizado == 1) {
-        mensaje = 'Registro sincronizado correctamente';
+        mensaje = 'Registro sincronizado correctamente (UNIFICADO)';
         icono = Icons.cloud_done;
         color = Colors.green;
       } else if (estadoCenso == 'error') {
@@ -762,7 +650,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         icono = Icons.cloud_off;
         color = Colors.red;
       } else {
-        mensaje = 'Pendiente de sincronización automática';
+        mensaje = 'Pendiente de sincronización automática (UNIFICADO)';
         icono = Icons.cloud_upload;
         color = Colors.orange;
       }
