@@ -197,41 +197,15 @@ class EquipoPostService {
     final int esDisponibleInt = (clienteId == null || clienteId.isEmpty) ? 1 : 0;
 
     return {
-      // CAMPOS PRINCIPALES (ambos formatos para seguridad)
       'id': codigoBarras,
       'equipoId': codigoBarras,
       'equipo_id': codigoBarras,
       'codigoBarras': codigoBarras,
       'codigo_barras': codigoBarras,
-
-      // RELACIONES
       'edfModeloId': modeloId,
       'edf_modelo_id': modeloId,
-      'edfLogoId': logoId,
-      'edf_logo_id': logoId,
       'marcaId': marcaId.toString(),
       'marca_id': marcaId.toString(),
-      'clienteId': clienteId,
-      'cliente_id': clienteId,
-
-      // INFO
-      'numSerie': numeroSerie ?? '',
-      'num_serie': numeroSerie ?? '',
-
-      // FLAGS (INTs)
-      'appInsert': appInsertInt,
-      'app_insert': appInsertInt,
-      'esActivo': esActivoInt,
-      'es_activo': esActivoInt,
-      'esAplicaCenso': esAplicaCensoInt,
-      'es_aplica_censo': esAplicaCensoInt,
-      'esDisponible': esDisponibleInt,
-      'es_disponible': esDisponibleInt,
-
-      // OPCIONALES
-      'fecha': now,
-      // ... resto de nulos si son necesarios para tu backend ...
-      'ubicacionId': null,
     };
   }
 }

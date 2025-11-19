@@ -5,11 +5,12 @@ import 'package:http/http.dart' as http;
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
-import 'package:ada_app/repositories/equipo_pendiente_repository.dart'; // ✅ NUEVO IMPORT
+import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/services/censo/censo_api_mapper.dart';
 import 'package:ada_app/services/post/base_post_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
+import 'package:ada_app/services/post/equipo_post_service.dart';
 import 'package:ada_app/config/constants/server_constants.dart';
 import 'censo_log_service.dart';
 
@@ -18,7 +19,8 @@ class CensoUploadService {
   final EstadoEquipoRepository _estadoEquipoRepository;
   final CensoActivoFotoRepository _fotoRepository;
   final CensoLogService _logService;
-  final EquipoPendienteRepository _equipoPendienteRepository; // ✅ NUEVO REPOSITORY
+  final EquipoPendienteRepository _equipoPendienteRepository; // ✅ NUEVO
+  final EquipoRepository _equipoRepository; // ✅ NUEVO
 
   // ========== CONFIGURACIÓN ==========
   static const int maxIntentos = 10;
@@ -35,12 +37,13 @@ class CensoUploadService {
     EstadoEquipoRepository? estadoEquipoRepository,
     CensoActivoFotoRepository? fotoRepository,
     CensoLogService? logService,
-    EquipoPendienteRepository? equipoPendienteRepository, // ✅ INYECTABLE
+    EquipoPendienteRepository? equipoPendienteRepository, // ✅ NUEVO
+    EquipoRepository? equipoRepository, // ✅ NUEVO
   })  : _estadoEquipoRepository = estadoEquipoRepository ?? EstadoEquipoRepository(),
         _fotoRepository = fotoRepository ?? CensoActivoFotoRepository(),
         _logService = logService ?? CensoLogService(),
-        _equipoPendienteRepository = equipoPendienteRepository ?? EquipoPendienteRepository(); // ✅ INICIALIZADO
-
+        _equipoPendienteRepository = equipoPendienteRepository ?? EquipoPendienteRepository(), // ✅ NUEVO
+        _equipoRepository = equipoRepository ?? EquipoRepository(); // ✅ NUEVO
 
   /// Ejecuta una función, la envuelve en try/catch, loguea el error y lo relanza.
   Future<T> _executeAndLogError<T>(
@@ -80,7 +83,6 @@ class CensoUploadService {
     const endpoint = '/censoActivo/insertCensoActivo';
 
     return await _executeAndLogError<Map<String, dynamic>>(() async {
-
       if (guardarLog) { /* ... lógica de log ... */ }
 
       final resultado = await BasePostService.post(
@@ -98,7 +100,6 @@ class CensoUploadService {
         // ❌ ERROR LÓGICO (-501, 205, etc.)
         final errorMsg = resultado['resultError'] ?? resultado['mensaje'] ?? 'Error desconocido';
 
-        // 🛑 Logueamos el error LÓGICO que generó el FALSO NEGATIVO
         await ErrorLogService.logServerError(
           tableName: 'censo_activo',
           operation: 'upload_logic_fail',
@@ -109,13 +110,14 @@ class CensoUploadService {
           userId: userId,
         );
 
-        // Retornamos el resultado negativo para que el llamador lo marque como error.
         return {'exito': false, 'mensaje': errorMsg, 'serverAction': serverAction};
       }
     }, 'upload', id: censoId, userId: userId, endpoint: endpoint);
   }
 
-  Future<Map<String, dynamic>> _prepararPayloadConMapper(
+  /// TODO: PREPARAR PAYLOAD CON MAPPER (usado por ViewModel)
+  /// Obtiene datos del censo desde BD y prepara payload para API
+  Future<Map<String, dynamic>> prepararPayloadConMapper(
       String estadoId,
       List<dynamic> fotos,
       ) async {
@@ -129,10 +131,24 @@ class CensoUploadService {
 
       final datosLocales = maps.first;
       final usuarioId = datosLocales['usuario_id'] as int?;
-      if (usuarioId == null) throw Exception('usuario_id es requerido');
+
+      // 🔍 LOG DE DEBUG PARA ENCONTRAR PROBLEMA
+      _logger.i('🔍 DEBUG prepararPayloadConMapper:');
+      _logger.i('   estadoId: $estadoId');
+      _logger.i('   usuario_id en BD: $usuarioId');
+      _logger.i('   datosLocales keys: ${datosLocales.keys.toList()}');
+
+      if (usuarioId == null) {
+        _logger.e('❌ usuario_id es NULL en la BD');
+        _logger.e('   Datos completos del censo: $datosLocales');
+        throw Exception('usuario_id es requerido');
+      }
 
       final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(usuarioId);
-      final estaAsignado = await _verificarEquipoAsignado(datosLocales['equipo_id']?.toString(), datosLocales['cliente_id']);
+      final estaAsignado = await _verificarEquipoAsignado(
+          datosLocales['equipo_id']?.toString(),
+          datosLocales['cliente_id']
+      );
 
       final datosLocalesMutable = Map<String, dynamic>.from(datosLocales);
       datosLocalesMutable['ya_asignado'] = estaAsignado;
@@ -150,6 +166,8 @@ class CensoUploadService {
 
   // ==================== SINCRONIZACIÓN EN BACKGROUND ====================
 
+  /// TODO: SINCRONIZACIÓN INDIVIDUAL EN BACKGROUND (llamada desde ViewModel)
+  /// Se ejecuta después de guardar localmente, sin bloquear al usuario
   Future<void> sincronizarCensoEnBackground(
       String estadoId,
       Map<String, dynamic> datos,
@@ -160,21 +178,11 @@ class CensoUploadService {
     try {
       _logger.i('🔄 Sincronización background para: $estadoId');
 
-      // 🛑 VALIDACIÓN: BLOQUEAR SI HAY PENDIENTE LOCAL
-      final equipoId = datos['equipo_id'] as String?;
-      final clienteId = datos['cliente_id'] as int?;
-
-      if (equipoId != null && clienteId != null) {
-        final hayPendiente = await _existePendienteAsignacion(equipoId, clienteId);
-        if (hayPendiente) {
-          _logger.w('⏸️ Background sync pospuesto para $estadoId: Pendiente de asignación en cola (equipo: $equipoId, cliente: $clienteId)');
-          return;
-        }
-      }
+      // ✅ SIN VALIDACIONES DE BLOQUEO
+      // El ViewModel ya sincronizó equipo y pendiente ANTES de llamar aquí
 
       final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
-
-      final datosParaApi = await _prepararPayloadConMapper(estadoId, fotos);
+      final datosParaApi = await prepararPayloadConMapper(estadoId, fotos);
       await _actualizarUltimoIntento(estadoId, 1);
 
       final respuesta = await enviarCensoAlServidor(datosParaApi, timeoutSegundos: 45);
@@ -197,76 +205,195 @@ class CensoUploadService {
     }
   }
 
-  // ==================== SINCRONIZACIÓN DE PENDIENTES ====================
+  // ==================== SINCRONIZACIÓN PERIÓDICA ====================
 
+  /// TODO: SISTEMA DE REINTENTOS PERIÓDICOS MEJORADO
+  /// Este método se ejecuta automáticamente cada minuto
+  /// Sincroniza Equipos → Pendientes → Censos en orden
   Future<Map<String, int>> sincronizarRegistrosPendientes(int usuarioId) async {
-    _logger.i('🔄 Sincronización de pendientes...');
-    int exitosos = 0;
-    int fallidos = 0;
+    _logger.i('═══════════════════════════════════════════════════════');
+    _logger.i('🔄 SINCRONIZACIÓN PERIÓDICA AUTOMÁTICA');
+    _logger.i('═══════════════════════════════════════════════════════');
 
-    final registrosCreados = await _estadoEquipoRepository.obtenerCreados();
-    final registrosError = await _estadoEquipoRepository.obtenerConError();
-    final registrosErrorListos = await _filtrarRegistrosListosParaReintento(registrosError);
-    final todosLosRegistros = [...registrosCreados, ...registrosErrorListos];
+    int equiposExitosos = 0;
+    int pendientesExitosos = 0;
+    int censosExitosos = 0;
+    int totalFallidos = 0;
 
-    if (todosLosRegistros.isEmpty) return {'exitosos': 0, 'fallidos': 0, 'total': 0};
+    try {
+      // ============================================================
+      // TODO: PASO 1 - SINCRONIZAR EQUIPOS PENDIENTES
+      // ============================================================
+      _logger.i('📤 PASO 1: Sincronizando EQUIPOS pendientes...');
 
-    for (final registro in todosLosRegistros) {
-      try {
-        await _sincronizarRegistroIndividualConBackoff(registro, usuarioId);
-        exitosos++;
-      } catch (e) {
-        fallidos++;
-        if (registro.id != null) {
-          await _estadoEquipoRepository.marcarComoError(registro.id!, 'Excepción: ${e.toString()}');
+      final equiposPendientes = await _equipoRepository.obtenerEquiposNoSincronizados();
+
+      _logger.i('   Equipos encontrados: ${equiposPendientes.length}');
+
+      // Limitar a 10 equipos por ciclo (rate limiting)
+      for (final equipo in equiposPendientes.take(10)) {
+        try {
+          final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(usuarioId);
+          if (edfVendedorId == null) {
+            _logger.w('   ⚠️ Sin edfVendedorId para equipo ${equipo['id']}');
+            continue;
+          }
+
+          final resultado = await EquipoPostService.enviarEquipoNuevo(
+            equipoId: equipo['id'],
+            codigoBarras: equipo['cod_barras'] ?? '',
+            marcaId: equipo['marca_id'],
+            modeloId: equipo['modelo_id'],
+            logoId: equipo['logo_id'],
+            numeroSerie: equipo['numero_serie'],
+            clienteId: equipo['cliente_id'],
+            edfVendedorId: edfVendedorId,
+          ).timeout(Duration(seconds: 20));
+
+          if (resultado['exito'] == true) {
+            await _equipoRepository.marcarEquipoComoSincronizado(equipo['id']);
+            equiposExitosos++;
+            _logger.i('   ✅ Equipo sincronizado: ${equipo['id']}');
+          } else {
+            _logger.w('   ⚠️ Equipo NO sincronizado: ${equipo['id']} - ${resultado['mensaje']}');
+          }
+
+          // Rate limiting: 500ms entre cada request
+          await Future.delayed(Duration(milliseconds: 500));
+
+        } catch (e) {
+          _logger.w('   ⚠️ Error en equipo ${equipo['id']}: $e');
+          totalFallidos++;
         }
       }
-    }
 
-    _logger.i('✅ Completado - Exitosos: $exitosos, Fallidos: $fallidos');
-    return {'exitosos': exitosos, 'fallidos': fallidos, 'total': todosLosRegistros.length};
+      _logger.i('   Resultado PASO 1: $equiposExitosos/${equiposPendientes.take(10).length} exitosos');
+
+      // ============================================================
+      // TODO: PASO 2 - SINCRONIZAR PENDIENTES
+      // ============================================================
+      _logger.i('📤 PASO 2: Sincronizando PENDIENTES...');
+
+      try {
+        final pendientesResult = await _equipoPendienteRepository.sincronizarPendientesAlServidor();
+
+        if (pendientesResult['exito'] == true) {
+          pendientesExitosos = 1;
+          _logger.i('   ✅ Pendientes sincronizados correctamente');
+        } else {
+          _logger.w('   ⚠️ Error en pendientes: ${pendientesResult['mensaje']}');
+        }
+      } catch (e) {
+        _logger.w('   ⚠️ Excepción en pendientes: $e');
+      }
+
+      // ============================================================
+      // TODO: PASO 3 - SINCRONIZAR CENSOS
+      // ============================================================
+      _logger.i('📤 PASO 3: Sincronizando CENSOS...');
+
+      final registrosCreados = await _estadoEquipoRepository.obtenerCreados();
+      final registrosError = await _estadoEquipoRepository.obtenerConError();
+      final registrosErrorListos = await _filtrarRegistrosListosParaReintento(registrosError);
+
+      final todosLosRegistros = [...registrosCreados, ...registrosErrorListos];
+
+      _logger.i('   Censos creados: ${registrosCreados.length}');
+      _logger.i('   Censos con error listos: ${registrosErrorListos.length}');
+      _logger.i('   Total a procesar: ${todosLosRegistros.length}');
+
+      // Limitar a 20 censos por ciclo
+      final registrosAProcesar = todosLosRegistros.take(20);
+
+      _logger.i('   Procesando: ${registrosAProcesar.length} censos');
+
+      for (final registro in registrosAProcesar) {
+        try {
+          await _sincronizarRegistroIndividualConBackoff(registro, usuarioId);
+          censosExitosos++;
+          _logger.i('   ✅ Censo sincronizado: ${registro.id}');
+        } catch (e) {
+          _logger.e('   ❌ Error en censo ${registro.id}: $e');
+          totalFallidos++;
+
+          if (registro.id != null) {
+            await _estadoEquipoRepository.marcarComoError(
+              registro.id!,
+              'Excepción: ${e.toString()}',
+            );
+          }
+        }
+
+        // Rate limiting: 500ms entre cada request
+        await Future.delayed(Duration(milliseconds: 500));
+      }
+
+      _logger.i('   Resultado PASO 3: $censosExitosos/${registrosAProcesar.length} exitosos');
+
+      // ============================================================
+      // RESUMEN FINAL
+      // ============================================================
+      _logger.i('═══════════════════════════════════════════════════════');
+      _logger.i('✅ SINCRONIZACIÓN PERIÓDICA COMPLETADA');
+      _logger.i('   - Equipos exitosos: $equiposExitosos');
+      _logger.i('   - Pendientes exitosos: $pendientesExitosos');
+      _logger.i('   - Censos exitosos: $censosExitosos');
+      _logger.i('   - Total fallidos: $totalFallidos');
+      _logger.i('═══════════════════════════════════════════════════════');
+
+      return {
+        'equipos_exitosos': equiposExitosos,
+        'pendientes_exitosos': pendientesExitosos,
+        'censos_exitosos': censosExitosos,
+        'fallidos': totalFallidos,
+        'total': equiposExitosos + pendientesExitosos + censosExitosos,
+      };
+
+    } catch (e) {
+      _logger.e('❌ Error en sincronización periódica: $e');
+      return {
+        'equipos_exitosos': equiposExitosos,
+        'pendientes_exitosos': pendientesExitosos,
+        'censos_exitosos': censosExitosos,
+        'fallidos': totalFallidos,
+        'total': 0,
+      };
+    }
   }
 
+  /// TODO: SINCRONIZACIÓN INDIVIDUAL CON BACKOFF (reintentos automáticos)
+  /// Intenta sincronizar un censo individual con lógica de reintentos
   Future<void> _sincronizarRegistroIndividualConBackoff(
       dynamic registro,
       int usuarioId,
       ) async {
 
-    final equipoId = registro.equipoId as String?;
-    final clienteId = registro.clienteId as int?;
+    // ✅ VALIDACIONES DE BLOQUEO ELIMINADAS
+    // Todos los censos intentan sincronizarse sin restricciones
 
-    if (equipoId != null && clienteId != null) {
-      final hayPendiente = await _existePendienteAsignacion(equipoId, clienteId);
-
-      if (hayPendiente) {
-        _logger.w('⏸️ Censo ${registro.id} pospuesto: Pendiente de asignación en cola (equipo: $equipoId, cliente: $clienteId)');
-        // NO incrementamos intentos, simplemente salimos sin hacer nada
-        await ErrorLogService.logValidationError(
-            tableName: 'censo_activo',
-            operation: 'SYNC_PAUSED_DEPENDENCY', // Operación clara para identificar la causa
-            errorMessage: 'Censo bloqueado. Equipo pendiente de asignación no sincronizado.',
-            registroFailId: registro.id,
-            userId: usuarioId.toString(),
-        );
-
-        return;
-      }
-    }
-
-    // ✅ Si llegamos aquí, NO hay bloqueos, continuar normalmente
     final fotos = await _fotoRepository.obtenerFotosPorCenso(registro.id!);
     final intentosPrevios = await _obtenerNumeroIntentos(registro.id!);
     final numeroIntento = intentosPrevios + 1;
 
     if (numeroIntento > maxIntentos) {
-      await _estadoEquipoRepository.marcarComoError(registro.id!, 'Fallo permanente: máximo de intentos alcanzado');
-      await ErrorLogService.logError(tableName: 'censo_activo', operation: 'sync_max_retries', errorMessage: 'Máximo de intentos alcanzado', errorType: 'max_retries', registroFailId: registro.id, userId: usuarioId.toString());
+      await _estadoEquipoRepository.marcarComoError(
+          registro.id!,
+          'Fallo permanente: máximo de intentos alcanzado'
+      );
+      await ErrorLogService.logError(
+          tableName: 'censo_activo',
+          operation: 'sync_max_retries',
+          errorMessage: 'Máximo de intentos alcanzado',
+          errorType: 'max_retries',
+          registroFailId: registro.id,
+          userId: usuarioId.toString()
+      );
       return;
     }
 
     _logger.i('🔄 Sincronizando ${registro.id} (intento #$numeroIntento/$maxIntentos)');
 
-    final datosParaApi = await _prepararPayloadConMapper(registro.id!, fotos);
+    final datosParaApi = await prepararPayloadConMapper(registro.id!, fotos);
     await _actualizarUltimoIntento(registro.id!, numeroIntento);
 
     final respuesta = await enviarCensoAlServidor(datosParaApi, timeoutSegundos: 60);
@@ -278,38 +405,25 @@ class CensoUploadService {
         if (foto.id != null) await _fotoRepository.marcarComoSincronizada(foto.id!);
       }
     } else {
-      await _estadoEquipoRepository.marcarComoError(registro.id!, 'Error (intento #$numeroIntento): ${respuesta['mensaje']}');
+      await _estadoEquipoRepository.marcarComoError(
+          registro.id!,
+          'Error (intento #$numeroIntento): ${respuesta['mensaje']}'
+      );
     }
   }
 
+  /// TODO: REINTENTO MANUAL (desde UI)
+  /// Permite al usuario reintentar manualmente un censo fallido
   Future<Map<String, dynamic>> reintentarEnvioCenso(
       String estadoId,
       int usuarioId,
       String? edfVendedorId,
       ) async {
     try {
-      // 🛑 VALIDACIÓN: BLOQUEAR SI HAY PENDIENTE LOCAL
-      final maps = await _estadoEquipoRepository.dbHelper.consultar(
-        'censo_activo', where: 'id = ?', whereArgs: [estadoId], limit: 1,
-      );
-
-      if (maps.isNotEmpty) {
-        final equipoId = maps.first['equipo_id'] as String?;
-        final clienteId = maps.first['cliente_id'] as int?;
-
-        if (equipoId != null && clienteId != null) {
-          final hayPendiente = await _existePendienteAsignacion(equipoId, clienteId);
-          if (hayPendiente) {
-            return {
-              'success': false,
-              'error': 'Censo bloqueado: existe un pendiente de asignación en cola para este equipo'
-            };
-          }
-        }
-      }
+      // ✅ SIN VALIDACIONES DE BLOQUEO - Permitimos reintentos manuales siempre
 
       final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
-      final datosParaApi = await _prepararPayloadConMapper(estadoId, fotos);
+      final datosParaApi = await prepararPayloadConMapper(estadoId, fotos);
 
       final respuesta = await enviarCensoAlServidor(datosParaApi, timeoutSegundos: 45);
 
@@ -406,28 +520,6 @@ class CensoUploadService {
 
   // ==================== MÉTODOS PRIVADOS ====================
 
-  /// ✅ NUEVO: Verifica si existe un pendiente de asignación no sincronizado
-  Future<bool> _existePendienteAsignacion(String equipoId, int clienteId) async {
-    try {
-      final maps = await _equipoPendienteRepository.dbHelper.consultar(
-        'equipos_pendientes',
-        where: 'equipo_id = ? AND cliente_id = ? AND sincronizado = 0',
-        whereArgs: [equipoId, clienteId],
-        limit: 1,
-      );
-
-      if (maps.isNotEmpty) {
-        _logger.i('🔒 Pendiente local detectado para equipo $equipoId - cliente $clienteId');
-        return true;
-      }
-      return false;
-    } catch (e) {
-      _logger.e('❌ Error verificando pendiente de asignación: $e');
-      // En caso de error de DB, ser conservador y bloquear
-      return true;
-    }
-  }
-
   Future<List<dynamic>> _filtrarRegistrosListosParaReintento(List<dynamic> registrosError) async {
     final registrosListos = <dynamic>[];
     final ahora = DateTime.now();
@@ -438,7 +530,10 @@ class CensoUploadService {
         if (intentos >= maxIntentos) continue;
 
         final ultimoIntento = await _obtenerUltimoIntento(registro.id!);
-        if (ultimoIntento == null) { registrosListos.add(registro); continue; }
+        if (ultimoIntento == null) {
+          registrosListos.add(registro);
+          continue;
+        }
 
         final minutosEspera = _calcularProximoIntento(intentos);
         if (minutosEspera < 0) continue;
@@ -536,8 +631,7 @@ class CensoUploadService {
   Future<bool> _verificarEquipoAsignado(String? equipoId, dynamic clienteId) async {
     try {
       if (equipoId == null || clienteId == null) return false;
-      final equipoRepository = EquipoRepository();
-      return await equipoRepository.verificarAsignacionEquipoCliente(
+      return await _equipoRepository.verificarAsignacionEquipoCliente(
           equipoId,
           _convertirAInt(clienteId)
       );

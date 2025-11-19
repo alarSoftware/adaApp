@@ -14,7 +14,7 @@ class EquiposPendientesApiService {
     required String equipoId,
     required int clienteId,
     required String edfVendedorId,
-    String? appId, // UUID local del registro
+    String? appId,
   }) async {
     String? fullEndpoint;
 
@@ -178,22 +178,23 @@ class EquiposPendientesApiService {
 
     // ✅ Usar Map<String, dynamic> para permitir diferentes tipos
     final Map<String, dynamic> payload = {
-      'edfEquipoId': equipoId,                      // String
-      'edfClienteId': clienteId.toString(),         // String
-      'uuid': uuidValue,                            // String
-      'edfVendedorSucursalId': edfVendedorId,       // String
-      'edfVendedorId': vendedorIdValue,             // String
-      'estado': 'pendiente',                        // String
+      'edfEquipoId': equipoId,
+      'edfClienteId': clienteId.toString(),
+      'uuid': uuidValue,
+      'edfVendedorSucursalId': edfVendedorId,
+      'edfVendedorId': vendedorIdValue,
+      'estado': 'pendiente',
     };
 
     // ✅ Agregar sucursalId si existe (como int, no String)
     if (sucursalIdValue != null) {
-      payload['edfSucursalId'] = sucursalIdValue;   // int
+      payload['edfSucursalId'] = sucursalIdValue;
     }
 
     return payload;
   }
 
+  // ✅ MÉTODO CORREGIDO - Ahora valida serverAction correctamente
   static Map<String, dynamic> _procesarRespuesta(http.Response response) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       return {
@@ -201,14 +202,60 @@ class EquiposPendientesApiService {
         'mensaje': 'Error del servidor: ${response.statusCode}'
       };
     }
+    //TODO demasiados returns
 
-    final body = response.body;
-    if (body.contains('REGISTRADO')) {
-      return {'exito': true, 'mensaje': 'Equipo pendiente registrado'};
-    } else if (body.contains('ya fue registrado')) {
-      return {'exito': true, 'mensaje': 'Equipo ya estaba registrado'};
-    } else {
-      return {'exito': false, 'mensaje': body};
+    try {
+      // Intentar parsear como JSON
+      final responseBody = jsonDecode(response.body);
+
+      BaseSyncService.logger.i('📊 Response parseado como JSON');
+
+      // ✅ VALIDAR serverAction como en BasePostService
+      if (responseBody is Map && responseBody.containsKey('serverAction')) {
+        final serverAction = responseBody['serverAction'] as int?;
+
+        BaseSyncService.logger.i('🔍 ServerAction encontrado: $serverAction');
+
+        if (serverAction == 100) {
+          // ✅ Éxito confirmado con Action 100
+          BaseSyncService.logger.i('✅✅✅ ServerAction 100 - ÉXITO CONFIRMADO ✅✅✅');
+          return {
+            'exito': true,
+            'mensaje': responseBody['resultMessage'] ?? 'Equipo pendiente registrado exitosamente',
+            'servidor_id': responseBody['resultId'],
+            'serverAction': serverAction,
+          };
+        } else {
+          // ❌ Error lógico (cualquier otro código)
+          BaseSyncService.logger.e('❌ ServerAction $serverAction - ERROR LÓGICO');
+          return {
+            'exito': false,
+            'mensaje': responseBody['resultError'] ?? responseBody['resultMessage'] ?? 'Error del servidor',
+            'serverAction': serverAction,
+          };
+        }
+      }
+
+      // Fallback para respuestas sin serverAction (asumir éxito)
+      BaseSyncService.logger.w('⚠️ No se encontró serverAction, asumiendo éxito');
+      return {
+        'exito': true,
+        'mensaje': 'Operación completada (sin serverAction)',
+      };
+
+    } catch (e) {
+      BaseSyncService.logger.w('⚠️ Error parseando JSON: $e');
+      BaseSyncService.logger.i('🔄 Intentando validación de texto plano...');
+
+      // Si no es JSON, intentar validación de texto plano (fallback legacy)
+      final body = response.body;
+      if (body.contains('REGISTRADO') || body.contains('ya fue registrado')) {
+        BaseSyncService.logger.i('✅ Texto plano indica éxito');
+        return {'exito': true, 'mensaje': 'Equipo pendiente registrado'};
+      } else {
+        BaseSyncService.logger.e('❌ Texto plano no reconocido');
+        return {'exito': false, 'mensaje': 'Respuesta no reconocida: $body'};
+      }
     }
   }
 

@@ -442,7 +442,6 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   void _mostrarEstadoEquipo(Map<String, dynamic> equipoCompleto) {
-    final nombreCompleto = '${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']}';
 
     if (_equipoYaAsignado) {
       _showSuccess(
@@ -677,17 +676,17 @@ class FormsScreenViewModel extends ChangeNotifier {
     return null;
   }
 
-  String? validarFotos() {
-    if (_equipoYaAsignado) {
-      return null;
-    }
-
-    if (_imagenSeleccionada == null && _imagenSeleccionada2 == null) {
-      return 'Debe capturar al menos una foto del equipo para continuar';
-    }
-
-    return null;
-  }
+  // String? validarFotos() {
+  //   if (_equipoYaAsignado) {
+  //     return null;
+  //   }
+  //
+  //   if (_imagenSeleccionada == null && _imagenSeleccionada2 == null) {
+  //     return 'Debe capturar al menos una foto del equipo para continuar';
+  //   }
+  //
+  //   return null;
+  // }
 
   // ===============================
   // LÓGICA DE NEGOCIO - NAVEGACIÓN
@@ -701,11 +700,11 @@ class FormsScreenViewModel extends ChangeNotifier {
       return;
     }
 
-    final errorFotos = validarFotos();
-    if (errorFotos != null) {
-      _showError(errorFotos);
-      return;
-    }
+    // final errorFotos = validarFotos();
+    // if (errorFotos != null) {
+    //   _showError(errorFotos);
+    //   return;
+    // }
 
     _setLoading(true);
 
