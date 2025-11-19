@@ -1,10 +1,7 @@
 import 'package:ada_app/models/equipos_pendientes.dart';
-import 'package:ada_app/services/post/equipo_pendiente_post_service.dart';
 import 'base_repository.dart';
 import 'package:uuid/uuid.dart';
 import 'package:logger/logger.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:ada_app/services/auth_service.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -107,11 +104,11 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
   }
 
   /// Procesar escaneo de censo - crear registro pendiente
-  /// ✅ CORREGIDO: Ahora acepta y usa el usuario correcto
+  /// ✅ COMPATIBLE con nuevo sistema unificado
   Future<String> procesarEscaneoCenso({
     required dynamic equipoId,
     required int clienteId,
-    int? usuarioId, // ✅ Añadir parámetro opcional
+    int? usuarioId,
   }) async {
     try {
       final now = DateTime.now();
@@ -122,7 +119,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
       final usuario = await authService.getCurrentUser();
       final usuarioCensoId = usuarioId ?? usuario?.id ?? 1;
 
-      _logger.i('Procesando censo - equipoId: $equipoIdString, clienteId: $clienteId, usuarioId: $usuarioCensoId');
+      _logger.i('📋 Procesando censo pendiente - equipoId: $equipoIdString, clienteId: $clienteId, usuarioId: $usuarioCensoId');
 
       // Verificar si ya existe por equipo_id + cliente_id
       final existente = await dbHelper.consultar(
@@ -134,7 +131,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
 
       if (existente.isNotEmpty) {
         final registroId = existente.first['id'].toString();
-        _logger.i('✅ Ya existe registro pendiente (UUID: $registroId) - ACTUALIZANDO');
+        _logger.i('⚠️ Ya existe registro pendiente (UUID: $registroId) - ACTUALIZANDO fecha');
 
         // ✅ Actualizar con usuario correcto
         await dbHelper.actualizar(
@@ -143,7 +140,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
             'fecha_censo': now.toIso8601String(),
             'fecha_actualizacion': now.toIso8601String(),
             'usuario_censo_id': usuarioCensoId,
-            'sincronizado': 0, // Marcar para reenvío
+            'sincronizado': 0, // Marcar para sincronización por CensoActivoPostService
           },
           where: 'id = ?',
           whereArgs: [registroId],
@@ -160,14 +157,15 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
         'equipo_id': equipoIdString,
         'cliente_id': clienteId,
         'fecha_censo': now.toIso8601String(),
-        'usuario_censo_id': usuarioCensoId, // ✅ Usuario correcto
+        'usuario_censo_id': usuarioCensoId,
         'fecha_creacion': now.toIso8601String(),
         'fecha_actualizacion': now.toIso8601String(),
-        'sincronizado': 0,
+        'sincronizado': 0, // Será sincronizado por CensoActivoPostService
       };
 
       await dbHelper.insertar(tableName, datos);
       _logger.i('✅ Registro pendiente NUEVO creado con UUID: $uuid y usuario: $usuarioCensoId');
+      _logger.i('ℹ️ La sincronización se manejará por CensoActivoPostService automáticamente');
 
       return uuid;
 
@@ -177,8 +175,8 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
     }
   }
 
-  /// Marcar equipos pendientes como sincronizados cuando su censo se migra
-  /// ✅ CORREGIDO: Ahora registra fecha_sincronizacion
+  /// Marcar equipos pendientes como sincronizados
+  /// ✅ Llamado desde CensoActivoPostService cuando la sincronización unificada es exitosa
   Future<int> marcarSincronizadosPorCenso(String equipoId, int clienteId) async {
     try {
       final actualizados = await dbHelper.actualizar(
@@ -186,13 +184,18 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
         {
           'sincronizado': 1,
           'fecha_actualizacion': DateTime.now().toIso8601String(),
-          'fecha_sincronizacion': DateTime.now().toIso8601String(), // ✅ Añadir fecha
+          'fecha_sincronizacion': DateTime.now().toIso8601String(),
         },
         where: 'equipo_id = ? AND cliente_id = ? AND sincronizado = 0',
         whereArgs: [equipoId, clienteId],
       );
 
-      _logger.i('✅ Equipos pendientes marcados como sincronizados: $actualizados');
+      if (actualizados > 0) {
+        _logger.i('✅ Equipos pendientes marcados como sincronizados: $actualizados');
+      } else {
+        _logger.d('ℹ️ No había pendientes sin sincronizar para equipo $equipoId - cliente $clienteId');
+      }
+
       return actualizados;
     } catch (e) {
       _logger.e('❌ Error marcando equipos pendientes como sincronizados: $e');
@@ -201,7 +204,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
   }
 
   /// Crear nuevo registro de equipo pendiente
-  /// ✅ CORREGIDO: Acepta usuarioId como parámetro
+  /// ✅ COMPATIBLE: Acepta usuarioId como parámetro
   Future<int> crear(Map<String, dynamic> datos) async {
     try {
       final uuid = Uuid();
@@ -214,10 +217,10 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
         'equipo_id': datos['equipo_id'],
         'cliente_id': datos['cliente_id'],
         'fecha_censo': datos['fecha_censo'],
-        'usuario_censo_id': usuarioId, // ✅ Usuario correcto
+        'usuario_censo_id': usuarioId,
         'fecha_creacion': DateTime.now().toIso8601String(),
         'fecha_actualizacion': DateTime.now().toIso8601String(),
-        'sincronizado': 0,
+        'sincronizado': 0, // Será manejado por CensoActivoPostService
       };
 
       await dbHelper.insertar(tableName, registroData);
@@ -230,7 +233,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
     }
   }
 
-  /// ✅ NUEVO: Helper para obtener usuario actual
+  /// ✅ Helper para obtener usuario actual
   Future<int> _getUsuarioIdActual() async {
     try {
       final authService = AuthService();
@@ -242,87 +245,60 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
     }
   }
 
-  /// Sincronizar pendientes locales al servidor
-  /// ✅ CORREGIDO: Registra fecha_sincronizacion al marcar como sincronizado
-  Future<Map<String, dynamic>> sincronizarPendientesAlServidor() async {
+  // ================================
+  // MÉTODOS DE CONSULTA (sin sincronización manual)
+  // ================================
+
+  /// Obtener pendientes no sincronizados (para debug/reportes)
+  Future<List<Map<String, dynamic>>> obtenerPendientesNoSincronizados() async {
     try {
-      _logger.i('Sincronizando pendientes...');
+      final sql = '''
+        SELECT ep.*,
+               e.cod_barras,
+               e.numero_serie,
+               m.nombre as marca_nombre,
+               mo.nombre as modelo_nombre,
+               c.nombre as cliente_nombre
+        FROM equipos_pendientes ep
+        LEFT JOIN equipos e ON ep.equipo_id = e.id
+        LEFT JOIN marcas m ON e.marca_id = m.id
+        LEFT JOIN modelos mo ON e.modelo_id = mo.id
+        LEFT JOIN clientes c ON ep.cliente_id = c.id
+        WHERE ep.sincronizado = 0
+        ORDER BY ep.fecha_creacion DESC
+      ''';
 
-      final pendientes = await dbHelper.consultar(
-        tableName,
-        where: 'sincronizado = ?',
-        whereArgs: [0],
-      );
-
-      if (pendientes.isEmpty) {
-        return {'exito': true, 'mensaje': 'No hay pendientes'};
-      }
-
-      _logger.i('Encontrados ${pendientes.length} pendientes');
-
-      final authService = AuthService();
-      final usuario = await authService.getCurrentUser();
-      final usuarioId = usuario?.id ?? 1;
-      final edfVendedorId = usuario?.edfVendedorId ?? '1';
-
-      int exitosos = 0;
-      int fallidos = 0;
-
-      for (final pendiente in pendientes) {
-        try {
-          final payload = {
-            'id': DateTime.now().millisecondsSinceEpoch.toString(),
-            'edfVendedorSucursalId': edfVendedorId,
-            'edfEquipoId': pendiente['equipo_id'].toString(),
-            'edfClienteId': pendiente['cliente_id'],
-            'usuarioId': usuarioId,
-            'fecha_revision': pendiente['fecha_censo'] ?? DateTime.now().toIso8601String(),
-            'equipo_id': pendiente['equipo_id'].toString(),
-            'cliente_id': pendiente['cliente_id'],
-            'usuario_id': usuarioId,
-            'es_censo': true,
-            'estadoCenso': 'pendiente'
-          };
-
-          _logger.i('Enviando pendiente: ${pendiente['equipo_id']}');
-
-          final response = await http.post(
-            Uri.parse('https://ada-api.loca.lt/adaControl/censoActivo/insertCensoActivo'),
-            headers: {'Content-Type': 'application/json'},
-            body: json.encode(payload),
-          ).timeout(Duration(seconds: 10));
-
-          if (response.statusCode >= 200 && response.statusCode < 300) {
-            // ✅ Marcar como sincronizado CON fecha
-            await dbHelper.actualizar(
-              tableName,
-              {
-                'sincronizado': 1,
-                'fecha_sincronizacion': DateTime.now().toIso8601String(), // ✅ Añadir fecha
-              },
-              where: 'id = ?',
-              whereArgs: [pendiente['id']],
-            );
-            exitosos++;
-            _logger.i('✅ Pendiente sincronizado con fecha: ${pendiente['id']}');
-          } else {
-            fallidos++;
-          }
-        } catch (e) {
-          _logger.e('Error en pendiente: $e');
-          fallidos++;
-        }
-      }
-
-      return {
-        'exito': exitosos > 0,
-        'mensaje': 'Sincronizados: $exitosos, Fallidos: $fallidos'
-      };
+      return await dbHelper.consultarPersonalizada(sql);
     } catch (e) {
-      _logger.e('Error sincronizando: $e');
-      return {'exito': false, 'mensaje': 'Error: $e'};
+      _logger.e('Error obteniendo pendientes no sincronizados: $e');
+      return [];
     }
   }
+
+  /// Obtener estadísticas de pendientes
+  Future<Map<String, dynamic>> obtenerEstadisticasPendientes() async {
+    try {
+      final sql = '''
+        SELECT 
+          COUNT(*) as total_pendientes,
+          COUNT(CASE WHEN sincronizado = 0 THEN 1 END) as pendientes_no_sincronizados,
+          COUNT(CASE WHEN sincronizado = 1 THEN 1 END) as pendientes_sincronizados,
+          COUNT(DISTINCT equipo_id) as equipos_con_pendientes,
+          COUNT(DISTINCT cliente_id) as clientes_con_pendientes
+        FROM equipos_pendientes
+      ''';
+
+      final result = await dbHelper.consultarPersonalizada(sql);
+      return result.isNotEmpty ? result.first : {};
+    } catch (e) {
+      _logger.e('Error obteniendo estadísticas: $e');
+      return {};
+    }
+  }
+
+  // ================================
+  // MÉTODOS PARA DESCARGA/SINCRONIZACIÓN DESDE SERVIDOR
+  // ================================
 
   /// Procesar equipos pendientes después de descargar censo del servidor
   Future<int> procesarPendientesDelCensoDescargado() async {
@@ -362,11 +338,11 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
             'equipo_id': equipo['equipo_id'].toString(),
             'cliente_id': equipo['cliente_id'],
             'fecha_censo': now.toIso8601String(),
-            'usuario_censo_id': equipo['usuario_id'] ?? 1, // ✅ Usar usuario del censo
+            'usuario_censo_id': equipo['usuario_id'] ?? 1,
             'fecha_creacion': now.toIso8601String(),
             'fecha_actualizacion': now.toIso8601String(),
             'sincronizado': 1, // Ya viene del servidor
-            'fecha_sincronizacion': now.toIso8601String(), // ✅ Añadir fecha
+            'fecha_sincronizacion': now.toIso8601String(),
           };
 
           await dbHelper.insertar(tableName, datos);
@@ -386,16 +362,16 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
   }
 
   /// Guardar equipos pendientes desde el servidor con mapeo de campos
-  /// ✅ CORREGIDO: Extrae y guarda usuario_censo_id correctamente
+  /// ✅ MEJORADO: Extrae y guarda usuario_censo_id correctamente
   Future<int> guardarEquiposPendientesDesdeServidor(List<Map<String, dynamic>> equiposAPI) async {
     final db = await dbHelper.database;
     int guardados = 0;
 
-    _logger.i('Guardando ${equiposAPI.length} equipos pendientes desde servidor...');
+    _logger.i('📥 Guardando ${equiposAPI.length} equipos pendientes desde servidor...');
 
     await db.transaction((txn) async {
       await txn.delete('equipos_pendientes');
-      _logger.i('Tabla equipos_pendientes limpiada');
+      _logger.i('🧹 Tabla equipos_pendientes limpiada');
 
       for (var equipoAPI in equiposAPI) {
         try {
@@ -407,12 +383,10 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
             'fecha_creacion': equipoAPI['creationDate'],
             'fecha_actualizacion': DateTime.now().toIso8601String(),
             'fecha_censo': equipoAPI['creationDate'],
-            'usuario_censo_id': equipoAPI['usuarioId'] ?? equipoAPI['usuario']?['id'] ?? 1, // ✅ Extraer usuario
+            'usuario_censo_id': equipoAPI['usuarioId'] ?? equipoAPI['usuario']?['id'] ?? 1,
             'sincronizado': 1,
-            'fecha_sincronizacion': DateTime.now().toIso8601String(), // ✅ Registrar fecha
+            'fecha_sincronizacion': DateTime.now().toIso8601String(),
           };
-
-          _logger.i('Insertando: equipo_id=${equipoLocal['equipo_id']}, cliente_id=${equipoLocal['cliente_id']}, usuario=${equipoLocal['usuario_censo_id']}');
 
           await txn.insert(
             'equipos_pendientes',
@@ -421,45 +395,86 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
           );
 
           guardados++;
-          _logger.i('✅ Guardado exitosamente');
 
         } catch (e) {
-          _logger.e('❌ Error guardando: $e');
-          _logger.e('Dato API: $equipoAPI');
+          _logger.e('❌ Error guardando pendiente desde servidor: $e');
+          _logger.d('Dato API problemático: $equipoAPI');
         }
       }
     });
 
-    _logger.i('✅ $guardados equipos pendientes guardados correctamente');
-    await debugVerificarDatos();
+    _logger.i('✅ $guardados equipos pendientes guardados desde servidor');
     return guardados;
   }
+
+  // ================================
+  // MÉTODOS DE DEBUG Y VERIFICACIÓN
+  // ================================
 
   /// DEBUG: Verificar datos guardados
   Future<void> debugVerificarDatos() async {
     final db = await dbHelper.database;
 
-    _logger.i('=== DEBUG: Verificando datos en equipos_pendientes ===');
+    _logger.i('=== 🔍 DEBUG: Verificando datos en equipos_pendientes ===');
 
-    final schema = await db.rawQuery("PRAGMA table_info(equipos_pendientes)");
-    _logger.i('Columnas de la tabla: ${schema.map((e) => e['name']).toList()}');
+    try {
+      final schema = await db.rawQuery("PRAGMA table_info(equipos_pendientes)");
+      _logger.i('📋 Columnas de la tabla: ${schema.map((e) => e['name']).toList()}');
 
-    final todos = await db.query('equipos_pendientes');
-    _logger.i('Total de registros en tabla: ${todos.length}');
+      final todos = await db.query('equipos_pendientes');
+      _logger.i('📊 Total de registros en tabla: ${todos.length}');
 
-    if (todos.isNotEmpty) {
-      _logger.i('=== TODOS LOS REGISTROS ===');
-      for (var i = 0; i < todos.length; i++) {
-        _logger.i('--- Registro ${i + 1} ---');
-        todos[i].forEach((key, value) {
-          _logger.i('  $key: $value');
-        });
+      if (todos.isNotEmpty) {
+        _logger.i('=== 📑 PRIMEROS 3 REGISTROS ===');
+        final muestra = todos.take(3);
+        for (var i = 0; i < muestra.length; i++) {
+          final registro = muestra.elementAt(i);
+          _logger.i('--- 📄 Registro ${i + 1} ---');
+          _logger.i('  ID: ${registro['id']}');
+          _logger.i('  Equipo: ${registro['equipo_id']}');
+          _logger.i('  Cliente: ${registro['cliente_id']}');
+          _logger.i('  Usuario: ${registro['usuario_censo_id']}');
+          _logger.i('  Sincronizado: ${registro['sincronizado']}');
+          _logger.i('  Fecha censo: ${registro['fecha_censo']}');
+        }
+
+        if (todos.length > 3) {
+          _logger.i('... y ${todos.length - 3} registros más');
+        }
+
+        // Estadísticas rápidas
+        final sincronizados = todos.where((r) => r['sincronizado'] == 1).length;
+        final noSincronizados = todos.where((r) => r['sincronizado'] == 0).length;
+
+        _logger.i('📈 Estadísticas:');
+        _logger.i('   - Sincronizados: $sincronizados');
+        _logger.i('   - No sincronizados: $noSincronizados');
+
+      } else {
+        _logger.w('⚠️ LA TABLA ESTÁ VACÍA');
       }
-    } else {
-      _logger.w('⚠️ LA TABLA ESTÁ VACÍA');
+    } catch (e) {
+      _logger.e('❌ Error en debug: $e');
     }
 
-    _logger.i('========================================================');
+    _logger.i('════════════════════════════════════════════════════════');
   }
 
+  /// DEBUG: Mostrar resumen de estado
+  Future<void> debugMostrarResumen() async {
+    try {
+      final estadisticas = await obtenerEstadisticasPendientes();
+
+      _logger.i('=== 📊 RESUMEN EQUIPOS_PENDIENTES ===');
+      _logger.i('Total pendientes: ${estadisticas['total_pendientes'] ?? 0}');
+      _logger.i('No sincronizados: ${estadisticas['pendientes_no_sincronizados'] ?? 0}');
+      _logger.i('Sincronizados: ${estadisticas['pendientes_sincronizados'] ?? 0}');
+      _logger.i('Equipos únicos: ${estadisticas['equipos_con_pendientes'] ?? 0}');
+      _logger.i('Clientes únicos: ${estadisticas['clientes_con_pendientes'] ?? 0}');
+      _logger.i('====================================');
+
+    } catch (e) {
+      _logger.e('❌ Error mostrando resumen: $e');
+    }
+  }
 }

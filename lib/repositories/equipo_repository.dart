@@ -1,6 +1,5 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:ada_app/models/equipos.dart';
-import 'package:ada_app/services/post/equipo_post_service.dart';
 import 'package:ada_app/services/auth_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import '../repositories/base_repository.dart';
@@ -269,20 +268,22 @@ class EquipoRepository extends BaseRepository<Equipo> {
   }
 
   // ================================
-  // CREACIÓN Y SINCRONIZACIÓN DE EQUIPOS NUEVOS
+  // CREACIÓN DE EQUIPOS NUEVOS ✅ CORREGIDO
   // ================================
 
-  /// Crear equipo nuevo desde la app
+  /// Crear equipo nuevo desde la app - ✅ AHORA PERMITE ASIGNAR CLIENTE
   Future<String> crearEquipoNuevo({
     required String codigoBarras,
     required int marcaId,
     required int modeloId,
     required String? numeroSerie,
     required int logoId,
+    int? clienteId, // ✅ NUEVO: agregar cliente_id opcional
   }) async {
     try {
-      _logger.i('=== CREANDO EQUIPO NUEVO ===');
+      _logger.i('=== CREANDO EQUIPO NUEVO (SOLO LOCAL) ===');
       _logger.i('Código: $codigoBarras');
+      _logger.i('Cliente ID: $clienteId'); // ✅ Log del cliente
 
       if (codigoBarras.isNotEmpty) {
         final existe = await existeCodigoBarras(codigoBarras);
@@ -291,23 +292,23 @@ class EquipoRepository extends BaseRepository<Equipo> {
         }
       }
 
-      final now = DateTime.now();                                    // 🆕
+      final now = DateTime.now();
       final equipoId = codigoBarras.isEmpty
-          ? 'NUEVO_${now.millisecondsSinceEpoch}'                    // 🆕 Usar now
+          ? 'NUEVO_${now.millisecondsSinceEpoch}'
           : codigoBarras;
 
       final equipoMap = {
         'id': equipoId,
-        'cliente_id': null,
+        'cliente_id': clienteId, // ✅ CORREGIDO: usar el cliente_id pasado como parámetro
         'cod_barras': codigoBarras,
         'marca_id': marcaId,
         'modelo_id': modeloId,
         'numero_serie': numeroSerie,
         'logo_id': logoId,
         'app_insert': 1,
-        'sincronizado': 0,                                           // 🆕 AGREGAR
-        'fecha_creacion': now.toIso8601String(),                     // 🆕 AGREGAR
-        'fecha_actualizacion': now.toIso8601String(),                // 🆕 AGREGAR
+        'sincronizado': 0,
+        'fecha_creacion': now.toIso8601String(),
+        'fecha_actualizacion': now.toIso8601String(),
       };
 
       _logger.i('Datos a insertar: $equipoMap');
@@ -320,7 +321,14 @@ class EquipoRepository extends BaseRepository<Equipo> {
         );
       });
 
-      _logger.i('✅ Equipo nuevo creado como DISPONIBLE con ID: $equipoId');
+      if (clienteId != null) {
+        _logger.i('✅ Equipo nuevo creado y PRE-ASIGNADO al cliente $clienteId con ID: $equipoId');
+      } else {
+        _logger.i('✅ Equipo nuevo creado como DISPONIBLE con ID: $equipoId');
+      }
+
+      _logger.i('ℹ️ La sincronización se manejará por CensoActivoPostService cuando se haga el censo');
+
       return equipoId;
 
     } catch (e, stackTrace) {
@@ -329,90 +337,36 @@ class EquipoRepository extends BaseRepository<Equipo> {
     }
   }
 
-  /// Crear equipo nuevo Y sincronizarlo con el servidor
-  Future<Map<String, dynamic>> crearYSincronizarEquipoNuevo({
+  // ✅ MÉTODO SIMPLIFICADO: Solo crear y devolver ID, sin sincronización automática
+  Future<Map<String, dynamic>> crearEquipoSimple({
     required String codigoBarras,
     required int marcaId,
     required int modeloId,
     required String? numeroSerie,
     required int logoId,
-    String? clienteId,
-    bool sincronizarInmediato = true,
+    int? clienteId, // ✅ NUEVO: agregar cliente_id opcional
   }) async {
     try {
-      _logger.i('=== CREANDO Y SINCRONIZANDO EQUIPO NUEVO ===');
+      _logger.i('=== CREANDO EQUIPO SIMPLE ===');
 
-      // 1. Crear equipo localmente
       final equipoId = await crearEquipoNuevo(
         codigoBarras: codigoBarras,
         marcaId: marcaId,
         modeloId: modeloId,
         numeroSerie: numeroSerie,
         logoId: logoId,
+        clienteId: clienteId, // ✅ PASAR cliente_id
       );
 
-      // 2. Sincronizar si se requiere
-      if (sincronizarInmediato) {
-        try {
-          final usuario = await _authService.getCurrentUser();
-          final edfVendedorId = usuario?.edfVendedorId ?? '';
-
-          if (edfVendedorId.isEmpty) {
-            _logger.w('⚠️ No hay edfVendedorId, sincronización pendiente');
-            return {
-              'success': true,
-              'equipo_id': equipoId,
-              'sincronizado': false,
-              'message': 'Equipo creado localmente, sincronización pendiente',
-            };
-          }
-
-          final resultado = await EquipoPostService.enviarEquipoNuevo(
-            equipoId: equipoId,
-            codigoBarras: codigoBarras,
-            marcaId: marcaId,
-            modeloId: modeloId,
-            logoId: logoId,
-            numeroSerie: numeroSerie,
-            clienteId: clienteId,
-            edfVendedorId: edfVendedorId,
-          );
-
-          if (resultado['exito'] == true) {
-            await marcarEquipoComoSincronizado(equipoId);
-
-            return {
-              'success': true,
-              'equipo_id': equipoId,
-              'sincronizado': true,
-              'message': 'Equipo creado y sincronizado',
-            };
-          } else {
-            return {
-              'success': true,
-              'equipo_id': equipoId,
-              'sincronizado': false,
-              'message': 'Equipo creado localmente, sincronización pendiente',
-              'error_sync': resultado['mensaje'],
-            };
-          }
-        } catch (e) {
-          _logger.e('⚠️ Error en sincronización: $e');
-          return {
-            'success': true,
-            'equipo_id': equipoId,
-            'sincronizado': false,
-            'message': 'Equipo creado localmente, sincronización pendiente',
-            'error_sync': e.toString(),
-          };
-        }
-      }
+      final mensaje = clienteId != null
+          ? 'Equipo creado y pre-asignado al cliente $clienteId. Se sincronizará automáticamente con el censo.'
+          : 'Equipo creado como disponible. Se sincronizará automáticamente con el censo.';
 
       return {
         'success': true,
         'equipo_id': equipoId,
-        'sincronizado': false,
-        'message': 'Equipo creado localmente',
+        'cliente_id': clienteId,
+        'message': mensaje,
       };
 
     } catch (e, stackTrace) {
@@ -420,7 +374,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
 
       await ErrorLogService.logError(
         tableName: 'equipos',
-        operation: 'crear_y_sincronizar_equipo',
+        operation: 'crear_equipo_simple',
         errorMessage: 'Error: $e',
         errorType: 'general',
       );
@@ -432,62 +386,40 @@ class EquipoRepository extends BaseRepository<Equipo> {
     }
   }
 
-  /// Sincronizar equipos pendientes en background
-  Future<void> sincronizarEquiposPendientes() async {
+  // ================================
+  // SINCRONIZACIÓN (SIMPLIFICADA)
+  // ================================
+
+  /// Marcar equipo como sincronizado (llamado desde CensoActivoPostService)
+  Future<void> marcarEquipoComoSincronizado(String equipoId) async {
     try {
-      _logger.i('🔄 Sincronizando equipos pendientes...');
-
-      final usuario = await _authService.getCurrentUser();
-      final edfVendedorId = usuario?.edfVendedorId ?? '';
-
-      if (edfVendedorId.isEmpty) {
-        _logger.w('⚠️ No hay edfVendedorId, no se puede sincronizar');
-        return;
-      }
-
-      final equiposPendientes = await obtenerEquiposNoSincronizados();
-
-      _logger.i('📊 Equipos pendientes: ${equiposPendientes.length}');
-
-      for (final equipo in equiposPendientes) {
-        try {
-          final resultado = await EquipoPostService.enviarEquipoNuevo(
-            equipoId: equipo['id'],
-            codigoBarras: equipo['cod_barras'] ?? '',
-            marcaId: equipo['marca_id'],
-            modeloId: equipo['modelo_id'],
-            logoId: equipo['logo_id'],
-            numeroSerie: equipo['numero_serie'],
-            clienteId: equipo['cliente_id'],
-            edfVendedorId: edfVendedorId,
-          );
-
-          if (resultado['exito'] == true) {
-            await marcarEquipoComoSincronizado(equipo['id']);
-            _logger.i('✅ Equipo sincronizado: ${equipo['id']}');
-          } else {
-            _logger.w('⚠️ Fallo sincronizando equipo: ${equipo['id']}');
-          }
-
-          await Future.delayed(const Duration(milliseconds: 500));
-
-        } catch (e) {
-          _logger.e('❌ Error sincronizando equipo ${equipo['id']}: $e');
-        }
-      }
-
-      _logger.i('✅ Sincronización de equipos completada');
-
+      await dbHelper.actualizar(
+        tableName,
+        {'sincronizado': 1},
+        where: 'id = ?',
+        whereArgs: [equipoId],
+      );
+      _logger.i('✅ Equipo $equipoId marcado como sincronizado');
     } catch (e) {
-      _logger.e('❌ Error en sincronización de equipos: $e');
+      _logger.e('❌ Error marcando equipo como sincronizado: $e');
+      rethrow;
     }
   }
 
+  /// Obtener equipos no sincronizados (para debug o reportes)
   Future<List<Map<String, dynamic>>> obtenerEquiposNoSincronizados() async {
     try {
       final sql = '''
-        SELECT e.*
+        SELECT e.*,
+               m.nombre as marca_nombre,
+               mo.nombre as modelo_nombre,
+               l.nombre as logo_nombre,
+               c.nombre as cliente_nombre
         FROM equipos e
+        LEFT JOIN marcas m ON e.marca_id = m.id
+        LEFT JOIN modelos mo ON e.modelo_id = mo.id
+        LEFT JOIN logo l ON e.logo_id = l.id
+        LEFT JOIN clientes c ON e.cliente_id = c.id
         WHERE e.app_insert = 1 
           AND (e.sincronizado IS NULL OR e.sincronizado = 0)
         ORDER BY e.id DESC
@@ -523,21 +455,6 @@ class EquipoRepository extends BaseRepository<Equipo> {
       return result;
     } catch (e) {
       _logger.e('Error obteniendo equipos nuevos: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> marcarEquipoComoSincronizado(String equipoId) async {
-    try {
-      await dbHelper.actualizar(
-        tableName,
-        {'sincronizado': 1},
-        where: 'id = ?',
-        whereArgs: [equipoId],
-      );
-      _logger.i('Equipo $equipoId marcado como sincronizado');
-    } catch (e) {
-      _logger.e('Error marcando equipo como sincronizado: $e');
       rethrow;
     }
   }

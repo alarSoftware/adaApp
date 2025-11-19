@@ -1,196 +1,871 @@
 // lib/services/post/censo_activo_post_service.dart
 
+import 'dart:convert';
+import 'dart:async';
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:logger/logger.dart';
+import 'package:uuid/uuid.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:ada_app/services/post/base_post_service.dart';
-import 'package:ada_app/services/auth_service.dart';
-import 'package:ada_app/services/error_log/error_log_service.dart'; // 🆕 AGREGAR
+import 'package:ada_app/services/api_config_service.dart';
+import 'package:ada_app/config/constants/server_constants.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart';
 
 class CensoActivoPostService {
+  static final Logger _logger = Logger();
+  static const String _tableName = 'censo_unificado';
   static const String _endpoint = '/censoActivo/insertCensoActivo';
-  static const String _tableName = 'censo_activo'; // 🆕 AGREGAR
-  static final AuthService _authService = AuthService();
+  static const Uuid _uuid = Uuid();
 
-  /// Enviar cambio de estado de equipo
-  static Future<Map<String, dynamic>> enviarCambioEstado({
-    required String codigoBarras,
-    required int clienteId,
-    required bool enLocal,
-    required Position position,
-    String? observaciones,
-    String? imagenBase64,
-    String? imagenBase64_2,
+  /// Método principal: envía equipo + pendiente + censo en un solo JSON unificado
+  static Future<Map<String, dynamic>> enviarCensoActivo({
+    // Datos del equipo (si es nuevo)
     String? equipoId,
-    String? clienteNombre,
+    String? codigoBarras,
+    int? marcaId,
+    int? modeloId,
+    int? logoId,
     String? numeroSerie,
-    String? modelo,
+    bool esNuevoEquipo = false,
+
+    // Datos del pendiente
+    required int clienteId,
+    required String edfVendedorId,
+    bool crearPendiente = false,
+
+    // Datos del censo activo
+    required int usuarioId,
+    required double latitud,
+    required double longitud,
+    String? observaciones,
+    bool enLocal = true,
+    String? estadoCenso = 'pendiente',
+
+    // Fotos
+    List<dynamic>? fotos,
+
+    // Datos adicionales del equipo
+    String? clienteNombre,
     String? marca,
+    String? modelo,
     String? logo,
+
+    // Control
+    int timeoutSegundos = 60,
+    String? userId,
+    bool guardarLog = true,
   }) async {
-    String? userId;
-    String? estadoId;
+    String? fullUrl;
+    String? censoId;
 
     try {
-      // Obtener usuario actual
-      final usuario = await _authService.getCurrentUser();
-      final usuarioId = usuario?.id ?? 1;
-      final edfVendedorId = usuario?.edfVendedorId ?? '';
-      userId = usuarioId.toString();
+      _logger.i('📤 === ENVIANDO CENSO UNIFICADO ===');
 
+      // Generar IDs
       final now = DateTime.now().toLocal();
-      final timestampId = now.millisecondsSinceEpoch;
-      estadoId = timestampId.toString();
+      censoId = now.millisecondsSinceEpoch.toString();
+      final equipoIdFinal = equipoId ?? codigoBarras ?? 'EQUIPO_${censoId}';
 
-      // Preparar datos
-      final datos = _prepararDatosEstado(
-        timestampId: timestampId,
-        edfVendedorId: edfVendedorId,
-        equipoId: equipoId ?? codigoBarras,
-        usuarioId: usuarioId,
-        clienteId: clienteId,
-        position: position,
-        enLocal: enLocal,
-        observaciones: observaciones,
-        imagenBase64: imagenBase64,
-        imagenBase64_2: imagenBase64_2,
-        codigoBarras: codigoBarras,
+      _logger.i('🔧 Preparando payload unificado...');
+      _logger.i('   - Equipo ID: $equipoIdFinal');
+      _logger.i('   - Cliente ID: $clienteId');
+      _logger.i('   - Es nuevo equipo: $esNuevoEquipo');
+      _logger.i('   - Crear pendiente: $crearPendiente');
+
+      // Construir el JSON unificado
+      final payloadUnificado = _construirPayloadUnificado(
+        // Equipo
+        equipoId: equipoIdFinal,
+        codigoBarras: codigoBarras ?? equipoIdFinal,
+        marcaId: marcaId,
+        modeloId: modeloId,
+        logoId: logoId,
         numeroSerie: numeroSerie,
-        modelo: modelo,
-        marca: marca,
-        logo: logo,
+        esNuevoEquipo: esNuevoEquipo,
+
+        // Pendiente
+        clienteId: clienteId,
+        edfVendedorId: edfVendedorId,
+        crearPendiente: crearPendiente,
+
+        // Censo
+        censoId: censoId,
+        usuarioId: usuarioId,
+        latitud: latitud,
+        longitud: longitud,
+        observaciones: observaciones,
+        enLocal: enLocal,
+        estadoCenso: estadoCenso,
+        fotos: fotos,
         clienteNombre: clienteNombre,
+        marca: marca,
+        modelo: modelo,
+        logo: logo,
         now: now,
       );
 
-      // ✅ BasePostService maneja todos los errores
-      return await BasePostService.post(
-        endpoint: _endpoint,
-        body: datos,
-        timeout: const Duration(seconds: 30),
-        tableName: _tableName,      // 🔥 Activa logging
-        registroId: estadoId,        // 🔥 ID del censo
-        userId: userId,              // 🔥 Usuario
-      );
+      _logger.i('📦 Payload size: ${jsonEncode(payloadUnificado).length} caracteres');
 
-    } catch (e) {
-      BasePostService.logger.e('❌ Error preparando censo: $e');
+      // Envío HTTP
+      final baseUrl = await ApiConfigService.getBaseUrl();
+      fullUrl = '$baseUrl$_endpoint';
 
-      // 🚨 LOG: Error en preparación de datos (antes de enviar)
-      await ErrorLogService.logError(
-        tableName: _tableName,
-        operation: 'enviar_cambio_estado',
-        errorMessage: 'Error preparando datos del censo: $e',
-        errorType: 'preparation',
-        errorCode: 'PREPARATION_ERROR',
-        registroFailId: estadoId,
-        userId: userId,
-      );
+      _logger.i('🌐 Enviando a: $fullUrl');
 
-      return {
-        'success': false,
-        'exito': false,
-        'error': 'Error preparando datos: $e',
-      };
+      // 🔥 GUARDAR LOG TXT (si está habilitado)
+      if (guardarLog) {
+        await _guardarLogSimple(
+          url: fullUrl,
+          payload: payloadUnificado,
+          timestamp: now.toIso8601String(),
+        );
+      }
+
+      final response = await http.post(
+        Uri.parse(fullUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: jsonEncode(payloadUnificado),
+      ).timeout(Duration(seconds: timeoutSegundos));
+
+      _logger.i('📥 Response: ${response.statusCode}');
+
+      // Procesar respuesta con validación estricta
+      final result = _procesarRespuesta(response);
+
+      // 🔥 MANEJO UNIFICADO DE ERRORES DEL SERVIDOR
+      if (!result['exito']) {
+        await _manejarErrorServidor(result, censoId, fullUrl, userId);
+      }
+
+      return result;
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Error en envío: $e', stackTrace: stackTrace);
+
+      // 🔥 MANEJO UNIFICADO DE EXCEPCIONES
+      return await _manejarExcepcion(e, censoId, fullUrl, userId, timeoutSegundos);
     }
   }
 
-  /// Preparar datos para el estado
-  static Map<String, dynamic> _prepararDatosEstado({
-    required int timestampId,
-    required String edfVendedorId,
+  // =================================================================
+  // 🔥 MANEJO UNIFICADO DE ERRORES (sin duplicación)
+  // =================================================================
+
+  /// Maneja errores del servidor (serverAction != 100)
+  static Future<void> _manejarErrorServidor(
+      Map<String, dynamic> result,
+      String? censoId,
+      String? fullUrl,
+      String? userId,
+      ) async {
+    final errorCode = result['serverAction']?.toString() ?? 'UNKNOWN';
+    final errorMessage = result['mensaje'] ?? 'Error del servidor';
+
+    // Determinar tipo de error según serverAction
+    String tipoError;
+    String codigoError;
+
+    if (result['serverAction'] == ServerConstants.STOP_TRANSACTION) {
+      tipoError = 'business_logic';
+      codigoError = 'STOP_TRANSACTION_205';
+    } else if (result['serverAction'] == ServerConstants.ERROR) {
+      tipoError = 'server_error';
+      codigoError = 'SERVER_ERROR_-501';
+    } else {
+      tipoError = 'server_response';
+      codigoError = 'UNEXPECTED_ACTION_$errorCode';
+    }
+
+    // 🔥 REGISTRO AUTOMÁTICO POR TIPO
+    await ErrorLogService.logServerError(
+      tableName: _tableName,
+      operation: 'POST_CENSO_ACTIVO_SERVER_ERROR',
+      errorMessage: 'ServerAction $errorCode: $errorMessage',
+      errorCode: codigoError,
+      registroFailId: censoId,
+      endpoint: fullUrl,
+      userId: userId,
+    );
+
+    _logger.e('🚫 Error del servidor registrado: $codigoError');
+  }
+
+  /// Maneja todas las excepciones de red/timeout/crash de forma unificada
+  static Future<Map<String, dynamic>> _manejarExcepcion(
+      dynamic excepcion,
+      String? censoId,
+      String? fullUrl,
+      String? userId,
+      int timeoutSegundos,
+      ) async {
+
+    String tipoError;
+    String codigoError;
+    String mensajeUsuario;
+    String mensajeDetallado;
+
+    // 🎯 CLASIFICAR EXCEPCIÓN AUTOMÁTICAMENTE
+    if (excepcion is SocketException) {
+      tipoError = 'network';
+      codigoError = 'NETWORK_CONNECTION_ERROR';
+      mensajeUsuario = 'Sin conexión de red';
+      mensajeDetallado = 'Error de conexión de red: ${excepcion.message}';
+
+    } else if (excepcion is TimeoutException) {
+      tipoError = 'network';
+      codigoError = 'REQUEST_TIMEOUT_ERROR';
+      mensajeUsuario = 'Tiempo de espera agotado';
+      mensajeDetallado = 'Timeout tras ${timeoutSegundos}s: $excepcion';
+
+    } else if (excepcion is http.ClientException) {
+      tipoError = 'network';
+      codigoError = 'HTTP_CLIENT_ERROR';
+      mensajeUsuario = 'Error de red: ${excepcion.message}';
+      mensajeDetallado = 'Error HTTP del cliente: ${excepcion.message}';
+
+    } else {
+      tipoError = 'crash';
+      codigoError = 'UNEXPECTED_EXCEPTION';
+      mensajeUsuario = 'Error interno: $excepcion';
+      mensajeDetallado = 'Excepción no manejada: $excepcion';
+    }
+
+    // 🔥 REGISTRO AUTOMÁTICO UNIFICADO
+    await ErrorLogService.logError(
+      tableName: _tableName,
+      operation: 'POST_CENSO_ACTIVO_EXCEPTION',
+      errorMessage: mensajeDetallado,
+      errorType: tipoError,
+      errorCode: codigoError,
+      registroFailId: censoId,
+      endpoint: fullUrl,
+      userId: userId,
+    );
+
+    _logger.e('🚨 Excepción registrada: $codigoError');
+
+    // 🎯 RESPUESTA UNIFICADA DE ERROR
+    return _errorResponse(mensajeUsuario);
+  }
+
+  // =================================================================
+  // LOGGING TXT SIMPLE (estilo CensoLogService original)
+  // =================================================================
+
+  /// Guarda un log simple estilo CensoLogService original
+  static Future<void> _guardarLogSimple({
+    required String url,
+    required Map<String, dynamic> payload,
+    required String timestamp,
+  }) async {
+    try {
+      final file = await _obtenerArchivoLog();
+      if (file == null) return;
+
+      final contenido = _generarContenidoLogSimple(
+        url: url,
+        payload: payload,
+        timestamp: timestamp,
+        filePath: file.path,
+      );
+
+      await file.writeAsString(contenido);
+
+      _logger.i('📁 Log unificado guardado: ${file.uri.pathSegments.last}');
+    } catch (e) {
+      _logger.w('Error guardando log: $e');
+    }
+  }
+
+  /// Genera el contenido del log simple
+  static String _generarContenidoLogSimple({
+    required String url,
+    required Map<String, dynamic> payload,
+    required String timestamp,
+    required String filePath,
+  }) {
+    final buffer = StringBuffer();
+    final separador = '=' * 80;
+    final divisor = '-' * 40;
+
+    // Encabezado
+    buffer.writeln(separador);
+    buffer.writeln('CENSO ACTIVO - POST REQUEST LOG');
+    buffer.writeln(separador);
+    buffer.writeln('Timestamp: $timestamp');
+    buffer.writeln('URL: $url');
+    buffer.writeln('Archivo: $filePath');
+    buffer.writeln('');
+
+    // Headers
+    buffer.writeln(divisor);
+    buffer.writeln('HEADERS:');
+    buffer.writeln(divisor);
+    buffer.writeln('Content-Type: application/json');
+    buffer.writeln('Accept: application/json');
+    buffer.writeln('ngrok-skip-browser-warning: true');
+    buffer.writeln('');
+
+    // Resumen del censo
+    buffer.writeln(divisor);
+    buffer.writeln('RESUMEN DEL CENSO:');
+    buffer.writeln(divisor);
+    _agregarResumenSimple(buffer, payload);
+    buffer.writeln('');
+
+    // JSON completo
+    buffer.writeln(divisor);
+    buffer.writeln('REQUEST BODY (JSON):');
+    buffer.writeln(divisor);
+    _agregarBodyJson(buffer, payload);
+    buffer.writeln('');
+
+    // Pie
+    buffer.writeln(separador);
+    buffer.writeln('FIN DEL LOG - ${DateTime.now().toLocal()}');
+    buffer.writeln(separador);
+
+    return buffer.toString();
+  }
+
+  /// Agrega resumen simple estilo CensoLogService
+  static void _agregarResumenSimple(
+      StringBuffer buffer,
+      Map<String, dynamic> payload,
+      ) {
+    final censo = payload['censo_activo'] as Map<String, dynamic>?;
+    final equipo = payload['equipo'] as Map<String, dynamic>?;
+    final pendiente = payload['equipo_pendiente'] as Map<String, dynamic>?;
+
+    // Info básica del censo (SIEMPRE presente)
+    if (censo != null && censo.isNotEmpty) {
+      buffer.writeln('Equipo ID: ${censo['edfEquipoId'] ?? 'N/A'}');
+      buffer.writeln('Cliente ID: ${censo['edfClienteId'] ?? 'N/A'}');
+      buffer.writeln('Usuario ID: ${censo['usuarioId'] ?? 'N/A'}');
+      buffer.writeln('Latitud: ${censo['latitud'] ?? 'N/A'}');
+      buffer.writeln('Longitud: ${censo['longitud'] ?? 'N/A'}');
+    }
+
+    // Estado de secciones
+    final equipoCompleto = equipo != null && equipo.isNotEmpty;
+    final pendienteCompleto = pendiente != null && pendiente.isNotEmpty;
+
+    buffer.writeln('Sección equipo: ${equipoCompleto ? 'COMPLETA (nuevo equipo)' : 'VACÍA (equipo existente)'}');
+    buffer.writeln('Sección equipo_pendiente: ${pendienteCompleto ? 'COMPLETA (crear asignación)' : 'VACÍA (ya asignado)'}');
+    buffer.writeln('Sección censo_activo: COMPLETA (siempre)');
+
+    // Info de fotos (del censo_activo)
+    if (censo != null && censo.isNotEmpty) {
+      final fotosArray = censo['fotos'] as List<dynamic>?;
+      final totalFotos = fotosArray?.length ?? 0;
+      final tieneImagen1 = censo['tieneImagen'] == true;
+      final tieneImagen2 = censo['tieneImagen2'] == true;
+
+      buffer.writeln('Tiene imagen 1: $tieneImagen1');
+      buffer.writeln('Tiene imagen 2: $tieneImagen2');
+      buffer.writeln('Total fotos: $totalFotos');
+
+      // Tamaños de imágenes base64
+      if (censo['imageBase64_1'] != null) {
+        final tamano1 = censo['imageBase64_1'].toString().length;
+        buffer.writeln('Tamaño imagen 1: ${(tamano1 / 1024).toStringAsFixed(1)} KB');
+      }
+      if (censo['imageBase64_2'] != null) {
+        final tamano2 = censo['imageBase64_2'].toString().length;
+        buffer.writeln('Tamaño imagen 2: ${(tamano2 / 1024).toStringAsFixed(1)} KB');
+      }
+
+      buffer.writeln('Observaciones: ${censo['observaciones'] ?? 'N/A'}');
+      buffer.writeln('Estado censo: ${censo['estadoCenso'] ?? 'N/A'}');
+      buffer.writeln('Fecha revisión: ${censo['fechaRevision'] ?? 'N/A'}');
+    }
+  }
+
+  /// Agrega el JSON completo sin mostrar base64 completo
+  static void _agregarBodyJson(
+      StringBuffer buffer,
+      Map<String, dynamic> payload,
+      ) {
+    // Crear versión simplificada para el log
+    final payloadSimplificado = Map<String, dynamic>.from(payload);
+
+    // Simplificar censo_activo si tiene fotos pesadas
+    if (payloadSimplificado.containsKey('censo_activo')) {
+      final censo = Map<String, dynamic>.from(payloadSimplificado['censo_activo']);
+
+      // Reemplazar base64 por resumen
+      if (censo.containsKey('imageBase64_1')) {
+        final tamano1 = censo['imageBase64_1']?.toString().length ?? 0;
+        censo['imageBase64_1'] = '[BASE64 - ${(tamano1 / 1024).toStringAsFixed(1)} KB]';
+      }
+      if (censo.containsKey('imageBase64_2')) {
+        final tamano2 = censo['imageBase64_2']?.toString().length ?? 0;
+        censo['imageBase64_2'] = '[BASE64 - ${(tamano2 / 1024).toStringAsFixed(1)} KB]';
+      }
+
+      // Simplificar array de fotos
+      if (censo.containsKey('fotos') && censo['fotos'] is List) {
+        final fotosCount = (censo['fotos'] as List).length;
+        censo['fotos'] = '[${fotosCount} fotos - contenido omitido del log]';
+      }
+
+      payloadSimplificado['censo_activo'] = censo;
+    }
+
+    final prettyJson = JsonEncoder.withIndent('  ').convert(payloadSimplificado);
+    buffer.writeln(prettyJson);
+  }
+
+  /// Obtiene el archivo para guardar el log
+  static Future<File?> _obtenerArchivoLog() async {
+    final downloadsDir = await _obtenerDirectorioDescargas();
+    if (downloadsDir == null) return null;
+
+    if (!await downloadsDir.exists()) {
+      await downloadsDir.create(recursive: true);
+    }
+
+    final now = DateTime.now();
+    final fechaFormateada = '${now.year}${now.month.toString().padLeft(2, '0')}'
+        '${now.day.toString().padLeft(2, '0')}_'
+        '${now.hour.toString().padLeft(2, '0')}'
+        '${now.minute.toString().padLeft(2, '0')}_'
+        '${now.second.toString().padLeft(2, '0')}';
+
+    final fileName = 'censo_activo_post_$fechaFormateada.txt';
+    return File('${downloadsDir.path}/$fileName');
+  }
+
+  /// Obtiene el directorio de descargas
+  static Future<Directory?> _obtenerDirectorioDescargas() async {
+    try {
+      if (Platform.isAndroid) {
+        var downloadsDir = Directory('/storage/emulated/0/Download');
+        if (!await downloadsDir.exists()) {
+          final externalDir = await getExternalStorageDirectory();
+          downloadsDir = Directory('${externalDir?.path}/Download');
+        }
+        return downloadsDir;
+      } else if (Platform.isIOS) {
+        return await getApplicationDocumentsDirectory();
+      }
+      return null;
+    } catch (e) {
+      _logger.w('Error obteniendo directorio: $e');
+      return null;
+    }
+  }
+
+  // =================================================================
+  // CONSTRUCCIÓN DEL PAYLOAD CON 3 SECCIONES
+  // =================================================================
+
+  /// Construye el payload unificado con las 3 secciones SIEMPRE (vacías si no aplican)
+  static Map<String, dynamic> _construirPayloadUnificado({
+    // Equipo
     required String equipoId,
-    required int usuarioId,
+    required String codigoBarras,
+    int? marcaId,
+    int? modeloId,
+    int? logoId,
+    String? numeroSerie,
+    required bool esNuevoEquipo,
+
+    // Pendiente
     required int clienteId,
-    required Position position,
-    required bool enLocal,
-    required DateTime now,
+    required String edfVendedorId,
+    required bool crearPendiente,
+
+    // Censo
+    required String censoId,
+    required int usuarioId,
+    required double latitud,
+    required double longitud,
     String? observaciones,
-    String? imagenBase64,
-    String? imagenBase64_2,
+    required bool enLocal,
+    String? estadoCenso,
+    List<dynamic>? fotos,
+    String? clienteNombre,
+    String? marca,
+    String? modelo,
+    String? logo,
+    required DateTime now,
+  }) {
+    // 🔥 SIEMPRE LAS 3 SECCIONES (vacías si no aplican)
+    final Map<String, dynamic> payload = {};
+
+    // ═══════════════════════════════════════════════════════════════
+    // SECCIÓN EQUIPO (llena si es nuevo equipo, vacía si no)
+    // ═══════════════════════════════════════════════════════════════
+    if (esNuevoEquipo && marcaId != null && modeloId != null && logoId != null) {
+      payload['equipo'] = _construirJsonEquipo(
+        equipoId: equipoId,
+        codigoBarras: codigoBarras,
+        marcaId: marcaId,
+        modeloId: modeloId,
+        logoId: logoId,
+        numeroSerie: numeroSerie,
+      );
+      _logger.i('✅ JSON Equipo agregado (nuevo equipo)');
+    } else {
+      payload['equipo'] = {}; // 🔥 VACÍO si no es nuevo equipo
+      _logger.i('📭 JSON Equipo vacío (equipo existente)');
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SECCIÓN EQUIPO_PENDIENTE (llena si necesita pendiente, vacía si no)
+    // ═══════════════════════════════════════════════════════════════
+    if (crearPendiente) {
+      payload['equipo_pendiente'] = _construirJsonEquipoPendiente(
+        equipoId: equipoId,
+        clienteId: clienteId,
+        edfVendedorId: edfVendedorId,
+      );
+      _logger.i('✅ JSON Equipo_Pendiente agregado (crear asignación)');
+    } else {
+      payload['equipo_pendiente'] = {}; // 🔥 VACÍO si no necesita pendiente
+      _logger.i('📭 JSON Equipo_Pendiente vacío (ya asignado)');
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SECCIÓN CENSO_ACTIVO (SIEMPRE con datos completos)
+    // ═══════════════════════════════════════════════════════════════
+    payload['censo_activo'] = _construirJsonCensoActivo(
+      censoId: censoId,
+      equipoId: equipoId,
+      clienteId: clienteId,
+      usuarioId: usuarioId,
+      edfVendedorId: edfVendedorId,
+      latitud: latitud,
+      longitud: longitud,
+      observaciones: observaciones,
+      enLocal: enLocal,
+      estadoCenso: estadoCenso ?? 'pendiente',
+      fotos: fotos,
+      codigoBarras: codigoBarras,
+      numeroSerie: numeroSerie,
+      marca: marca,
+      modelo: modelo,
+      logo: logo,
+      clienteNombre: clienteNombre,
+      now: now,
+      esNuevoEquipo: esNuevoEquipo,
+    );
+
+    _logger.i('✅ JSON Censo_Activo agregado (SIEMPRE completo)');
+
+    return payload;
+  }
+
+  /// Construye el JSON del equipo (SOLO camelCase)
+  static Map<String, dynamic> _construirJsonEquipo({
+    required String equipoId,
+    required String codigoBarras,
+    required int marcaId,
+    required int modeloId,
+    required int logoId,
+    String? numeroSerie,
+  }) {
+    final now = DateTime.now().toIso8601String();
+
+    return {
+      'id': codigoBarras,
+      'equipoId': codigoBarras,
+      'codigoBarras': codigoBarras,
+      'edfModeloId': modeloId,
+      'marcaId': marcaId.toString(),
+      'logoId': logoId.toString(),
+      'numeroSerie': numeroSerie ?? '',
+      'fechaCreacion': now,
+      'appInsert': 1,
+      'esActivo': 1,
+      'esAplicaCenso': 1,
+      'esDisponible': 1,
+    };
+  }
+
+  /// Construye el JSON del equipo pendiente
+  static Map<String, dynamic> _construirJsonEquipoPendiente({
+    required String equipoId,
+    required int clienteId,
+    required String edfVendedorId,
+  }) {
+    final uuid = _uuid.v4();
+
+    // Extraer vendedorId y sucursalId del edfVendedorId
+    final partes = edfVendedorId.split('_');
+    final vendedorIdValue = partes.isNotEmpty ? partes[0] : edfVendedorId;
+    int? sucursalIdValue;
+    if (partes.length > 1) {
+      sucursalIdValue = int.tryParse(partes[1]);
+    }
+
+    final Map<String, dynamic> pendiente = {
+      'edfEquipoId': equipoId,
+      'edfClienteId': clienteId.toString(),
+      'uuid': uuid,
+      'edfVendedorSucursalId': edfVendedorId,
+      'edfVendedorId': vendedorIdValue,
+      'estado': 'pendiente',
+    };
+
+    if (sucursalIdValue != null) {
+      pendiente['edfSucursalId'] = sucursalIdValue;
+    }
+
+    return pendiente;
+  }
+
+  /// Construye el JSON del censo activo (SOLO camelCase)
+  static Map<String, dynamic> _construirJsonCensoActivo({
+    required String censoId,
+    required String equipoId,
+    required int clienteId,
+    required int usuarioId,
+    required String edfVendedorId,
+    required double latitud,
+    required double longitud,
+    String? observaciones,
+    required bool enLocal,
+    required String estadoCenso,
+    List<dynamic>? fotos,
     String? codigoBarras,
     String? numeroSerie,
-    String? modelo,
     String? marca,
+    String? modelo,
     String? logo,
     String? clienteNombre,
+    required DateTime now,
+    required bool esNuevoEquipo,
   }) {
     String formatearFechaLocal(DateTime fecha) {
       final local = fecha.toLocal();
       return local.toIso8601String().replaceAll('Z', '');
     }
 
-    return {
-      'id': timestampId.toString(),
+    final censo = {
+      'id': censoId,
       'edfVendedorSucursalId': edfVendedorId,
       'edfEquipoId': equipoId,
       'usuarioId': usuarioId,
       'edfClienteId': clienteId,
-      'fecha_revision': formatearFechaLocal(now),
-      'latitud': position.latitude,
-      'longitud': position.longitude,
+      'fechaRevision': formatearFechaLocal(now),
+      'latitud': latitud,
+      'longitud': longitud,
       'enLocal': enLocal,
       'fechaDeRevision': formatearFechaLocal(now),
-      'estadoCenso': 'asignado',
-      'equipo_codigo_barras': codigoBarras,
-      'equipo_numero_serie': numeroSerie ?? '',
-      'equipo_modelo': modelo ?? '',
-      'equipo_marca': marca ?? '',
-      'equipo_logo': logo ?? '',
-      'equipo_id': equipoId,
-      'cliente_nombre': clienteNombre ?? '',
+      'estadoCenso': estadoCenso,
+      'esNuevoEquipo': esNuevoEquipo,
+
+      // Información del equipo
+      'equipoCodigoBarras': codigoBarras,
+      'equipoNumeroSerie': numeroSerie ?? '',
+      'equipoModelo': modelo ?? '',
+      'equipoMarca': marca ?? '',
+      'equipoLogo': logo ?? '',
+      'equipoId': equipoId,
+
+      // Información del cliente
+      'clienteNombre': clienteNombre ?? '',
+      'clienteId': clienteId,
+
+      // Usuario y observaciones
+      'usuarioId': usuarioId,
       'observaciones': observaciones ?? '',
-      'cliente_id': clienteId,
-      'usuario_id': usuarioId,
-      'imagenPath': null,
-      'imageBase64_1': imagenBase64,
-      'imageBase64_2': imagenBase64_2,
-      'imageSize': null,
-      'en_local': enLocal,
+      'estadoGeneral': observaciones ?? 'Registro desde APP móvil',
+
+      // Metadata
+      'enLocal': enLocal,
       'dispositivo': 'android',
-      'es_censo': false,
-      'version_app': '1.0.0',
-      'estado_general': observaciones ?? 'Cambio de ubicación desde APP móvil',
-      'imagen_tamano': null,
-      'imagen_base64': imagenBase64,
-      'imagen_base64_2': imagenBase64_2,
-      'imagen_tamano2': null,
-      'tiene_imagen': imagenBase64 != null && imagenBase64.isNotEmpty,
-      'tiene_imagen2': imagenBase64_2 != null && imagenBase64_2.isNotEmpty,
-      'imagen_path': null,
-      'imagen_path2': null,
+      'esCenso': true,
+      'versionApp': '1.0.0',
+    };
+
+    // Agregar fotos si existen
+    if (fotos != null && fotos.isNotEmpty) {
+      censo['fotos'] = fotos;
+      censo['totalImagenes'] = fotos.length;
+
+      // Compatibilidad con formato anterior
+      for (int i = 0; i < fotos.length && i < 2; i++) {
+        final foto = fotos[i];
+        if (foto is Map<String, dynamic>) {
+          if (i == 0) {
+            censo['imageBase64_1'] = foto['base64'];
+            censo['tieneImagen'] = true;
+          } else if (i == 1) {
+            censo['imageBase64_2'] = foto['base64'];
+            censo['tieneImagen2'] = true;
+          }
+        }
+      }
+    } else {
+      censo['fotos'] = [];
+      censo['totalImagenes'] = 0;
+      censo['tieneImagen'] = false;
+      censo['tieneImagen2'] = false;
+    }
+
+    return censo;
+  }
+
+  /// Procesar respuesta con validación estricta usando ServerConstants
+  static Map<String, dynamic> _procesarRespuesta(http.Response response) {
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      return {
+        'exito': false,
+        'success': false,
+        'mensaje': 'Error del servidor: ${response.statusCode}',
+        'status_code': response.statusCode,
+      };
+    }
+
+    try {
+      final responseBody = json.decode(response.body);
+
+      // Validación con serverAction usando ServerConstants
+      if (responseBody is Map && responseBody.containsKey('serverAction')) {
+        final serverAction = responseBody['serverAction'] as int?;
+
+        if (serverAction == ServerConstants.SUCCESS_TRANSACTION) {
+          _logger.i('✅ Censo activo procesado correctamente (Action 100)');
+          return {
+            'exito': true,
+            'success': true,
+            'mensaje': responseBody['resultMessage'] ?? 'Censo activo procesado correctamente',
+            'serverAction': serverAction,
+            'servidor_id': responseBody['resultId'],
+            'id': responseBody['resultId'],
+          };
+        } else {
+          _logger.e('❌ Servidor rechazó censo activo (Action: $serverAction)');
+          return {
+            'exito': false,
+            'success': false,
+            'mensaje': responseBody['resultError'] ?? responseBody['resultMessage'] ?? 'Error del servidor',
+            'serverAction': serverAction,
+          };
+        }
+      }
+
+      // Fallback para respuestas sin serverAction
+      _logger.w('⚠️ Respuesta sin serverAction, asumiendo éxito');
+      return {
+        'exito': true,
+        'success': true,
+        'mensaje': 'Censo activo procesado (sin serverAction)',
+        'id': responseBody['id'],
+      };
+
+    } catch (e) {
+      _logger.w('⚠️ Error parseando JSON: $e');
+      return {
+        'exito': false,
+        'success': false,
+        'mensaje': 'Error en formato de respuesta',
+      };
+    }
+  }
+
+  static Map<String, dynamic> _errorResponse(String message) {
+    return {
+      'exito': false,
+      'success': false,
+      'mensaje': message,
+      'error': message,
     };
   }
 
-  /// Reintentar envío de censo fallido
-  static Future<Map<String, dynamic>> reintentarEnvioCenso({
-    required String estadoId,
-    required Map<String, dynamic> datos,
-    int intentoNumero = 1,
+  // =================================================================
+  // MÉTODO PARA COMPATIBILIDAD CON CÓDIGO EXISTENTE
+  // =================================================================
+
+  /// Método de compatibilidad para enviar solo cambio de estado (sin equipo/pendiente)
+  /// Usado por EquiposClienteDetailScreenViewModel
+  static Future<Map<String, dynamic>> enviarCambioEstado({
+    required String codigoBarras,
+    required int clienteId,
+    required bool enLocal,
+    required Position position,
+    String? observaciones,
+    String? equipoId,
+    String? clienteNombre,
+    String? numeroSerie,
+    String? modelo,
+    String? marca,
+    String? logo,
+    String? estadoCenso = 'pendiente',
+    int timeoutSegundos = 60,
     String? userId,
+    bool guardarLog = true,
   }) async {
-    BasePostService.logger.i('🔁 Reintentando censo: $estadoId (Intento #$intentoNumero)');
+    try {
+      _logger.i('📤 === ENVIANDO CAMBIO DE ESTADO (COMPATIBILIDAD) ===');
 
-    final result = await BasePostService.post(
-      endpoint: _endpoint,
-      body: datos,
-      timeout: const Duration(seconds: 30),
-      tableName: _tableName,
-      registroId: estadoId,
-      userId: userId,
-    );
+      // Obtener vendedorId del AuthService o usar valor por defecto
+      String edfVendedorId = '40_24'; // Valor por defecto
+      try {
+        // TODO: Implementar obtención real del vendedorId desde AuthService
+        // final usuario = await AuthService().getCurrentUser();
+        // edfVendedorId = usuario?.edfVendedorId ?? '40_24';
+      } catch (e) {
+        _logger.w('⚠️ No se pudo obtener vendedorId, usando valor por defecto: $edfVendedorId');
+      }
 
-    // Loguear reintento fallido
-    if (result['success'] == false || result['exito'] == false) {
-      await ErrorLogService.logError(
-        tableName: _tableName,
-        operation: 'RETRY_POST',
-        errorMessage: 'Reintento #$intentoNumero falló: ${result['error'] ?? result['mensaje']}',
-        errorType: 'retry_failed',
-        registroFailId: estadoId,
-        syncAttempt: intentoNumero,
-        userId: userId,
+      // Obtener usuarioId del AuthService o usar valor por defecto
+      int usuarioId = 1; // Valor por defecto
+      try {
+        // TODO: Implementar obtención real del usuarioId desde AuthService
+        // final usuario = await AuthService().getCurrentUser();
+        // usuarioId = usuario?.id ?? 1;
+      } catch (e) {
+        _logger.w('⚠️ No se pudo obtener usuarioId, usando valor por defecto: $usuarioId');
+      }
+
+      // Usar el método principal con parámetros para cambio de estado
+      return await enviarCensoActivo(
+        // NO es nuevo equipo (solo cambio de estado)
+        equipoId: equipoId ?? codigoBarras,
+        codigoBarras: codigoBarras,
+        esNuevoEquipo: false, // ✅ Solo cambio de estado
+
+        // NO crear pendiente (equipo ya asignado)
+        clienteId: clienteId,
+        edfVendedorId: edfVendedorId,
+        crearPendiente: false, // ✅ Equipo ya asignado
+
+        // Datos del censo (cambio de estado)
+        usuarioId: usuarioId,
+        latitud: position.latitude,
+        longitud: position.longitude,
+        observaciones: observaciones,
+        enLocal: enLocal,
+        estadoCenso: estadoCenso,
+
+        // Sin fotos para cambios de estado
+        fotos: [],
+
+        // Datos adicionales del equipo
+        clienteNombre: clienteNombre,
+        marca: marca,
+        modelo: modelo,
+        logo: logo,
+        numeroSerie: numeroSerie,
+
+        // Control
+        timeoutSegundos: timeoutSegundos,
+        userId: userId?.toString(),
+        guardarLog: guardarLog,
       );
-    }
 
-    return result;
+    } catch (e) {
+      _logger.e('❌ Error en enviarCambioEstado: $e');
+      return _errorResponse('Error enviando cambio de estado: $e');
+    }
   }
 }

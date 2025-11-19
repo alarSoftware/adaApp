@@ -7,16 +7,13 @@ import 'package:uuid/uuid.dart';
 import '../../models/cliente.dart';
 import '../../models/usuario.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
-import 'package:ada_app/services/post/equipo_post_service.dart';
-import 'package:ada_app/services/post/equipo_pendiente_post_service.dart';
-import 'package:ada_app/services/post/censo_unificado_post_service.dart'; // 🔥 NUEVO SERVICIO
+import 'package:ada_app/services/post/censo_activo_post_service.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/services/auth_service.dart';
 import 'package:ada_app/services/censo/censo_log_service.dart';
 import 'package:ada_app/services/censo/censo_upload_service.dart';
-import 'package:ada_app/services/censo/censo_api_mapper.dart';
 import 'package:ada_app/services/censo/censo_foto_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
@@ -174,7 +171,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         _setStatusMessage('Registrando equipo...');
         equipoId = await _crearEquipoNuevo(
             datos,
-            null,
+            clienteId, // ✅ PASAR cliente_id para pre-asignación
             processId,
             usuarioId.toString()
         );
@@ -244,11 +241,36 @@ class PreviewScreenViewModel extends ChangeNotifier {
       // FASE 3: RETORNO INMEDIATO AL USUARIO
       // ============================================================
 
+      // 🔥 AGREGAR equipo_completo para navegación (especialmente equipos nuevos)
+      Map<String, dynamic>? equipoCompleto;
+
+      if (esNuevoEquipo) {
+        // Para equipos nuevos, construir equipo_completo desde los datos del form
+        equipoCompleto = {
+          'id': equipoId,
+          'cod_barras': datos['codigo_barras']?.toString() ?? '',
+          'numero_serie': datos['numero_serie']?.toString(),
+          'marca_id': datos['marca_id'],
+          'modelo_id': datos['modelo_id'],
+          'logo_id': datos['logo_id'],
+          'marca_nombre': datos['marca_nombre']?.toString() ?? '',
+          'modelo_nombre': datos['modelo']?.toString() ?? '',
+          'logo_nombre': datos['logo']?.toString() ?? '',
+          'cliente_id': clienteId,
+        };
+        _logger.i('✅ equipo_completo construido para equipo nuevo');
+      } else {
+        // Para equipos existentes, usar los datos originales
+        equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
+        _logger.i('✅ equipo_completo obtenido de datos existentes');
+      }
+
       return {
         'success': true,
         'message': '✅ Registro guardado. Sincronizando unificado en segundo plano...',
         'estado_id': estadoIdActual,
         'equipo_id': equipoId,
+        'equipo_completo': equipoCompleto, // ✅ CRUCIAL para navegación
         'sincronizacion': 'unificada_background',
         'tiempo_guardado': '${tiempoLocal}s',
       };
@@ -315,8 +337,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
         // Determinar si necesita crear pendiente
         final crearPendiente = esNuevoEquipo || !await _verificarAsignacionLocal(equipoId, clienteId);
 
-        // 🔥 LLAMADA AL NUEVO SERVICIO UNIFICADO
-        final respuesta = await CensoUnificadoPostService.enviarCensoUnificado(
+        // 🔥 LLAMADA AL SERVICIO UNIFICADO
+        final respuesta = await CensoActivoPostService.enviarCensoActivo(
           // Datos del equipo (si es nuevo)
           equipoId: equipoId,
           codigoBarras: datos['codigo_barras']?.toString(),
@@ -433,7 +455,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Future<String> _crearEquipoNuevo(
       Map<String, dynamic> datos,
-      int? clienteId,
+      int? clienteId, // ✅ Recibe cliente_id para pre-asignación
       String processId,
       String? userId,
       ) async {
@@ -448,8 +470,13 @@ class PreviewScreenViewModel extends ChangeNotifier {
         modeloId: _safeCastToInt(datos['modelo_id'], 'modelo_id') ?? 1,
         numeroSerie: datos['numero_serie']?.toString(),
         logoId: _safeCastToInt(datos['logo_id'], 'logo_id') ?? 1,
+        clienteId: clienteId, // ✅ PASAR cliente_id para pre-asignación
       );
-      _logger.i('✅ Equipo creado localmente (disponible): $equipoId');
+      if (clienteId != null) {
+        _logger.i('✅ Equipo creado y PRE-ASIGNADO al cliente $clienteId: $equipoId');
+      } else {
+        _logger.i('✅ Equipo creado localmente (disponible): $equipoId');
+      }
       return equipoId;
     } catch (e, stackTrace) {
       _logger.e('❌ Error creando equipo: $e', stackTrace: stackTrace);

@@ -7,7 +7,7 @@ import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/services/censo/censo_api_mapper.dart';
-import 'package:ada_app/services/post/censo_unificado_post_service.dart'; // 🔥 NUEVO
+import 'package:ada_app/services/post/censo_activo_post_service.dart'; // 🔥 SERVICIO UNIFICADO
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:ada_app/config/constants/server_constants.dart';
@@ -72,7 +72,7 @@ class CensoUploadService {
 
   // ==================== ENVÍO AL SERVIDOR (UNIFICADO) ====================
 
-  /// 🔥 MÉTODO PRINCIPAL ACTUALIZADO - Usa el nuevo servicio unificado
+  /// 🔥 MÉTODO PRINCIPAL ACTUALIZADO - Usa el servicio unificado
   Future<Map<String, dynamic>> enviarCensoUnificadoAlServidor(
       Map<String, dynamic> datosLocales,
       List<dynamic> fotos, {
@@ -101,8 +101,9 @@ class CensoUploadService {
       // Verificar si necesita crear pendiente
       final crearPendiente = esNuevoEquipo || !await _verificarEquipoAsignado(equipoId, clienteId);
 
-      // 🔥 LLAMADA AL NUEVO SERVICIO UNIFICADO
-      final resultado = await CensoUnificadoPostService.enviarCensoUnificado(
+      // 🔥 LLAMADA AL SERVICIO UNIFICADO
+
+      final resultado = await CensoActivoPostService.enviarCensoActivo(
         // Datos del equipo (si es nuevo)
         equipoId: equipoId,
         codigoBarras: datosLocales['codigo_barras']?.toString(),
@@ -148,7 +149,7 @@ class CensoUploadService {
     }, 'upload_unificado', id: censoId, userId: userId);
   }
 
-  /// TODO: PREPARAR PAYLOAD CON MAPPER (actualizado para unificado)
+  /// Preparar payload con mapper (actualizado para unificado)
   Future<Map<String, dynamic>> prepararPayloadUnificado(
       String estadoId,
       List<dynamic> fotos,
@@ -191,7 +192,7 @@ class CensoUploadService {
 
   // ==================== SINCRONIZACIÓN EN BACKGROUND (SIMPLIFICADA) ====================
 
-  /// TODO: SINCRONIZACIÓN INDIVIDUAL SIMPLIFICADA (ya no necesita 3 pasos)
+  /// Sincronización individual simplificada (ya no necesita 3 pasos)
   Future<void> sincronizarCensoEnBackground(
       String estadoId,
       Map<String, dynamic> datos,
@@ -245,7 +246,7 @@ class CensoUploadService {
 
   // ==================== SINCRONIZACIÓN PERIÓDICA (SIMPLIFICADA) ====================
 
-  /// TODO: SINCRONIZACIÓN PERIÓDICA SIMPLIFICADA (solo censos, ya no equipos y pendientes separados)
+  /// Sincronización periódica simplificada (solo censos, ya no equipos y pendientes separados)
   Future<Map<String, int>> sincronizarRegistrosPendientes(int usuarioId) async {
     _logger.i('═══════════════════════════════════════════════════════');
     _logger.i('🔄 SINCRONIZACIÓN PERIÓDICA UNIFICADA');
@@ -309,7 +310,7 @@ class CensoUploadService {
     }
   }
 
-  /// TODO: SINCRONIZACIÓN INDIVIDUAL UNIFICADA
+  /// Sincronización individual unificada
   Future<void> _sincronizarRegistroIndividualUnificado(
       dynamic registro,
       int usuarioId,
@@ -362,7 +363,7 @@ class CensoUploadService {
     }
   }
 
-  /// TODO: REINTENTO MANUAL UNIFICADO
+  /// Reintento manual unificado
   Future<Map<String, dynamic>> reintentarEnvioCenso(
       String estadoId,
       int usuarioId,
@@ -407,7 +408,7 @@ class CensoUploadService {
     }
   }
 
-  // ==================== MÉTODOS ESTÁTICOS Y AUXILIARES (sin cambios) ====================
+  // ==================== MÉTODOS ESTÁTICOS Y AUXILIARES ====================
 
   static void iniciarSincronizacionAutomatica(int usuarioId) {
     if (_syncActivo && _usuarioActual == usuarioId) {
@@ -479,7 +480,7 @@ class CensoUploadService {
   static bool get esSincronizacionActiva => _syncActivo;
   static bool get estaEnProgreso => _syncEnProgreso;
 
-  // ==================== MÉTODOS PRIVADOS (sin cambios) ====================
+  // ==================== MÉTODOS PRIVADOS ====================
 
   Future<List<dynamic>> _filtrarRegistrosListosParaReintento(List<dynamic> registrosError) async {
     final registrosListos = <dynamic>[];

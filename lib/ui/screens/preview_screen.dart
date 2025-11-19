@@ -253,6 +253,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
       datosCompletos['imagen_tamano2'] = null;
     }
 
+    // 🔥 CORREGIDO: Usar confirmarRegistro (método que SÍ existe en el ViewModel actual)
     final resultado = await viewModel.confirmarRegistro(datosCompletos);
 
     if (mounted) {
