@@ -525,13 +525,18 @@ class CensoActivoPostService {
         equipoId: equipoId,
         clienteId: clienteId,
         edfVendedorId: edfVendedorId,
+        // 🔥 AGREGAMOS ESTOS DATOS PARA QUE LLEGUEN AL BACKEND
+        codigoBarras: codigoBarras,
+        numeroSerie: numeroSerie,
+        marcaId: marcaId,
+        modeloId: modeloId,
+        logoId: logoId,
       );
       _logger.i('✅ JSON Equipo_Pendiente agregado (crear asignación)');
     } else {
-      payload['equipo_pendiente'] = {}; // 🔥 VACÍO si no necesita pendiente
+      payload['equipo_pendiente'] = {};
       _logger.i('📭 JSON Equipo_Pendiente vacío (ya asignado)');
     }
-
     // ═══════════════════════════════════════════════════════════════
     // SECCIÓN CENSO_ACTIVO (SIEMPRE con datos completos)
     // ═══════════════════════════════════════════════════════════════
@@ -575,7 +580,7 @@ class CensoActivoPostService {
 
     return {
       'id': codigoBarras,
-      'equipoId': codigoBarras,
+      'edfEquipoId': codigoBarras,
       'codigoBarras': codigoBarras,
       'edfModeloId': modeloId,
       'marcaId': marcaId.toString(),
@@ -589,15 +594,20 @@ class CensoActivoPostService {
     };
   }
 
-  /// Construye el JSON del equipo pendiente
   static Map<String, dynamic> _construirJsonEquipoPendiente({
     required String equipoId,
     required int clienteId,
     required String edfVendedorId,
+    // ✅ NUEVOS PARÁMETROS QUE FALTABAN
+    required String codigoBarras,
+    String? numeroSerie,
+    int? marcaId,
+    int? modeloId,
+    int? logoId,
   }) {
     final uuid = _uuid.v4();
 
-    // Extraer vendedorId y sucursalId del edfVendedorId
+    // Lógica para separar Vendedor de Sucursal (ej: "40_24")
     final partes = edfVendedorId.split('_');
     final vendedorIdValue = partes.isNotEmpty ? partes[0] : edfVendedorId;
     int? sucursalIdValue;
@@ -605,13 +615,19 @@ class CensoActivoPostService {
       sucursalIdValue = int.tryParse(partes[1]);
     }
 
+    // ✅ MAPEO COMPLETO SEGÚN TU BACKEND GROOVY
     final Map<String, dynamic> pendiente = {
       'edfEquipoId': equipoId,
+      'edfCodigoBarras': codigoBarras,
       'edfClienteId': clienteId.toString(),
       'uuid': uuid,
+      'estado': 'pendiente',
       'edfVendedorSucursalId': edfVendedorId,
       'edfVendedorId': vendedorIdValue,
-      'estado': 'pendiente',
+      'edfSerie': numeroSerie,
+      'edfMarcaId': marcaId?.toString(),
+      'edfModeloId': modeloId,
+      'edfLogoId': logoId,
     };
 
     if (sucursalIdValue != null) {

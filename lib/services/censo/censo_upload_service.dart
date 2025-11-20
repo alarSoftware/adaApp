@@ -156,13 +156,43 @@ class CensoUploadService {
       ) async {
     return await _executeAndLogError<Map<String, dynamic>>(() async {
 
+      // 1. Obtener datos del CENSO
       final maps = await _estadoEquipoRepository.dbHelper.consultar(
         'censo_activo', where: 'id = ?', whereArgs: [estadoId], limit: 1,
       );
 
       if (maps.isEmpty) throw Exception('No se encontró el censo: $estadoId');
 
-      final datosLocales = maps.first;
+      // Hacemos una copia mutable para poder agregarle cosas
+      final datosLocales = Map<String, dynamic>.from(maps.first);
+      if (datosLocales['equipo_id'] != null) {
+        try {
+          final equiposList = await _equipoRepository.dbHelper.consultar(
+              'equipos',
+              where: 'id = ?',
+              whereArgs: [datosLocales['equipo_id']],
+              limit: 1
+          );
+
+          if (equiposList.isNotEmpty) {
+            final infoEquipo = equiposList.first;
+            datosLocales['marca_id'] ??= infoEquipo['marca_id'];
+            datosLocales['modelo_id'] ??= infoEquipo['modelo_id'];
+            datosLocales['logo_id'] ??= infoEquipo['logo_id'];
+            datosLocales['numero_serie'] ??= infoEquipo['numero_serie'];
+            datosLocales['codigo_barras'] ??= infoEquipo['cod_barras'];
+
+            // Opcional: Traer nombres si los necesitas para logs
+            datosLocales['marca_nombre'] ??= infoEquipo['marca_nombre'];
+            datosLocales['modelo'] ??= infoEquipo['modelo_nombre'];
+
+            _logger.i('✅ Datos enriquecidos desde tabla equipos (Marca: ${datosLocales['marca_id']}, Serie: ${datosLocales['numero_serie']})');
+          }
+        } catch (e) {
+          _logger.w('⚠️ No se pudo enriquecer datos del equipo: $e');
+        }
+      }
+
       final usuarioId = datosLocales['usuario_id'] as int?;
 
       _logger.i('🔍 DEBUG prepararPayloadUnificado:');
@@ -173,19 +203,15 @@ class CensoUploadService {
         _logger.e('❌ usuario_id es NULL en la BD');
         throw Exception('usuario_id es requerido');
       }
-
-      // Preparar datos adicionales
-      final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(usuarioId);
       final equipoId = datosLocales['equipo_id']?.toString();
       final clienteId = datosLocales['cliente_id'];
 
       final estaAsignado = await _verificarEquipoAsignado(equipoId, clienteId);
 
-      final datosLocalesMutable = Map<String, dynamic>.from(datosLocales);
-      datosLocalesMutable['ya_asignado'] = estaAsignado;
+      datosLocales['ya_asignado'] = estaAsignado;
 
       // Retornar datos preparados para envío unificado
-      return datosLocalesMutable;
+      return datosLocales;
 
     }, 'prepare_payload_unificado', id: estadoId);
   }
@@ -207,15 +233,12 @@ class CensoUploadService {
       final datosParaApi = await prepararPayloadUnificado(estadoId, fotos);
       await _actualizarUltimoIntento(estadoId, 1);
 
-      // 🔥 UNA SOLA LLAMADA UNIFICADA
       final respuesta = await enviarCensoUnificadoAlServidor(datosParaApi, fotos, timeoutSegundos: 45);
 
       if (respuesta['exito'] == true) {
-        // Marcar todo como sincronizado
         await _estadoEquipoRepository.marcarComoMigrado(estadoId, servidorId: respuesta['servidor_id']);
         await _estadoEquipoRepository.marcarComoSincronizado(estadoId);
 
-        // Si era nuevo equipo, marcarlo como sincronizado
         final equipoId = datosParaApi['equipo_id']?.toString();
         if (equipoId != null && datosParaApi['es_nuevo_equipo'] == true) {
           await _equipoRepository.marcarEquipoComoSincronizado(equipoId);

@@ -153,12 +153,12 @@ class _SelectScreenState extends State<SelectScreen> {
         IconButton(
           onPressed: () async {
             // Navegar a la pantalla de datos pendientes
-            // await Navigator.push(
-            //   context,
-            //   MaterialPageRoute(
-            //     builder: (context) => PendingDataScreen(),
-            //   ),
-            // );
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PendingDataScreen(),
+              ),
+            );
             // Refrescar contador después de volver
             _checkPendingData();
           },
@@ -518,14 +518,14 @@ class _SelectScreenState extends State<SelectScreen> {
                 style: TextStyle(color: AppColors.textSecondary),
               ),
             ),
-            // 🆕 NUEVO: Botón para ir a datos pendientes
+            // NUEVO: Botón para ir a datos pendientes
             TextButton(
               onPressed: () async {
                 Navigator.of(context).pop();
-                // await Navigator.push(
-                //   context,
-                //   // MaterialPageRoute(builder: (context) => PendingDataScreen()),
-                // );
+                await Navigator.push(
+                  context,
+                   MaterialPageRoute(builder: (context) => PendingDataScreen()),
+                );
                 _checkPendingData();
               },
               child: Text(

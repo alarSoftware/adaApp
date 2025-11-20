@@ -1,4 +1,3 @@
-// lib/ui/screens/operaciones_comerciales/operacion_comercial_form_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -15,18 +14,18 @@ import 'package:ada_app/ui/widgets/operaciones_comerciales/productos_seleccionad
 import 'package:ada_app/ui/widgets/bottom_bar_widget.dart';
 import 'package:ada_app/ui/widgets/observaciones_widget.dart';
 
-/// Pantalla principal del formulario de operación comercial
-/// Actualizada para trabajar con la nueva estructura de productos
 class OperacionComercialFormScreen extends StatelessWidget {
   final Cliente cliente;
   final TipoOperacion tipoOperacion;
   final OperacionComercial? operacionExistente;
+  final bool isViewOnly; // 👈 NUEVO: Parámetro explícito
 
   const OperacionComercialFormScreen({
     Key? key,
     required this.cliente,
     required this.tipoOperacion,
     this.operacionExistente,
+    this.isViewOnly = false, // 👈 NUEVO: Por defecto falso (modo edición/creación)
   }) : super(key: key);
 
   @override
@@ -36,6 +35,7 @@ class OperacionComercialFormScreen extends StatelessWidget {
         cliente: cliente,
         tipoOperacion: tipoOperacion,
         operacionExistente: operacionExistente,
+        isViewOnly: isViewOnly, // 👈 Pasamos el modo al ViewModel
       ),
       child: const _OperacionComercialFormView(),
     );
@@ -56,12 +56,12 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
   Widget build(BuildContext context) {
     return Consumer<vm.OperacionComercialFormViewModel>(
       builder: (context, viewModel, child) {
-        _handleViewModelStateChanges(viewModel);
 
+        // Bloqueo de botón atrás solo si hay cambios y NO es modo lectura
         return PopScope(
-          canPop: !viewModel.isFormDirty,
+          canPop: viewModel.isViewOnly || !viewModel.isFormDirty,
           onPopInvoked: (didPop) async {
-            if (!didPop && viewModel.isFormDirty) {
+            if (!didPop && !viewModel.isViewOnly && viewModel.isFormDirty) {
               final shouldPop = await _handleBackNavigation(viewModel);
               if (shouldPop && mounted) {
                 Navigator.of(context).pop();
@@ -69,6 +69,7 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
             }
           },
           child: Scaffold(
+            backgroundColor: const Color(0xFFF8F9FC),
             appBar: _buildAppBar(viewModel),
             body: _buildBody(viewModel),
           ),
@@ -77,93 +78,99 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     );
   }
 
-  void _handleViewModelStateChanges(vm.OperacionComercialFormViewModel viewModel) {
-    if (viewModel.hasError && viewModel.errorMessage != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          AppNotification.show(
-            context,
-            message: viewModel.errorMessage!,
-            type: NotificationType.error,
-          );
-          viewModel.clearError();
-        }
-      });
-    }
-  }
-
   PreferredSizeWidget _buildAppBar(vm.OperacionComercialFormViewModel viewModel) {
     return AppBar(
+      // Cambiamos el título según el modo
       title: Text(
-        viewModel.operacionExistente != null
-            ? 'Editar ${viewModel.tipoOperacion.displayName}'
+        viewModel.isViewOnly
+            ? 'Detalle de Operación'
             : 'Crear ${viewModel.tipoOperacion.displayName}',
+        style: const TextStyle(fontWeight: FontWeight.w600),
       ),
       backgroundColor: AppColors.appBarBackground,
       foregroundColor: AppColors.appBarForeground,
-      elevation: 2,
+      elevation: 0,
+      centerTitle: true,
     );
   }
 
   Widget _buildBody(vm.OperacionComercialFormViewModel viewModel) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () {
-        FocusScope.of(context).unfocus();
-      },
+      onTap: () => FocusScope.of(context).unfocus(),
       child: Form(
         key: _formKey,
         child: Column(
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Cliente siempre visible
                     _buildClienteInfo(viewModel),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
 
-                    BuscadorProductosWidget(
-                      searchQuery: viewModel.searchQuery,
-                      productosFiltrados: viewModel.productosFiltrados,
-                      productosSeleccionados: viewModel.productosSeleccionados,
-                      onSearchChanged: viewModel.setSearchQuery,
-                      onClearSearch: viewModel.clearSearch,
-                      onProductoSelected: viewModel.agregarProducto,
-                    ),
-                    const SizedBox(height: 16),
-
+                    // 1️⃣ Fecha de Retiro
                     if (viewModel.tipoOperacion.necesitaFechaRetiro) ...[
-                      _buildFechaRetiroField(viewModel),
-                      const SizedBox(height: 16),
+                      // Usamos IgnorePointer para bloquear clicks en modo lectura
+                      IgnorePointer(
+                        ignoring: viewModel.isViewOnly,
+                        child: _buildFechaRetiroField(viewModel),
+                      ),
+                      const SizedBox(height: 20),
                     ],
 
-                    ProductosSeleccionadosWidget(
-                      productosSeleccionados: viewModel.productosSeleccionados,
-                      tipoOperacion: viewModel.tipoOperacion,
-                      onEliminarProducto: viewModel.eliminarProducto,
-                      onActualizarCantidad: viewModel.actualizarCantidadProducto,
-                      onSeleccionarReemplazo: (index, detalle) =>
-                          _seleccionarProductoReemplazo(viewModel, index, detalle),
-                    ),
-                    const SizedBox(height: 16),
+                    // 2️⃣ Buscador: LO OCULTAMOS SI ES SOLO LECTURA
+                    if (!viewModel.isViewOnly) ...[
+                      BuscadorProductosWidget(
+                        searchQuery: viewModel.searchQuery,
+                        productosFiltrados: viewModel.productosFiltrados,
+                        productosSeleccionados: viewModel.productosSeleccionados,
+                        onSearchChanged: viewModel.setSearchQuery,
+                        onClearSearch: viewModel.clearSearch,
+                        onProductoSelected: viewModel.agregarProducto,
+                      ),
+                      const SizedBox(height: 20),
+                    ],
 
-                    ObservacionesWidget(
-                      observaciones: viewModel.observaciones,
-                      onObservacionesChanged: viewModel.setObservaciones,
+                    // 3️⃣ Lista de productos
+                    // Aquí usamos IgnorePointer para evitar eliminar/editar items
+                    IgnorePointer(
+                      ignoring: viewModel.isViewOnly,
+                      child: ProductosSeleccionadosWidget(
+                        productosSeleccionados: viewModel.productosSeleccionados,
+                        tipoOperacion: viewModel.tipoOperacion,
+                        onEliminarProducto: viewModel.isViewOnly ? (_) {} : viewModel.eliminarProducto,
+                        onActualizarCantidad: viewModel.isViewOnly ? (_, __) {} : viewModel.actualizarCantidadProducto,
+                        onSeleccionarReemplazo: viewModel.isViewOnly ? (_, __) {} : (index, detalle) =>
+                            _seleccionarProductoReemplazo(viewModel, index, detalle),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // 4️⃣ Observaciones
+                    IgnorePointer(
+                      ignoring: viewModel.isViewOnly,
+                      child: ObservacionesWidget(
+                        observaciones: viewModel.observaciones,
+                        onObservacionesChanged: viewModel.setObservaciones,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
 
-            BottomBarWidget(
-              totalProductos: viewModel.totalProductos,
-              isSaving: viewModel.isSaving,
-              isEditing: viewModel.operacionExistente != null,
-              onGuardar: () => _guardarOperacion(viewModel),
-            ),
+            // 🚫 BARRA INFERIOR: Solo se muestra si NO es solo lectura
+            if (!viewModel.isViewOnly)
+              BottomBarWidget(
+                totalProductos: viewModel.totalProductos,
+                isSaving: viewModel.isSaving,
+                isEditing: false, // Ya no es edición, es creación única
+                onGuardar: () => _guardarOperacion(viewModel),
+              ),
           ],
         ),
       ),
@@ -177,108 +184,139 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
         child: ClientInfoCard(
           cliente: viewModel.cliente,
           showFullDetails: false,
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(4),
         ),
       ),
     );
   }
 
   Widget _buildFechaRetiroField(vm.OperacionComercialFormViewModel viewModel) {
+    final isError = !viewModel.isViewOnly && viewModel.fechaRetiro == null;
+
+    // Color más apagado si es solo lectura
+    final containerColor = viewModel.isViewOnly ? Colors.grey.shade100 : Colors.white;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Fecha de Retiro *',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: () => _seleccionarFechaRetiro(viewModel),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: viewModel.fechaRetiro == null
-                    ? AppColors.error
-                    : AppColors.border,
-                width: viewModel.fechaRetiro == null ? 2 : 1,
+        Row(
+          children: [
+            Text(
+              'Fecha de Retiro',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
               ),
-              borderRadius: BorderRadius.circular(8),
-              color: Colors.white,
             ),
+            if (!viewModel.isViewOnly)
+              Text(' *', style: TextStyle(color: AppColors.error, fontSize: 16)),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: containerColor,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: viewModel.isViewOnly ? [] : [ // Sin sombra en lectura
+              BoxShadow(
+                color: isError ? AppColors.error.withOpacity(0.1) : Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: Border.all(
+              color: isError ? AppColors.error : Colors.transparent,
+              width: isError ? 1.5 : 1,
+            ),
+          ),
+          child: InkWell(
+            // Bloqueamos el tap aquí también por seguridad
+            onTap: viewModel.isViewOnly ? null : () => _seleccionarFechaRetiro(viewModel),
             child: Row(
               children: [
-                Icon(
-                  Icons.calendar_today,
-                  color: AppColors.textSecondary,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    viewModel.fechaRetiro == null
-                        ? 'Seleccionar fecha'
-                        : DateFormat('dd/MM/yyyy').format(viewModel.fechaRetiro!),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: viewModel.fechaRetiro == null
-                          ? AppColors.textSecondary
-                          : AppColors.textPrimary,
-                    ),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isError
+                        ? AppColors.error.withOpacity(0.1)
+                        : AppColors.primary.withOpacity(viewModel.isViewOnly ? 0.05 : 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.calendar_today_rounded,
+                    color: viewModel.isViewOnly
+                        ? Colors.grey
+                        : (isError ? AppColors.error : AppColors.primary),
+                    size: 22,
                   ),
                 ),
-                Icon(
-                  Icons.arrow_drop_down,
-                  color: AppColors.textSecondary,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        viewModel.fechaRetiro == null
+                            ? 'Sin fecha definida'
+                            : DateFormat('dd/MM/yyyy').format(viewModel.fechaRetiro!),
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: viewModel.isViewOnly
+                              ? AppColors.textSecondary
+                              : AppColors.textPrimary,
+                        ),
+                      ),
+                      if (isError)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Requerido',
+                            style: TextStyle(fontSize: 12, color: AppColors.error),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
+                if (!viewModel.isViewOnly) // Solo mostramos flecha si se puede editar
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: AppColors.textSecondary.withOpacity(0.5),
+                    size: 16,
+                  ),
               ],
             ),
           ),
         ),
-        if (viewModel.fechaRetiro == null) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.error_outline, size: 14, color: AppColors.error),
-              const SizedBox(width: 4),
-              Text(
-                'La fecha de retiro es obligatoria',
-                style: TextStyle(
-                  color: AppColors.error,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ],
       ],
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // EVENT HANDLERS
-  // ═══════════════════════════════════════════════════════════════════
-
   Future<void> _seleccionarFechaRetiro(vm.OperacionComercialFormViewModel viewModel) async {
+    if (viewModel.isViewOnly) return; // Doble chequeo
+
     final ahora = DateTime.now();
     final hoy = DateTime(ahora.year, ahora.month, ahora.day);
+    final fechaActual = viewModel.fechaRetiro ?? hoy;
+    // Permitir fechas pasadas en visualización por si acaso
+    final firstDate = fechaActual.isBefore(hoy) ? fechaActual : hoy;
 
     final fechaSeleccionada = await showDatePicker(
       context: context,
-      initialDate: viewModel.fechaRetiro ?? hoy,
-      firstDate: hoy,
-      lastDate: DateTime(ahora.year + 1, ahora.month, ahora.day),
+      initialDate: fechaActual,
+      firstDate: firstDate,
+      lastDate: DateTime(ahora.year + 1),
+      locale: const Locale('es', 'ES'),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
               primary: AppColors.primary,
-              onPrimary: AppColors.onPrimary,
-              surface: AppColors.surface,
+              onPrimary: Colors.white,
+              surface: Colors.white,
               onSurface: AppColors.textPrimary,
             ),
           ),
@@ -292,66 +330,23 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     }
   }
 
-  Future<void> _seleccionarProductoReemplazo(
-      vm.OperacionComercialFormViewModel viewModel,
-      int index,
-      dynamic detalle,
-      ) async {
-    // ✅ Usar el ID que ya está guardado en el detalle
-    final productosReemplazo = await viewModel.getProductosReemplazo(
-      detalle.productoCategoria ?? '',
-      detalle.productoCodigo,
-      detalle.productoId, // 👈 Usar el ID guardado directamente
-    );
-
-    if (productosReemplazo.isEmpty) {
-      if (mounted) {
-        AppNotification.show(
-          context,
-          message: 'No hay productos disponibles en la categoría ${detalle.productoCategoria}',
-          type: NotificationType.warning,
-        );
-      }
-      return;
-    }
-
-    if (!mounted) return;
-
-    final productoSeleccionado = await showModalBottomSheet<Producto>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => _ProductoReemplazoModal(
-        productos: productosReemplazo,
-        categoriaOriginal: detalle.productoCategoria ?? '',
-      ),
-    );
-
-    if (productoSeleccionado != null) {
-      viewModel.setProductoReemplazo(index, productoSeleccionado);
-    }
-  }
-
   Future<void> _guardarOperacion(vm.OperacionComercialFormViewModel viewModel) async {
     if (!_formKey.currentState!.validate()) {
       AppNotification.show(
         context,
-        message: 'Por favor corrige los errores en el formulario',
+        message: 'Por favor revisa los campos marcados',
         type: NotificationType.error,
       );
       return;
     }
 
     final success = await viewModel.guardarOperacion();
-
     if (!mounted) return;
 
     if (success) {
       AppNotification.show(
         context,
-        message: 'Operación guardada exitosamente',
+        message: 'Operación guardada correctamente',
         type: NotificationType.success,
       );
       Navigator.pop(context, true);
@@ -359,348 +354,193 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
   }
 
   Future<bool> _handleBackNavigation(vm.OperacionComercialFormViewModel viewModel) async {
-    if (!viewModel.isFormDirty) {
-      return true;
-    }
-
-    final confirm = await showDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('¿Descartar cambios?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppColors.warning),
+            const SizedBox(width: 12),
+            const Text('Cambios sin guardar'),
+          ],
+        ),
         content: const Text(
-          'Tienes cambios sin guardar. ¿Estás seguro que deseas salir?',
+          'Tienes cambios que no se han guardado. ¿Estás seguro que quieres salir?',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
+            child: Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
+              backgroundColor: AppColors.warning,
+              foregroundColor: Colors.white,
             ),
-            child: const Text('Descartar'),
+            child: const Text('Salir sin guardar'),
           ),
         ],
       ),
     );
-
-    return confirm ?? false;
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// MODAL PARA SELECCIONAR PRODUCTO DE REEMPLAZO
-// ═══════════════════════════════════════════════════════════════════
-
-class _ProductoReemplazoModal extends StatefulWidget {
-  final List<Producto> productos;
-  final String categoriaOriginal;
-
-  const _ProductoReemplazoModal({
-    required this.productos,
-    required this.categoriaOriginal,
-  });
-
-  @override
-  State<_ProductoReemplazoModal> createState() => _ProductoReemplazoModalState();
-}
-
-class _ProductoReemplazoModalState extends State<_ProductoReemplazoModal> {
-  final _searchController = TextEditingController();
-  List<Producto> _productosFiltrados = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _productosFiltrados = widget.productos;
+    return result ?? false;
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
+  // ✅ VERSIÓN CORREGIDA: Método para seleccionar reemplazo
+  Future<void> _seleccionarProductoReemplazo(
+      vm.OperacionComercialFormViewModel viewModel,
+      int index,
+      dynamic detalle,
+      ) async {
+    if (viewModel.isViewOnly) return; // No permitir en modo solo lectura
 
-  void _filtrarProductos(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        _productosFiltrados = widget.productos;
-      } else {
-        final queryLower = query.toLowerCase();
-        _productosFiltrados = widget.productos.where((producto) {
-          // ✅ CORREGIDO: Usar campos que existen en la nueva estructura
-          final codigo = producto.codigo?.toLowerCase() ?? '';
-          final nombre = producto.nombre?.toLowerCase() ?? '';
-          final codigoBarras = producto.codigoBarras?.toLowerCase() ?? '';
+    // Crear un objeto Producto temporal para usar con el ViewModel
+    final productoOriginal = Producto(
+      id: detalle.productoId,
+      codigo: detalle.productoCodigo,
+      nombre: detalle.productoDescripcion,
+      categoria: detalle.productoCategoria,
+    );
 
-          return codigo.contains(queryLower) ||
-              nombre.contains(queryLower) ||
-              codigoBarras.contains(queryLower);
-        }).toList();
-      }
-    });
-  }
+    // Obtener productos de reemplazo usando el método correcto
+    final productosReemplazo = await viewModel.obtenerProductosReemplazo(productoOriginal);
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            children: [
-              Icon(
-                Icons.swap_horiz,
-                color: AppColors.primary,
-                size: 28,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Seleccionar Reemplazo',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Categoría: ${widget.categoriaOriginal}',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: Icon(Icons.close, color: AppColors.textSecondary),
-              ),
-            ],
-          ),
+    if (!mounted) return;
 
-          const SizedBox(height: 16),
+    if (productosReemplazo.isEmpty) {
+      AppNotification.show(
+        context,
+        message: 'No hay productos de reemplazo disponibles',
+        type: NotificationType.info,
+      );
+      return;
+    }
 
-          // Buscador
-          TextField(
-            controller: _searchController,
-            onChanged: _filtrarProductos,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: 'Buscar por código, nombre o código de barras...', // ✅ Actualizado
-              hintStyle: TextStyle(color: AppColors.textSecondary),
-              prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                icon: Icon(Icons.clear, color: AppColors.textSecondary),
-                onPressed: () {
-                  _searchController.clear();
-                  _filtrarProductos('');
-                },
-              )
-                  : null,
-              filled: true,
-              fillColor: AppColors.surfaceVariant,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.primary, width: 2),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.inventory_2,
-                  size: 14,
-                  color: AppColors.textSecondary,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  _productosFiltrados.length == widget.productos.length
-                      ? '${widget.productos.length} productos disponibles'
-                      : '${_productosFiltrados.length} de ${widget.productos.length} productos',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
+    // Mostrar modal de selección
+    final productoSeleccionado = await showModalBottomSheet<Producto>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Lista de productos
-          Expanded(
-            child: _productosFiltrados.isEmpty
-                ? Center(
+                ],
+              ),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.search_off,
-                    size: 64,
-                    color: AppColors.textSecondary.withOpacity(0.3),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'No se encontraron productos',
+                    'Seleccionar Reemplazo',
                     style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Intenta con otro término de búsqueda',
+                    'Productos de la misma categoría disponibles',
                     style: TextStyle(
+                      fontSize: 14,
                       color: AppColors.textSecondary,
-                      fontSize: 13,
                     ),
                   ),
                 ],
               ),
-            )
-                : ListView.builder(
-              itemCount: _productosFiltrados.length,
-              itemBuilder: (context, index) {
-                final producto = _productosFiltrados[index];
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    border: Border.all(color: AppColors.border),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.03),
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
+            ),
+            Expanded(
+              child: ListView.separated(
+                controller: scrollController,
+                padding: const EdgeInsets.all(16),
+                itemCount: productosReemplazo.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final producto = productosReemplazo[index];
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      onTap: () => Navigator.pop(context, producto),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          children: [
-                            // Icono
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                Icons.inventory_2,
-                                color: AppColors.primary,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-
-                            // Información del producto
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    producto.codigo ?? 'Sin código', // ✅ CORREGIDO: Manejar nullable
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    producto.nombre ?? 'Sin nombre', // ✅ CORREGIDO: Usar nombre en lugar de descripcion
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  // ✅ CORREGIDO: Mostrar código de barras en lugar de stock
-                                  if (producto.tieneCodigoBarras) ...[
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.qr_code,
-                                          size: 12,
-                                          color: AppColors.primary,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'CB: ${producto.codigoBarras}',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: AppColors.textSecondary,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-
-                            // Flecha
-                            Icon(
-                              Icons.arrow_forward_ios,
-                              size: 16,
-                              color: AppColors.textSecondary,
-                            ),
-                          ],
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(12),
+                      leading: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.inventory_2,
+                          color: AppColors.primary,
+                          size: 24,
                         ),
                       ),
+                      title: Text(
+                        producto.nombre ?? 'Sin nombre',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 4),
+                          Text(
+                            'Código: ${producto.codigo ?? 'N/A'}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      trailing: Icon(
+                        Icons.arrow_forward_ios,
+                        color: AppColors.primary,
+                        size: 16,
+                      ),
+                      onTap: () => Navigator.pop(context, producto),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+
+    if (productoSeleccionado != null) {
+      viewModel.seleccionarProductoReemplazo(index, productoSeleccionado);
+    }
   }
 }

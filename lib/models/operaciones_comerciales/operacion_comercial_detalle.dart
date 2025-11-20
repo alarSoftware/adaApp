@@ -1,11 +1,10 @@
-// lib/models/operaciones_comerciales/operacion_comercial_detalle.dart
 class OperacionComercialDetalle {
   final String? id;
   final String operacionComercialId;
   final String productoCodigo;
   final String productoDescripcion;
   final String? productoCategoria;
-  final int? productoId; // 👈 NUEVO CAMPO
+  final int? productoId;
   final double cantidad;
   final String unidadMedida;
   final String? ticket;
@@ -16,6 +15,7 @@ class OperacionComercialDetalle {
   final bool estaSincronizado;
 
   // 🆕 CAMPOS PARA INTERCAMBIO (RETIRO DISCONTINUOS)
+  final int? productoReemplazoId; // 👈 AGREGAR ESTE CAMPO
   final String? productoReemplazoCodigo;
   final String? productoReemplazoDescripcion;
   final String? productoReemplazoCategoria;
@@ -26,7 +26,7 @@ class OperacionComercialDetalle {
     required this.productoCodigo,
     required this.productoDescripcion,
     this.productoCategoria,
-    this.productoId, // 👈 NUEVO
+    this.productoId,
     required this.cantidad,
     required this.unidadMedida,
     this.ticket,
@@ -35,6 +35,7 @@ class OperacionComercialDetalle {
     this.orden = 1,
     required this.fechaCreacion,
     this.estaSincronizado = false,
+    this.productoReemplazoId, // 👈 AGREGAR AQUÍ
     this.productoReemplazoCodigo,
     this.productoReemplazoDescripcion,
     this.productoReemplazoCategoria,
@@ -47,7 +48,7 @@ class OperacionComercialDetalle {
       productoCodigo: map['producto_codigo'] as String? ?? '',
       productoDescripcion: map['producto_descripcion'] as String? ?? '',
       productoCategoria: map['producto_categoria'] as String?,
-      productoId: map['producto_id'] as int?, // 👈 NUEVO
+      productoId: map['producto_id'] as int?,
       cantidad: (map['cantidad'] as num?)?.toDouble() ?? 0.0,
       unidadMedida: map['unidad_medida'] as String? ?? '',
       ticket: map['ticket'] as String?,
@@ -58,6 +59,7 @@ class OperacionComercialDetalle {
           ? DateTime.parse(map['fecha_creacion'] as String)
           : DateTime.now(),
       estaSincronizado: (map['sincronizado'] as int?) == 1,
+      productoReemplazoId: map['producto_reemplazo_id'] as int?, // 👈 AGREGAR
       productoReemplazoCodigo: map['producto_reemplazo_codigo'] as String?,
       productoReemplazoDescripcion: map['producto_reemplazo_descripcion'] as String?,
       productoReemplazoCategoria: map['producto_reemplazo_categoria'] as String?,
@@ -71,7 +73,7 @@ class OperacionComercialDetalle {
       'producto_codigo': productoCodigo,
       'producto_descripcion': productoDescripcion,
       'producto_categoria': productoCategoria,
-      'producto_id': productoId, // 👈 NUEVO
+      'producto_id': productoId,
       'cantidad': cantidad,
       'unidad_medida': unidadMedida,
       'ticket': ticket,
@@ -80,6 +82,7 @@ class OperacionComercialDetalle {
       'orden': orden,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'sincronizado': estaSincronizado ? 1 : 0,
+      'producto_reemplazo_id': productoReemplazoId, // 👈 AGREGAR
       'producto_reemplazo_codigo': productoReemplazoCodigo,
       'producto_reemplazo_descripcion': productoReemplazoDescripcion,
       'producto_reemplazo_categoria': productoReemplazoCategoria,
@@ -92,13 +95,14 @@ class OperacionComercialDetalle {
       'producto_codigo': productoCodigo,
       'producto_descripcion': productoDescripcion,
       'producto_categoria': productoCategoria,
-      'producto_id': productoId, // 👈 NUEVO
+      'producto_id': productoId,
       'cantidad': cantidad,
       'unidad_medida': unidadMedida,
       'ticket': ticket,
       'precio_unitario': precioUnitario,
       'subtotal': subtotal,
       'orden': orden,
+      'producto_reemplazo_id': productoReemplazoId, // 👈 AGREGAR
       'producto_reemplazo_codigo': productoReemplazoCodigo,
       'producto_reemplazo_descripcion': productoReemplazoDescripcion,
       'producto_reemplazo_categoria': productoReemplazoCategoria,
@@ -111,7 +115,7 @@ class OperacionComercialDetalle {
     String? productoCodigo,
     String? productoDescripcion,
     String? productoCategoria,
-    int? productoId, // 👈 NUEVO
+    int? productoId,
     double? cantidad,
     String? unidadMedida,
     String? ticket,
@@ -120,6 +124,7 @@ class OperacionComercialDetalle {
     int? orden,
     DateTime? fechaCreacion,
     bool? estaSincronizado,
+    int? productoReemplazoId, // 👈 AGREGAR
     String? productoReemplazoCodigo,
     String? productoReemplazoDescripcion,
     String? productoReemplazoCategoria,
@@ -130,7 +135,7 @@ class OperacionComercialDetalle {
       productoCodigo: productoCodigo ?? this.productoCodigo,
       productoDescripcion: productoDescripcion ?? this.productoDescripcion,
       productoCategoria: productoCategoria ?? this.productoCategoria,
-      productoId: productoId ?? this.productoId, // 👈 NUEVO
+      productoId: productoId ?? this.productoId,
       cantidad: cantidad ?? this.cantidad,
       unidadMedida: unidadMedida ?? this.unidadMedida,
       ticket: ticket ?? this.ticket,
@@ -139,6 +144,7 @@ class OperacionComercialDetalle {
       orden: orden ?? this.orden,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       estaSincronizado: estaSincronizado ?? this.estaSincronizado,
+      productoReemplazoId: productoReemplazoId ?? this.productoReemplazoId, // 👈 AGREGAR
       productoReemplazoCodigo: productoReemplazoCodigo ?? this.productoReemplazoCodigo,
       productoReemplazoDescripcion: productoReemplazoDescripcion ?? this.productoReemplazoDescripcion,
       productoReemplazoCategoria: productoReemplazoCategoria ?? this.productoReemplazoCategoria,

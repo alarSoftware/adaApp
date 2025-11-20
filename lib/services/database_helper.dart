@@ -522,6 +522,8 @@ class DatabaseHelper {
     const tablesWithoutTimestamps = {
       'clientes',
       'modelos',
+      'marcas',
+      'logo',
       'dynamic_form',
       'dynamic_form_detail',
       'dynamic_form_response',

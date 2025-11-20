@@ -182,16 +182,14 @@ class PreviewScreenViewModel extends ChangeNotifier {
         _logger.i('ℹ️ Usando equipo existente: $equipoId');
       }
 
-      // 1B. Crear pendiente LOCAL (si aplica)
-      if (esNuevoEquipo) {
-        _setStatusMessage('Registrando asignación...');
-        await _equipoPendienteRepository.procesarEscaneoCenso(
-          equipoId: equipoId,
-          clienteId: clienteId,
-          usuarioId: usuarioId,
-        );
-        _logger.i('✅ Pendiente registrado localmente');
-      }
+      // 1B. Crear pendiente LOCAL (SIEMPRE para censos)
+      _setStatusMessage('Registrando asignación...');
+      await _equipoPendienteRepository.procesarEscaneoCenso(
+        equipoId: equipoId,
+        clienteId: clienteId,
+        usuarioId: usuarioId,
+      );
+      _logger.i('✅ Pendiente registrado localmente');
 
       // 🔥 1C. CREAR CENSO LOCAL CON USUARIO GARANTIZADO
       _setStatusMessage('Guardando censo...');
