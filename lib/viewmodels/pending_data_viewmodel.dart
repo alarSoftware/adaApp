@@ -145,7 +145,7 @@ class PendingDataViewModel extends ChangeNotifier {
   // Control de cancelación
   bool _isCancelled = false;
 
-  // 🆕 Auto-sincronización
+  // Auto-sincronización
   Timer? _autoSyncTimer;
   bool _autoSyncEnabled = false;
 
@@ -169,7 +169,7 @@ class PendingDataViewModel extends ChangeNotifier {
   int get sendCompletedCount => _sendCompletedCount;
   int get sendTotalCount => _sendTotalCount;
 
-  // 🆕 Getters de auto-sync
+  // Getters de auto-sync
   bool get autoSyncEnabled => _autoSyncEnabled;
   Duration get autoSyncInterval => _config.autoSyncInterval;
 
@@ -186,7 +186,7 @@ class PendingDataViewModel extends ChangeNotifier {
     super.dispose();
   }
 
-  // ========== 🆕 MÉTODOS DE SINCRONIZACIÓN AUTOMÁTICA ==========
+  // ========== MÉTODOS DE SINCRONIZACIÓN AUTOMÁTICA ==========
 
   /// Inicia la sincronización automática periódica
   void iniciarSincronizacionAutomatica() {
@@ -344,38 +344,82 @@ class PendingDataViewModel extends ChangeNotifier {
       _logger.i('🔍 Cargando datos pendientes...');
 
       final db = await _dbHelper.database;
+
+      // 🔥 CONTAR SOLO CENSOS ACTIVOS NO SINCRONIZADOS
+      final censosPendientes = await db.query(
+        'censo_activo',
+        where: 'sincronizado = ?',
+        whereArgs: [0],
+      );
+
+      final cantidadCensos = censosPendientes.length;
+
+      _logger.i('📋 Censos pendientes de sincronización: $cantidadCensos');
+
+      // Obtener otros datos pendientes (formularios, logs, etc.)
       final validationService = DatabaseValidationService(db);
-
       final summary = await validationService.getPendingSyncSummary();
-
-      _totalPendingItems = summary['total_pending'] ?? 0;
-
       final pendingByTable = summary['pending_by_table'] as List<dynamic>? ?? [];
 
-      _pendingGroups = pendingByTable.map((item) {
+      final grupos = <PendingDataGroup>[];
+
+      // Tablas relacionadas con censos que NO deben aparecer por separado
+      final tablasExcluidas = {
+        'censo_activo',
+        'equipos_pendientes',
+        'censo_activo_foto',
+      };
+
+      // 🔥 AGREGAR SOLO LA TARJETA DE CENSOS SI HAY CENSOS SIN SINCRONIZAR
+      if (cantidadCensos > 0) {
+        grupos.add(PendingDataGroup(
+          tableName: 'censo_activo',
+          displayName: 'Censos Activos',
+          count: cantidadCensos, // 🔑 SOLO los censos no sincronizados
+          type: PendingDataType.census,
+          description: 'Censos pendientes de sincronización',
+        ));
+      }
+
+      // Agregar otras categorías (formularios, logs, etc.)
+      for (var item in pendingByTable) {
         final tableName = item['table'] as String;
+
+        // Saltar tablas relacionadas con censos
+        if (tablasExcluidas.contains(tableName)) {
+          continue;
+        }
+
         final displayName = item['display_name'] as String;
         final count = item['count'] as int;
 
-        return PendingDataGroup(
-          tableName: tableName,
-          displayName: displayName,
-          count: count,
-          type: _getDataType(tableName),
-          description: _getDescription(tableName),
-        );
-      }).toList();
+        if (count > 0) {
+          grupos.add(PendingDataGroup(
+            tableName: tableName,
+            displayName: displayName,
+            count: count,
+            type: _getDataType(tableName),
+            description: _getDescription(tableName),
+          ));
+        }
+      }
 
       // Ordenar por tipo y luego por nombre
-      _pendingGroups.sort((a, b) {
+      grupos.sort((a, b) {
         final typeCompare = a.type.index.compareTo(b.type.index);
         if (typeCompare != 0) return typeCompare;
         return a.displayName.compareTo(b.displayName);
       });
 
+      _pendingGroups = grupos;
+
+      // 🔥 TOTAL: Sumar solo los grupos que se muestran
+      _totalPendingItems = grupos.fold(0, (sum, group) => sum + group.count);
+
       _lastUpdateTime = DateTime.now().toString().substring(0, 19);
 
       _logger.i('✅ Datos pendientes cargados: $_totalPendingItems items en ${_pendingGroups.length} grupos');
+      _logger.i('   - Censos activos: $cantidadCensos');
 
     } catch (e) {
       _logger.e('❌ Error cargando datos pendientes: $e');
@@ -541,6 +585,181 @@ class PendingDataViewModel extends ChangeNotifier {
     await loadPendingData();
   }
 
+  // ========== MÉTODOS PARA CENSOS PENDIENTES DETALLADOS ==========
+
+  /// Obtiene la lista detallada de censos fallidos con información completa
+  Future<List<Map<String, dynamic>>> getCensosFallidos() async {
+    try {
+      final db = await _dbHelper.database;
+
+      _logger.i('🔍 Buscando censos fallidos...');
+
+      // Query con información completa
+      final censos = await db.rawQuery('''
+        SELECT 
+          ca.*,
+          eq.cod_barras,
+          c.nombre as cliente_nombre,
+          m.nombre as marca_nombre,
+          mo.nombre as modelo_nombre
+        FROM censo_activo ca
+        LEFT JOIN equipos eq ON ca.equipo_id = eq.id
+        LEFT JOIN clientes c ON ca.cliente_id = c.id
+        LEFT JOIN marcas m ON eq.marca_id = m.id
+        LEFT JOIN modelos mo ON eq.modelo_id = mo.id
+        WHERE ca.sincronizado = 0
+        ORDER BY ca.fecha_creacion DESC
+      ''');
+
+      _logger.i('📋 Censos fallidos encontrados: ${censos.length}');
+
+      if (censos.isNotEmpty) {
+        final conError = censos.where((c) => c['estado_censo'] == 'error').length;
+        final creados = censos.where((c) => c['estado_censo'] == 'creado').length;
+        _logger.i('   - Con estado error: $conError');
+        _logger.i('   - Con estado creado: $creados');
+      }
+
+      return censos;
+
+    } catch (e) {
+      _logger.e('❌ Error obteniendo censos fallidos: $e');
+      rethrow;
+    }
+  }
+
+  /// Reintenta enviar un censo específico
+  Future<Map<String, dynamic>> reintentarCenso(String censoId) async {
+    try {
+      _logger.i('🔄 Reintentando censo: $censoId');
+
+      final db = await _dbHelper.database;
+
+      // Obtener datos del censo
+      final censos = await db.query(
+        'censo_activo',
+        where: 'id = ?',
+        whereArgs: [censoId],
+      );
+
+      if (censos.isEmpty) {
+        return {
+          'success': false,
+          'error': 'Censo no encontrado',
+        };
+      }
+
+      final censo = censos.first;
+
+      // Verificar si ya está sincronizado
+      if ((censo['sincronizado'] as int?) == 1) {
+        _logger.w('⚠️ Censo $censoId ya está sincronizado');
+        return {
+          'success': true,
+          'message': 'El censo ya estaba sincronizado',
+        };
+      }
+
+      // Preparar datos para envío
+      final position = Position(
+        latitude: (censo['latitud'] as num?)?.toDouble() ?? 0.0,
+        longitude: (censo['longitud'] as num?)?.toDouble() ?? 0.0,
+        timestamp: DateTime.now(),
+        accuracy: 0.0,
+        altitude: 0.0,
+        altitudeAccuracy: 0.0,
+        heading: 0.0,
+        headingAccuracy: 0.0,
+        speed: 0.0,
+        speedAccuracy: 0.0,
+      );
+
+      // 🔥 USAR EL SERVICIO UNIFICADO
+      final response = await CensoActivoPostService.enviarCambioEstado(
+        codigoBarras: censo['equipo_id']?.toString() ?? '',
+        clienteId: (censo['cliente_id'] as num?)?.toInt() ?? 0,
+        enLocal: (censo['en_local'] as num?) == 1,
+        position: position,
+        observaciones: censo['observaciones']?.toString(),
+        equipoId: censo['equipo_id']?.toString(),
+      );
+
+      if (response['exito'] == true) {
+        _logger.i('✅ Censo $censoId sincronizado exitosamente');
+
+        return {
+          'success': true,
+          'message': 'Censo sincronizado correctamente',
+        };
+      } else {
+        return {
+          'success': false,
+          'error': response['mensaje'] ?? 'Error al sincronizar censo',
+        };
+      }
+
+    } catch (e) {
+      _logger.e('💥 Error reintentando censo $censoId: $e');
+      return {
+        'success': false,
+        'error': 'Error interno: $e',
+      };
+    }
+  }
+
+  /// Reintenta enviar todos los censos pendientes
+  Future<Map<String, dynamic>> reintentarTodosCensos() async {
+    try {
+      _logger.i('🔄 Reintentando todos los censos pendientes...');
+
+      final censosFallidos = await getCensosFallidos();
+
+      if (censosFallidos.isEmpty) {
+        return {
+          'success': true,
+          'message': 'No hay censos pendientes',
+        };
+      }
+
+      int exitosos = 0;
+      int fallidos = 0;
+
+      for (final censo in censosFallidos) {
+        final resultado = await reintentarCenso(censo['id']);
+
+        if (resultado['success'] == true) {
+          exitosos++;
+        } else {
+          fallidos++;
+        }
+
+        // Pequeña pausa para no saturar
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+
+      _logger.i('✅ Reintentos completados: $exitosos exitosos, $fallidos fallidos');
+
+      // Recargar datos principales
+      await loadPendingData();
+
+      return {
+        'success': exitosos > 0,
+        'message': exitosos > 0
+            ? '$exitosos de ${censosFallidos.length} censos sincronizados${fallidos > 0 ? " ($fallidos fallaron)" : ""}'
+            : 'No se pudieron sincronizar los censos',
+        'exitosos': exitosos,
+        'fallidos': fallidos,
+      };
+
+    } catch (e) {
+      _logger.e('❌ Error reintentando todos los censos: $e');
+      return {
+        'success': false,
+        'error': 'Error: $e',
+      };
+    }
+  }
+
   // ========== MÉTODOS PRIVADOS ==========
 
   void _setLoading(bool loading) {
@@ -656,10 +875,14 @@ class PendingDataViewModel extends ChangeNotifier {
       switch (group.type) {
         case PendingDataType.forms:
           return await _sendForms(group);
+
         case PendingDataType.census:
+        // 🔥 ENVIAR TODOS LOS CENSOS (incluye censos_activo, equipos_pendientes, fotos)
           return await _sendCensus(group);
+
         case PendingDataType.images:
           return await _sendImages(group);
+
         case PendingDataType.logs:
           return await _sendLogs(group);
       }
@@ -823,11 +1046,12 @@ class PendingDataViewModel extends ChangeNotifier {
     };
   }
 
+  /// 🔥 MÉTODO REFACTORIZADO - USA EL SERVICIO UNIFICADO
   Future<SendResult> _sendCensus(PendingDataGroup group) async {
     try {
       final db = await _dbHelper.database;
 
-      // Usar sincronizado = 0 para datos pendientes
+      // Obtener censos pendientes (sincronizado = 0)
       final pendingCensus = await db.query(
         'censo_activo',
         where: 'sincronizado = ?',
@@ -851,7 +1075,7 @@ class PendingDataViewModel extends ChangeNotifier {
         if (_isCancelled) break;
 
         try {
-          // Preparar datos usando tu servicio existente
+          // Preparar Position
           final position = Position(
             latitude: (censo['latitud'] as num?)?.toDouble() ?? 0.0,
             longitude: (censo['longitud'] as num?)?.toDouble() ?? 0.0,
@@ -865,25 +1089,7 @@ class PendingDataViewModel extends ChangeNotifier {
             speedAccuracy: 0.0,
           );
 
-          // Obtener fotos del censo
-          final fotos = await db.query(
-            'censo_activo_foto',
-            where: 'censo_activo_id = ? AND sincronizado = ?',
-            whereArgs: [censo['id'], 0],
-            orderBy: 'orden ASC',
-          );
-
-          String? imagenBase64;
-          String? imagenBase64_2;
-
-          if (fotos.isNotEmpty) {
-            imagenBase64 = fotos.first['imagen_base64'] as String?;
-            if (fotos.length > 1) {
-              imagenBase64_2 = fotos[1]['imagen_base64'] as String?;
-            }
-          }
-
-          // Usar tu servicio existente CensoActivoPostService
+          // 🔥 USAR EL SERVICIO UNIFICADO - UNA SOLA FUENTE DE VERDAD
           final response = await CensoActivoPostService.enviarCambioEstado(
             codigoBarras: censo['equipo_id']?.toString() ?? '',
             clienteId: (censo['cliente_id'] as num?)?.toInt() ?? 0,
@@ -894,32 +1100,18 @@ class PendingDataViewModel extends ChangeNotifier {
           );
 
           if (response['exito'] == true) {
-            // Marcar como enviado
-            await db.update(
-              'censo_activo',
-              {
-                'sincronizado': 1,
-                'fecha_actualizacion': DateTime.now().toIso8601String(),
-              },
-              where: 'id = ?',
-              whereArgs: [censo['id']],
-            );
-
-            // Marcar fotos como enviadas
-            await db.update(
-              'censo_activo_foto',
-              {'sincronizado': 1},
-              where: 'censo_activo_id = ?',
-              whereArgs: [censo['id']],
-            );
-
+            // ✅ El servicio ya maneja el marcado como sincronizado
             sentCount++;
+            _logger.i('✅ Censo ${censo['id']} sincronizado');
           } else {
+            // ❌ Registrar error - el servicio ya lo maneja internamente
             errors.add('Censo ${censo['id']}: ${response['mensaje'] ?? 'Error desconocido'}');
+            _logger.w('❌ Error censo ${censo['id']}: ${response['mensaje']}');
           }
 
         } catch (e) {
           errors.add('Censo ${censo['id']}: $e');
+          _logger.e('❌ Excepción censo ${censo['id']}: $e');
         }
       }
 

@@ -331,12 +331,14 @@ class SyncStatusIndicator extends StatelessWidget {
   final String mensaje;
   final IconData icono;
   final Color color;
+  final String? errorDetalle;
 
   const SyncStatusIndicator({
     super.key,
     required this.mensaje,
     required this.icono,
     required this.color,
+    this.errorDetalle,
   });
 
   @override
@@ -349,20 +351,54 @@ class SyncStatusIndicator extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icono, color: color, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              mensaje,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
+          Row(
+            children: [
+              Icon(icono, color: color, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  mensaje,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          // 🆕 Mostrar el error específico si existe
+          if (errorDetalle != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: color.withOpacity(0.2)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: color, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      errorDetalle!,
+                      style: TextStyle(
+                        color: color.withOpacity(0.95),
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

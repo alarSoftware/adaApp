@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:ada_app/viewmodels/pending_data_viewmodel.dart';
+import 'package:ada_app/ui/screens/censos_pendientes_detail_screen.dart';
 
 class PendingDataScreen extends StatefulWidget {
   static const String routeName = '/pending-data';
@@ -368,60 +369,90 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
     return Card(
       margin: const EdgeInsets.only(bottom: 12.0),
       elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _buildTypeIcon(group.type),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        group.displayName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
+      child: InkWell(
+        onTap: group.type == PendingDataType.census
+            ? () => _navigateToCensosDetail(group)
+            : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _buildTypeIcon(group.type),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          group.displayName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        group.description,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).hintColor,
+                        const SizedBox(height: 4),
+                        Text(
+                          group.description,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).hintColor,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    '${group.count}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orange,
+                      ],
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      '${group.count}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                      ),
+                    ),
+                  ),
+                  if (group.type == PendingDataType.census) ...[
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      size: 16,
+                      color: Theme.of(context).hintColor,
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+// Agregar este método al final de la clase _PendingDataScreenState
+  void _navigateToCensosDetail(PendingDataGroup group) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CensosPendientesDetailScreen(
+          viewModel: _viewModel,
+          group: group,
+        ),
+      ),
+    ).then((_) {
+      // Recargar cuando regrese de la pantalla de detalle
+      _viewModel.refresh();
+    });
   }
 
   Widget _buildTypeIcon(PendingDataType type) {

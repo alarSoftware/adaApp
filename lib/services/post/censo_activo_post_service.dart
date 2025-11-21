@@ -1,4 +1,3 @@
-// lib/services/post/censo_activo_post_service.dart
 
 import 'dart:convert';
 import 'dart:async';
@@ -14,7 +13,7 @@ import 'package:ada_app/services/error_log/error_log_service.dart';
 
 class CensoActivoPostService {
   static final Logger _logger = Logger();
-  static const String _tableName = 'censo_unificado';
+  static const String _tableName = 'censo_activo';
   static const String _endpoint = '/censoActivo/insertCensoActivo';
   static const Uuid _uuid = Uuid();
 

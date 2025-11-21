@@ -604,14 +604,18 @@ class _PreviewScreenState extends State<PreviewScreen> {
         }
 
         final info = snapshot.data!;
+        final estado = info['estado'] as String;
         final mensaje = info['mensaje'] as String;
         final icono = info['icono'] as IconData;
         final color = info['color'] as Color;
+        final errorDetalle = info['error_detalle'] as String?;
 
+        // ✅ SIEMPRE MOSTRAR el indicador
         return SyncStatusIndicator(
           mensaje: mensaje,
           icono: icono,
           color: color,
+          errorDetalle: errorDetalle,
         );
       },
     );

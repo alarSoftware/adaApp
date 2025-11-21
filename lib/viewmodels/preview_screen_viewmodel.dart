@@ -1,5 +1,3 @@
-// lib/viewmodels/preview_screen_viewmodel.dart
-
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'dart:async';
@@ -16,6 +14,8 @@ import 'package:ada_app/services/censo/censo_log_service.dart';
 import 'package:ada_app/services/censo/censo_upload_service.dart';
 import 'package:ada_app/services/censo/censo_foto_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
+import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/ui/theme/colors.dart';
 
 final _logger = Logger();
 final Uuid _uuid = const Uuid();
@@ -207,7 +207,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         usuarioId: usuarioId,
         datos: datos,
         processId: processId,
-        yaAsignado: yaAsignado,  // ✅ PASAMOS EL VALOR REAL
+        yaAsignado: yaAsignado,
       );
 
       if (estadoIdActual == null) {
@@ -240,7 +240,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         clienteId: clienteId,
         usuarioId: usuarioId,
         esNuevoEquipo: esNuevoEquipo,
-        yaAsignado: yaAsignado,  // ✅ PASAR al background sync
+        yaAsignado: yaAsignado,
         datos: datos,
       );
 
@@ -277,9 +277,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
         'message': '✅ Registro guardado. Sincronizando unificado en segundo plano...',
         'estado_id': estadoIdActual,
         'equipo_id': equipoId,
-        'equipo_completo': equipoCompleto, // ✅ CRUCIAL para navegación
+        'equipo_completo': equipoCompleto,
         'sincronizacion': 'unificada_background',
         'tiempo_guardado': '${tiempoLocal}s',
+        'ya_asignado': yaAsignado,
       };
 
     } catch (e, stackTrace) {
@@ -314,7 +315,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     required int clienteId,
     required int usuarioId,
     required bool esNuevoEquipo,
-    required bool yaAsignado,  // ✅ NUEVO PARÁMETRO
+    required bool yaAsignado,
     required Map<String, dynamic> datos,
   }) {
     // Lanzar en background con Future.microtask
@@ -328,7 +329,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         _logger.i('📋 Cliente ID: $clienteId');
         _logger.i('📋 Usuario ID: $usuarioId');
         _logger.i('📋 Es nuevo equipo: $esNuevoEquipo');
-        _logger.i('📋 Ya asignado: $yaAsignado');  // ✅ LOG
+        _logger.i('📋 Ya asignado: $yaAsignado');
         _logger.i('═══════════════════════════════════════════════════════');
 
         // Obtener datos necesarios
@@ -336,6 +337,15 @@ class PreviewScreenViewModel extends ChangeNotifier {
         if (edfVendedorId == null || edfVendedorId.isEmpty) {
           _logger.w('⚠️ Sin edfVendedorId, marcando como error');
           await _estadoEquipoRepository.marcarComoError(estadoId, 'Sin edfVendedorId');
+
+          // 🆕 Registrar en error_log
+          await ErrorLogService.logValidationError(
+            tableName: 'censo_activo',
+            operation: 'sync_unificado',
+            errorMessage: 'Sin edfVendedorId para sincronizar',
+            registroFailId: estadoId,
+            userId: usuarioId.toString(),
+          );
           return;
         }
 
@@ -361,7 +371,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
           // Datos del pendiente
           clienteId: clienteId,
           edfVendedorId: edfVendedorId,
-          crearPendiente: crearPendiente,  // ✅ BASADO EN yaAsignado
+          crearPendiente: crearPendiente,
 
           // Datos del censo activo
           usuarioId: usuarioId,
@@ -369,7 +379,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
           longitud: datos['longitud']?.toDouble() ?? 0.0,
           observaciones: datos['observaciones']?.toString(),
           enLocal: true,
-          estadoCenso: yaAsignado ? 'asignado' : 'pendiente',  // ✅ CORRECTO
+          estadoCenso: yaAsignado ? 'asignado' : 'pendiente',
 
           // Fotos
           fotos: fotos,
@@ -383,7 +393,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
           // Control
           timeoutSegundos: 30,
           userId: usuarioId.toString(),
-          guardarLog: true, // ✅ Habilita logs TXT
+          guardarLog: true,
         );
 
         if (respuesta['exito'] == true) {
@@ -413,14 +423,30 @@ class PreviewScreenViewModel extends ChangeNotifier {
             }
           }
 
+          // 🆕 Marcar errores previos como resueltos
+          await ErrorLogService.marcarErroresComoResueltos(
+            registroFailId: estadoId,
+            tableName: 'censo_activo',
+          );
+
           _logger.i('🎉 TODO sincronizado correctamente en una sola llamada');
 
         } else {
           // ❌ ERROR: Marcar como error para reintentos
-          _logger.e('❌ Error en sincronización unificada: ${respuesta['mensaje']}');
-          await _estadoEquipoRepository.marcarComoError(
-            estadoId,
-            'Error unificado: ${respuesta['mensaje']}',
+          final errorMsg = respuesta['mensaje'] ?? 'Error desconocido en sincronización';
+          _logger.e('❌ Error en sincronización unificada: $errorMsg');
+
+          await _estadoEquipoRepository.marcarComoError(estadoId, errorMsg);
+
+          // 🆕 Registrar en error_log con información detallada
+          await ErrorLogService.logError(
+            tableName: 'censo_activo',
+            operation: 'sync_unificado',
+            errorMessage: errorMsg,
+            errorType: 'sync',
+            errorCode: respuesta['codigo_error']?.toString(),
+            registroFailId: estadoId,
+            userId: usuarioId.toString(),
           );
         }
 
@@ -437,6 +463,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
           'Excepción unificada: $e',
         );
 
+        // 🆕 Registrar en error_log
         await ErrorLogService.logError(
           tableName: 'censo_activo',
           operation: 'sync_unificado_background',
@@ -491,7 +518,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     } catch (e, stackTrace) {
       _logger.e('❌ Error creando equipo: $e', stackTrace: stackTrace);
       await ErrorLogService.logDatabaseError(
-        tableName: 'equipments',
+        tableName: 'equipos',
         operation: 'crear_equipo_nuevo',
         errorMessage: 'Error registrando equipo nuevo: $e',
         registroFailId: datos['codigo_barras']?.toString(),
@@ -641,81 +668,268 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> obtenerInfoSincronizacion(String? estadoId) async {
-    if (estadoId == null) {
+  Future<Map<String, dynamic>> obtenerInfoSincronizacion(String? censoActivoId) async {
+    if (censoActivoId == null) {
       return {
-        'pendiente': false,
         'estado': 'desconocido',
-        'mensaje': 'No hay ID de estado',
+        'mensaje': 'Estado desconocido',
         'icono': Icons.help_outline,
-        'color': Colors.grey,
+        'color': AppColors.textSecondary,
+        'error_detalle': null,
       };
     }
 
     try {
-      final maps = await _estadoEquipoRepository.dbHelper.consultar(
+      final dbHelper = DatabaseHelper();
+      final db = await dbHelper.database;
+
+      // Consultar el estado del censo
+      final result = await db.query(
         'censo_activo',
         where: 'id = ?',
-        whereArgs: [estadoId],
+        whereArgs: [censoActivoId],
         limit: 1,
       );
 
-      if (maps.isEmpty) {
+      if (result.isEmpty) {
         return {
-          'pendiente': false,
           'estado': 'no_encontrado',
-          'mensaje': 'Estado no encontrado',
+          'mensaje': 'Registro no encontrado',
           'icono': Icons.error_outline,
-          'color': Colors.grey,
+          'color': AppColors.error,
+          'error_detalle': null,
         };
       }
 
-      final estado = maps.first;
-      final estadoCenso = estado['estado_censo'] as String?;
-      final sincronizado = estado['sincronizado'] as int?;
+      final estadoCenso = result.first['estado_censo'] as String?;
+      final sincronizado = result.first['sincronizado'] as int?;
 
-      String mensaje;
-      IconData icono;
-      Color color;
-
+      // Determinar el estado real
+      String estado;
       if (sincronizado == 1) {
-        mensaje = 'Registro sincronizado correctamente (UNIFICADO)';
-        icono = Icons.cloud_done;
-        color = Colors.green;
+        estado = 'sincronizado';
       } else if (estadoCenso == 'error') {
-        mensaje = 'Error en sincronización - Puede reintentar';
-        icono = Icons.cloud_off;
-        color = Colors.red;
+        estado = 'error';
       } else {
-        mensaje = 'Pendiente de sincronización automática (UNIFICADO)';
-        icono = Icons.cloud_upload;
-        color = Colors.orange;
+        estado = estadoCenso ?? 'creado';
       }
 
-      return {
-        'pendiente': (estadoCenso == 'creado' || estadoCenso == 'error') && sincronizado == 0,
-        'estado': estadoCenso,
-        'sincronizado': sincronizado,
-        'mensaje': mensaje,
-        'icono': icono,
-        'color': color,
-        'fecha_creacion': estado['fecha_creacion'],
-        'observaciones': estado['observaciones'],
-      };
+      switch (estado) {
+        case 'creado':
+        case 'pendiente':
+        case 'asignado':
+          return {
+            'estado': estado,
+            'mensaje': 'Pendiente de sincronización',
+            'icono': Icons.sync,
+            'color': AppColors.warning,
+            'error_detalle': null,
+          };
+
+        case 'sincronizado': {
+          // 🆕 Buscar si hubo errores previos (incluso resueltos)
+          final errorLog = await db.query(
+            'error_log',
+            where: 'registro_fail_id = ? AND table_name = ?',
+            whereArgs: [censoActivoId, 'censo_activo'],
+            orderBy: 'timestamp DESC',
+            limit: 1,
+          );
+
+          String? errorDetalle;
+          if (errorLog.isNotEmpty) {
+            final errorType = errorLog.first['error_type'] as String?;
+            if (errorType == 'resuelto') {
+              final errorMessage = errorLog.first['error_message'] as String?;
+              final retryCount = errorLog.first['retry_count'] as int? ?? 0;
+              final errorCode = errorLog.first['error_code'] as String?;
+              final endpoint = errorLog.first['endpoint'] as String?;
+
+              errorDetalle = 'Sincronizado después de ${retryCount + 1} intento(s)';
+              errorDetalle += '\n\n📌 Último error encontrado:';
+              errorDetalle += '\n$errorMessage';
+
+              if (errorCode != null) {
+                errorDetalle += '\n\n🔖 Código: $errorCode';
+              }
+
+              if (endpoint != null) {
+                errorDetalle += '\n🌐 Endpoint: ${_formatEndpoint(endpoint)}';
+              }
+            }
+          }
+
+          return {
+            'estado': estado,
+            'mensaje': 'Sincronizado exitosamente',
+            'icono': Icons.check_circle,
+            'color': AppColors.success,
+            'error_detalle': errorDetalle,
+          };
+
+        }
+        case 'error': {
+          // 🆕 Buscar el error más reciente en error_log para este censo
+          final errorLog = await db.query(
+            'error_log',
+            where: 'registro_fail_id = ? AND table_name = ?',
+            whereArgs: [censoActivoId, 'censo_activo'],
+            orderBy: 'timestamp DESC',
+            limit: 1,
+          );
+
+          String? errorDetalle;
+          if (errorLog.isNotEmpty) {
+            final errorMessage = errorLog.first['error_message'] as String?;
+            final errorType = errorLog.first['error_type'] as String?;
+            final errorCode = errorLog.first['error_code'] as String?;
+            final endpoint = errorLog.first['endpoint'] as String?;
+            final retryCount = errorLog.first['retry_count'] as int? ?? 0;
+            final nextRetryAt = errorLog.first['next_retry_at'] as String?;
+            final timestamp = errorLog.first['timestamp'] as String?;
+
+            // 🔥 CONSTRUIR MENSAJE DETALLADO
+            errorDetalle = errorMessage ?? 'Error desconocido';
+
+            // Tipo de error
+            if (errorType != null && errorType != 'unknown') {
+              errorDetalle = '$errorDetalle\n\nTipo: ${_formatErrorType(errorType)}';
+            }
+
+            // Código de error
+            if (errorCode != null) {
+              errorDetalle = '$errorDetalle\nCódigo: $errorCode';
+            }
+
+            // Endpoint
+            if (endpoint != null) {
+              errorDetalle = '$errorDetalle\nEndpoint: ${_formatEndpoint(endpoint)}';
+            }
+
+            // Información de reintentos
+            if (retryCount > 0) {
+              errorDetalle = '$errorDetalle\n\nReintentos realizados: $retryCount';
+
+              if (nextRetryAt != null) {
+                try {
+                  final nextRetry = DateTime.parse(nextRetryAt);
+                  final now = DateTime.now();
+                  if (nextRetry.isAfter(now)) {
+                    final diff = nextRetry.difference(now);
+                    final minutos = diff.inMinutes;
+                    if (minutos > 60) {
+                      final horas = (minutos / 60).floor();
+                      errorDetalle = '$errorDetalle\nPróximo intento en: ${horas}h ${minutos % 60}min';
+                    } else {
+                      errorDetalle = '$errorDetalle\nPróximo intento en: ${minutos}min';
+                    }
+                  } else {
+                    errorDetalle = '$errorDetalle\nListo para reintentar';
+                  }
+                } catch (e) {
+                  // Ignorar error de parsing de fecha
+                }
+              }
+            }
+
+            // Timestamp del error - 🔥 CORRECCIÓN AQUÍ
+            if (timestamp != null) {
+              try {
+                final errorDate = DateTime.parse(timestamp);
+                errorDetalle = '$errorDetalle\n\nOcurrió el: ${_formatTimestamp(errorDate)}';
+              } catch (e) {
+                // Ignorar error de parsing
+              }
+            }
+
+          } else {
+            // Si no hay error en error_log, buscar en el campo error_mensaje de censo_activo
+            errorDetalle = result.first['error_mensaje'] as String?;
+            if (errorDetalle != null) {
+              errorDetalle = '$errorDetalle\n\n(Sin detalles adicionales registrados)';
+            }
+          }
+
+          return {
+            'estado': estado,
+            'mensaje': 'Error de sincronización',
+            'icono': Icons.error,
+            'color': AppColors.error,
+            'error_detalle': errorDetalle ?? 'No se encontró detalle del error',
+          };
+
+        }
+
+        default:
+          return {
+            'estado': 'desconocido',
+            'mensaje': 'Estado: $estado',
+            'icono': Icons.help_outline,
+            'color': AppColors.textSecondary,
+            'error_detalle': null,
+          };
+      }
     } catch (e) {
-      await ErrorLogService.logDatabaseError(
-        tableName: 'censo_activo',
-        operation: 'obtener_info_sincronizacion',
-        errorMessage: 'Error consultando estado: $e',
-        registroFailId: estadoId,
-      );
+      debugPrint('❌ Error obteniendo info de sincronización: $e');
       return {
-        'pendiente': false,
         'estado': 'error',
-        'mensaje': 'Error consultando estado: $e',
-        'icono': Icons.error,
-        'color': Colors.red,
+        'mensaje': 'Error consultando estado',
+        'icono': Icons.error_outline,
+        'color': AppColors.error,
+        'error_detalle': e.toString(),
       };
+    }
+  }
+
+  // 🆕 Métodos helper para formatear información
+  String _formatErrorType(String errorType) {
+    switch (errorType) {
+      case 'network':
+        return 'Error de Red';
+      case 'server':
+        return 'Error del Servidor';
+      case 'validation':
+        return 'Error de Validación';
+      case 'database':
+        return 'Error de Base de Datos';
+      case 'sync':
+        return 'Error de Sincronización';
+      case 'auth':
+        return 'Error de Autenticación';
+      case 'timeout':
+        return 'Tiempo de Espera Agotado';
+      default:
+        return errorType.toUpperCase();
+    }
+  }
+
+  String _formatEndpoint(String endpoint) {
+    // Acortar URLs largas para mejor legibilidad
+    if (endpoint.length > 50) {
+      final uri = Uri.tryParse(endpoint);
+      if (uri != null) {
+        return '...${uri.path}';
+      }
+    }
+    return endpoint;
+  }
+
+  String _formatTimestamp(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inMinutes < 60) {
+      return 'hace ${diff.inMinutes} minutos';
+    } else if (diff.inHours < 24) {
+      return 'hace ${diff.inHours} horas';
+    } else if (diff.inDays == 1) {
+      return 'ayer a las ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    } else {
+      final dia = date.day.toString().padLeft(2, '0');
+      final mes = date.month.toString().padLeft(2, '0');
+      final hora = date.hour.toString().padLeft(2, '0');
+      final minuto = date.minute.toString().padLeft(2, '0');
+      return '$dia/$mes a las $hora:$minuto';
     }
   }
 

@@ -64,19 +64,54 @@ class _SelectScreenState extends State<SelectScreen> {
   }
 
   // 🆕 NUEVO: Verificar datos pendientes
+// 🆕 NUEVO: Verificar datos pendientes (CORREGIDO)
   Future<void> _checkPendingData() async {
     try {
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
+
+      // 🔥 CONTAR SOLO CENSOS ACTIVOS NO SINCRONIZADOS
+      final censosPendientes = await db.query(
+        'censo_activo',
+        where: 'sincronizado = ?',
+        whereArgs: [0],
+      );
+
+      final cantidadCensos = censosPendientes.length;
+
+      // 🔥 CONTAR OTROS DATOS PENDIENTES (excluyendo tablas relacionadas con censos)
       final validationService = DatabaseValidationService(db);
-      final status = await validationService.getPendingSyncSummary();
+      final summary = await validationService.getPendingSyncSummary();
+      final pendingByTable = summary['pending_by_table'] as List<dynamic>? ?? [];
+
+      // Tablas que se excluyen del conteo (ya están incluidas en censos)
+      final tablasExcluidas = {
+        'censo_activo',
+        'equipos_pendientes',
+        'censo_activo_foto',
+      };
+
+      int otrosDatos = 0;
+      for (var item in pendingByTable) {
+        final tableName = item['table'] as String;
+        if (!tablasExcluidas.contains(tableName)) {
+          otrosDatos += item['count'] as int;
+        }
+      }
+
+      // Total: censos + otros datos
+      final totalPendientes = cantidadCensos + otrosDatos;
 
       if (mounted) {
         setState(() {
-          _pendingDataCount = status['total_pending'] ?? 0;
+          _pendingDataCount = totalPendientes;
         });
       }
+
+      print('📊 Datos pendientes: $totalPendientes (Censos: $cantidadCensos, Otros: $otrosDatos)');
+
     } catch (e) {
+      print('❌ Error verificando datos pendientes: $e');
       // Silently ignore errors for background check
     }
   }
