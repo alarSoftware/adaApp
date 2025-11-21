@@ -171,7 +171,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         _setStatusMessage('Registrando equipo...');
         equipoId = await _crearEquipoNuevo(
             datos,
-            clienteId, // ✅ PASAR cliente_id para pre-asignación
+            clienteId,
             processId,
             usuarioId.toString()
         );
@@ -182,31 +182,39 @@ class PreviewScreenViewModel extends ChangeNotifier {
         _logger.i('ℹ️ Usando equipo existente: $equipoId');
       }
 
-      // 1B. Crear pendiente LOCAL (SIEMPRE para censos)
-      _setStatusMessage('Registrando asignación...');
-      await _equipoPendienteRepository.procesarEscaneoCenso(
-        equipoId: equipoId,
-        clienteId: clienteId,
-        usuarioId: usuarioId,
-      );
-      _logger.i('✅ Pendiente registrado localmente');
+      // ✅ NUEVO: Verificar si el equipo YA está asignado al cliente
+      final yaAsignado = await _verificarAsignacionLocal(equipoId, clienteId);
+      _logger.i('📋 Equipo ya asignado: $yaAsignado');
 
-      // 🔥 1C. CREAR CENSO LOCAL CON USUARIO GARANTIZADO
+      // 1B. Crear pendiente LOCAL SOLO si NO está asignado
+      if (!yaAsignado) {
+        _setStatusMessage('Registrando asignación pendiente...');
+        await _equipoPendienteRepository.procesarEscaneoCenso(
+          equipoId: equipoId,
+          clienteId: clienteId,
+          usuarioId: usuarioId,
+        );
+        _logger.i('✅ Pendiente registrado localmente (equipo NO asignado)');
+      } else {
+        _logger.i('ℹ️ Equipo YA asignado - NO se crea pendiente');
+      }
+
+      // 1C. CREAR CENSO LOCAL CON USUARIO GARANTIZADO
       _setStatusMessage('Guardando censo...');
       estadoIdActual = await _crearCensoLocalConUsuario(
         equipoId: equipoId,
         clienteId: clienteId,
-        usuarioId: usuarioId, // ✅ Pasamos usuario explícitamente
+        usuarioId: usuarioId,
         datos: datos,
         processId: processId,
-        yaAsignado: false,
+        yaAsignado: yaAsignado,  // ✅ PASAMOS EL VALOR REAL
       );
 
       if (estadoIdActual == null) {
         throw 'No se pudo crear el censo en la base de datos';
       }
 
-      _logger.i('✅ Censo creado localmente: $estadoIdActual');
+      _logger.i('✅ Censo creado localmente: $estadoIdActual (estado: ${yaAsignado ? "asignado" : "pendiente"})');
 
       // 1D. Guardar fotos LOCAL
       final idsImagenes = await _fotoService.guardarFotosDelCenso(
@@ -232,6 +240,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         clienteId: clienteId,
         usuarioId: usuarioId,
         esNuevoEquipo: esNuevoEquipo,
+        yaAsignado: yaAsignado,  // ✅ PASAR al background sync
         datos: datos,
       );
 
@@ -305,6 +314,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     required int clienteId,
     required int usuarioId,
     required bool esNuevoEquipo,
+    required bool yaAsignado,  // ✅ NUEVO PARÁMETRO
     required Map<String, dynamic> datos,
   }) {
     // Lanzar en background con Future.microtask
@@ -316,8 +326,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
         _logger.i('📋 Estado ID: $estadoId');
         _logger.i('📋 Equipo ID: $equipoId');
         _logger.i('📋 Cliente ID: $clienteId');
-        _logger.i('📋 Usuario ID: $usuarioId'); // ✅ Verificar que llegue
+        _logger.i('📋 Usuario ID: $usuarioId');
         _logger.i('📋 Es nuevo equipo: $esNuevoEquipo');
+        _logger.i('📋 Ya asignado: $yaAsignado');  // ✅ LOG
         _logger.i('═══════════════════════════════════════════════════════');
 
         // Obtener datos necesarios
@@ -332,8 +343,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
         final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
         _logger.i('📸 Fotos encontradas: ${fotos.length}');
 
-        // Determinar si necesita crear pendiente
-        final crearPendiente = esNuevoEquipo || !await _verificarAsignacionLocal(equipoId, clienteId);
+        // ✅ DETERMINAR SI CREAR PENDIENTE: Solo si NO está asignado
+        final crearPendiente = !yaAsignado;
+        _logger.i('📋 Crear pendiente en servidor: $crearPendiente');
 
         // 🔥 LLAMADA AL SERVICIO UNIFICADO
         final respuesta = await CensoActivoPostService.enviarCensoActivo(
@@ -349,15 +361,15 @@ class PreviewScreenViewModel extends ChangeNotifier {
           // Datos del pendiente
           clienteId: clienteId,
           edfVendedorId: edfVendedorId,
-          crearPendiente: crearPendiente,
+          crearPendiente: crearPendiente,  // ✅ BASADO EN yaAsignado
 
           // Datos del censo activo
-          usuarioId: usuarioId, // ✅ Usuario correcto
+          usuarioId: usuarioId,
           latitud: datos['latitud']?.toDouble() ?? 0.0,
           longitud: datos['longitud']?.toDouble() ?? 0.0,
           observaciones: datos['observaciones']?.toString(),
           enLocal: true,
-          estadoCenso: 'pendiente',
+          estadoCenso: yaAsignado ? 'asignado' : 'pendiente',  // ✅ CORRECTO
 
           // Fotos
           fotos: fotos,
@@ -389,7 +401,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
             await _equipoRepository.marcarEquipoComoSincronizado(equipoId);
           }
 
-          // Si tenía pendiente, marcarlo como sincronizado
+          // ✅ SOLO marcar pendientes como sincronizados si efectivamente se crearon
           if (crearPendiente) {
             await _equipoPendienteRepository.marcarSincronizadosPorCenso(equipoId, clienteId);
           }
@@ -453,7 +465,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Future<String> _crearEquipoNuevo(
       Map<String, dynamic> datos,
-      int? clienteId, // ✅ Recibe cliente_id para pre-asignación
+      int? clienteId,
       String processId,
       String? userId,
       ) async {
@@ -468,7 +480,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         modeloId: _safeCastToInt(datos['modelo_id'], 'modelo_id') ?? 1,
         numeroSerie: datos['numero_serie']?.toString(),
         logoId: _safeCastToInt(datos['logo_id'], 'logo_id') ?? 1,
-        clienteId: clienteId, // ✅ PASAR cliente_id para pre-asignación
+        clienteId: clienteId,
       );
       if (clienteId != null) {
         _logger.i('✅ Equipo creado y PRE-ASIGNADO al cliente $clienteId: $equipoId');
@@ -504,7 +516,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   Future<String?> _crearCensoLocalConUsuario({
     required String equipoId,
     required int clienteId,
-    required int usuarioId, // ✅ Usuario obligatorio
+    required int usuarioId,
     required Map<String, dynamic> datos,
     required String processId,
     required bool yaAsignado,
@@ -584,7 +596,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   // =================================================================
-  // MÉTODOS PÚBLICOS DE UTILIDAD (sin cambios)
+  // MÉTODOS PÚBLICOS DE UTILIDAD
   // =================================================================
 
   String formatearFecha(String? fechaIso) {
