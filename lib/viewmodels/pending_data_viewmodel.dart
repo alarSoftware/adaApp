@@ -6,6 +6,7 @@ import 'package:ada_app/services/sync/sync_service.dart';
 import 'package:ada_app/services/post/base_post_service.dart';
 import 'package:ada_app/services/post/dynamic_form_post_service.dart';
 import 'package:ada_app/services/post/censo_activo_post_service.dart';
+import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/services/post/device_log_post_service.dart';
 import 'package:ada_app/models/device_log.dart';
 import 'package:geolocator/geolocator.dart';
@@ -127,6 +128,7 @@ class PendingDataViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final SendConfiguration _config = const SendConfiguration();
+  final CensoActivoFotoRepository _fotoRepository = CensoActivoFotoRepository();
 
   // ========== ESTADO INTERNO ==========
   bool _isLoading = false;
@@ -1047,11 +1049,11 @@ class PendingDataViewModel extends ChangeNotifier {
   }
 
   /// 🔥 MÉTODO REFACTORIZADO - USA EL SERVICIO UNIFICADO
+  /// Envía censos usando enviarCensoActivo directamente
   Future<SendResult> _sendCensus(PendingDataGroup group) async {
     try {
       final db = await _dbHelper.database;
 
-      // Obtener censos pendientes (sincronizado = 0)
       final pendingCensus = await db.query(
         'censo_activo',
         where: 'sincronizado = ?',
@@ -1075,56 +1077,119 @@ class PendingDataViewModel extends ChangeNotifier {
         if (_isCancelled) break;
 
         try {
-          // Preparar Position
-          final position = Position(
-            latitude: (censo['latitud'] as num?)?.toDouble() ?? 0.0,
-            longitude: (censo['longitud'] as num?)?.toDouble() ?? 0.0,
-            timestamp: DateTime.now(),
-            accuracy: 0.0,
-            altitude: 0.0,
-            altitudeAccuracy: 0.0,
-            heading: 0.0,
-            headingAccuracy: 0.0,
-            speed: 0.0,
-            speedAccuracy: 0.0,
+          final censoId = censo['id'] as String;
+          final usuarioId = censo['usuario_id'] as int?;
+
+          if (usuarioId == null) {
+            errors.add('Censo $censoId: usuario_id no encontrado');
+            continue;
+          }
+
+          final usuariosList = await db.query(
+            'Users',
+            where: 'id = ?',
+            whereArgs: [usuarioId],
+            limit: 1,
           );
 
-          // 🔥 USAR EL SERVICIO UNIFICADO - UNA SOLA FUENTE DE VERDAD
-          final response = await CensoActivoPostService.enviarCambioEstado(
-            codigoBarras: censo['equipo_id']?.toString() ?? '',
+          if (usuariosList.isEmpty) {
+            errors.add('Censo $censoId: usuario no encontrado');
+            continue;
+          }
+
+          final edfVendedorId = usuariosList.first['edf_vendedor_id'] as String?;
+          if (edfVendedorId == null || edfVendedorId.isEmpty) {
+            errors.add('Censo $censoId: edf_vendedor_id no disponible');
+            continue;
+          }
+
+          final fotos = await _fotoRepository.obtenerFotosPorCenso(censoId);
+
+          final equipoId = censo['equipo_id']?.toString();
+          int? marcaId;
+          int? modeloId;
+          int? logoId;
+          String? numeroSerie;
+
+          if (equipoId != null) {
+            final equiposList = await db.query(
+              'equipos',
+              where: 'id = ?',
+              whereArgs: [equipoId],
+              limit: 1,
+            );
+
+            if (equiposList.isNotEmpty) {
+              final equipo = equiposList.first;
+              marcaId = equipo['marca_id'] as int?;
+              modeloId = equipo['modelo_id'] as int?;
+              logoId = equipo['logo_id'] as int?;
+              numeroSerie = equipo['numero_serie'] as String?;
+            }
+          }
+
+          final response = await CensoActivoPostService.enviarCensoActivo(
+            equipoId: equipoId ?? '',
+            codigoBarras: censo['codigo_barras']?.toString() ?? equipoId ?? '',
+            marcaId: marcaId,
+            modeloId: modeloId,
+            logoId: logoId,
+            numeroSerie: numeroSerie,
+            esNuevoEquipo: false,
             clienteId: (censo['cliente_id'] as num?)?.toInt() ?? 0,
-            enLocal: (censo['en_local'] as num?) == 1,
-            position: position,
+            edfVendedorId: edfVendedorId,
+            crearPendiente: false,
+            usuarioId: usuarioId,
+            latitud: (censo['latitud'] as num?)?.toDouble() ?? 0.0,
+            longitud: (censo['longitud'] as num?)?.toDouble() ?? 0.0,
             observaciones: censo['observaciones']?.toString(),
-            equipoId: censo['equipo_id']?.toString(),
+            enLocal: (censo['en_local'] as int?) == 1,
+            estadoCenso: censo['estado_censo']?.toString() ?? 'pendiente',
+            fotos: fotos,
+            clienteNombre: censo['cliente_nombre']?.toString(),
+            marca: censo['marca_nombre']?.toString(),
+            modelo: censo['modelo']?.toString(),
+            logo: censo['logo']?.toString(),
+            timeoutSegundos: 45,
+            userId: usuarioId.toString(),
+            guardarLog: false,
           );
 
           if (response['exito'] == true) {
-            // ✅ El servicio ya maneja el marcado como sincronizado
+            await db.update(
+              'censo_activo',
+              {
+                'sincronizado': 1,
+                'estado_censo': 'migrado',
+                'fecha_actualizacion': DateTime.now().toIso8601String(),
+              },
+              where: 'id = ?',
+              whereArgs: [censoId],
+            );
+
+            for (final foto in fotos) {
+              if (foto.id != null) {
+                await _fotoRepository.marcarComoSincronizada(foto.id!);
+              }
+            }
+
             sentCount++;
-            _logger.i('✅ Censo ${censo['id']} sincronizado');
           } else {
-            // ❌ Registrar error - el servicio ya lo maneja internamente
-            errors.add('Censo ${censo['id']}: ${response['mensaje'] ?? 'Error desconocido'}');
-            _logger.w('❌ Error censo ${censo['id']}: ${response['mensaje']}');
+            errors.add('Censo $censoId: ${response['mensaje']}');
           }
 
         } catch (e) {
           errors.add('Censo ${censo['id']}: $e');
-          _logger.e('❌ Excepción censo ${censo['id']}: $e');
         }
       }
 
-      final success = sentCount > 0;
-      final message = success
-          ? '$sentCount de ${pendingCensus.length} censos enviados'
-          : 'No se pudieron enviar censos: ${errors.join(', ')}';
-
       return SendResult(
-        success: success,
+        success: sentCount > 0,
         tableName: group.tableName,
         itemsSent: sentCount,
-        message: message,
+        message: sentCount > 0
+            ? '$sentCount de ${pendingCensus.length} censos enviados'
+            : 'No se pudieron enviar censos',
         error: errors.isNotEmpty ? errors.join('; ') : null,
       );
 

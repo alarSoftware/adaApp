@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/services/post/censo_activo_post_service.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:logger/logger.dart';
 
 /// Estados de carga para el ViewModel
@@ -101,13 +101,9 @@ class CensoFallido {
   }
 
   bool get puedeReintentar {
-    // No reintentar si ya está sincronizado
     if (sincronizado == 1) return false;
-
-    // Si no tiene intentos previos, siempre puede reintentar
     if (intentosSync == 0) return true;
 
-    // Si tiene último intento, verificar tiempo de espera
     if (ultimoIntento != null) {
       final minutosEspera = _calcularEsperaMinutos(intentosSync);
       final proximoIntento = ultimoIntento!.add(Duration(minutes: minutosEspera));
@@ -159,6 +155,7 @@ class SyncResult {
 class CensosPendientesDetailViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
   final DatabaseHelper _dbHelper = DatabaseHelper();
+  final CensoActivoFotoRepository _fotoRepository = CensoActivoFotoRepository();
 
   // Estado
   CensosLoadingState _state = CensosLoadingState.initial;
@@ -190,10 +187,6 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
       _censos = result.map((map) => CensoFallido.fromMap(map)).toList();
 
       _logger.i('✅ Censos pendientes cargados: ${_censos.length}');
-      _logger.i('   - Con error (estado_censo = error): ${_censos.where((c) => c.estadoCenso == 'error').length}');
-      _logger.i('   - Creados (estado_censo = creado): ${_censos.where((c) => c.estadoCenso == 'creado').length}');
-      _logger.i('   - Sin sincronizar (sincronizado = 0): ${_censos.where((c) => c.sincronizado == 0).length}');
-      _logger.i('   - Con intentos fallidos: ${_censos.where((c) => c.intentosSync > 0).length}');
 
       _setState(CensosLoadingState.loaded);
 
@@ -223,52 +216,127 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
         );
       }
 
-      // 2. Validar que no esté ya sincronizado
       if ((censoData['sincronizado'] as int?) == 1) {
         _logger.w('⚠️ Censo $censoId ya está sincronizado');
-        await loadCensosPendientes(); // Recargar lista
+        await loadCensosPendientes();
         return SyncResult(
           success: true,
           message: 'El censo ya estaba sincronizado',
         );
       }
 
-      // 3. Preparar datos para envío
-      final position = Position(
-        latitude: (censoData['latitud'] as num?)?.toDouble() ?? 0.0,
-        longitude: (censoData['longitud'] as num?)?.toDouble() ?? 0.0,
-        timestamp: DateTime.now(),
-        accuracy: 0.0,
-        altitude: 0.0,
-        altitudeAccuracy: 0.0,
-        heading: 0.0,
-        headingAccuracy: 0.0,
-        speed: 0.0,
-        speedAccuracy: 0.0,
+      // 2. Obtener usuario_id
+      final usuarioId = censoData['usuario_id'] as int?;
+      if (usuarioId == null) {
+        _logger.e('❌ usuario_id no encontrado en censo $censoId');
+        return SyncResult(
+          success: false,
+          error: 'Usuario no encontrado en el censo',
+        );
+      }
+
+      // 3. Obtener edf_vendedor_id
+      final usuariosList = await db.query(
+        'Users',
+        where: 'id = ?',
+        whereArgs: [usuarioId],
+        limit: 1,
       );
 
-      // 4. Obtener fotos asociadas
-      final fotos = await _obtenerFotosCenso(db, censoId);
-      _logger.i('📷 Fotos encontradas: ${fotos.length}');
+      if (usuariosList.isEmpty) {
+        _logger.e('❌ Usuario $usuarioId no encontrado');
+        return SyncResult(
+          success: false,
+          error: 'Datos del usuario no disponibles',
+        );
+      }
 
-      // 5. Enviar usando tu servicio existente CensoActivoPostService
-      final response = await CensoActivoPostService.enviarCambioEstado(
-        codigoBarras: censoData['equipo_id']?.toString() ?? '',
+      final edfVendedorId = usuariosList.first['edf_vendedor_id'] as String?;
+      if (edfVendedorId == null || edfVendedorId.isEmpty) {
+        _logger.e('❌ edf_vendedor_id vacío');
+        return SyncResult(
+          success: false,
+          error: 'edf_vendedor_id no disponible',
+        );
+      }
+
+      // 4. Obtener fotos del censo
+      final fotos = await _fotoRepository.obtenerFotosPorCenso(censoId);
+      _logger.i('📸 Fotos encontradas: ${fotos.length}');
+
+      // 5. Obtener datos del equipo
+      final equipoId = censoData['equipo_id']?.toString();
+      int? marcaId;
+      int? modeloId;
+      int? logoId;
+      String? numeroSerie;
+
+      if (equipoId != null) {
+        final equiposList = await db.query(
+          'equipos',
+          where: 'id = ?',
+          whereArgs: [equipoId],
+          limit: 1,
+        );
+
+        if (equiposList.isNotEmpty) {
+          final equipo = equiposList.first;
+          marcaId = equipo['marca_id'] as int?;
+          modeloId = equipo['modelo_id'] as int?;
+          logoId = equipo['logo_id'] as int?;
+          numeroSerie = equipo['numero_serie'] as String?;
+        }
+      }
+
+      // 6. Llamada directa a enviarCensoActivo
+      _logger.i('📤 Usando enviarCensoActivo...');
+      final response = await CensoActivoPostService.enviarCensoActivo(
+        equipoId: equipoId ?? '',
+        codigoBarras: censoData['codigo_barras']?.toString() ?? equipoId ?? '',
+        marcaId: marcaId,
+        modeloId: modeloId,
+        logoId: logoId,
+        numeroSerie: numeroSerie,
+        esNuevoEquipo: false,
         clienteId: (censoData['cliente_id'] as num?)?.toInt() ?? 0,
-        enLocal: (censoData['en_local'] as num?) == 1,
-        position: position,
+        edfVendedorId: edfVendedorId,
+        crearPendiente: false,
+        usuarioId: usuarioId,
+        latitud: (censoData['latitud'] as num?)?.toDouble() ?? 0.0,
+        longitud: (censoData['longitud'] as num?)?.toDouble() ?? 0.0,
         observaciones: censoData['observaciones']?.toString(),
-        equipoId: censoData['equipo_id']?.toString(),
+        enLocal: (censoData['en_local'] as int?) == 1,
+        estadoCenso: censoData['estado_censo']?.toString() ?? 'pendiente',
+        fotos: fotos,
+        clienteNombre: censoData['cliente_nombre']?.toString(),
+        marca: censoData['marca_nombre']?.toString(),
+        modelo: censoData['modelo']?.toString(),
+        logo: censoData['logo']?.toString(),
+        timeoutSegundos: 45,
+        userId: usuarioId.toString(),
+        guardarLog: true,
       );
 
       if (response['exito'] == true) {
-        // ✅ ÉXITO: Marcar como sincronizado
-        await _marcarCensoComoSincronizado(db, censoId);
-        await _marcarFotosComoSincronizadas(db, censoId);
+        await db.update(
+          'censo_activo',
+          {
+            'sincronizado': 1,
+            'estado_censo': 'migrado',
+            'fecha_actualizacion': DateTime.now().toIso8601String(),
+            'error_mensaje': null,
+          },
+          where: 'id = ?',
+          whereArgs: [censoId],
+        );
+
+        for (final foto in fotos) {
+          if (foto.id != null) {
+            await _fotoRepository.marcarComoSincronizada(foto.id!);
+          }
+        }
 
         _logger.i('✅ Censo $censoId sincronizado exitosamente');
-
-        // Recargar lista
         await loadCensosPendientes();
 
         return SyncResult(
@@ -277,27 +345,46 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
         );
 
       } else {
-        // ❌ ERROR: Registrar intento fallido
-        final mensajeError = response['mensaje'] ?? 'Error desconocido del servidor';
-        await _registrarIntentoFallido(db, censoId, mensajeError);
+        final errorMessage = response['mensaje'] ?? 'Error desconocido';
 
-        _logger.w('❌ Error sincronizando censo $censoId: $mensajeError');
+        await db.rawUpdate('''
+          UPDATE censo_activo 
+          SET intentos_sync = intentos_sync + 1,
+              ultimo_intento = ?,
+              error_mensaje = ?,
+              estado_censo = 'error'
+          WHERE id = ?
+        ''', [
+          DateTime.now().toIso8601String(),
+          errorMessage,
+          censoId,
+        ]);
 
         return SyncResult(
           success: false,
-          error: mensajeError,
+          error: errorMessage,
         );
       }
 
     } catch (e) {
       _logger.e('💥 Excepción al reintentar censo: $e');
 
-      // Registrar error en BD
       try {
         final db = await _dbHelper.database;
-        await _registrarIntentoFallido(db, censoId, 'Error interno: $e');
+        await db.rawUpdate('''
+          UPDATE censo_activo 
+          SET intentos_sync = intentos_sync + 1,
+              ultimo_intento = ?,
+              error_mensaje = ?,
+              estado_censo = 'error'
+          WHERE id = ?
+        ''', [
+          DateTime.now().toIso8601String(),
+          'Error interno: $e',
+          censoId,
+        ]);
       } catch (dbError) {
-        _logger.e('Error registrando fallo en BD: $dbError');
+        _logger.e('Error registrando fallo: $dbError');
       }
 
       return SyncResult(
@@ -329,12 +416,10 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
     int saltados = 0;
 
     try {
-      _logger.i('🔄 Iniciando sincronización masiva de ${_censos.length} censos...');
+      _logger.i('🔄 Iniciando sincronización masiva...');
 
       for (var censo in _censos) {
-        // Solo reintentar censos que puedan reintentarse
         if (!censo.puedeReintentar) {
-          _logger.i('⏭️ Saltando censo ${censo.id} (ya sincronizado o en cooldown)');
           saltados++;
           continue;
         }
@@ -347,40 +432,35 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
           fallidos++;
         }
 
-        // Pequeña pausa para no saturar el servidor
         await Future.delayed(const Duration(milliseconds: 500));
       }
 
-      _logger.i('📊 Resultado: ✅ $exitosos exitosos | ❌ $fallidos fallidos | ⏭️ $saltados saltados');
-
-      // Recargar lista final
       await loadCensosPendientes();
 
       if (fallidos == 0 && exitosos > 0) {
         return SyncResult(
           success: true,
-          message: 'Todos los censos sincronizados ($exitosos)${saltados > 0 ? " ($saltados ya estaban sincronizados)" : ""}',
+          message: 'Todos los censos sincronizados ($exitosos)',
           exitosos: exitosos,
           fallidos: 0,
         );
       } else if (exitosos > 0) {
         return SyncResult(
           success: true,
-          message: 'Sincronización parcial: $exitosos exitosos, $fallidos fallidos${saltados > 0 ? ", $saltados saltados" : ""}',
+          message: 'Sincronización parcial: $exitosos exitosos, $fallidos fallidos',
           exitosos: exitosos,
           fallidos: fallidos,
         );
       } else {
         return SyncResult(
           success: false,
-          error: 'No se pudieron sincronizar censos${saltados > 0 ? " ($saltados ya estaban sincronizados)" : ""}',
+          error: 'No se pudieron sincronizar censos',
           exitosos: 0,
           fallidos: fallidos,
         );
       }
 
     } catch (e) {
-      _logger.e('💥 Error en sincronización masiva: $e');
       return SyncResult(
         success: false,
         error: 'Error general: ${e.toString()}',
@@ -390,7 +470,6 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
     }
   }
 
-  /// Obtiene estadísticas de censos
   Future<Map<String, int>> getEstadisticas() async {
     try {
       final db = await _dbHelper.database;
@@ -398,10 +477,7 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
         SELECT 
           COUNT(*) as total,
           SUM(CASE WHEN sincronizado = 1 THEN 1 ELSE 0 END) as sincronizados,
-          SUM(CASE WHEN sincronizado = 0 OR sincronizado IS NULL THEN 1 ELSE 0 END) as pendientes,
-          SUM(CASE WHEN intentos_sync > 0 AND sincronizado = 0 THEN 1 ELSE 0 END) as con_errores,
-          SUM(CASE WHEN estado_censo = 'error' THEN 1 ELSE 0 END) as estado_error,
-          SUM(CASE WHEN estado_censo = 'creado' THEN 1 ELSE 0 END) as creados
+          SUM(CASE WHEN sincronizado = 0 THEN 1 ELSE 0 END) as pendientes
         FROM censo_activo
       ''');
 
@@ -411,72 +487,40 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
           'total': stats['total'] as int? ?? 0,
           'sincronizados': stats['sincronizados'] as int? ?? 0,
           'pendientes': stats['pendientes'] as int? ?? 0,
-          'con_errores': stats['con_errores'] as int? ?? 0,
-          'estado_error': stats['estado_error'] as int? ?? 0,
-          'creados': stats['creados'] as int? ?? 0,
         };
       }
     } catch (e) {
       _logger.e('❌ Error obteniendo estadísticas: $e');
     }
 
-    return {
-      'total': 0,
-      'sincronizados': 0,
-      'pendientes': 0,
-      'con_errores': 0,
-      'estado_error': 0,
-      'creados': 0,
-    };
+    return {'total': 0, 'sincronizados': 0, 'pendientes': 0};
   }
-
-  // ==================== MÉTODOS PRIVADOS ====================
 
   void _setState(CensosLoadingState newState) {
     _state = newState;
     notifyListeners();
   }
 
-  /// Consulta SQL para obtener censos pendientes
-  /// Filtra por: sincronizado = 0 Y (estado_censo = 'creado' O 'error' O NULL)
   Future<List<Map<String, dynamic>>> _getCensosPendientesFromDB(Database db) async {
     const sql = '''
     SELECT 
-      ca.id,
-      ca.equipo_id,
-      ca.cliente_id,
-      ca.en_local,
-      ca.latitud,
-      ca.longitud,
-      ca.observaciones,
-      ca.fecha_creacion,
-      ca.fecha_actualizacion,
-      ca.sincronizado,
-      ca.intentos_sync,
-      ca.ultimo_intento,
-      ca.error_mensaje,
-      ca.estado_censo,
+      ca.*,
       eq.cod_barras,
       c.nombre as cliente_nombre,
       m.nombre as marca_nombre,
-      mo.nombre as modelo_nombre,
-      (SELECT COUNT(*) FROM censo_activo_foto f WHERE f.censo_activo_id = ca.id) as fotos_count
+      mo.nombre as modelo_nombre
     FROM censo_activo ca
     LEFT JOIN clientes c ON ca.cliente_id = c.id
     LEFT JOIN equipos eq ON ca.equipo_id = eq.id
     LEFT JOIN marcas m ON eq.marca_id = m.id
     LEFT JOIN modelos mo ON eq.modelo_id = mo.id
-    WHERE (
-      ca.sincronizado = 0 
-      OR ca.estado_censo = 'error'
-    )
+    WHERE ca.sincronizado = 0
     ORDER BY ca.fecha_creacion DESC
   ''';
 
     return await db.rawQuery(sql);
   }
 
-  /// Obtiene el censo completo con todos sus datos
   Future<Map<String, dynamic>?> _obtenerCensoCompleto(Database db, String censoId) async {
     final result = await db.query(
       'censo_activo',
@@ -487,67 +531,9 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
     return result.isNotEmpty ? result.first : null;
   }
 
-  /// Obtiene las fotos asociadas a un censo
-  Future<List<Map<String, dynamic>>> _obtenerFotosCenso(Database db, String censoId) async {
-    return await db.query(
-      'censo_activo_foto',
-      where: 'censo_activo_id = ?',
-      whereArgs: [censoId],
-      orderBy: 'orden ASC',
-    );
-  }
-
-  /// Marca un censo como sincronizado
-  Future<void> _marcarCensoComoSincronizado(Database db, String censoId) async {
-    await db.update(
-      'censo_activo',
-      {
-        'sincronizado': 1,
-        'estado_censo': 'migrado',
-        'fecha_actualizacion': DateTime.now().toIso8601String(),
-        'error_mensaje': null, // Limpiar error si existía
-      },
-      where: 'id = ?',
-      whereArgs: [censoId],
-    );
-
-    _logger.i('✅ Censo $censoId marcado como sincronizado en BD');
-  }
-
-  /// Marca las fotos como sincronizadas
-  Future<void> _marcarFotosComoSincronizadas(Database db, String censoId) async {
-    final fotosActualizadas = await db.update(
-      'censo_activo_foto',
-      {'sincronizado': 1},
-      where: 'censo_activo_id = ?',
-      whereArgs: [censoId],
-    );
-
-    _logger.i('✅ $fotosActualizadas fotos marcadas como sincronizadas');
-  }
-
-  /// Registra un intento fallido de sincronización
-  Future<void> _registrarIntentoFallido(Database db, String censoId, String mensajeError) async {
-    await db.rawUpdate('''
-      UPDATE censo_activo 
-      SET intentos_sync = intentos_sync + 1,
-          ultimo_intento = ?,
-          error_mensaje = ?,
-          estado_censo = 'error',
-          sincronizado = 0
-      WHERE id = ?
-    ''', [
-      DateTime.now().toIso8601String(),
-      mensajeError,
-      censoId,
-    ]);
-
-    _logger.w('⚠️ Intento fallido registrado para censo $censoId: $mensajeError');
-  }
-
   @override
   void dispose() {
-    _logger.i('🗑️ CensosPendientesDetailViewModel disposed');
+    _logger.i('🗑️ Disposed');
     super.dispose();
   }
 }
