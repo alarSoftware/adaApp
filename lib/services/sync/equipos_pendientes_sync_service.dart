@@ -109,6 +109,7 @@ class EquiposPendientesSyncService extends BaseSyncService {
     } catch (e) {
       // --- MANEJO DE EXCEPCIONES GENERALES ---
       BaseSyncService.logger.e('💥 Error general: $e');
+      await ErrorLogService.logError(tableName: 'equipos_pendientes', operation: 'sync_from_server', errorMessage: 'Error general: $e', errorType: 'unknown', endpoint: currentEndpoint, userId: edfVendedorId);
       return SyncResult(exito: false, mensaje: BaseSyncService.getErrorMessage(e), itemsSincronizados: 0);
     }
   }

@@ -7,6 +7,7 @@ import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/sync/dynamic_form_sync_service.dart';
 import 'package:ada_app/services/censo/censo_upload_service.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:ada_app/services/app_services.dart';
 import 'package:ada_app/services/device_log/device_log_background_extension.dart';
 import 'package:ada_app/models/usuario.dart';
@@ -223,6 +224,7 @@ class AuthService {
       }
     } catch (e) {
       logger.e('Error sincronizando usuarios: $e');
+      await ErrorLogService.logError(tableName: 'Users', operation: 'sync_from_server', errorMessage: 'Error sincronizando usuarios: $e', errorType: 'unknown');
       return SyncResult(
         exito: false,
         mensaje: BaseSyncService.getErrorMessage(e),
@@ -297,6 +299,7 @@ class AuthService {
       }
     } catch (e) {
       logger.e('Error sincronizando clientes: $e');
+      await ErrorLogService.logError(tableName: 'Clientes', operation: 'sync_from_server', errorMessage: 'Error sincronizando clientes: $e', errorType: 'unknown');
       return SyncResult(exito: false, mensaje: BaseSyncService.getErrorMessage(e), itemsSincronizados: 0);
     }
   }
