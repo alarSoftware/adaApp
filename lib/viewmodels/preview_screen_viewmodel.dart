@@ -182,9 +182,17 @@ class PreviewScreenViewModel extends ChangeNotifier {
         _logger.i('ℹ️ Usando equipo existente: $equipoId');
       }
 
-      // ✅ NUEVO: Verificar si el equipo YA está asignado al cliente
-      final yaAsignado = await _verificarAsignacionLocal(equipoId, clienteId);
-      _logger.i('📋 Equipo ya asignado: $yaAsignado');
+      // 🔥 CORRECCIÓN: EQUIPOS NUEVOS SIEMPRE SON PENDIENTES
+      bool yaAsignado;
+      if (esNuevoEquipo) {
+        // Equipos nuevos SIEMPRE son pendientes (necesitan aprobación del servidor)
+        yaAsignado = false;
+        _logger.i('📋 Equipo NUEVO - Marcando como pendiente automáticamente');
+      } else {
+        // Solo para equipos existentes verificar asignación real
+        yaAsignado = await _verificarAsignacionLocal(equipoId, clienteId);
+        _logger.i('📋 Equipo existente - Ya asignado: $yaAsignado');
+      }
 
       // 1B. Crear pendiente LOCAL SOLO si NO está asignado
       if (!yaAsignado) {
@@ -194,7 +202,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
           clienteId: clienteId,
           usuarioId: usuarioId,
         );
-        _logger.i('✅ Pendiente registrado localmente (equipo NO asignado)');
+        _logger.i('✅ Pendiente registrado localmente');
       } else {
         _logger.i('ℹ️ Equipo YA asignado - NO se crea pendiente');
       }
@@ -338,7 +346,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
           _logger.w('⚠️ Sin edfVendedorId, marcando como error');
           await _estadoEquipoRepository.marcarComoError(estadoId, 'Sin edfVendedorId');
 
-          // 🆕 Registrar en error_log
           await ErrorLogService.logValidationError(
             tableName: 'censo_activo',
             operation: 'sync_unificado',
@@ -423,7 +430,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
             }
           }
 
-          // 🆕 Marcar errores previos como resueltos
+          // Marcar errores previos como resueltos
           await ErrorLogService.marcarErroresComoResueltos(
             registroFailId: estadoId,
             tableName: 'censo_activo',
@@ -438,7 +445,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
           await _estadoEquipoRepository.marcarComoError(estadoId, errorMsg);
 
-          // 🆕 Registrar en error_log con información detallada
           await ErrorLogService.logError(
             tableName: 'censo_activo',
             operation: 'sync_unificado',
@@ -463,7 +469,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
           'Excepción unificada: $e',
         );
 
-        // 🆕 Registrar en error_log
         await ErrorLogService.logError(
           tableName: 'censo_activo',
           operation: 'sync_unificado_background',
@@ -727,7 +732,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
           };
 
         case 'sincronizado': {
-          // 🆕 Buscar si hubo errores previos (incluso resueltos)
+          // Buscar si hubo errores previos (incluso resueltos)
           final errorLog = await db.query(
             'error_log',
             where: 'registro_fail_id = ? AND table_name = ?',
@@ -769,7 +774,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
         }
         case 'error': {
-          // 🆕 Buscar el error más reciente en error_log para este censo
+          // Buscar el error más reciente en error_log para este censo
           final errorLog = await db.query(
             'error_log',
             where: 'registro_fail_id = ? AND table_name = ?',
@@ -788,7 +793,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
             final nextRetryAt = errorLog.first['next_retry_at'] as String?;
             final timestamp = errorLog.first['timestamp'] as String?;
 
-            // 🔥 CONSTRUIR MENSAJE DETALLADO
+            // CONSTRUIR MENSAJE DETALLADO
             errorDetalle = errorMessage ?? 'Error desconocido';
 
             // Tipo de error
@@ -832,7 +837,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
               }
             }
 
-            // Timestamp del error - 🔥 CORRECCIÓN AQUÍ
+            // Timestamp del error
             if (timestamp != null) {
               try {
                 final errorDate = DateTime.parse(timestamp);
@@ -881,7 +886,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // 🆕 Métodos helper para formatear información
+  // Métodos helper para formatear información
   String _formatErrorType(String errorType) {
     switch (errorType) {
       case 'network':
