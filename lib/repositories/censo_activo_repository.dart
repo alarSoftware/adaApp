@@ -79,7 +79,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         id: uuidId,
         equipoId: equipoId,
         clienteId: clienteId,
-        usuarioId: usuarioId,  // ← Nuevo campo agregado
+        usuarioId: usuarioId,
         enLocal: enLocal,
         latitud: latitud,
         longitud: longitud,

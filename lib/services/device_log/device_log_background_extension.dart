@@ -7,7 +7,7 @@ import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/post/device_log_post_service.dart';
 import 'package:ada_app/services/api_config_service.dart';
 import 'package:ada_app/utils/device_info_helper.dart';
-import 'package:ada_app/services/auth_service.dart'; // 🆕 AGREGAR
+import 'package:ada_app/services/auth_service.dart';
 import 'package:logger/logger.dart';
 
 //  CONFIGURACIÓN CENTRALIZADA
@@ -20,27 +20,36 @@ class BackgroundLogConfig {
   static const Duration intervalo = Duration(minutes: 10);
 
   /// NÚMERO MÁXIMO DE REINTENTOS
-  static const int maxReintentos = 3;
+  static const int maxReintentos = 5;
 
-  ///  DURACIÓN BASE PARA BACKOFF EXPONENCIAL (en segundos)
-  static const int backoffBase = 2;
+  /// TIEMPOS DE ESPERA PARA BACKOFF EXPONENCIAL (en segundos)
+  /// Progresión: 5s, 10s, 20s, 40s, 60s
+  static const List<int> tiemposBackoff = [5, 10, 20, 40, 60];
+
+  /// Obtener tiempo de espera según el número de intento (1-based)
+  static int obtenerTiempoEspera(int numeroIntento) {
+    // numeroIntento empieza en 1, pero el array en 0
+    final index = numeroIntento - 1;
+
+    // Validar que el índice esté dentro del rango
+    if (index >= 0 && index < tiemposBackoff.length) {
+      return tiemposBackoff[index];
+    }
+
+    // Si se excede, usar el último valor (mayor tiempo de espera)
+    return tiemposBackoff.last;
+  }
 
   ///  MINUTOS MÍNIMOS ENTRE LOGS (prevenir duplicados)
   static const int minutosMinimosEntreLogs = 8;
 }
 
-///  SERVICIO PRINCIPAL DE LOGGING EN BACKGROUND
-/// - SOLO FUNCIONA CON SESIÓN ACTIVA
-/// - Ejecuta cada 10 minutos en horario laboral
-/// - Crea logs automáticamente
-/// - Intenta enviar con reintentos
-/// - Marca como sincronizado si tiene éxito
 /// - CON PROTECCIÓN ANTI-DUPLICADOS Y LOCK DE CONCURRENCIA
 class DeviceLogBackgroundExtension {
   static final _logger = Logger();
   static Timer? _backgroundTimer;
   static bool _isInitialized = false;
-  static bool _isExecuting = false; // 🆕 LOCK DE CONCURRENCIA
+  static bool _isExecuting = false;
 
   /// 🆕 Verificar si hay una sesión activa antes de proceder
   static Future<bool> _verificarSesionActiva() async {
@@ -280,7 +289,7 @@ class DeviceLogBackgroundExtension {
 
       // 🕐 Backoff exponencial antes del siguiente intento
       if (intento < BackgroundLogConfig.maxReintentos) {
-        final esperaSegundos = BackgroundLogConfig.backoffBase * intento; // 2s, 4s, 6s
+        final esperaSegundos = BackgroundLogConfig.obtenerTiempoEspera(intento);
         _logger.i('⏳ Esperando ${esperaSegundos}s antes del siguiente intento...');
         await Future.delayed(Duration(seconds: esperaSegundos));
       }
@@ -383,8 +392,8 @@ class DeviceLogBackgroundExtension {
       'activo': estaActivo,
       'inicializado': _isInitialized,
       'timer_activo': _backgroundTimer?.isActive ?? false,
-      'ejecutando': _isExecuting, // 🆕 Estado del lock
-      'sesion_activa': tieneSesion, // 🆕 Estado de la sesión
+      'ejecutando': _isExecuting,
+      'sesion_activa': tieneSesion,
       'en_horario': estaEnHorarioTrabajo(),
       'hora_actual': now.hour,
       'minuto_actual': now.minute,
@@ -394,8 +403,8 @@ class DeviceLogBackgroundExtension {
       'horario': '${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00',
       'url_servidor': urlActual,
       'max_reintentos': BackgroundLogConfig.maxReintentos,
-      'backoff_base': BackgroundLogConfig.backoffBase,
-      'minutos_minimos_entre_logs': BackgroundLogConfig.minutosMinimosEntreLogs, // 🆕
+      'tiempos_backoff': BackgroundLogConfig.tiemposBackoff.join(', '),
+      'minutos_minimos_entre_logs': BackgroundLogConfig.minutosMinimosEntreLogs,
     };
   }
 
@@ -430,8 +439,8 @@ class DeviceLogBackgroundExtension {
     _logger.i('');
     _logger.i('🔁 Configuración de Reintentos:');
     _logger.i('   • Máximo reintentos: ${estado['max_reintentos']}');
-    _logger.i('   • Backoff base: ${estado['backoff_base']}s');
-    _logger.i('   • Tiempos de espera: 2s, 4s, 6s');
+    _logger.i('   • Tiempos backoff: ${estado['tiempos_backoff']}s');
+    _logger.i('   • Progresión: 5s → 10s → 20s → 40s → 60s');
     _logger.i('═══════════════════════════════════════');
   }
 

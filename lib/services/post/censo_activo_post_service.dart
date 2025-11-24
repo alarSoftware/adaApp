@@ -17,7 +17,6 @@ class CensoActivoPostService {
   static const String _endpoint = '/censoActivo/insertCensoActivo';
   static const Uuid _uuid = Uuid();
 
-  /// Método principal: envía equipo + pendiente + censo en un solo JSON unificado
   static Future<Map<String, dynamic>> enviarCensoActivo({
     // Datos del equipo (si es nuevo)
     String? equipoId,
@@ -584,7 +583,7 @@ class CensoActivoPostService {
       'edfModeloId': modeloId,
       'marcaId': marcaId.toString(),
       'logoId': logoId.toString(),
-      'numeroSerie': numeroSerie ?? '',
+      'serie': numeroSerie ?? '',
       'fechaCreacion': now,
       'appInsert': 1,
       'esActivo': 1,
@@ -679,7 +678,7 @@ class CensoActivoPostService {
 
       // Información del equipo
       'equipoCodigoBarras': codigoBarras,
-      'equipoNumeroSerie': numeroSerie ?? '',
+      'serie': numeroSerie ?? '',
       'equipoModelo': modelo ?? '',
       'equipoMarca': marca ?? '',
       'equipoLogo': logo ?? '',

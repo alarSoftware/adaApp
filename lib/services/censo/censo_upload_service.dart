@@ -451,24 +451,48 @@ class CensoUploadService {
       String equipoId,
       ) async {
     try {
-      final equiposList = await _equipoRepository.dbHelper.consultar(
-        'equipos',
-        where: 'id = ?',
-        whereArgs: [equipoId],
-        limit: 1,
-      );
+      // ✅ HACER JOIN PARA OBTENER TODO: IDs + Nombres + app_insert
+      final db = await _equipoRepository.dbHelper.database;
+      final result = await db.rawQuery('''
+      SELECT 
+        e.id,
+        e.cod_barras,
+        e.marca_id,
+        e.modelo_id,
+        e.logo_id,
+        e.numero_serie,
+        e.app_insert,
+        m.nombre as marca_nombre,
+        mo.nombre as modelo_nombre,
+        l.nombre as logo_nombre
+      FROM equipos e
+      LEFT JOIN marcas m ON e.marca_id = m.id
+      LEFT JOIN modelos mo ON e.modelo_id = mo.id
+      LEFT JOIN logo l ON e.logo_id = l.id
+      WHERE e.id = ?
+    ''', [equipoId]);
 
-      if (equiposList.isNotEmpty) {
-        final infoEquipo = equiposList.first;
+      if (result.isNotEmpty) {
+        final infoEquipo = result.first;
+
+        // Datos del equipo
         datosLocales['marca_id'] ??= infoEquipo['marca_id'];
         datosLocales['modelo_id'] ??= infoEquipo['modelo_id'];
         datosLocales['logo_id'] ??= infoEquipo['logo_id'];
         datosLocales['numero_serie'] ??= infoEquipo['numero_serie'];
         datosLocales['codigo_barras'] ??= infoEquipo['cod_barras'];
+
+        // Nombres de las tablas maestras
         datosLocales['marca_nombre'] ??= infoEquipo['marca_nombre'];
         datosLocales['modelo'] ??= infoEquipo['modelo_nombre'];
+        datosLocales['logo'] ??= infoEquipo['logo_nombre'];
 
-        _logger.i('✅ Datos enriquecidos desde equipos');
+        // ✅ Flag de equipo nuevo desde app_insert
+        datosLocales['es_nuevo_equipo'] ??= (infoEquipo['app_insert'] == 1);
+
+        _logger.i('✅ Datos enriquecidos desde equipos con JOINs');
+        _logger.i('   Marca: ${infoEquipo['marca_nombre']}, Modelo: ${infoEquipo['modelo_nombre']}');
+        _logger.i('   Es nuevo equipo (app_insert): ${infoEquipo['app_insert']}');
       }
     } catch (e) {
       _logger.w('⚠️ No se pudo enriquecer datos: $e');
