@@ -5,6 +5,7 @@ import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart
 import 'package:ada_app/models/operaciones_comerciales/enums/estado_operacion.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
+import 'package:ada_app/services/post/operaciones_comerciales_post_service.dart';
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 import 'package:ada_app/repositories/producto_repository.dart';
 
@@ -384,7 +385,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   // ═══════════════════════════════════════════════════════════════════
 
   Future<bool> guardarOperacion() async {
-    if (isViewOnly) return false; // 👈 NUEVO: No se puede guardar en modo lectura
+    if (isViewOnly) return false;
 
     final validation = validateForm();
     if (!validation.isValid) {
@@ -395,7 +396,8 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     _setFormState(FormState.saving);
 
     try {
-      final operacion = OperacionComercial(
+      // 1. Preparar el objeto (igual que antes)
+      var operacion = OperacionComercial( // Cambié final por var para poder actualizarla
         id: operacionExistente?.id,
         clienteId: cliente.id!,
         tipoOperacion: tipoOperacion,
@@ -404,17 +406,40 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         estado: EstadoOperacion.borrador,
         observaciones: _observaciones.isEmpty ? null : _observaciones,
         totalProductos: _productosSeleccionados.length,
-        usuarioId: 1, // Ajustar según tu lógica de auth
+        usuarioId: 1, // Ajustar según auth
         estaSincronizado: false,
         syncStatus: 'pending',
         intentosSync: 0,
         detalles: _productosSeleccionados,
       );
 
+      // 2. Guardar en BD Local (igual que antes)
       if (operacionExistente != null) {
         await _operacionRepository.actualizarOperacion(operacion);
       } else {
         await _operacionRepository.crearOperacion(operacion);
+      }
+
+      // 3. INTENTAR ENVIAR AL SERVIDOR (NUEVO) <---
+      try {
+        final resultado = await OperacionesComercialesPostService.enviarOperacion(operacion);
+
+        if (resultado['exito'] == true) {
+          // Si se envió bien, actualizamos el estado local a 'sincronizado' o 'enviado'
+          operacion = operacion.copyWith(
+            estaSincronizado: true,
+            syncStatus: 'synced',
+            estado: EstadoOperacion.sincronizado, // O el estado que prefieras
+            serverId: resultado['id'], // Si el server devuelve ID
+            fechaSincronizacion: DateTime.now(),
+          );
+
+          // Actualizamos en local el nuevo estado
+          await _operacionRepository.actualizarOperacion(operacion);
+        }
+      } catch (e) {
+        print('Error al intentar enviar online: $e');
+        // No fallamos el guardado general, solo queda pendiente de sync
       }
 
       _setFormState(FormState.idle);
