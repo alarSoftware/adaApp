@@ -300,13 +300,14 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
 
     final ahora = DateTime.now();
     final hoy = DateTime(ahora.year, ahora.month, ahora.day);
-    final fechaActual = viewModel.fechaRetiro ?? hoy;
-    // Permitir fechas pasadas en visualización por si acaso
-    final firstDate = fechaActual.isBefore(hoy) ? fechaActual : hoy;
+    final manana = hoy.add(const Duration(days: 1));
+    final fechaActual = viewModel.fechaRetiro ?? manana;
+    // La fecha mínima es mañana (hoy está deshabilitado)
+    final firstDate = manana;
 
     final fechaSeleccionada = await showDatePicker(
       context: context,
-      initialDate: fechaActual,
+      initialDate: fechaActual.isBefore(manana) ? manana : fechaActual,
       firstDate: firstDate,
       lastDate: DateTime(ahora.year + 1),
       locale: const Locale('es', 'ES'),

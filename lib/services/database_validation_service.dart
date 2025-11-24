@@ -118,7 +118,7 @@ class DatabaseValidationService {
       'equipos_pendientes': 'Equipos Pendientes',
       'censo_activo': 'Censos Activos',
       'censo_activo_foto': 'Fotos de Censo',
-      'device_log': 'Logs de Dispositivo',
+      // 'device_log': 'Logs de Dispositivo',
     };
 
     for (var entry in tables.entries) {
