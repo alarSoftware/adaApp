@@ -19,6 +19,7 @@ class FullSyncService {
     required String edfVendedorId,
     String? edfVendedorNombre,
     String? previousVendedorId,
+    bool forceClear = false,
     required SyncProgressCallback onProgress,
   }) async {
     final completedSteps = <String>[];
@@ -26,10 +27,7 @@ class FullSyncService {
     int totalItemsSincronizados = 0;
 
     try {
-      // =================================================================
-      // 1. Limpiar datos anteriores si es cambio de vendedor
-      // =================================================================
-      if (previousVendedorId != null && previousVendedorId != edfVendedorId) {
+      if (forceClear || (previousVendedorId != null && previousVendedorId != edfVendedorId)) {
         try {
           onProgress(
             progress: 0.05,

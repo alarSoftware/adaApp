@@ -535,6 +535,7 @@ class SelectScreenViewModel extends ChangeNotifier {
   Future<void> _executeUnifiedSync({
     required String edfVendedorId,
     String? previousVendedorId,
+    bool forceClear = false,
   }) async {
     _setSyncLoading(true);
     _resetSyncProgress();
@@ -544,6 +545,7 @@ class SelectScreenViewModel extends ChangeNotifier {
       final result = await FullSyncService.syncAllDataWithProgress(
         edfVendedorId: edfVendedorId,
         previousVendedorId: previousVendedorId,
+        forceClear: forceClear,
         onProgress: ({
           required double progress,
           required String currentStep,
@@ -650,6 +652,7 @@ class SelectScreenViewModel extends ChangeNotifier {
     await _executeUnifiedSync(
       edfVendedorId: _currentUser!.edfVendedorId ?? '',
       previousVendedorId: null,
+      forceClear: true,
     );
   }
 

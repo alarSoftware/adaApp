@@ -678,7 +678,7 @@ class CensoActivoPostService {
 
       // Información del equipo
       'equipoCodigoBarras': codigoBarras,
-      'serie': numeroSerie ?? '',
+      'equipoNumeroSerie': numeroSerie ?? '',
       'equipoModelo': modelo ?? '',
       'equipoMarca': marca ?? '',
       'equipoLogo': logo ?? '',
