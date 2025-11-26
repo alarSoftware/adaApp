@@ -135,16 +135,12 @@ class SyncService {
 
       // Limpiar censos sincronizados y con estado correcto
       final deletedCensos = await txn.delete(
-          'censo_activo',
-          where: 'sincronizado = ? AND estado_censo IN (?, ?)',
-          whereArgs: [1, 'migrado', 'completado']
+          'censo_activo'
       );
 
       // Limpiar fotos de censos sincronizadas
       final deletedFotos = await txn.delete(
-          'censo_activo_foto',
-          where: 'sincronizado = ?',
-          whereArgs: [1]
+          'censo_activo_foto'
       );
 
       // Limpiar device logs sincronizados

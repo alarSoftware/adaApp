@@ -117,12 +117,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
        FROM censo_activo ca2 
        WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
        ORDER BY ca2.fecha_creacion DESC 
-       LIMIT 1) as estado_censo,
-      (SELECT ca2.sincronizado 
-       FROM censo_activo ca2 
-       WHERE ca2.equipo_id = e.id AND ca2.cliente_id = ?
-       ORDER BY ca2.fecha_creacion DESC 
-       LIMIT 1) as sincronizado
+       LIMIT 1) as estado_censo
     FROM equipos e
     INNER JOIN marcas m ON e.marca_id = m.id
     INNER JOIN modelos mo ON e.modelo_id = mo.id
@@ -138,7 +133,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
 
       final result = await dbHelper.consultarPersonalizada(
           sql,
-          [clienteId, clienteId, clienteId, clienteId, clienteId, clienteId]
+          [clienteId, clienteId, clienteId, clienteId, clienteId]
       );
 
       _logger.i('Equipos ASIGNADOS para cliente $clienteId: ${result.length}');

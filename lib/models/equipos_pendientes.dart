@@ -1,12 +1,12 @@
 class EquiposPendientes {
   final String? id;
+  final String? edfVendedorid;
   final String equipoId;
   final String clienteId;
   final DateTime fechaCenso;
   final int usuarioCensoId;
   final DateTime fechaCreacion;
   final DateTime? fechaActualizacion;
-  final bool sincronizado;
   final DateTime? fechaSincronizacion;
   final int intentosSync;
   final DateTime? ultimoIntento;
@@ -22,13 +22,13 @@ class EquiposPendientes {
 
   EquiposPendientes({
     this.id,
+    required this.edfVendedorid,
     required this.equipoId,
     required this.clienteId,
     required this.fechaCenso,
     required this.usuarioCensoId,
     required this.fechaCreacion,
     this.fechaActualizacion,
-    this.sincronizado = false,
     this.fechaSincronizacion,
     this.intentosSync = 0,
     this.ultimoIntento,
@@ -44,6 +44,7 @@ class EquiposPendientes {
   factory EquiposPendientes.fromMap(Map<String, dynamic> map) {
     return EquiposPendientes(
       id: map['id'] as String?,
+      edfVendedorid: map['edf_vendedor_id' as String?],
       equipoId: map['equipo_id'] as String,
       clienteId: map['cliente_id'] as String,
       fechaCenso: DateTime.parse(map['fecha_censo'] as String),
@@ -52,7 +53,6 @@ class EquiposPendientes {
       fechaActualizacion: map['fecha_actualizacion'] != null
           ? DateTime.parse(map['fecha_actualizacion'] as String)
           : null,
-      sincronizado: (map['sincronizado'] as int?) == 1,
       fechaSincronizacion: map['fecha_sincronizacion'] != null
           ? DateTime.parse(map['fecha_sincronizacion'] as String)
           : null,
@@ -79,7 +79,6 @@ class EquiposPendientes {
       'usuario_censo_id': usuarioCensoId,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
-      'sincronizado': sincronizado ? 1 : 0,
       'fecha_sincronizacion': fechaSincronizacion?.toIso8601String(),
       'intentos_sync': intentosSync,
       'ultimo_intento': ultimoIntento?.toIso8601String(),
@@ -87,6 +86,5 @@ class EquiposPendientes {
     };
   }
 
-  bool get necesitaSincronizar => !sincronizado;
   bool get tieneError => errorMensaje != null && errorMensaje!.isNotEmpty;
 }

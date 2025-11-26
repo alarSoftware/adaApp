@@ -1,11 +1,4 @@
-
-// lib/models/estado_equipo.dart
-
-enum EstadoEquipoCenso {
-  creado,
-  migrado,
-  error,
-}
+enum EstadoEquipoCenso { creado, migrado, error }
 
 extension EstadoEquipoCensoExtension on EstadoEquipoCenso {
   String get valor {
@@ -37,6 +30,7 @@ extension EstadoEquipoCensoExtension on EstadoEquipoCenso {
 
 class EstadoEquipo {
   final String? id;
+  final String? edfVendedorId;
   final String equipoId;
   final int clienteId;
   final int? usuarioId;
@@ -46,15 +40,15 @@ class EstadoEquipo {
   final DateTime fechaRevision;
   final DateTime fechaCreacion;
   final DateTime? fechaActualizacion;
-  final bool estaSincronizado;
   final String? estadoCenso;
   final String? observaciones;
-  final int intentosSync;              // 🆕 AGREGAR
-  final DateTime? ultimoIntento;       // 🆕 AGREGAR
-  final String? errorMensaje;          // 🆕 AGREGAR
+  final int intentosSync;
+  final DateTime? ultimoIntento;
+  final String? errorMensaje;
 
   EstadoEquipo({
     this.id,
+    this.edfVendedorId,
     required this.equipoId,
     required this.clienteId,
     this.usuarioId,
@@ -64,17 +58,17 @@ class EstadoEquipo {
     required this.fechaRevision,
     required this.fechaCreacion,
     this.fechaActualizacion,
-    this.estaSincronizado = false,
     this.estadoCenso,
     this.observaciones,
-    this.intentosSync = 0,             // 🆕 AGREGAR
-    this.ultimoIntento,                // 🆕 AGREGAR
-    this.errorMensaje,                 // 🆕 AGREGAR
+    this.intentosSync = 0,
+    this.ultimoIntento,
+    this.errorMensaje,
   });
 
   factory EstadoEquipo.fromMap(Map<String, dynamic> map) {
     return EstadoEquipo(
       id: map['id'] as String?,
+      edfVendedorId: map['edf_vendedor_id'],
       equipoId: map['equipo_id'] as String? ?? '0',
       clienteId: map['cliente_id'] as int? ?? 0,
       usuarioId: map['usuario_id'] as int?,
@@ -90,14 +84,13 @@ class EstadoEquipo {
       fechaActualizacion: map['fecha_actualizacion'] != null
           ? DateTime.parse(map['fecha_actualizacion'] as String)
           : null,
-      estaSincronizado: (map['sincronizado'] as int?) == 1,
       estadoCenso: map['estado_censo'] as String?,
       observaciones: map['observaciones'] as String?,
-      intentosSync: map['intentos_sync'] as int? ?? 0,                    // 🆕 AGREGAR
-      ultimoIntento: map['ultimo_intento'] != null                        // 🆕 AGREGAR
+      intentosSync: map['intentos_sync'] as int? ?? 0,
+      ultimoIntento: map['ultimo_intento'] != null
           ? DateTime.parse(map['ultimo_intento'] as String)
           : null,
-      errorMensaje: map['error_mensaje'] as String?,                      // 🆕 AGREGAR
+      errorMensaje: map['error_mensaje'] as String?,
     );
   }
 
@@ -113,11 +106,11 @@ class EstadoEquipo {
       'fecha_revision': fechaRevision.toIso8601String(),
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
-      'sincronizado': estaSincronizado ? 1 : 0,
+      'estado_censo': estadoCenso,
       'observaciones': observaciones,
-      'intentos_sync': intentosSync,                                       // 🆕 AGREGAR
-      'ultimo_intento': ultimoIntento?.toIso8601String(),                 // 🆕 AGREGAR
-      'error_mensaje': errorMensaje,                                       // 🆕 AGREGAR
+      'intentos_sync': intentosSync,
+      'ultimo_intento': ultimoIntento?.toIso8601String(),
+      'error_mensaje': errorMensaje,
     };
 
     if (estadoCenso != null) {
@@ -139,12 +132,11 @@ class EstadoEquipo {
       'fecha_revision': fechaRevision.toIso8601String(),
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
-      'sincronizado': estaSincronizado,
       'estado_censo': estadoCenso,
       'observaciones': observaciones,
-      'intentos_sync': intentosSync,                                       // 🆕 AGREGAR
-      'ultimo_intento': ultimoIntento?.toIso8601String(),                 // 🆕 AGREGAR
-      'error_mensaje': errorMensaje,                                       // 🆕 AGREGAR
+      'intentos_sync': intentosSync,
+      'ultimo_intento': ultimoIntento?.toIso8601String(),
+      'error_mensaje': errorMensaje,
     };
   }
 
@@ -159,12 +151,11 @@ class EstadoEquipo {
     DateTime? fechaRevision,
     DateTime? fechaCreacion,
     DateTime? fechaActualizacion,
-    bool? estaSincronizado,
     String? estadoCenso,
     String? observaciones,
-    int? intentosSync,                                                     // 🆕 AGREGAR
-    DateTime? ultimoIntento,                                               // 🆕 AGREGAR
-    String? errorMensaje,                                                  // 🆕 AGREGAR
+    int? intentosSync,
+    DateTime? ultimoIntento,
+    String? errorMensaje,
   }) {
     return EstadoEquipo(
       id: id ?? this.id,
@@ -177,23 +168,23 @@ class EstadoEquipo {
       fechaRevision: fechaRevision ?? this.fechaRevision,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
-      estaSincronizado: estaSincronizado ?? this.estaSincronizado,
       estadoCenso: estadoCenso ?? this.estadoCenso,
       observaciones: observaciones ?? this.observaciones,
-      intentosSync: intentosSync ?? this.intentosSync,                     // 🆕 AGREGAR
-      ultimoIntento: ultimoIntento ?? this.ultimoIntento,                 // 🆕 AGREGAR
-      errorMensaje: errorMensaje ?? this.errorMensaje,                    // 🆕 AGREGAR
+      intentosSync: intentosSync ?? this.intentosSync,
+      ultimoIntento: ultimoIntento ?? this.ultimoIntento,
+      errorMensaje: errorMensaje ?? this.errorMensaje,
     );
   }
 
   // Estados del censo
-  EstadoEquipoCenso get estadoCensoEnum => EstadoEquipoCensoExtension.fromString(estadoCenso);
+  EstadoEquipoCenso get estadoCensoEnum =>
+      EstadoEquipoCensoExtension.fromString(estadoCenso);
   bool get estaCreado => estadoCenso == EstadoEquipoCenso.creado.valor;
   bool get estaMigrado => estadoCenso == EstadoEquipoCenso.migrado.valor;
   bool get tieneError => estadoCenso == EstadoEquipoCenso.error.valor;
 
-  // 🆕 AGREGAR Helpers para reintentos
-  bool get necesitaReintento => !estaSincronizado && intentosSync < 10;
+  // Helpers para reintentos
+  bool get necesitaReintento => !estaMigrado && intentosSync < 10;
   bool get puedeReintentar {
     if (ultimoIntento == null) return true;
     final minutos = _calcularEsperaMinutos(intentosSync);
@@ -203,11 +194,16 @@ class EstadoEquipo {
 
   int _calcularEsperaMinutos(int intentos) {
     switch (intentos) {
-      case 0: return 0;
-      case 1: return 1;
-      case 2: return 5;
-      case 3: return 10;
-      default: return 30;
+      case 0:
+        return 0;
+      case 1:
+        return 1;
+      case 2:
+        return 5;
+      case 3:
+        return 10;
+      default:
+        return 30;
     }
   }
 }

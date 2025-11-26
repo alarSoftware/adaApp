@@ -468,9 +468,9 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
         iconData = Icons.inventory;
         color = Colors.green;
         break;
-        iconData = Icons.devices;
-        color = Colors.purple;
-        break;
+        // iconData = Icons.devices;
+        // color = Colors.purple;
+        // break;
       case PendingDataType.images:
         iconData = Icons.photo_library;
         color = Colors.pink;

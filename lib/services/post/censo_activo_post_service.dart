@@ -17,10 +17,7 @@ class CensoActivoPostService {
   static const Uuid _uuid = Uuid();
 
   static Future<Map<String, dynamic>> enviarCensoActivo({
-    // ID del censo (desde BD)
-    String? censoId, // 🔥 NUEVO: ID desde BD
-
-    // Datos del equipo (si es nuevo)
+    String? censoId,
     String? equipoId,
     String? codigoBarras,
     int? marcaId,
@@ -28,34 +25,25 @@ class CensoActivoPostService {
     int? logoId,
     String? numeroSerie,
     bool esNuevoEquipo = false,
-
-    // Datos del pendiente
     required int clienteId,
     required String edfVendedorId,
     bool crearPendiente = false,
-    String? pendienteUuid, // 🔥 UUID desde BD (no generar nuevo)
-
-    // Datos del censo activo
+    dynamic pendienteExistente,
     required int usuarioId,
     required double latitud,
     required double longitud,
     String? observaciones,
     bool enLocal = true,
     String? estadoCenso = 'pendiente',
-
-    // Fotos
     List<dynamic>? fotos,
-
-    // Datos adicionales del equipo
     String? clienteNombre,
     String? marca,
     String? modelo,
     String? logo,
-
-    // Control
     int timeoutSegundos = 60,
     String? userId,
-    bool guardarLog = true,
+    bool guardarLog = false,
+    var equipoDataMap
   }) async {
     String? fullUrl;
 
@@ -80,9 +68,6 @@ class CensoActivoPostService {
       _logger.i('   - Cliente ID: $clienteId');
       _logger.i('   - Es nuevo equipo: $esNuevoEquipo');
       _logger.i('   - Crear pendiente: $crearPendiente');
-      if (pendienteUuid != null) {
-        _logger.i('   - UUID Pendiente (BD): $pendienteUuid');
-      }
 
       // Construir el JSON unificado
       final payloadUnificado = _construirPayloadUnificado(
@@ -99,10 +84,10 @@ class CensoActivoPostService {
         clienteId: clienteId,
         edfVendedorId: edfVendedorId,
         crearPendiente: crearPendiente,
-        pendienteUuid: pendienteUuid, // 🔥 PASAR UUID DE BD
+        pendienteExistente: pendienteExistente,
 
         // Censo
-        censoId: censoIdFinal, // 🔥 USAR ID DE BD
+        censoId: censoIdFinal,
         usuarioId: usuarioId,
         latitud: latitud,
         longitud: longitud,
@@ -115,6 +100,7 @@ class CensoActivoPostService {
         modelo: modelo,
         logo: logo,
         now: now,
+          equipoDataMap:equipoDataMap
       );
 
       _logger.i('📦 Payload size: ${jsonEncode(payloadUnificado).length} caracteres');
@@ -300,23 +286,10 @@ class CensoActivoPostService {
         filePath: file.path,
       );
 
-      _logger.i('📝 Contenido generado: ${contenido.length} caracteres');
-      _logger.i('🔄 Intentando escribir archivo...');
 
       await file.writeAsString(contenido);
 
-      _logger.i('✅✅✅ ARCHIVO ESCRITO EXITOSAMENTE ✅✅✅');
-      _logger.i('📁 Log unificado guardado: ${file.uri.pathSegments.last}');
-      _logger.i('📍 Ubicación exacta: ${file.path}');
-      _logger.i('📊 Tamaño del archivo: ${await file.length()} bytes');
-      _logger.i('═══════════════════════════════════════════════════════');
-
     } catch (e, stackTrace) {
-      _logger.e('═══════════════════════════════════════════════════════');
-      _logger.e('❌❌❌ ERROR GUARDANDO LOG ❌❌❌');
-      _logger.e('Error: $e');
-      _logger.e('StackTrace: $stackTrace');
-      _logger.e('═══════════════════════════════════════════════════════');
     }
   }
 
@@ -574,7 +547,7 @@ class CensoActivoPostService {
     required int clienteId,
     required String edfVendedorId,
     required bool crearPendiente,
-    String? pendienteUuid, // 🔥 UUID desde BD
+    dynamic pendienteExistente,
 
     // Censo
     required String censoId,
@@ -590,6 +563,7 @@ class CensoActivoPostService {
     String? modelo,
     String? logo,
     required DateTime now,
+    var equipoDataMap
   }) {
     // 🔥 SIEMPRE LAS 3 SECCIONES (vacías si no aplican)
     final Map<String, dynamic> payload = {};
@@ -598,14 +572,7 @@ class CensoActivoPostService {
     // SECCIÓN EQUIPO (llena si es nuevo equipo, vacía si no)
     // ═══════════════════════════════════════════════════════════════
     if (esNuevoEquipo && marcaId != null && modeloId != null && logoId != null) {
-      payload['equipo'] = _construirJsonEquipo(
-        equipoId: equipoId,
-        codigoBarras: codigoBarras,
-        marcaId: marcaId,
-        modeloId: modeloId,
-        logoId: logoId,
-        numeroSerie: numeroSerie,
-      );
+      payload['equipo'] = _construirJsonEquipo(equipoDataMap);
       _logger.i('✅ JSON Equipo agregado (nuevo equipo)');
     } else {
       payload['equipo'] = {}; // 🔥 VACÍO si no es nuevo equipo
@@ -615,18 +582,8 @@ class CensoActivoPostService {
     // ═══════════════════════════════════════════════════════════════
     // SECCIÓN EQUIPO_PENDIENTE (llena si necesita pendiente, vacía si no)
     // ═══════════════════════════════════════════════════════════════
-    if (crearPendiente) {
-      payload['equipo_pendiente'] = _construirJsonEquipoPendiente(
-        equipoId: equipoId,
-        clienteId: clienteId,
-        edfVendedorId: edfVendedorId,
-        pendienteUuid: pendienteUuid, // 🔥 USAR UUID DE BD
-        codigoBarras: codigoBarras,
-        numeroSerie: numeroSerie,
-        marcaId: marcaId,
-        modeloId: modeloId,
-        logoId: logoId,
-      );
+    if (pendienteExistente!=null) {
+      payload['equipo_pendiente'] = _construirJsonEquipoPendiente(pendienteExistente);
       _logger.i('✅ JSON Equipo_Pendiente agregado (crear asignación)');
     } else {
       payload['equipo_pendiente'] = {};
@@ -663,68 +620,62 @@ class CensoActivoPostService {
   }
 
   /// Construye el JSON del equipo (SOLO camelCase)
-  static Map<String, dynamic> _construirJsonEquipo({
-    required String equipoId,
-    required String codigoBarras,
-    required int marcaId,
-    required int modeloId,
-    required int logoId,
-    String? numeroSerie,
-  }) {
+  static Map<String, dynamic> _construirJsonEquipo(var equipoDataMap) {
+// required String equipoId,
+// required String codigoBarras,
+// required int marcaId,
+// required int modeloId,
+// required int logoId,
+// String? numeroSerie,
     final now = DateTime.now().toIso8601String();
+    var id              = equipoDataMap['id'];
+    var edfEquipoId     = equipoDataMap['cod_barras'];
+    var codigoBarras    = equipoDataMap['cod_barras'];
+    var modeloId     = equipoDataMap['modelo_id'];
+    var marcaId         = equipoDataMap['marca_id'];
+    var logoId          = equipoDataMap['logo_id'];
+    var numeroSerie     = equipoDataMap['numero_serie'];
+    var fechaCreacion   = equipoDataMap['fecha_creacion'];
+    var appInsert       = equipoDataMap['app_insert'];
 
     return {
-      'id': codigoBarras,
-      'edfEquipoId': codigoBarras,
+      'id': id,
+      'edfEquipoId': edfEquipoId,
       'codigoBarras': codigoBarras,
       'edfModeloId': modeloId,
       'marcaId': marcaId.toString(),
       'logoId': logoId.toString(),
       'serie': numeroSerie ?? '',
       'fechaCreacion': now,
-      'appInsert': 1,
-      'esActivo': 1,
-      'esAplicaCenso': 1,
-      'esDisponible': 1,
     };
   }
 
   /// 🔥 Construye el JSON del equipo pendiente CON UUID DE BD
-  static Map<String, dynamic> _construirJsonEquipoPendiente({
-    required String equipoId,
-    required int clienteId,
-    required String edfVendedorId,
-    String? pendienteUuid, // 🔥 UUID DESDE BD
-    required String codigoBarras,
-    String? numeroSerie,
-    int? marcaId,
-    int? modeloId,
-    int? logoId,
-  }) {
-    // 🔥 USAR UUID DE BD O GENERAR NUEVO SOLO SI NO EXISTE
-    final uuid = pendienteUuid ?? _uuid.v4();
-
-    if (pendienteUuid != null) {
-      _logger.i('✅ Usando UUID de BD: $uuid');
-    } else {
-      _logger.w('⚠️ UUID no proporcionado, generando nuevo: $uuid');
-    }
-
-    // Lógica para separar Vendedor de Sucursal (ej: "40_24")
+  static Map<String, dynamic> _construirJsonEquipoPendiente(dynamic pendienteExistenteList) {
+    var pendienteExistente = pendienteExistenteList[0];
+    String id            = pendienteExistente['id'];
+    var edfVendedorId = pendienteExistente['edf_vendedor_id'];
+    var equipoId      = pendienteExistente['equipo_id'];
+    var codigoBarras  = pendienteExistente['codigo_barras'];
+    var clienteId     = pendienteExistente['cliente_id'];
+    var numeroSerie   = pendienteExistente['numero_serie'];
+    var estado        = pendienteExistente['estado'];
+    var marcaId       = pendienteExistente['marca_id'];
+    var modeloId      = pendienteExistente['modelo_id'];
+    var logoId        = pendienteExistente['logo_id'];
     final partes = edfVendedorId.split('_');
     final vendedorIdValue = partes.isNotEmpty ? partes[0] : edfVendedorId;
     int? sucursalIdValue;
     if (partes.length > 1) {
       sucursalIdValue = int.tryParse(partes[1]);
     }
-
     // ✅ MAPEO COMPLETO SEGÚN TU BACKEND GROOVY
     final Map<String, dynamic> pendiente = {
       'edfEquipoId': equipoId,
       'edfCodigoBarras': codigoBarras,
       'edfClienteId': clienteId.toString(),
-      'uuid': uuid, // 🔥 UUID DE BD
-      'estado': 'pendiente',
+      'id': id,
+      'estado': estado,
       'edfVendedorSucursalId': edfVendedorId,
       'edfVendedorId': vendedorIdValue,
       'edfSerie': numeroSerie,
@@ -948,16 +899,12 @@ class CensoActivoPostService {
 
       // Usar el método principal con parámetros para cambio de estado
       return await enviarCensoActivo(
-        // NO es nuevo equipo (solo cambio de estado)
         equipoId: equipoId ?? codigoBarras,
         codigoBarras: codigoBarras,
-        esNuevoEquipo: false, // ✅ Solo cambio de estado
-
-        // NO crear pendiente (equipo ya asignado)
+        esNuevoEquipo: false,
         clienteId: clienteId,
         edfVendedorId: edfVendedorId,
-        crearPendiente: false, // ✅ Equipo ya asignado
-        pendienteUuid: null, // ✅ No aplica para cambio de estado
+        crearPendiente: false,
 
         // Datos del censo (cambio de estado)
         usuarioId: usuarioId,

@@ -609,7 +609,6 @@ class PendingDataViewModel extends ChangeNotifier {
         LEFT JOIN clientes c ON ca.cliente_id = c.id
         LEFT JOIN marcas m ON eq.marca_id = m.id
         LEFT JOIN modelos mo ON eq.modelo_id = mo.id
-        WHERE ca.sincronizado = 0
         ORDER BY ca.fecha_creacion DESC
       ''');
 

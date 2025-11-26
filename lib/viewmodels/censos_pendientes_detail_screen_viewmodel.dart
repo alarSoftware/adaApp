@@ -34,7 +34,6 @@ class CensoFallido {
   final String? errorMensaje;
   final int fotosCount;
   final String? estadoCenso;
-  final int sincronizado;
 
   CensoFallido({
     required this.id,
@@ -54,8 +53,7 @@ class CensoFallido {
     this.ultimoIntento,
     this.errorMensaje,
     this.fotosCount = 0,
-    this.estadoCenso,
-    this.sincronizado = 0,
+    this.estadoCenso
   });
 
   factory CensoFallido.fromMap(Map<String, dynamic> map) {
@@ -84,7 +82,6 @@ class CensoFallido {
       errorMensaje: map['error_mensaje']?.toString(),
       fotosCount: map['fotos_count'] as int? ?? 0,
       estadoCenso: map['estado_censo']?.toString(),
-      sincronizado: map['sincronizado'] as int? ?? 0,
     );
   }
 
@@ -94,14 +91,12 @@ class CensoFallido {
   }
 
   String get estadoDescripcion {
-    if (sincronizado == 1) return 'Sincronizado';
     if (estadoCenso == 'error') return 'Error';
     if (estadoCenso == 'creado') return 'Pendiente';
     return 'Desconocido';
   }
 
   bool get puedeReintentar {
-    if (sincronizado == 1) return false;
     if (intentosSync == 0) return true;
 
     if (ultimoIntento != null) {
@@ -216,14 +211,7 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
         );
       }
 
-      if ((censoData['sincronizado'] as int?) == 1) {
-        _logger.w('⚠️ Censo $censoId ya está sincronizado');
-        await loadCensosPendientes();
-        return SyncResult(
-          success: true,
-          message: 'El censo ya estaba sincronizado',
-        );
-      }
+
 
       // 2. Obtener usuario_id
       final usuarioId = censoData['usuario_id'] as int?;
@@ -321,7 +309,6 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
         await db.update(
           'censo_activo',
           {
-            'sincronizado': 1,
             'estado_censo': 'migrado',
             'fecha_actualizacion': DateTime.now().toIso8601String(),
             'error_mensaje': null,
@@ -336,12 +323,12 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
           }
         }
 
-        _logger.i('✅ Censo $censoId sincronizado exitosamente');
+        _logger.i('✅ Censo $censoId migrado exitosamente');
         await loadCensosPendientes();
 
         return SyncResult(
           success: true,
-          message: 'Censo sincronizado correctamente',
+          message: 'Censo migrado correctamente',
         );
 
       } else {
@@ -440,7 +427,7 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
       if (fallidos == 0 && exitosos > 0) {
         return SyncResult(
           success: true,
-          message: 'Todos los censos sincronizados ($exitosos)',
+          message: 'Todos los censos migrados ($exitosos)',
           exitosos: exitosos,
           fallidos: 0,
         );
@@ -470,31 +457,7 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, int>> getEstadisticas() async {
-    try {
-      final db = await _dbHelper.database;
-      final result = await db.rawQuery('''
-        SELECT 
-          COUNT(*) as total,
-          SUM(CASE WHEN sincronizado = 1 THEN 1 ELSE 0 END) as sincronizados,
-          SUM(CASE WHEN sincronizado = 0 THEN 1 ELSE 0 END) as pendientes
-        FROM censo_activo
-      ''');
 
-      if (result.isNotEmpty) {
-        final stats = result.first;
-        return {
-          'total': stats['total'] as int? ?? 0,
-          'sincronizados': stats['sincronizados'] as int? ?? 0,
-          'pendientes': stats['pendientes'] as int? ?? 0,
-        };
-      }
-    } catch (e) {
-      _logger.e('❌ Error obteniendo estadísticas: $e');
-    }
-
-    return {'total': 0, 'sincronizados': 0, 'pendientes': 0};
-  }
 
   void _setState(CensosLoadingState newState) {
     _state = newState;
@@ -514,7 +477,6 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
     LEFT JOIN equipos eq ON ca.equipo_id = eq.id
     LEFT JOIN marcas m ON eq.marca_id = m.id
     LEFT JOIN modelos mo ON eq.modelo_id = mo.id
-    WHERE ca.sincronizado = 0
     ORDER BY ca.fecha_creacion DESC
   ''';
 

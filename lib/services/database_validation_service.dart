@@ -127,7 +127,8 @@ class DatabaseValidationService {
 
       try {
         final result = await db.rawQuery(
-          'SELECT COUNT(*) as count FROM $tableName WHERE sincronizado = 0',
+          // 'SELECT COUNT(*) as count FROM $tableName WHERE estado_censo != "migrado" ',
+          "SELECT COUNT(*) as count FROM $tableName WHERE estado_censo != 'migrado' ",
         );
 
         final count = Sqflite.firstIntValue(result) ?? 0;

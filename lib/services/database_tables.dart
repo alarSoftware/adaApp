@@ -105,6 +105,7 @@ class DatabaseTables {
   String _sqlEquiposPendientes() => '''
   CREATE TABLE equipos_pendientes (
     id TEXT PRIMARY KEY,
+    edf_vendedor_id TEXT,
     equipo_id TEXT,
     cliente_id TEXT,
     fecha_censo DATETIME,
@@ -137,6 +138,7 @@ class DatabaseTables {
   String _sqlCensoActivo() => '''
   CREATE TABLE censo_activo (
     id TEXT PRIMARY KEY,
+    edf_vendedor_id TEXT,
     equipo_id TEXT NOT NULL,
     cliente_id INTEGER NOT NULL,
     usuario_id INTEGER,
@@ -146,7 +148,6 @@ class DatabaseTables {
     fecha_revision TEXT,
     fecha_creacion TEXT,
     fecha_actualizacion TEXT,
-    sincronizado INTEGER DEFAULT 0,
     observaciones TEXT,
     estado_censo TEXT DEFAULT 'creado',
     intentos_sync INTEGER DEFAULT 0,   

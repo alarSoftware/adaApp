@@ -44,100 +44,110 @@ class CensoUploadService {
 
   // ==================== 🔥 MÉTODO PRIVADO CENTRALIZADO ====================
   /// 🎯 ÚNICO PUNTO DE ENVÍO - Usa UUIDs de BD y evita duplicación
-  Future<Map<String, dynamic>> _enviarCensoUnificado({
-    required String estadoId,
+  Future<Map<String, dynamic>> enviarCensoUnificado({
+    required String censoActivoId,
     required int usuarioId,
     required String edfVendedorId,
-    required int timeoutSegundos,
-    required bool guardarLog,
+    required bool guardarLog
   }) async {
     try {
-      _logger.i('📤 Enviando censo unificado: $estadoId');
+      _logger.i('📤 Enviando censo unificado: $censoActivoId');
 
       // 1️⃣ Obtener datos frescos de BD
       final maps = await _estadoEquipoRepository.dbHelper.consultar(
         'censo_activo',
         where: 'id = ?',
-        whereArgs: [estadoId],
+        whereArgs: [censoActivoId],
         limit: 1,
       );
 
+
+
+
       if (maps.isEmpty) {
-        throw Exception('Censo no encontrado en BD: $estadoId');
+        throw Exception('Censo no encontrado en BD: $censoActivoId');
       }
 
-      final datosLocales = Map<String, dynamic>.from(maps.first);
+      final censoActivoMap = Map<String, dynamic>.from(maps.first);
+
+      var estado = censoActivoMap['estado_censo']?.toString();
+      if(estado=='migrado' ){ //TODO RONALDO PROBAR = CREAR UN CENSO TIENE QUE DAR ERROR DEL LADO ADACONTROL, QUEDARTE EN EL PRW, ESPERAR QUE VAYA EN BG Y LUEGO CLICK EN REINTENTAR
+        throw Exception('CENSO ACTIVO YA FUE MIGRADO: $censoActivoId');
+      }
 
       // 2️⃣ Enriquecer datos del equipo
-      final equipoId = datosLocales['equipo_id']?.toString();
+      final equipoId = censoActivoMap['equipo_id']?.toString();
+      var equipoDataMap;
       if (equipoId != null) {
-        await _enriquecerDatosEquipo(datosLocales, equipoId);
+        await _enriquecerDatosEquipo(censoActivoMap, equipoId);
+
+
+        var equipoDataMapList = await _equipoRepository.dbHelper.consultar(
+          'equipos',
+          where: 'id = ?',
+          whereArgs: [equipoId],
+          limit: 1,
+        );
+        equipoDataMap = equipoDataMapList[0];
+
       }
+      //equipoDataMap
+      _logger.i('equipoDataMap: $equipoDataMap');
 
       // 3️⃣ Obtener fotos
-      final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
+      final fotos = await _fotoRepository.obtenerFotosPorCenso(censoActivoId);
 
       // 4️⃣ Determinar flags
-      final esNuevoEquipo = datosLocales['es_nuevo_equipo'] == true;
-      final clienteId = _convertirAInt(datosLocales['cliente_id']);
+      final esNuevoEquipo = censoActivoMap['es_nuevo_equipo'] == true;
+      final clienteId = _convertirAInt(censoActivoMap['cliente_id']);
       final yaAsignado = await _verificarEquipoAsignado(equipoId, clienteId);
       final crearPendiente = !yaAsignado;
 
       _logger.i('🔍 Flags - Nuevo: $esNuevoEquipo, Crear pendiente: $crearPendiente');
 
-      // 5️⃣ 🔥 OBTENER UUID DEL PENDIENTE DE LA BD (SI EXISTE)
-      String? pendienteUuid;
-      if (crearPendiente && equipoId != null) {
-        final pendienteExistente = await _equipoPendienteRepository.dbHelper.consultar(
-          'equipos_pendientes',
-          where: 'equipo_id = ? AND cliente_id = ?',
-          whereArgs: [equipoId, clienteId],
-          orderBy: 'fecha_creacion DESC',
-          limit: 1,
-        );
-
-        if (pendienteExistente.isNotEmpty) {
-          pendienteUuid = pendienteExistente.first['id']?.toString();
-          _logger.i('✅ UUID del pendiente desde BD: $pendienteUuid');
-        } else {
-          _logger.w('⚠️ No se encontró UUID del pendiente en BD para equipo $equipoId - cliente $clienteId');
-        }
-      }
+      final pendienteExistente = await _equipoPendienteRepository.dbHelper.consultar(
+        'equipos_pendientes',
+        where: 'equipo_id = ? AND cliente_id = ?',
+        whereArgs: [equipoId, clienteId],
+        orderBy: 'fecha_creacion DESC',
+        limit: 1,
+      );
 
       // 6️⃣ Llamada al servicio POST unificado
       final respuesta = await CensoActivoPostService.enviarCensoActivo(
-        censoId: estadoId, // 🔥 PASAR ID DE BD
+        censoId: censoActivoId, // 🔥 PASAR ID DE BD
         equipoId: equipoId,
-        codigoBarras: datosLocales['codigo_barras']?.toString(),
-        marcaId: datosLocales['marca_id'] as int?,
-        modeloId: datosLocales['modelo_id'] as int?,
-        logoId: datosLocales['logo_id'] as int?,
-        numeroSerie: datosLocales['numero_serie']?.toString(),
+        codigoBarras: censoActivoMap['codigo_barras']?.toString(),
+        marcaId: censoActivoMap['marca_id'] as int?,
+        modeloId: censoActivoMap['modelo_id'] as int?,
+        logoId: censoActivoMap['logo_id'] as int?,
+        numeroSerie: censoActivoMap['numero_serie']?.toString(),
         esNuevoEquipo: esNuevoEquipo,
         clienteId: clienteId,
         edfVendedorId: edfVendedorId,
         crearPendiente: crearPendiente,
-        pendienteUuid: pendienteUuid, // 🔥 PASAR UUID DE BD
+        pendienteExistente: pendienteExistente, // 🔥 PASAR UUID DE BD
         usuarioId: usuarioId,
-        latitud: datosLocales['latitud']?.toDouble() ?? 0.0,
-        longitud: datosLocales['longitud']?.toDouble() ?? 0.0,
-        observaciones: datosLocales['observaciones']?.toString(),
-        enLocal: datosLocales['en_local'] == true,
+        latitud: censoActivoMap['latitud']?.toDouble() ?? 0.0,
+        longitud: censoActivoMap['longitud']?.toDouble() ?? 0.0,
+        observaciones: censoActivoMap['observaciones']?.toString(),
+        enLocal: censoActivoMap['en_local'] == true,
         estadoCenso: yaAsignado ? 'asignado' : 'pendiente',
         fotos: fotos,
-        clienteNombre: datosLocales['cliente_nombre']?.toString(),
-        marca: datosLocales['marca_nombre']?.toString(),
-        modelo: datosLocales['modelo']?.toString(),
-        logo: datosLocales['logo']?.toString(),
-        timeoutSegundos: timeoutSegundos,
+        clienteNombre: censoActivoMap['cliente_nombre']?.toString(),
+        marca: censoActivoMap['marca_nombre']?.toString(),
+        modelo: censoActivoMap['modelo']?.toString(),
+        logo: censoActivoMap['logo']?.toString(),
         userId: usuarioId.toString(),
         guardarLog: guardarLog,
+          equipoDataMap:equipoDataMap
+          // censoActivoMap:censoActivoMap
       );
 
       // 7️⃣ Procesar resultado
       if (respuesta['exito'] == true) {
         await _marcarComoSincronizadoCompleto(
-          estadoId: estadoId,
+          estadoId: censoActivoId,
           servidorId: respuesta['servidor_id'],
           equipoId: equipoId,
           clienteId: clienteId,
@@ -145,10 +155,10 @@ class CensoUploadService {
           crearPendiente: crearPendiente,
           fotos: fotos,
         );
-        _logger.i('✅ Censo sincronizado exitosamente: $estadoId');
+        _logger.i('✅ Censo sincronizado exitosamente: $censoActivoId');
       } else {
         await _estadoEquipoRepository.marcarComoError(
-          estadoId,
+          censoActivoId,
           'Error: ${respuesta['mensaje']}',
         );
       }
@@ -185,13 +195,10 @@ class CensoUploadService {
       }
 
       await _actualizarUltimoIntento(estadoId, 1);
-
-      // 🔥 USA MÉTODO CENTRALIZADO
-      await _enviarCensoUnificado(
-        estadoId: estadoId,
+      await enviarCensoUnificado(
+        censoActivoId: estadoId,
         usuarioId: usuarioId,
         edfVendedorId: edfVendedorId,
-        timeoutSegundos: 45,
         guardarLog: true, // 🔥 SIEMPRE GENERAR LOG
       );
 
@@ -232,7 +239,7 @@ class CensoUploadService {
 
       for (final registro in registrosAProcesar) {
         try {
-          await _sincronizarRegistroIndividualUnificado(registro, usuarioId);
+          //await _sincronizarRegistroIndividualUnificado(registro, usuarioId);
           censosExitosos++;
           _logger.i('✅ Censo sincronizado: ${registro.id}');
         } catch (e) {
@@ -304,11 +311,10 @@ class CensoUploadService {
     await _actualizarUltimoIntento(estadoId, numeroIntento);
 
     // 🔥 USA MÉTODO CENTRALIZADO
-    await _enviarCensoUnificado(
-      estadoId: estadoId,
+    await enviarCensoUnificado(
+      censoActivoId: estadoId,
       usuarioId: usuarioId,
       edfVendedorId: edfVendedorId,
-      timeoutSegundos: 60,
       guardarLog: true, // 🔥 SIEMPRE GENERAR LOG
     );
   }
@@ -330,11 +336,10 @@ class CensoUploadService {
       }
 
       // 🔥 USA MÉTODO CENTRALIZADO
-      final respuesta = await _enviarCensoUnificado(
-        estadoId: estadoId,
+      final respuesta = await enviarCensoUnificado(
+        censoActivoId: estadoId,
         usuarioId: usuarioId,
         edfVendedorId: edfVendedorId,
-        timeoutSegundos: 45,
         guardarLog: true,
       );
 

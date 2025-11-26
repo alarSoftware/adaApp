@@ -44,6 +44,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     double? longitud,
     String? estadoCenso,
     String? observaciones,
+    String? edfVendedorId
   }) async {
     try {
       final now = DateTime.now();
@@ -55,7 +56,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       _logger.i('   Cliente ID: $clienteId');
       _logger.i('   Usuario ID: $usuarioId');  // ← Nuevo log
 
-      final datosEstado = {
+      final censoActivoData = {
         'id': uuidId,
         'equipo_id': equipoId,
         'cliente_id': clienteId,
@@ -66,12 +67,12 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         'fecha_revision': fechaRevision.toIso8601String(),
         'fecha_creacion': now.toIso8601String(),
         'fecha_actualizacion': now.toIso8601String(),
-        'sincronizado': 0,
         'estado_censo': estadoCenso ?? EstadoEquipoCenso.creado.valor,
         'observaciones': observaciones,
+        'edf_vendedor_id': edfVendedorId
       };
 
-      await dbHelper.insertar(tableName, datosEstado);
+      await dbHelper.insertar(tableName, censoActivoData);
 
       _logger.i('✅ Estado insertado en BD con UUID: $uuidId');
 
@@ -86,7 +87,6 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         fechaRevision: fechaRevision,
         fechaCreacion: now,
         fechaActualizacion: now,
-        estaSincronizado: false,
         estadoCenso: estadoCenso ?? EstadoEquipoCenso.creado.valor,
         observaciones: observaciones,
       );
@@ -251,18 +251,19 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-  /// Obtener no sincronizados
   Future<List<EstadoEquipo>> obtenerNoSincronizados() async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
-        where: 'sincronizado = ?',
-        whereArgs: [0],
+        where: 'estado_censo = ?',
+        whereArgs: ['error'],
         orderBy: getDefaultOrderBy(),
       );
+
+      _logger.i('📊 Censos con error encontrados: ${maps.length}');
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
-      _logger.e('Error al obtener no sincronizados: $e');
+      _logger.e('Error al obtener no migrados: $e');
       return [];
     }
   }
@@ -331,27 +332,22 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       await dbHelper.actualizar(
         tableName,
         {
-          'sincronizado': 1,
           'estado_censo': EstadoEquipoCenso.migrado.valor,
           'fecha_actualizacion': DateTime.now().toIso8601String(),
         },
         where: 'id = ?',
         whereArgs: [estadoId],
       );
-
-      // 3. ✅ NUEVO: Marcar equipos pendientes relacionados como sincronizados
       final equiposPendientesActualizados = await dbHelper.actualizar(
         'equipos_pendientes',
         {
-          'sincronizado': 1,
           'fecha_actualizacion': DateTime.now().toIso8601String(),
         },
-        // ✅ CASTING EXPLÍCITO para manejar diferencia de tipos
         where: 'CAST(equipo_id AS TEXT) = ? AND CAST(cliente_id AS TEXT) = ?',
         whereArgs: [equipoId.toString(), clienteId.toString()],
       );
 
-      _logger.i('✅ Estado $estadoId marcado como sincronizado');
+      _logger.i('✅ Estado $estadoId marcado como sincronizado (migrado)');
       _logger.i('📈 Equipos pendientes actualizados: $equiposPendientesActualizados');
 
     } catch (e) {
@@ -367,7 +363,6 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       await dbHelper.actualizar(
         tableName,
         {
-          'sincronizado': 1,
           'estado_censo': EstadoEquipoCenso.migrado.valor,
           'fecha_actualizacion': DateTime.now().toIso8601String(),
         },
@@ -503,13 +498,11 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         };
       }
 
-      final cambiosPendientes = historial.where((e) => !e.estaSincronizado).length;
 
       return {
         'total_cambios': historial.length,
         'ultimo_cambio': historial.first.fechaRevision,
         'estado_actual': historial.first.enLocal,
-        'cambios_pendientes': cambiosPendientes,
       };
     } catch (e) {
       _logger.e('Error al obtener estadísticas: $e');
@@ -540,11 +533,13 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     try {
       final fechaLimite = DateTime.now().subtract(Duration(days: diasAntiguedad));
 
-      await dbHelper.eliminar(
+      final registrosEliminados = await dbHelper.eliminar(
         tableName,
-        where: 'fecha_creacion < ? AND sincronizado = ?',
-        whereArgs: [fechaLimite.toIso8601String(), 1],
+        where: 'fecha_creacion < ? AND estado_censo = ?',
+        whereArgs: [fechaLimite.toIso8601String(), 'migrado'],
       );
+
+      _logger.i('🗑️ Registros antiguos eliminados: $registrosEliminados');
     } catch (e) {
       _logger.e('Error al limpiar historial antiguo: $e');
       rethrow;
@@ -582,7 +577,6 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       await dbHelper.actualizar(
         tableName,
         {
-          'sincronizado': 1,
           'estado_censo': EstadoEquipoCenso.migrado.valor,
           'fecha_actualizacion': DateTime.now().toIso8601String(),
         },

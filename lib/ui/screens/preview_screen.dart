@@ -353,12 +353,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
   }
 
   Future<void> _reintentarEnvioHistorial(String? estadoId) async {
-    // 🔴 Verificar si ya se está reintentando
     if (_yaReintentando) {
       return; // Ignorar silenciosamente
     }
 
-    // 🔴 CRÍTICO: Marcar como reintentando INMEDIATAMENTE
     setState(() {
       _yaReintentando = true;
     });
@@ -384,14 +382,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
     if (mounted) {
       if (resultado['success']) {
         _mostrarSnackBar(resultado['message'], AppColors.success);
-
-        // 🔴 Mantener deshabilitado después del éxito
-        // porque ya no debería poder reintentar más
         setState(() {
-          // _yaReintentando permanece en true
         });
       } else {
-        // 🔴 Si falla, rehabilitar para permitir reintentar
         setState(() {
           _yaReintentando = false;
         });
@@ -510,11 +503,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
       final estadoId = widget.datos['id'] as String?;
 
       return FutureBuilder<Map<String, dynamic>>(
-        future: vm.obtenerInfoSincronizacion(estadoId),
+        future: vm.obtenerInfoSincronizacion(estadoId ),
         builder: (context, snapshot) {
           final info = snapshot.data;
-          // SOLO mostrar reintentar si el estado es 'error' (no 'creado' o 'pendiente')
-          final envioFallido = info?['estado'] == 'error';
+          final envioFallido = info?['envioFallido'] == true;
+
 
           return PreviewBottomBar(
             esHistorial: esHistorial,

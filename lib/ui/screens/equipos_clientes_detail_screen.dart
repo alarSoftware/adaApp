@@ -955,15 +955,15 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
   }
 
 
-  Widget _buildHistorialItem(dynamic cambio, bool isFirst) {
-    final enLocal = cambio.enLocal;
-    final fecha = cambio.fechaRevision;
+  Widget _buildHistorialItem(dynamic censoActivo, bool isFirst) {
+    final enLocal = censoActivo.enLocal;
+    final fecha = censoActivo.fechaRevision;
     final statusColor = enLocal ? AppColors.success : AppColors.neutral500;
     final statusIcon = enLocal ? Icons.store : Icons.location_off;
     final statusText = enLocal ? 'EN LOCAL' : 'FUERA DEL LOCAL';
 
     // Información de ubicación GPS (solo para mostrar información)
-    final tieneUbicacion = cambio.latitud != null && cambio.longitud != null;
+    final tieneUbicacion = censoActivo.latitud != null && censoActivo.longitud != null;
 
     return Container(
       padding: EdgeInsets.all(16),
@@ -1058,7 +1058,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
           Column(
             children: [
               // Indicador de sincronización
-              if (!cambio.estaSincronizado)
+              if (censoActivo.estadoCenso!='migrado')
                 Container(
                   width: 8,
                   height: 8,

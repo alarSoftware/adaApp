@@ -109,6 +109,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
     required dynamic equipoId,
     required int clienteId,
     int? usuarioId,
+    String? edfVendedorId
   }) async {
     try {
       final now = DateTime.now();
@@ -160,7 +161,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
         'usuario_censo_id': usuarioCensoId,
         'fecha_creacion': now.toIso8601String(),
         'fecha_actualizacion': now.toIso8601String(),
-        'sincronizado': 0, // Será sincronizado por CensoActivoPostService
+        'edf_vendedor_id': edfVendedorId,
       };
 
       await dbHelper.insertar(tableName, datos);
@@ -264,7 +265,6 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
         LEFT JOIN marcas m ON e.marca_id = m.id
         LEFT JOIN modelos mo ON e.modelo_id = mo.id
         LEFT JOIN clientes c ON ep.cliente_id = c.id
-        WHERE ep.sincronizado = 0
         ORDER BY ep.fecha_creacion DESC
       ''';
 

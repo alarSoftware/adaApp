@@ -56,11 +56,11 @@ class _SelectScreenState extends State<SelectScreen> {
 
   // 🆕 NUEVO: Monitoreo de datos pendientes
   void _startPendingDataMonitoring() {
-    _pendingDataTimer = Timer.periodic(
-      Duration(minutes: 2),
-          (_) => _checkPendingData(),
-    );
-    _checkPendingData(); // Verificar inmediatamente
+    // _pendingDataTimer = Timer.periodic(
+    //   Duration(minutes: 2),
+    //       (_) => _checkPendingData(),
+    // );
+    // _checkPendingData();
   }
 
   // 🆕 NUEVO: Verificar datos pendientes
@@ -195,7 +195,7 @@ class _SelectScreenState extends State<SelectScreen> {
               ),
             );
             // Refrescar contador después de volver
-            _checkPendingData();
+            // _checkPendingData();
           },
           icon: Icon(Icons.notifications, color: AppColors.onPrimary),
           tooltip: 'Datos pendientes de envío',
@@ -248,7 +248,7 @@ class _SelectScreenState extends State<SelectScreen> {
       } else if (event is ShowSuccessEvent) {
         _mostrarExito(event.message);
         // 🆕 NUEVO: Refrescar contador después de sync exitoso
-        _checkPendingData();
+        // _checkPendingData();
       } else if (event is RequestSyncConfirmationEvent) {
         _handleSyncConfirmation();
       } else if (event is RequiredSyncEvent) {
@@ -262,7 +262,7 @@ class _SelectScreenState extends State<SelectScreen> {
       } else if (event is SyncCompletedEvent) {
         _mostrarExito(event.result.message);
         // 🆕 NUEVO: Refrescar contador después de sync
-        _checkPendingData();
+        // _checkPendingData();
       } else if (event is SyncErrorEvent) {
         // 🆕 NUEVO: Mostrar diálogo de error de sincronización
         _mostrarDialogoErrorSync(event);
@@ -561,7 +561,7 @@ class _SelectScreenState extends State<SelectScreen> {
                   context,
                    MaterialPageRoute(builder: (context) => PendingDataScreen()),
                 );
-                _checkPendingData();
+                // _checkPendingData();
               },
               child: Text(
                 'Ver Detalles',
