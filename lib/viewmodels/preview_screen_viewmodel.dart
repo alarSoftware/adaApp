@@ -316,7 +316,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
   // 🔥 SINCRONIZACIÓN UNIFICADA EN BACKGROUND (USANDO NUEVO SERVICIO)
   // =================================================================
 
-  /// 🔥 SINCRONIZACIÓN UNIFICADA - UNA SOLA LLAMADA AL SERVIDOR
   void _iniciarSincronizacionUnificadaEnBackground({
     required String estadoId,
     required String equipoId,
@@ -364,8 +363,35 @@ class PreviewScreenViewModel extends ChangeNotifier {
         final crearPendiente = !yaAsignado;
         _logger.i('📋 Crear pendiente en servidor: $crearPendiente');
 
-        // 🔥 LLAMADA AL SERVICIO UNIFICADO
+        // 🔥 OBTENER UUID DEL PENDIENTE DESDE BD (si se debe crear pendiente)
+        String? pendienteUuid;
+        if (crearPendiente) {
+          try {
+            final pendienteExistente = await _equipoPendienteRepository.dbHelper.consultar(
+              'equipos_pendientes',
+              where: 'equipo_id = ? AND cliente_id = ?',
+              whereArgs: [equipoId, clienteId],
+              orderBy: 'fecha_creacion DESC',
+              limit: 1,
+            );
+
+            if (pendienteExistente.isNotEmpty) {
+              pendienteUuid = pendienteExistente.first['id']?.toString();
+              _logger.i('✅ UUID del pendiente desde BD: $pendienteUuid');
+            } else {
+              _logger.w('⚠️ No se encontró UUID del pendiente en BD para equipo $equipoId - cliente $clienteId');
+              _logger.w('⚠️ Se generará uno nuevo en el servidor');
+            }
+          } catch (e) {
+            _logger.e('❌ Error obteniendo UUID del pendiente: $e');
+          }
+        }
+
+        // 🔥 LLAMADA AL SERVICIO UNIFICADO CON UUID DE BD
         final respuesta = await CensoActivoPostService.enviarCensoActivo(
+          // ID del censo
+          censoId: estadoId, // 🔥 PASAR ID DE BD
+
           // Datos del equipo (si es nuevo)
           equipoId: equipoId,
           codigoBarras: datos['codigo_barras']?.toString(),
@@ -379,6 +405,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
           clienteId: clienteId,
           edfVendedorId: edfVendedorId,
           crearPendiente: crearPendiente,
+          pendienteUuid: pendienteUuid, // 🔥 UUID DESDE BD
 
           // Datos del censo activo
           usuarioId: usuarioId,
@@ -480,10 +507,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
     });
   }
-
-  // =================================================================
-  // MÉTODOS AUXILIARES Y MANEJO DE ESTADO
-  // =================================================================
 
   void _setSaving(bool saving) {
     _isSaving = saving;

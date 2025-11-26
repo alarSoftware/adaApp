@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
@@ -18,6 +17,9 @@ class CensoActivoPostService {
   static const Uuid _uuid = Uuid();
 
   static Future<Map<String, dynamic>> enviarCensoActivo({
+    // ID del censo (desde BD)
+    String? censoId, // 🔥 NUEVO: ID desde BD
+
     // Datos del equipo (si es nuevo)
     String? equipoId,
     String? codigoBarras,
@@ -31,6 +33,7 @@ class CensoActivoPostService {
     required int clienteId,
     required String edfVendedorId,
     bool crearPendiente = false,
+    String? pendienteUuid, // 🔥 UUID desde BD (no generar nuevo)
 
     // Datos del censo activo
     required int usuarioId,
@@ -55,21 +58,31 @@ class CensoActivoPostService {
     bool guardarLog = true,
   }) async {
     String? fullUrl;
-    String? censoId;
 
     try {
       _logger.i('📤 === ENVIANDO CENSO UNIFICADO ===');
 
-      // Generar IDs
+      // Usar censoId de BD o generar uno nuevo si no se proporciona
       final now = DateTime.now().toLocal();
-      censoId = now.millisecondsSinceEpoch.toString();
-      final equipoIdFinal = equipoId ?? codigoBarras ?? 'EQUIPO_${censoId}';
+      final censoIdFinal = censoId ?? now.millisecondsSinceEpoch.toString();
+
+      if (censoId != null) {
+        _logger.i('✅ Usando censo ID de BD: $censoIdFinal');
+      } else {
+        _logger.w('⚠️ No se proporcionó censoId, generando nuevo: $censoIdFinal');
+      }
+
+      final equipoIdFinal = equipoId ?? codigoBarras ?? 'EQUIPO_${censoIdFinal}';
 
       _logger.i('🔧 Preparando payload unificado...');
+      _logger.i('   - Censo ID: $censoIdFinal');
       _logger.i('   - Equipo ID: $equipoIdFinal');
       _logger.i('   - Cliente ID: $clienteId');
       _logger.i('   - Es nuevo equipo: $esNuevoEquipo');
       _logger.i('   - Crear pendiente: $crearPendiente');
+      if (pendienteUuid != null) {
+        _logger.i('   - UUID Pendiente (BD): $pendienteUuid');
+      }
 
       // Construir el JSON unificado
       final payloadUnificado = _construirPayloadUnificado(
@@ -86,9 +99,10 @@ class CensoActivoPostService {
         clienteId: clienteId,
         edfVendedorId: edfVendedorId,
         crearPendiente: crearPendiente,
+        pendienteUuid: pendienteUuid, // 🔥 PASAR UUID DE BD
 
         // Censo
-        censoId: censoId,
+        censoId: censoIdFinal, // 🔥 USAR ID DE BD
         usuarioId: usuarioId,
         latitud: latitud,
         longitud: longitud,
@@ -137,7 +151,7 @@ class CensoActivoPostService {
 
       // 🔥 MANEJO UNIFICADO DE ERRORES DEL SERVIDOR
       if (!result['exito']) {
-        await _manejarErrorServidor(result, censoId, fullUrl, userId);
+        await _manejarErrorServidor(result, censoIdFinal, fullUrl, userId);
       }
 
       return result;
@@ -262,8 +276,22 @@ class CensoActivoPostService {
     required String timestamp,
   }) async {
     try {
+      _logger.i('═══════════════════════════════════════════════════════');
+      _logger.i('🔍 DEBUG LOG: INICIO DE GUARDADO');
+      _logger.i('═══════════════════════════════════════════════════════');
+
       final file = await _obtenerArchivoLog();
-      if (file == null) return;
+
+      if (file == null) {
+        _logger.e('❌ DEBUG LOG: file = NULL (no se pudo obtener archivo)');
+        _logger.e('❌ Revisar método _obtenerArchivoLog()');
+        return;
+      }
+
+      _logger.i('✅ DEBUG LOG: Archivo obtenido');
+      _logger.i('📍 Ruta completa: ${file.path}');
+      _logger.i('📂 Directorio padre: ${file.parent.path}');
+      _logger.i('📂 ¿Directorio existe?: ${await file.parent.exists()}');
 
       final contenido = _generarContenidoLogSimple(
         url: url,
@@ -272,11 +300,23 @@ class CensoActivoPostService {
         filePath: file.path,
       );
 
+      _logger.i('📝 Contenido generado: ${contenido.length} caracteres');
+      _logger.i('🔄 Intentando escribir archivo...');
+
       await file.writeAsString(contenido);
 
+      _logger.i('✅✅✅ ARCHIVO ESCRITO EXITOSAMENTE ✅✅✅');
       _logger.i('📁 Log unificado guardado: ${file.uri.pathSegments.last}');
-    } catch (e) {
-      _logger.w('Error guardando log: $e');
+      _logger.i('📍 Ubicación exacta: ${file.path}');
+      _logger.i('📊 Tamaño del archivo: ${await file.length()} bytes');
+      _logger.i('═══════════════════════════════════════════════════════');
+
+    } catch (e, stackTrace) {
+      _logger.e('═══════════════════════════════════════════════════════');
+      _logger.e('❌❌❌ ERROR GUARDANDO LOG ❌❌❌');
+      _logger.e('Error: $e');
+      _logger.e('StackTrace: $stackTrace');
+      _logger.e('═══════════════════════════════════════════════════════');
     }
   }
 
@@ -336,9 +376,16 @@ class CensoActivoPostService {
       StringBuffer buffer,
       Map<String, dynamic> payload,
       ) {
-    final censo = payload['censo_activo'] as Map<String, dynamic>?;
-    final equipo = payload['equipo'] as Map<String, dynamic>?;
-    final pendiente = payload['equipo_pendiente'] as Map<String, dynamic>?;
+    // 🔥 CASTING SEGURO con Map<String, dynamic>.from()
+    final censo = payload['censo_activo'] != null
+        ? Map<String, dynamic>.from(payload['censo_activo'] as Map)
+        : null;
+    final equipo = payload['equipo'] != null
+        ? Map<String, dynamic>.from(payload['equipo'] as Map)
+        : null;
+    final pendiente = payload['equipo_pendiente'] != null
+        ? Map<String, dynamic>.from(payload['equipo_pendiente'] as Map)
+        : null;
 
     // Info básica del censo (SIEMPRE presente)
     if (censo != null && censo.isNotEmpty) {
@@ -355,6 +402,12 @@ class CensoActivoPostService {
 
     buffer.writeln('Sección equipo: ${equipoCompleto ? 'COMPLETA (nuevo equipo)' : 'VACÍA (equipo existente)'}');
     buffer.writeln('Sección equipo_pendiente: ${pendienteCompleto ? 'COMPLETA (crear asignación)' : 'VACÍA (ya asignado)'}');
+
+    // 🔥 MOSTRAR UUID DEL PENDIENTE
+    if (pendienteCompleto && pendiente != null) {
+      buffer.writeln('UUID Pendiente (BD): ${pendiente['uuid'] ?? 'NO DISPONIBLE'}');
+    }
+
     buffer.writeln('Sección censo_activo: COMPLETA (siempre)');
 
     // Info de fotos (del censo_activo)
@@ -421,40 +474,83 @@ class CensoActivoPostService {
 
   /// Obtiene el archivo para guardar el log
   static Future<File?> _obtenerArchivoLog() async {
-    final downloadsDir = await _obtenerDirectorioDescargas();
-    if (downloadsDir == null) return null;
+    try {
+      _logger.i('🔍 DEBUG: Obteniendo directorio de descargas...');
 
-    if (!await downloadsDir.exists()) {
-      await downloadsDir.create(recursive: true);
+      final downloadsDir = await _obtenerDirectorioDescargas();
+
+      if (downloadsDir == null) {
+        _logger.e('❌ DEBUG: downloadsDir = NULL');
+        return null;
+      }
+
+      _logger.i('✅ DEBUG: Directorio obtenido: ${downloadsDir.path}');
+
+      if (!await downloadsDir.exists()) {
+        _logger.w('⚠️ DEBUG: Directorio no existe, intentando crear...');
+        await downloadsDir.create(recursive: true);
+        _logger.i('✅ DEBUG: Directorio creado');
+      } else {
+        _logger.i('✅ DEBUG: Directorio ya existe');
+      }
+
+      final now = DateTime.now();
+      final fechaFormateada = '${now.year}${now.month.toString().padLeft(2, '0')}'
+          '${now.day.toString().padLeft(2, '0')}_'
+          '${now.hour.toString().padLeft(2, '0')}'
+          '${now.minute.toString().padLeft(2, '0')}_'
+          '${now.second.toString().padLeft(2, '0')}';
+
+      final fileName = 'censo_activo_post_$fechaFormateada.txt';
+      final filePath = '${downloadsDir.path}/$fileName';
+
+      _logger.i('✅ DEBUG: Nombre del archivo: $fileName');
+      _logger.i('✅ DEBUG: Ruta completa: $filePath');
+
+      return File(filePath);
+    } catch (e, stackTrace) {
+      _logger.e('❌ DEBUG: Error en _obtenerArchivoLog: $e');
+      _logger.e('StackTrace: $stackTrace');
+      return null;
     }
-
-    final now = DateTime.now();
-    final fechaFormateada = '${now.year}${now.month.toString().padLeft(2, '0')}'
-        '${now.day.toString().padLeft(2, '0')}_'
-        '${now.hour.toString().padLeft(2, '0')}'
-        '${now.minute.toString().padLeft(2, '0')}_'
-        '${now.second.toString().padLeft(2, '0')}';
-
-    final fileName = 'censo_activo_post_$fechaFormateada.txt';
-    return File('${downloadsDir.path}/$fileName');
   }
 
   /// Obtiene el directorio de descargas
   static Future<Directory?> _obtenerDirectorioDescargas() async {
     try {
+      _logger.i('🔍 DEBUG: Detectando plataforma...');
+
       if (Platform.isAndroid) {
+        _logger.i('✅ DEBUG: Plataforma = Android');
+
         var downloadsDir = Directory('/storage/emulated/0/Download');
+        _logger.i('🔍 DEBUG: Intentando ruta: ${downloadsDir.path}');
+
         if (!await downloadsDir.exists()) {
+          _logger.w('⚠️ DEBUG: Ruta principal no existe, buscando alternativa...');
+
           final externalDir = await getExternalStorageDirectory();
+          _logger.i('🔍 DEBUG: ExternalStorageDirectory: ${externalDir?.path}');
+
           downloadsDir = Directory('${externalDir?.path}/Download');
+          _logger.i('🔍 DEBUG: Usando ruta alternativa: ${downloadsDir.path}');
+        } else {
+          _logger.i('✅ DEBUG: Ruta principal existe');
         }
+
         return downloadsDir;
       } else if (Platform.isIOS) {
-        return await getApplicationDocumentsDirectory();
+        _logger.i('✅ DEBUG: Plataforma = iOS');
+        final appDocDir = await getApplicationDocumentsDirectory();
+        _logger.i('✅ DEBUG: App Documents Directory: ${appDocDir.path}');
+        return appDocDir;
       }
+
+      _logger.w('⚠️ DEBUG: Plataforma no soportada');
       return null;
-    } catch (e) {
-      _logger.w('Error obteniendo directorio: $e');
+    } catch (e, stackTrace) {
+      _logger.e('❌ DEBUG: Error obteniendo directorio: $e');
+      _logger.e('StackTrace: $stackTrace');
       return null;
     }
   }
@@ -478,6 +574,7 @@ class CensoActivoPostService {
     required int clienteId,
     required String edfVendedorId,
     required bool crearPendiente,
+    String? pendienteUuid, // 🔥 UUID desde BD
 
     // Censo
     required String censoId,
@@ -523,7 +620,7 @@ class CensoActivoPostService {
         equipoId: equipoId,
         clienteId: clienteId,
         edfVendedorId: edfVendedorId,
-        // 🔥 AGREGAMOS ESTOS DATOS PARA QUE LLEGUEN AL BACKEND
+        pendienteUuid: pendienteUuid, // 🔥 USAR UUID DE BD
         codigoBarras: codigoBarras,
         numeroSerie: numeroSerie,
         marcaId: marcaId,
@@ -592,18 +689,26 @@ class CensoActivoPostService {
     };
   }
 
+  /// 🔥 Construye el JSON del equipo pendiente CON UUID DE BD
   static Map<String, dynamic> _construirJsonEquipoPendiente({
     required String equipoId,
     required int clienteId,
     required String edfVendedorId,
-    // ✅ NUEVOS PARÁMETROS QUE FALTABAN
+    String? pendienteUuid, // 🔥 UUID DESDE BD
     required String codigoBarras,
     String? numeroSerie,
     int? marcaId,
     int? modeloId,
     int? logoId,
   }) {
-    final uuid = _uuid.v4();
+    // 🔥 USAR UUID DE BD O GENERAR NUEVO SOLO SI NO EXISTE
+    final uuid = pendienteUuid ?? _uuid.v4();
+
+    if (pendienteUuid != null) {
+      _logger.i('✅ Usando UUID de BD: $uuid');
+    } else {
+      _logger.w('⚠️ UUID no proporcionado, generando nuevo: $uuid');
+    }
 
     // Lógica para separar Vendedor de Sucursal (ej: "40_24")
     final partes = edfVendedorId.split('_');
@@ -618,7 +723,7 @@ class CensoActivoPostService {
       'edfEquipoId': equipoId,
       'edfCodigoBarras': codigoBarras,
       'edfClienteId': clienteId.toString(),
-      'uuid': uuid,
+      'uuid': uuid, // 🔥 UUID DE BD
       'estado': 'pendiente',
       'edfVendedorSucursalId': edfVendedorId,
       'edfVendedorId': vendedorIdValue,
@@ -852,6 +957,7 @@ class CensoActivoPostService {
         clienteId: clienteId,
         edfVendedorId: edfVendedorId,
         crearPendiente: false, // ✅ Equipo ya asignado
+        pendienteUuid: null, // ✅ No aplica para cambio de estado
 
         // Datos del censo (cambio de estado)
         usuarioId: usuarioId,

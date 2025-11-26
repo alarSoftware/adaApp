@@ -42,20 +42,19 @@ class CensoUploadService {
         _equipoPendienteRepository = equipoPendienteRepository ?? EquipoPendienteRepository(),
         _equipoRepository = equipoRepository ?? EquipoRepository();
 
-  // ==================== SINCRONIZACIÓN EN BACKGROUND ====================
-
-  /// Sincronización individual en background (usa servicio unificado directamente)
-  Future<void> sincronizarCensoEnBackground(
-      String estadoId,
-      Map<String, dynamic> datos,
-      ) async {
-    if (_censosEnProceso.contains(estadoId)) return;
-    _censosEnProceso.add(estadoId);
-
+  // ==================== 🔥 MÉTODO PRIVADO CENTRALIZADO ====================
+  /// 🎯 ÚNICO PUNTO DE ENVÍO - Usa UUIDs de BD y evita duplicación
+  Future<Map<String, dynamic>> _enviarCensoUnificado({
+    required String estadoId,
+    required int usuarioId,
+    required String edfVendedorId,
+    required int timeoutSegundos,
+    required bool guardarLog,
+  }) async {
     try {
-      _logger.i('🔄 Sincronización background unificada: $estadoId');
+      _logger.i('📤 Enviando censo unificado: $estadoId');
 
-      // 1. Obtener datos frescos de BD
+      // 1️⃣ Obtener datos frescos de BD
       final maps = await _estadoEquipoRepository.dbHelper.consultar(
         'censo_activo',
         where: 'id = ?',
@@ -64,42 +63,50 @@ class CensoUploadService {
       );
 
       if (maps.isEmpty) {
-        _logger.w('⚠️ Censo no encontrado: $estadoId');
-        return;
+        throw Exception('Censo no encontrado en BD: $estadoId');
       }
 
       final datosLocales = Map<String, dynamic>.from(maps.first);
 
-      // 2. Enriquecer datos del equipo
+      // 2️⃣ Enriquecer datos del equipo
       final equipoId = datosLocales['equipo_id']?.toString();
       if (equipoId != null) {
         await _enriquecerDatosEquipo(datosLocales, equipoId);
       }
 
-      // 3. Obtener fotos
+      // 3️⃣ Obtener fotos
       final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
 
-      // 4. Obtener datos del usuario
-      final usuarioId = datosLocales['usuario_id'] as int?;
-      if (usuarioId == null) {
-        throw Exception('usuario_id no encontrado en censo');
-      }
-
-      final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(usuarioId);
-      if (edfVendedorId == null || edfVendedorId.isEmpty) {
-        throw Exception('edfVendedorId no encontrado');
-      }
-
-      // 5. Determinar flags
+      // 4️⃣ Determinar flags
       final esNuevoEquipo = datosLocales['es_nuevo_equipo'] == true;
       final clienteId = _convertirAInt(datosLocales['cliente_id']);
       final yaAsignado = await _verificarEquipoAsignado(equipoId, clienteId);
       final crearPendiente = !yaAsignado;
 
-      await _actualizarUltimoIntento(estadoId, 1);
+      _logger.i('🔍 Flags - Nuevo: $esNuevoEquipo, Crear pendiente: $crearPendiente');
 
-      // 🔥 LLAMADA DIRECTA AL SERVICIO UNIFICADO
+      // 5️⃣ 🔥 OBTENER UUID DEL PENDIENTE DE LA BD (SI EXISTE)
+      String? pendienteUuid;
+      if (crearPendiente && equipoId != null) {
+        final pendienteExistente = await _equipoPendienteRepository.dbHelper.consultar(
+          'equipos_pendientes',
+          where: 'equipo_id = ? AND cliente_id = ?',
+          whereArgs: [equipoId, clienteId],
+          orderBy: 'fecha_creacion DESC',
+          limit: 1,
+        );
+
+        if (pendienteExistente.isNotEmpty) {
+          pendienteUuid = pendienteExistente.first['id']?.toString();
+          _logger.i('✅ UUID del pendiente desde BD: $pendienteUuid');
+        } else {
+          _logger.w('⚠️ No se encontró UUID del pendiente en BD para equipo $equipoId - cliente $clienteId');
+        }
+      }
+
+      // 6️⃣ Llamada al servicio POST unificado
       final respuesta = await CensoActivoPostService.enviarCensoActivo(
+        censoId: estadoId, // 🔥 PASAR ID DE BD
         equipoId: equipoId,
         codigoBarras: datosLocales['codigo_barras']?.toString(),
         marcaId: datosLocales['marca_id'] as int?,
@@ -110,6 +117,7 @@ class CensoUploadService {
         clienteId: clienteId,
         edfVendedorId: edfVendedorId,
         crearPendiente: crearPendiente,
+        pendienteUuid: pendienteUuid, // 🔥 PASAR UUID DE BD
         usuarioId: usuarioId,
         latitud: datosLocales['latitud']?.toDouble() ?? 0.0,
         longitud: datosLocales['longitud']?.toDouble() ?? 0.0,
@@ -121,12 +129,12 @@ class CensoUploadService {
         marca: datosLocales['marca_nombre']?.toString(),
         modelo: datosLocales['modelo']?.toString(),
         logo: datosLocales['logo']?.toString(),
-        timeoutSegundos: 45,
+        timeoutSegundos: timeoutSegundos,
         userId: usuarioId.toString(),
-        guardarLog: false,
+        guardarLog: guardarLog,
       );
 
-      // 6. Procesar resultado
+      // 7️⃣ Procesar resultado
       if (respuesta['exito'] == true) {
         await _marcarComoSincronizadoCompleto(
           estadoId: estadoId,
@@ -137,13 +145,56 @@ class CensoUploadService {
           crearPendiente: crearPendiente,
           fotos: fotos,
         );
-        _logger.i('✅ Sincronización background exitosa: $estadoId');
+        _logger.i('✅ Censo sincronizado exitosamente: $estadoId');
       } else {
         await _estadoEquipoRepository.marcarComoError(
           estadoId,
           'Error: ${respuesta['mensaje']}',
         );
       }
+
+      return respuesta;
+
+    } catch (e) {
+      _logger.e('❌ Error enviando censo: $e');
+      rethrow;
+    }
+  }
+
+  // ==================== SINCRONIZACIÓN EN BACKGROUND ====================
+
+  /// Sincronización individual en background
+  Future<void> sincronizarCensoEnBackground(
+      String estadoId,
+      Map<String, dynamic> datos,
+      ) async {
+    if (_censosEnProceso.contains(estadoId)) return;
+    _censosEnProceso.add(estadoId);
+
+    try {
+      _logger.i('🔄 Sincronización background: $estadoId');
+
+      final usuarioId = datos['usuario_id'] as int?;
+      if (usuarioId == null) {
+        throw Exception('usuario_id no encontrado');
+      }
+
+      final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(usuarioId);
+      if (edfVendedorId == null || edfVendedorId.isEmpty) {
+        throw Exception('edfVendedorId no encontrado');
+      }
+
+      await _actualizarUltimoIntento(estadoId, 1);
+
+      // 🔥 USA MÉTODO CENTRALIZADO
+      await _enviarCensoUnificado(
+        estadoId: estadoId,
+        usuarioId: usuarioId,
+        edfVendedorId: edfVendedorId,
+        timeoutSegundos: 45,
+        guardarLog: true, // 🔥 SIEMPRE GENERAR LOG
+      );
+
     } catch (e) {
       _logger.e('❌ Error en sync background: $e');
       await _actualizarUltimoIntento(estadoId, 1);
@@ -222,7 +273,7 @@ class CensoUploadService {
     }
   }
 
-  /// 🔥 Sincronización individual (usa servicio unificado directamente)
+  /// 🔥 Sincronización individual (usa método centralizado)
   Future<void> _sincronizarRegistroIndividualUnificado(
       dynamic registro,
       int usuarioId,
@@ -244,187 +295,56 @@ class CensoUploadService {
 
     _logger.i('🔄 Sincronizando $estadoId (intento #$numeroIntento/$maxIntentos)');
 
-    // 2. Obtener datos del censo
-    final maps = await _estadoEquipoRepository.dbHelper.consultar(
-      'censo_activo',
-      where: 'id = ?',
-      whereArgs: [estadoId],
-      limit: 1,
-    );
-
-    if (maps.isEmpty) {
-      throw Exception('Censo no encontrado: $estadoId');
-    }
-
-    final datosLocales = Map<String, dynamic>.from(maps.first);
-
-    // 3. Enriquecer datos del equipo
-    final equipoId = datosLocales['equipo_id']?.toString();
-    if (equipoId != null) {
-      await _enriquecerDatosEquipo(datosLocales, equipoId);
-    }
-
-    // 4. Obtener fotos
-    final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
-
-    // 5. Obtener edfVendedorId
+    // 2. Obtener edfVendedorId
     final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(usuarioId);
     if (edfVendedorId == null || edfVendedorId.isEmpty) {
       throw Exception('edfVendedorId no encontrado');
     }
 
-    // 6. Determinar flags
-    final esNuevoEquipo = datosLocales['es_nuevo_equipo'] == true;
-    final clienteId = _convertirAInt(datosLocales['cliente_id']);
-    final yaAsignado = await _verificarEquipoAsignado(equipoId, clienteId);
-    final crearPendiente = !yaAsignado;
-
     await _actualizarUltimoIntento(estadoId, numeroIntento);
 
-    // 🔥 LLAMADA DIRECTA AL SERVICIO UNIFICADO
-    final respuesta = await CensoActivoPostService.enviarCensoActivo(
-      equipoId: equipoId,
-      codigoBarras: datosLocales['codigo_barras']?.toString(),
-      marcaId: datosLocales['marca_id'] as int?,
-      modeloId: datosLocales['modelo_id'] as int?,
-      logoId: datosLocales['logo_id'] as int?,
-      numeroSerie: datosLocales['numero_serie']?.toString(),
-      esNuevoEquipo: esNuevoEquipo,
-      clienteId: clienteId,
-      edfVendedorId: edfVendedorId,
-      crearPendiente: crearPendiente,
+    // 🔥 USA MÉTODO CENTRALIZADO
+    await _enviarCensoUnificado(
+      estadoId: estadoId,
       usuarioId: usuarioId,
-      latitud: datosLocales['latitud']?.toDouble() ?? 0.0,
-      longitud: datosLocales['longitud']?.toDouble() ?? 0.0,
-      observaciones: datosLocales['observaciones']?.toString(),
-      enLocal: datosLocales['en_local'] == true,
-      estadoCenso: yaAsignado ? 'asignado' : 'pendiente',
-      fotos: fotos,
-      clienteNombre: datosLocales['cliente_nombre']?.toString(),
-      marca: datosLocales['marca_nombre']?.toString(),
-      modelo: datosLocales['modelo']?.toString(),
-      logo: datosLocales['logo']?.toString(),
+      edfVendedorId: edfVendedorId,
       timeoutSegundos: 60,
-      userId: usuarioId.toString(),
-      guardarLog: false,
+      guardarLog: true, // 🔥 SIEMPRE GENERAR LOG
     );
-
-    // 7. Procesar resultado
-    if (respuesta['exito'] == true) {
-      await _marcarComoSincronizadoCompleto(
-        estadoId: estadoId,
-        servidorId: respuesta['servidor_id'],
-        equipoId: equipoId,
-        clienteId: clienteId,
-        esNuevoEquipo: esNuevoEquipo,
-        crearPendiente: crearPendiente,
-        fotos: fotos,
-      );
-    } else {
-      await _estadoEquipoRepository.marcarComoError(
-        estadoId,
-        'Error (intento #$numeroIntento): ${respuesta['mensaje']}',
-      );
-    }
   }
 
   // ==================== REINTENTO MANUAL ====================
 
-  /// 🔥 Reintento manual (usa servicio unificado directamente - MISMO JSON QUE CONFIRMAR)
+  /// 🔥 Reintento manual (usa método centralizado)
   Future<Map<String, dynamic>> reintentarEnvioCenso(
       String estadoId,
       int usuarioId,
       String? edfVendedorId,
       ) async {
     try {
-      _logger.i('🔄 Reintento manual con JSON unificado: $estadoId');
+      _logger.i('🔄 Reintento manual: $estadoId');
 
-      // 1. Obtener datos del censo
-      final maps = await _estadoEquipoRepository.dbHelper.consultar(
-        'censo_activo',
-        where: 'id = ?',
-        whereArgs: [estadoId],
-        limit: 1,
-      );
-
-      if (maps.isEmpty) {
-        throw Exception('No se encontró el censo: $estadoId');
-      }
-
-      final datosLocales = Map<String, dynamic>.from(maps.first);
-
-      // 2. Enriquecer datos del equipo
-      final equipoId = datosLocales['equipo_id']?.toString();
-      if (equipoId != null) {
-        await _enriquecerDatosEquipo(datosLocales, equipoId);
-      }
-
-      // 3. Obtener fotos
-      final fotos = await _fotoRepository.obtenerFotosPorCenso(estadoId);
-
-      // 4. Validar edfVendedorId
+      // Validar edfVendedorId
       if (edfVendedorId == null || edfVendedorId.isEmpty) {
         throw Exception('edfVendedorId es requerido');
       }
 
-      // 5. Determinar flags
-      final esNuevoEquipo = datosLocales['es_nuevo_equipo'] == true;
-      final clienteId = _convertirAInt(datosLocales['cliente_id']);
-      final yaAsignado = await _verificarEquipoAsignado(equipoId, clienteId);
-      final crearPendiente = !yaAsignado;
-
-      _logger.i('📋 Reintento - Nuevo: $esNuevoEquipo, Pendiente: $crearPendiente');
-
-      // 🔥 LLAMADA DIRECTA AL SERVICIO UNIFICADO (MISMO JSON QUE CONFIRMAR CENSO)
-      final respuesta = await CensoActivoPostService.enviarCensoActivo(
-        equipoId: equipoId,
-        codigoBarras: datosLocales['codigo_barras']?.toString(),
-        marcaId: datosLocales['marca_id'] as int?,
-        modeloId: datosLocales['modelo_id'] as int?,
-        logoId: datosLocales['logo_id'] as int?,
-        numeroSerie: datosLocales['numero_serie']?.toString(),
-        esNuevoEquipo: esNuevoEquipo,
-        clienteId: clienteId,
-        edfVendedorId: edfVendedorId,
-        crearPendiente: crearPendiente,
+      // 🔥 USA MÉTODO CENTRALIZADO
+      final respuesta = await _enviarCensoUnificado(
+        estadoId: estadoId,
         usuarioId: usuarioId,
-        latitud: datosLocales['latitud']?.toDouble() ?? 0.0,
-        longitud: datosLocales['longitud']?.toDouble() ?? 0.0,
-        observaciones: datosLocales['observaciones']?.toString(),
-        enLocal: datosLocales['en_local'] == true,
-        estadoCenso: yaAsignado ? 'asignado' : 'pendiente',
-        fotos: fotos,
-        clienteNombre: datosLocales['cliente_nombre']?.toString(),
-        marca: datosLocales['marca_nombre']?.toString(),
-        modelo: datosLocales['modelo']?.toString(),
-        logo: datosLocales['logo']?.toString(),
+        edfVendedorId: edfVendedorId,
         timeoutSegundos: 45,
-        userId: usuarioId.toString(),
         guardarLog: true,
       );
 
-      // 6. Procesar resultado
       if (respuesta['exito'] == true) {
-        await _marcarComoSincronizadoCompleto(
-          estadoId: estadoId,
-          servidorId: respuesta['servidor_id'],
-          equipoId: equipoId,
-          clienteId: clienteId,
-          esNuevoEquipo: esNuevoEquipo,
-          crearPendiente: crearPendiente,
-          fotos: fotos,
-        );
-
-        _logger.i('✅ Reintento exitoso con JSON unificado');
+        _logger.i('✅ Reintento exitoso');
         return {
           'success': true,
           'message': 'Registro sincronizado correctamente',
         };
       } else {
-        await _estadoEquipoRepository.marcarComoError(
-          estadoId,
-          'Error: ${respuesta['mensaje']}',
-        );
         return {
           'success': false,
           'error': respuesta['mensaje'],
@@ -451,7 +371,6 @@ class CensoUploadService {
       String equipoId,
       ) async {
     try {
-      // ✅ HACER JOIN PARA OBTENER TODO: IDs + Nombres + app_insert
       final db = await _equipoRepository.dbHelper.database;
       final result = await db.rawQuery('''
       SELECT 
@@ -475,24 +394,17 @@ class CensoUploadService {
       if (result.isNotEmpty) {
         final infoEquipo = result.first;
 
-        // Datos del equipo
         datosLocales['marca_id'] ??= infoEquipo['marca_id'];
         datosLocales['modelo_id'] ??= infoEquipo['modelo_id'];
         datosLocales['logo_id'] ??= infoEquipo['logo_id'];
         datosLocales['numero_serie'] ??= infoEquipo['numero_serie'];
         datosLocales['codigo_barras'] ??= infoEquipo['cod_barras'];
-
-        // Nombres de las tablas maestras
         datosLocales['marca_nombre'] ??= infoEquipo['marca_nombre'];
         datosLocales['modelo'] ??= infoEquipo['modelo_nombre'];
         datosLocales['logo'] ??= infoEquipo['logo_nombre'];
-
-        // ✅ Flag de equipo nuevo desde app_insert
         datosLocales['es_nuevo_equipo'] ??= (infoEquipo['app_insert'] == 1);
 
-        _logger.i('✅ Datos enriquecidos desde equipos con JOINs');
-        _logger.i('   Marca: ${infoEquipo['marca_nombre']}, Modelo: ${infoEquipo['modelo_nombre']}');
-        _logger.i('   Es nuevo equipo (app_insert): ${infoEquipo['app_insert']}');
+        _logger.i('✅ Datos enriquecidos desde equipos');
       }
     } catch (e) {
       _logger.w('⚠️ No se pudo enriquecer datos: $e');
@@ -509,19 +421,16 @@ class CensoUploadService {
     required bool crearPendiente,
     required List<dynamic> fotos,
   }) async {
-    // Marcar censo como sincronizado
     await _estadoEquipoRepository.marcarComoMigrado(
       estadoId,
       servidorId: servidorId,
     );
     await _estadoEquipoRepository.marcarComoSincronizado(estadoId);
 
-    // Marcar equipo como sincronizado (si era nuevo)
     if (equipoId != null && esNuevoEquipo) {
       await _equipoRepository.marcarEquipoComoSincronizado(equipoId);
     }
 
-    // Marcar pendientes como sincronizados (si se crearon)
     if (equipoId != null && crearPendiente) {
       await _equipoPendienteRepository.marcarSincronizadosPorCenso(
         equipoId,
@@ -529,7 +438,6 @@ class CensoUploadService {
       );
     }
 
-    // Marcar fotos como sincronizadas
     for (final foto in fotos) {
       if (foto.id != null) {
         await _fotoRepository.marcarComoSincronizada(foto.id!);
