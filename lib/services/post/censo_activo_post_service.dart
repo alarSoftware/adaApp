@@ -20,7 +20,7 @@ class CensoActivoPostService {
   static const String _endpoint = '/censoActivo/insertCensoActivo';
   static const Uuid _uuid = Uuid();
 
-  static void enviarCensoActivo({
+  static Future<void> enviarCensoActivo({
     String? censoId,
     String? equipoId,
     String? codigoBarras,
@@ -138,29 +138,51 @@ class CensoActivoPostService {
       // Procesar respuesta con validación estricta
 
       ServerResponse resultObject = ServerResponse.fromHttp(response);
-      if(!resultObject.success){
-        if(!resultObject.isDuplicate&&resultObject.message!=''){
-          final estadoEquipoRepository = new EstadoEquipoRepository();
-          estadoEquipoRepository.marcarComoError(censoId!, resultObject.message);
+
+      // 1. Validación de seguridad para evitar saltos inesperados
+      if (censoId == null) throw Exception("censoId es nulo");
+
+      if (!resultObject.success) {
+        // CASO ERROR: Si NO es duplicado y tiene mensaje -> Marcar error y lanzar excepción
+        if (!resultObject.isDuplicate && resultObject.message != '') {
+          final estadoEquipoRepository = EstadoEquipoRepository();
+          await estadoEquipoRepository.marcarComoError(censoId, resultObject.message);
           throw Exception(resultObject.message);
         }
-      }else if(resultObject.success==true){
-         final censoUploadService= new CensoUploadService();
-          censoUploadService.marcarComoSincronizadoCompleto(
-          censoId: censoId!,
+        // CASO DUPLICADO: Si el servidor dice que ya existe, lo marcamos como éxito localmente
+        else if (resultObject.isDuplicate) {
+          _logger.w('⚠️ Registro duplicado en servidor, marcando como sincronizado localmente.');
+          final censoUploadService = CensoUploadService();
+          final fotosSeguras = fotos ?? [];
+
+          await censoUploadService.marcarComoSincronizadoCompleto(
+            censoId: censoId,
+            equipoId: equipoId,
+            clienteId: clienteId,
+            esNuevoEquipo: esNuevoEquipo,
+            crearPendiente: crearPendiente,
+            fotos: fotosSeguras,
+          );
+        }
+      } else {
+        // CASO ÉXITO (success == true)
+        final censoUploadService = CensoUploadService();
+        final fotosSeguras = fotos ?? []; // Evita crash si fotos es null
+
+        await censoUploadService.marcarComoSincronizadoCompleto(
+          censoId: censoId,
           equipoId: equipoId,
           clienteId: clienteId,
           esNuevoEquipo: esNuevoEquipo,
           crearPendiente: crearPendiente,
-          fotos: fotos!,
+          fotos: fotosSeguras,
         );
-      };
-
-
+      }
 
     } catch (e, stackTrace) {
+      // Aquí puedes descomentar tu manejo de excepciones si lo deseas,
+      // pero 'rethrow' está bien para que el servicio de arriba se entere.
       rethrow;
-      //return await _manejarExcepcion(e, censoId, fullUrl, userId, timeoutSegundos);
     }
   }
 
@@ -596,7 +618,7 @@ class CensoActivoPostService {
     // ═══════════════════════════════════════════════════════════════
     // SECCIÓN EQUIPO_PENDIENTE (llena si necesita pendiente, vacía si no)
     // ═══════════════════════════════════════════════════════════════
-    if (pendienteExistente!=null) {
+    if (pendienteExistente != null && (pendienteExistente is List && pendienteExistente.isNotEmpty)) {
       payload['equipo_pendiente'] = _construirJsonEquipoPendiente(pendienteExistente);
       _logger.i('✅ JSON Equipo_Pendiente agregado (crear asignación)');
     } else {

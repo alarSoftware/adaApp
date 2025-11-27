@@ -242,7 +242,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       // ============================================================
 
       _logger.i('ESTOY CENSANDO, GUARDANDO, Y ENVIANDO AL MISMO TIEMPO');
-      _uploadService.enviarCensoUnificado(
+      await _uploadService.enviarCensoUnificado(
         censoActivoId: censoActivoId,
         usuarioId: usuarioId,
         edfVendedorId:edfVendedorId,
@@ -593,7 +593,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final estadoCenso = yaAsignado ? 'asignado' : 'pendiente';
 
       // 🔥 USAR MÉTODO EXISTENTE
-      final estadoCreado = await _estadoEquipoRepository.crearCensoActivo(
+      final censoActivo = await _estadoEquipoRepository.crearCensoActivo(
         equipoId: equipoId,
         clienteId: clienteId,
         latitud: datos['latitud'],
@@ -605,7 +605,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
           edfVendedorId:edfVendedorId
       );
 
-      if (estadoCreado.id != null) {
+      if (censoActivo.id != null) {
         // 🔥 INMEDIATAMENTE DESPUÉS ACTUALIZAR EL USUARIO_ID
         await _estadoEquipoRepository.dbHelper.actualizar(
           'censo_activo',
@@ -614,7 +614,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
             'fecha_actualizacion': now.toIso8601String(),
           },
           where: 'id = ?',
-          whereArgs: [estadoCreado.id!],
+          whereArgs: [censoActivo.id!],
         );
 
         _logger.i('✅ Censo creado y usuario_id actualizado: $usuarioId');
@@ -623,7 +623,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         final verificacion = await _estadoEquipoRepository.dbHelper.consultar(
           'censo_activo',
           where: 'id = ?',
-          whereArgs: [estadoCreado.id!],
+          whereArgs: [censoActivo.id!],
           limit: 1,
         );
 
@@ -637,7 +637,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
           }
         }
 
-        return estadoCreado.id!;
+        return censoActivo.id!;
       }
 
       await ErrorLogService.logDatabaseError(

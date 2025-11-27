@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
+import 'package:ada_app/models/censo_activo.dart';
 import 'package:logger/logger.dart';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/repositories/censo_activo_repository.dart';
@@ -44,7 +45,7 @@ class CensoUploadService {
         _equipoRepository = equipoRepository ?? EquipoRepository();
 
   // ==================== METODO CENTRALIZADO DE CONSULTAS Y ENVIO DE CENSOS ====================
-  void enviarCensoUnificado({
+  Future<void> enviarCensoUnificado({
     required String censoActivoId,
     required int usuarioId,
     required String edfVendedorId,
@@ -105,7 +106,7 @@ class CensoUploadService {
         limit: 1,
       );
 
-      CensoActivoPostService.enviarCensoActivo(
+      await CensoActivoPostService.enviarCensoActivo(
         censoId: censoActivoId,
         equipoId: equipoId,
         codigoBarras: censoActivoMap['codigo_barras']?.toString(),
@@ -306,7 +307,7 @@ class CensoUploadService {
       }
 
       _logger.i('ESTOY REINTENTANDO ENVIAR MANUALMENTE UN CENSO');
-      enviarCensoUnificado(
+      await enviarCensoUnificado(
         censoActivoId: censoActivoId,
         usuarioId: usuarioId,
         edfVendedorId: edfVendedorId,

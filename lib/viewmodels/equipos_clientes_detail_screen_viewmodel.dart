@@ -29,8 +29,8 @@ class EquiposClienteDetailState {
   final dynamic equipoCliente;
   final bool isProcessing;
   final bool equipoEnLocal;
-  final List<EstadoEquipo> historialCambios;
-  final List<EstadoEquipo> historialUltimos5;
+  final List<CensoActivo> historialCambios;
+  final List<CensoActivo> historialUltimos5;
 
   EquiposClienteDetailState({
     required this.equipoCliente,
@@ -44,8 +44,8 @@ class EquiposClienteDetailState {
     dynamic equipoCliente,
     bool? isProcessing,
     bool? equipoEnLocal,
-    List<EstadoEquipo>? historialCambios,
-    List<EstadoEquipo>? historialUltimos5,
+    List<CensoActivo>? historialCambios,
+    List<CensoActivo>? historialUltimos5,
   }) {
     return EquiposClienteDetailState(
       equipoCliente: equipoCliente ?? this.equipoCliente,
@@ -125,8 +125,8 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       }
 
       final tipoEstado = equipoCliente['tipo_estado']?.toString();
-      EstadoEquipo? estadoActual;
-      List<EstadoEquipo> historialCompleto = [];
+      CensoActivo? estadoActual;
+      List<CensoActivo> historialCompleto = [];
 
       _logger.i(
           '📋 Cargando historial para equipo: $codigoBarras, cliente: $clienteId, tipo: $tipoEstado');
@@ -236,8 +236,8 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     return 'Guardar cambios';
   }
 
-  List<EstadoEquipo> get historialUltimos5 => _state.historialUltimos5;
-  List<EstadoEquipo> get historialCompleto => _state.historialCambios;
+  List<CensoActivo> get historialUltimos5 => _state.historialUltimos5;
+  List<CensoActivo> get historialCompleto => _state.historialCambios;
   int get totalCambios => _state.historialCambios.length;
 
   @override
@@ -268,7 +268,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       }
 
       final tipoEstado = equipoCliente['tipo_estado']?.toString();
-      List<EstadoEquipo> historialCompleto = [];
+      List<CensoActivo> historialCompleto = [];
 
       if (tipoEstado == 'asignado') {
         final clienteId = equipoCliente['cliente_id'];

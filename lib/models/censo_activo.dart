@@ -28,7 +28,7 @@ extension EstadoEquipoCensoExtension on EstadoEquipoCenso {
   }
 }
 
-class EstadoEquipo {
+class CensoActivo {
   final String? id;
   final String? edfVendedorId;
   final String equipoId;
@@ -46,7 +46,7 @@ class EstadoEquipo {
   final DateTime? ultimoIntento;
   final String? errorMensaje;
 
-  EstadoEquipo({
+  CensoActivo({
     this.id,
     this.edfVendedorId,
     required this.equipoId,
@@ -65,8 +65,8 @@ class EstadoEquipo {
     this.errorMensaje,
   });
 
-  factory EstadoEquipo.fromMap(Map<String, dynamic> map) {
-    return EstadoEquipo(
+  factory CensoActivo.fromMap(Map<String, dynamic> map) {
+    return CensoActivo(
       id: map['id'] as String?,
       edfVendedorId: map['edf_vendedor_id'],
       equipoId: map['equipo_id'] as String? ?? '0',
@@ -140,7 +140,7 @@ class EstadoEquipo {
     };
   }
 
-  EstadoEquipo copyWith({
+  CensoActivo copyWith({
     String? id,
     String? equipoId,
     int? clienteId,
@@ -157,7 +157,7 @@ class EstadoEquipo {
     DateTime? ultimoIntento,
     String? errorMensaje,
   }) {
-    return EstadoEquipo(
+    return CensoActivo(
       id: id ?? this.id,
       equipoId: equipoId ?? this.equipoId,
       clienteId: clienteId ?? this.clienteId,

@@ -3,7 +3,7 @@ import 'base_repository.dart';
 import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
 
-class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
+class EstadoEquipoRepository extends BaseRepository<CensoActivo> {
   final Logger _logger = Logger();
   final Uuid _uuid = Uuid();
 
@@ -11,10 +11,10 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   String get tableName => 'censo_activo';
 
   @override
-  EstadoEquipo fromMap(Map<String, dynamic> map) => EstadoEquipo.fromMap(map);
+  CensoActivo fromMap(Map<String, dynamic> map) => CensoActivo.fromMap(map);
 
   @override
-  Map<String, dynamic> toMap(EstadoEquipo estadoEquipo) => estadoEquipo.toMap();
+  Map<String, dynamic> toMap(CensoActivo estadoEquipo) => estadoEquipo.toMap();
 
   @override
   String getDefaultOrderBy() => 'fecha_revision DESC';
@@ -34,7 +34,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   // ========== MÉTODOS PRINCIPALES ==========
 
   /// Crear nuevo estado con GPS usando equipoId y clienteId
-  Future<EstadoEquipo> crearCensoActivo({
+  Future<CensoActivo> crearCensoActivo({
     required String equipoId,
     required int clienteId,
     int? usuarioId,
@@ -53,7 +53,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         'id': uuidId,
         'equipo_id': equipoId,
         'cliente_id': clienteId,
-        'usuario_id': usuarioId,  // ← Nuevo campo agregado
+        'usuario_id': usuarioId,
         'en_local': enLocal ? 1 : 0,
         'latitud': latitud,
         'longitud': longitud,
@@ -65,24 +65,20 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         'edf_vendedor_id': edfVendedorId
       };
 
-      var censoId = dbHelper.insertar(tableName, censoActivoData);
+      // 1. Usar await y no castear el resultado
+      await dbHelper.insertar(tableName, censoActivoData);
+
+      // 2. Recuperar usando el mismo UUID que generamos (sin crear nueva instancia de repo)
+      CensoActivo? censoRecuperado = await obtenerCensoActivoById(uuidId);
+
+      // 3. Validar que no sea null para cumplir con el retorno Future<CensoActivo>
+      if (censoRecuperado == null) {
+        throw Exception("Error crítico: No se pudo recuperar el censo recién creado ($uuidId)");
+      }
 
       _logger.i('✅ Estado insertado en BD con UUID: $uuidId');
 
-      return EstadoEquipo(
-        id: uuidId,
-        equipoId: equipoId,
-        clienteId: clienteId,
-        usuarioId: usuarioId,
-        enLocal: enLocal,
-        latitud: latitud,
-        longitud: longitud,
-        fechaRevision: fechaRevision,
-        fechaCreacion: now,
-        fechaActualizacion: now,
-        estadoCenso: estadoCenso ?? EstadoEquipoCenso.creado.valor,
-        observaciones: observaciones,
-      );
+      return censoRecuperado;
     } catch (e) {
       _logger.e('❌ Error creando nuevo estado: $e');
       rethrow;
@@ -145,8 +141,26 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   //   }
   // }
 
+  Future<CensoActivo?> obtenerCensoActivoById(String id) async {
+    try {
+      final maps = await dbHelper.consultar(
+        tableName,
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      return maps.isNotEmpty ? fromMap(maps.first) : null;
+    } catch (e) {
+      _logger.e('Error al obtenerCensoActivoById: $e');
+      return null;
+    }
+  }
+
   /// Obtener último estado por equipo_id y cliente_id
-  Future<EstadoEquipo?> obtenerUltimoEstado(String equipoId, int clienteId) async {
+  Future<CensoActivo?> obtenerUltimoEstado(
+    String equipoId,
+    int clienteId,
+  ) async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
@@ -165,7 +179,10 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   // ========== MÉTODOS DE CONSULTA ==========
 
   /// Obtener historial completo por equipo y cliente
-  Future<List<EstadoEquipo>> obtenerHistorialCompleto(String equipoId, int clienteId) async {
+  Future<List<CensoActivo>> obtenerHistorialCompleto(
+    String equipoId,
+    int clienteId,
+  ) async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
@@ -181,7 +198,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   /// Obtener estados por usuario - NUEVO MÉTODO
-  Future<List<EstadoEquipo>> obtenerPorUsuario(int usuarioId) async {
+  Future<List<CensoActivo>> obtenerPorUsuario(int usuarioId) async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
@@ -197,7 +214,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   /// Obtener estados creados (pendientes)
-  Future<List<EstadoEquipo>> obtenerCreados() async {
+  Future<List<CensoActivo>> obtenerCreados() async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
@@ -213,7 +230,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   /// Obtener estados migrados
-  Future<List<EstadoEquipo>> obtenerMigrados() async {
+  Future<List<CensoActivo>> obtenerMigrados() async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
@@ -229,7 +246,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   /// Obtener estados con error
-  Future<List<EstadoEquipo>> obtenerConError() async {
+  Future<List<CensoActivo>> obtenerConError() async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
@@ -244,16 +261,16 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-  Future<List<EstadoEquipo>> obtenerNoSincronizados() async {
+  Future<List<CensoActivo>> obtenerNoSincronizados() async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
-        where: 'estado_censo = ?',
-        whereArgs: ['error'],
+        where: 'estado_censo IN (?, ?)', // <--- CAMBIO CLAVE: Buscar CREADO y ERROR
+        whereArgs: [EstadoEquipoCenso.creado.valor, EstadoEquipoCenso.error.valor],
         orderBy: getDefaultOrderBy(),
       );
 
-      _logger.i('📊 Censos con error encontrados: ${maps.length}');
+      _logger.i('📊 Censos pendientes de sync encontrados: ${maps.length}');
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
       _logger.e('Error al obtener no migrados: $e');
@@ -264,7 +281,10 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   // ========== MÉTODOS DE ACTUALIZACIÓN ==========
 
   /// Actualizar estado del censo
-  Future<void> actualizarEstadoCenso(String estadoId, EstadoEquipoCenso nuevoEstado) async {
+  Future<void> actualizarEstadoCenso(
+    String estadoId,
+    EstadoEquipoCenso nuevoEstado,
+  ) async {
     try {
       await dbHelper.actualizar(
         tableName,
@@ -333,16 +353,15 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       );
       final equiposPendientesActualizados = await dbHelper.actualizar(
         'equipos_pendientes',
-        {
-          'fecha_actualizacion': DateTime.now().toIso8601String(),
-        },
+        {'fecha_actualizacion': DateTime.now().toIso8601String()},
         where: 'CAST(equipo_id AS TEXT) = ? AND CAST(cliente_id AS TEXT) = ?',
         whereArgs: [equipoId.toString(), clienteId.toString()],
       );
 
       _logger.i('✅ Estado $estadoId marcado como sincronizado (migrado)');
-      _logger.i('📈 Equipos pendientes actualizados: $equiposPendientesActualizados');
-
+      _logger.i(
+        '📈 Equipos pendientes actualizados: $equiposPendientesActualizados',
+      );
     } catch (e) {
       _logger.e('❌ Error al marcar como sincronizado: $e');
       rethrow;
@@ -385,12 +404,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       };
     } catch (e) {
       _logger.e('Error contando por estado: $e');
-      return {
-        'creados': 0,
-        'migrados': 0,
-        'error': 0,
-        'total': 0,
-      };
+      return {'creados': 0, 'migrados': 0, 'error': 0, 'total': 0};
     }
   }
 
@@ -416,12 +430,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
       };
     } catch (e) {
       _logger.e('Error contando por usuario: $e');
-      return {
-        'creados': 0,
-        'migrados': 0,
-        'error': 0,
-        'total': 0,
-      };
+      return {'creados': 0, 'migrados': 0, 'error': 0, 'total': 0};
     }
   }
 
@@ -478,7 +487,10 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   }
 
   /// Obtener estadísticas de cambios
-  Future<Map<String, dynamic>> obtenerEstadisticasCambios(String equipoId, int clienteId) async {
+  Future<Map<String, dynamic>> obtenerEstadisticasCambios(
+    String equipoId,
+    int clienteId,
+  ) async {
     try {
       final historial = await obtenerHistorialCompleto(equipoId, clienteId);
 
@@ -490,7 +502,6 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
           'cambios_pendientes': 0,
         };
       }
-
 
       return {
         'total_cambios': historial.length,
@@ -524,7 +535,9 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   /// Limpiar historial antiguo
   Future<void> limpiarHistorialAntiguo({int diasAntiguedad = 90}) async {
     try {
-      final fechaLimite = DateTime.now().subtract(Duration(days: diasAntiguedad));
+      final fechaLimite = DateTime.now().subtract(
+        Duration(days: diasAntiguedad),
+      );
 
       final registrosEliminados = await dbHelper.eliminar(
         tableName,
@@ -542,17 +555,26 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   // ========== MÉTODOS DE COMPATIBILIDAD CON VIEWMODELS EXISTENTES ==========
 
   /// Wrapper para compatibilidad con código que usa int equipoId
-  Future<EstadoEquipo?> obtenerUltimoEstadoLegacy(int equipoId, int clienteId) async {
+  Future<CensoActivo?> obtenerUltimoEstadoLegacy(
+    int equipoId,
+    int clienteId,
+  ) async {
     return await obtenerUltimoEstado(equipoId.toString(), clienteId);
   }
 
   /// Wrapper para compatibilidad con ViewModel de detalle
-  Future<List<EstadoEquipo>> obtenerHistorialDirectoPorEquipoCliente(String equipoId, int clienteId) async {
+  Future<List<CensoActivo>> obtenerHistorialDirectoPorEquipoCliente(
+    String equipoId,
+    int clienteId,
+  ) async {
     return await obtenerHistorialCompleto(equipoId, clienteId);
   }
 
   /// Método para obtener último estado retornando Map (para iconos)
-  Future<Map<String, dynamic>?> obtenerUltimoEstadoParaIcono(String equipoId, int clienteId) async {
+  Future<Map<String, dynamic>?> obtenerUltimoEstadoParaIcono(
+    String equipoId,
+    int clienteId,
+  ) async {
     try {
       final estado = await obtenerUltimoEstado(equipoId, clienteId);
       return estado?.toMap();
@@ -572,7 +594,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         {
           'estado_censo': EstadoEquipoCenso.migrado.valor,
           'fecha_actualizacion': DateTime.now().toIso8601String(),
-          'error_mensaje': null
+          'error_mensaje': null,
         },
         where: 'id = ?',
         whereArgs: [censoActivoId],
@@ -591,14 +613,13 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         {
           'estado_censo': EstadoEquipoCenso.error.valor,
           'fecha_actualizacion': DateTime.now().toIso8601String(),
-          'error_mensaje': mensajeError
+          'error_mensaje': mensajeError,
         },
         where: 'id = ?',
         whereArgs: [estadoId],
       );
       _logger.i('Estado $estadoId marcado con error: $mensajeError');
     } catch (e) {
-      _logger.e('Error al marcar como error: $e');
       rethrow;
     }
   }
