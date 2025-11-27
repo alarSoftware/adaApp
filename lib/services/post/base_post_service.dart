@@ -53,15 +53,15 @@ class BasePostService {
         // Usamos el status_code que devuelve el result si existe, sino el HTTP code
         final errorCode = result['serverAction']?.toString() ?? response.statusCode.toString();
 
-        await ErrorLogService.logServerError(
-          tableName: tableName,
-          operation: 'POST',
-          errorMessage: result['mensaje'] ?? 'Error del servidor',
-          errorCode: errorCode,
-          registroFailId: registroId,
-          endpoint: fullUrl,
-          userId: userId,
-        );
+        // await ErrorLogService.logServerError(
+        //   tableName: tableName,
+        //   operation: 'POST',
+        //   errorMessage: result['mensaje'] ?? 'Error del servidor',
+        //   errorCode: errorCode,
+        //   registroFailId: registroId,
+        //   endpoint: fullUrl,
+        //   userId: userId,
+        // );
       }
 
       return result;
@@ -71,14 +71,14 @@ class BasePostService {
 
       // 🚨 LOG ERROR
       if (tableName != null) {
-        await ErrorLogService.logNetworkError(
-          tableName: tableName,
-          operation: 'POST',
-          errorMessage: 'Sin conexión de red: $e',
-          registroFailId: registroId,
-          endpoint: fullUrl ?? endpoint,
-          userId: userId,
-        );
+        // await ErrorLogService.logNetworkError(
+        //   tableName: tableName,
+        //   operation: 'POST',
+        //   errorMessage: 'Sin conexión de red: $e',
+        //   registroFailId: registroId,
+        //   endpoint: fullUrl ?? endpoint,
+        //   userId: userId,
+        // );
       }
 
       return {
@@ -93,14 +93,14 @@ class BasePostService {
 
       // 🚨 LOG ERROR
       if (tableName != null) {
-        await ErrorLogService.logNetworkError(
-          tableName: tableName,
-          operation: 'POST',
-          errorMessage: 'Timeout de conexión: $e',
-          registroFailId: registroId,
-          endpoint: fullUrl ?? endpoint,
-          userId: userId,
-        );
+        // await ErrorLogService.logNetworkError(
+        //   tableName: tableName,
+        //   operation: 'POST',
+        //   errorMessage: 'Timeout de conexión: $e',
+        //   registroFailId: registroId,
+        //   endpoint: fullUrl ?? endpoint,
+        //   userId: userId,
+        // );
       }
 
       return {
@@ -115,14 +115,14 @@ class BasePostService {
 
       // 🚨 LOG ERROR
       if (tableName != null) {
-        await ErrorLogService.logNetworkError(
-          tableName: tableName,
-          operation: 'POST',
-          errorMessage: 'Error de red: ${e.message}',
-          registroFailId: registroId,
-          endpoint: fullUrl ?? endpoint,
-          userId: userId,
-        );
+        // await ErrorLogService.logNetworkError(
+        //   tableName: tableName,
+        //   operation: 'POST',
+        //   errorMessage: 'Error de red: ${e.message}',
+        //   registroFailId: registroId,
+        //   endpoint: fullUrl ?? endpoint,
+        //   userId: userId,
+        // );
       }
 
       return {
@@ -137,16 +137,16 @@ class BasePostService {
 
       // 🚨 LOG ERROR
       if (tableName != null) {
-        await ErrorLogService.logError(
-          tableName: tableName,
-          operation: 'POST',
-          errorMessage: 'Error general: $e',
-          errorType: 'unknown',
-          errorCode: 'POST_FAILED',
-          registroFailId: registroId,
-          endpoint: fullUrl ?? endpoint,
-          userId: userId,
-        );
+        // await ErrorLogService.logError(
+        //   tableName: tableName,
+        //   operation: 'POST',
+        //   errorMessage: 'Error general: $e',
+        //   errorType: 'unknown',
+        //   errorCode: 'POST_FAILED',
+        //   registroFailId: registroId,
+        //   endpoint: fullUrl ?? endpoint,
+        //   userId: userId,
+        // );
       }
 
       return {

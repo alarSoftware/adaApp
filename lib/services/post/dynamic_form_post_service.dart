@@ -49,15 +49,15 @@ class DynamicFormPostService {
 
     // Solo loguear el reintento específicamente si falló
     if (result['success'] == false || result['exito'] == false) {
-      await ErrorLogService.logError(
-        tableName: _tableName,
-        operation: 'RETRY_POST',
-        errorMessage: 'Reintento #$intentoNumero falló: ${result['error'] ?? result['mensaje']}',
-        errorType: 'retry_failed',
-        registroFailId: responseId,
-        syncAttempt: intentoNumero,
-        userId: userId,
-      );
+      // await ErrorLogService.logError(
+      //   tableName: _tableName,
+      //   operation: 'RETRY_POST',
+      //   errorMessage: 'Reintento #$intentoNumero falló: ${result['error'] ?? result['mensaje']}',
+      //   errorType: 'retry_failed',
+      //   registroFailId: responseId,
+      //   syncAttempt: intentoNumero,
+      //   userId: userId,
+      // );
     }
 
     return result;

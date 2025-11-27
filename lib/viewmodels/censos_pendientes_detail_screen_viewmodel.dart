@@ -278,32 +278,33 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
 
       // 6. Llamada directa a enviarCensoActivo
       _logger.i('📤 Usando enviarCensoActivo...');
-      final response = await CensoActivoPostService.enviarCensoActivo(
-        equipoId: equipoId ?? '',
-        codigoBarras: censoData['codigo_barras']?.toString() ?? equipoId ?? '',
-        marcaId: marcaId,
-        modeloId: modeloId,
-        logoId: logoId,
-        numeroSerie: numeroSerie,
-        esNuevoEquipo: false,
-        clienteId: (censoData['cliente_id'] as num?)?.toInt() ?? 0,
-        edfVendedorId: edfVendedorId,
-        crearPendiente: false,
-        usuarioId: usuarioId,
-        latitud: (censoData['latitud'] as num?)?.toDouble() ?? 0.0,
-        longitud: (censoData['longitud'] as num?)?.toDouble() ?? 0.0,
-        observaciones: censoData['observaciones']?.toString(),
-        enLocal: (censoData['en_local'] as int?) == 1,
-        estadoCenso: censoData['estado_censo']?.toString() ?? 'pendiente',
-        fotos: fotos,
-        clienteNombre: censoData['cliente_nombre']?.toString(),
-        marca: censoData['marca_nombre']?.toString(),
-        modelo: censoData['modelo']?.toString(),
-        logo: censoData['logo']?.toString(),
-        timeoutSegundos: 45,
-        userId: usuarioId.toString(),
-        guardarLog: true,
-      );
+      final response = null;
+      // final response = await CensoActivoPostService.enviarCensoActivo(
+      //   equipoId: equipoId ?? '',
+      //   codigoBarras: censoData['codigo_barras']?.toString() ?? equipoId ?? '',
+      //   marcaId: marcaId,
+      //   modeloId: modeloId,
+      //   logoId: logoId,
+      //   numeroSerie: numeroSerie,
+      //   esNuevoEquipo: false,
+      //   clienteId: (censoData['cliente_id'] as num?)?.toInt() ?? 0,
+      //   edfVendedorId: edfVendedorId,
+      //   crearPendiente: false,
+      //   usuarioId: usuarioId,
+      //   latitud: (censoData['latitud'] as num?)?.toDouble() ?? 0.0,
+      //   longitud: (censoData['longitud'] as num?)?.toDouble() ?? 0.0,
+      //   observaciones: censoData['observaciones']?.toString(),
+      //   enLocal: (censoData['en_local'] as int?) == 1,
+      //   estadoCenso: censoData['estado_censo']?.toString() ?? 'pendiente',
+      //   fotos: fotos,
+      //   clienteNombre: censoData['cliente_nombre']?.toString(),
+      //   marca: censoData['marca_nombre']?.toString(),
+      //   modelo: censoData['modelo']?.toString(),
+      //   logo: censoData['logo']?.toString(),
+      //   timeoutSegundos: 45,
+      //   userId: usuarioId.toString(),
+      //   guardarLog: true,
+      // );
 
       if (response['exito'] == true) {
         await db.update(

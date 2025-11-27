@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi';
+import 'dart:io';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:http/http.dart' as http;
@@ -23,7 +26,7 @@ class ErrorLogService {
     String? errorCode,
     String? errorType,
     int syncAttempt = 1,
-    String? userId,
+    int? userId,
     String? endpoint,
   }) async {
     try {
@@ -99,6 +102,64 @@ class ErrorLogService {
       _logger.e('Stack trace: $stackTrace');
       // No re-throw para evitar loops infinitos de errores
     }
+  }
+
+  static void manejarExcepcion(dynamic excepcion, String? elementId,
+      String? fullUrl, int? userId, String tableName) async {
+    String tipoError;
+    String codigoError;
+    String mensajeUsuario;
+    String mensajeDetallado;
+    int timeoutSegundos = 60;
+    // 🎯 CLASIFICAR EXCEPCIÓN AUTOMÁTICAMENTE
+    if (excepcion is SocketException) {
+      tipoError = 'network';
+      codigoError = 'NETWORK_CONNECTION_ERROR';
+      mensajeUsuario = 'Sin conexión de red';
+      mensajeDetallado = 'Error de conexión de red: ${excepcion.message}';
+
+    } else if (excepcion is TimeoutException) {
+      tipoError = 'network';
+      codigoError = 'REQUEST_TIMEOUT_ERROR';
+      mensajeUsuario = 'Tiempo de espera agotado';
+      mensajeDetallado = 'Timeout tras ${timeoutSegundos}s: $excepcion';
+
+    } else if (excepcion is http.ClientException) {
+      tipoError = 'network';
+      codigoError = 'HTTP_CLIENT_ERROR';
+      mensajeUsuario = 'Error de red: ${excepcion.message}';
+      mensajeDetallado = 'Error HTTP del cliente: ${excepcion.message}';
+
+    } else {
+      tipoError = 'crash';
+      codigoError = 'UNEXPECTED_EXCEPTION';
+      mensajeUsuario = 'Error interno: $excepcion';
+      mensajeDetallado = 'Excepción no manejada: $excepcion';
+    }
+
+    String operacion = '';
+    if(tableName=='censo_activo'){
+      // await _estadoEquipoRepository.marcarComoError(
+      //   elementId,
+      //   'Excepción en reintento: ${e.toString()}',
+      // );
+    }else if(tableName=='operacion_comercial'){
+      // await _estadoEquipoRepository.marcarComoError(
+      //   elementId,
+      //   'Excepción en reintento: ${e.toString()}',
+      // );
+    }
+    // 🔥 REGISTRO AUTOMÁTICO UNIFICADO
+    await ErrorLogService.logError(
+      tableName: tableName,
+      operation: 'EXCEPTION',
+      errorMessage: mensajeDetallado,
+      errorType: tipoError,
+      errorCode: codigoError,
+      registroFailId: elementId,
+      endpoint: fullUrl,
+      userId: userId,
+    );
   }
 
   // ==================== ENVÍO AL SERVIDOR CON REINTENTOS ====================
@@ -581,7 +642,7 @@ class ErrorLogService {
     required String errorMessage,
     String? registroFailId,
     String? endpoint,
-    String? userId,
+    int? userId,
   }) async {
     await logError(
       tableName: tableName,
@@ -602,7 +663,7 @@ class ErrorLogService {
     required String errorCode,
     String? registroFailId,
     String? endpoint,
-    String? userId,
+    int? userId,
   }) async {
     await logError(
       tableName: tableName,
@@ -621,7 +682,7 @@ class ErrorLogService {
     required String operation,
     required String errorMessage,
     String? registroFailId,
-    String? userId,
+    int? userId,
   }) async {
     await logError(
       tableName: tableName,
@@ -651,6 +712,8 @@ class ErrorLogService {
   }
 }
 
+
+
 // ==================== CLASE DE RESULTADO ====================
 
 class SyncErrorLogsResult {
@@ -670,4 +733,5 @@ class SyncErrorLogsResult {
   String toString() {
     return 'SyncErrorLogsResult(exito: $exito, mensaje: $mensaje, enviados: $logsEnviados, fallidos: $logsFallidos)';
   }
+
 }

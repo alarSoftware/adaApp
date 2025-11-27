@@ -238,12 +238,12 @@ class UserSyncService {
       BaseSyncService.logger.i('edf_vendedor_id: $edfVendedorId');
 
       if (edfVendedorId == null || edfVendedorId.trim().isEmpty) {
-        await ErrorLogService.logValidationError(
-          tableName: 'Users',
-          operation: 'get_edf_vendedor_id',
-          errorMessage: 'Usuario $username no tiene edf_vendedor_id configurado',
-          userId: username,
-        );
+        // await ErrorLogService.logValidationError(
+        //   tableName: 'Users',
+        //   operation: 'get_edf_vendedor_id',
+        //   errorMessage: 'Usuario $username no tiene edf_vendedor_id configurado',
+        //   userId: username,
+        // );
       }
 
       return edfVendedorId;

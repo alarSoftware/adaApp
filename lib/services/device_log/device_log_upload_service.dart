@@ -58,14 +58,14 @@ class DeviceLogUploadService {
           logger.e('❌ Error enviando ${log.id}: $e');
 
           // 🔥 Log adicional solo si no fue capturado por BasePostService
-          await ErrorLogService.logError(
-            tableName: 'device_log',
-            operation: 'sync_batch',
-            errorMessage: 'Error en sincronización batch: $e',
-            errorType: 'upload',
-            registroFailId: log.id,
-            userId: log.edfVendedorId,
-          );
+          // await ErrorLogService.logError(
+          //   tableName: 'device_log',
+          //   operation: 'sync_batch',
+          //   errorMessage: 'Error en sincronización batch: $e',
+          //   errorType: 'upload',
+          //   registroFailId: log.id,
+          //   userId: log.edfVendedorId,
+          // );
 
           fallidos++;
         }

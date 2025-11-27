@@ -521,15 +521,15 @@ class DynamicFormSyncService extends BaseSyncService {
         final responsesData = _parseListResponse(response.body);
 
         if (responsesData == null) {
-          await ErrorLogService.logError(
-            tableName: 'dynamic_form_response',
-            operation: 'parse_response',
-            errorMessage: 'Error parseando respuesta',
-            errorType: 'server',
-            errorCode: 'PARSE_ERROR',
-            endpoint: currentEndpoint,
-            userId: edfvendedorId,
-          );
+          // await ErrorLogService.logError(
+          //   tableName: 'dynamic_form_response',
+          //   operation: 'parse_response',
+          //   errorMessage: 'Error parseando respuesta',
+          //   errorType: 'server',
+          //   errorCode: 'PARSE_ERROR',
+          //   endpoint: currentEndpoint,
+          //   userId: edfvendedorId,
+          // );
 
           return SyncResult(
             exito: false,
@@ -578,14 +578,14 @@ class DynamicFormSyncService extends BaseSyncService {
         final mensaje = BaseSyncService.extractErrorMessage(response);
         BaseSyncService.logger.e('❌ Error del servidor: $mensaje');
 
-        await ErrorLogService.logServerError(
-          tableName: 'dynamic_form_response',
-          operation: 'sync_from_server',
-          errorMessage: mensaje,
-          errorCode: response.statusCode.toString(),
-          endpoint: currentEndpoint,
-          userId: edfvendedorId,
-        );
+        // await ErrorLogService.logServerError(
+        //   tableName: 'dynamic_form_response',
+        //   operation: 'sync_from_server',
+        //   errorMessage: mensaje,
+        //   errorCode: response.statusCode.toString(),
+        //   endpoint: currentEndpoint,
+        //   userId: edfvendedorId,
+        // );
 
         return SyncResult(
           exito: false,
@@ -595,13 +595,13 @@ class DynamicFormSyncService extends BaseSyncService {
       }
 
     } on TimeoutException catch (timeoutError) {
-      await ErrorLogService.logNetworkError(
-        tableName: 'dynamic_form_response',
-        operation: 'sync_from_server',
-        errorMessage: 'Timeout: $timeoutError',
-        endpoint: currentEndpoint,
-        userId: edfvendedorId,
-      );
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'dynamic_form_response',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Timeout: $timeoutError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfvendedorId,
+      // );
 
       return SyncResult(
         exito: false,
@@ -610,13 +610,13 @@ class DynamicFormSyncService extends BaseSyncService {
       );
 
     } on SocketException catch (socketError) {
-      await ErrorLogService.logNetworkError(
-        tableName: 'dynamic_form_response',
-        operation: 'sync_from_server',
-        errorMessage: 'Sin conexión: $socketError',
-        endpoint: currentEndpoint,
-        userId: edfvendedorId,
-      );
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'dynamic_form_response',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Sin conexión: $socketError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfvendedorId,
+      // );
 
       return SyncResult(
         exito: false,
@@ -627,14 +627,14 @@ class DynamicFormSyncService extends BaseSyncService {
     } catch (e) {
       BaseSyncService.logger.e('💥 Error obteniendo respuestas: $e');
 
-      await ErrorLogService.logError(
-        tableName: 'dynamic_form_response',
-        operation: 'sync_from_server',
-        errorMessage: 'Error: $e',
-        errorType: 'unknown',
-        endpoint: currentEndpoint,
-        userId: edfvendedorId,
-      );
+      // await ErrorLogService.logError(
+      //   tableName: 'dynamic_form_response',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Error: $e',
+      //   errorType: 'unknown',
+      //   endpoint: currentEndpoint,
+      //   userId: edfvendedorId,
+      // );
 
       return SyncResult(
         exito: false,
@@ -686,15 +686,15 @@ class DynamicFormSyncService extends BaseSyncService {
         }
 
         if (imagenesData == null) {
-          await ErrorLogService.logError(
-            tableName: 'dynamic_form_response_image',
-            operation: 'parse_response',
-            errorMessage: 'Error parseando respuesta',
-            errorType: 'server',
-            errorCode: 'PARSE_ERROR',
-            endpoint: currentEndpoint,
-            userId: edfvendedorId,
-          );
+          // await ErrorLogService.logError(
+          //   tableName: 'dynamic_form_response_image',
+          //   operation: 'parse_response',
+          //   errorMessage: 'Error parseando respuesta',
+          //   errorType: 'server',
+          //   errorCode: 'PARSE_ERROR',
+          //   endpoint: currentEndpoint,
+          //   userId: edfvendedorId,
+          // );
 
           return SyncResult(
             exito: false,
@@ -743,14 +743,14 @@ class DynamicFormSyncService extends BaseSyncService {
         final mensaje = BaseSyncService.extractErrorMessage(response);
         BaseSyncService.logger.e('❌ Error del servidor: $mensaje');
 
-        await ErrorLogService.logServerError(
-          tableName: 'dynamic_form_response_image',
-          operation: 'sync_from_server',
-          errorMessage: mensaje,
-          errorCode: response.statusCode.toString(),
-          endpoint: currentEndpoint,
-          userId: edfvendedorId,
-        );
+        // await ErrorLogService.logServerError(
+        //   tableName: 'dynamic_form_response_image',
+        //   operation: 'sync_from_server',
+        //   errorMessage: mensaje,
+        //   errorCode: response.statusCode.toString(),
+        //   endpoint: currentEndpoint,
+        //   userId: edfvendedorId,
+        // );
 
         return SyncResult(
           exito: false,
@@ -760,13 +760,13 @@ class DynamicFormSyncService extends BaseSyncService {
       }
 
     } on TimeoutException catch (timeoutError) {
-      await ErrorLogService.logNetworkError(
-        tableName: 'dynamic_form_response_image',
-        operation: 'sync_from_server',
-        errorMessage: 'Timeout: $timeoutError',
-        endpoint: currentEndpoint,
-        userId: edfvendedorId,
-      );
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'dynamic_form_response_image',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Timeout: $timeoutError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfvendedorId,
+      // );
 
       return SyncResult(
         exito: false,
@@ -775,13 +775,13 @@ class DynamicFormSyncService extends BaseSyncService {
       );
 
     } on SocketException catch (socketError) {
-      await ErrorLogService.logNetworkError(
-        tableName: 'dynamic_form_response_image',
-        operation: 'sync_from_server',
-        errorMessage: 'Sin conexión: $socketError',
-        endpoint: currentEndpoint,
-        userId: edfvendedorId,
-      );
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'dynamic_form_response_image',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Sin conexión: $socketError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfvendedorId,
+      // );
 
       return SyncResult(
         exito: false,
@@ -792,14 +792,14 @@ class DynamicFormSyncService extends BaseSyncService {
     } catch (e) {
       BaseSyncService.logger.e('💥 Error obteniendo imágenes: $e');
 
-      await ErrorLogService.logError(
-        tableName: 'dynamic_form_response_image',
-        operation: 'sync_from_server',
-        errorMessage: 'Error: $e',
-        errorType: 'unknown',
-        endpoint: currentEndpoint,
-        userId: edfvendedorId,
-      );
+      // await ErrorLogService.logError(
+      //   tableName: 'dynamic_form_response_image',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Error: $e',
+      //   errorType: 'unknown',
+      //   endpoint: currentEndpoint,
+      //   userId: edfvendedorId,
+      // );
 
       return SyncResult(
         exito: false,

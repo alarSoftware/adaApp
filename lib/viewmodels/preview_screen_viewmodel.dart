@@ -237,17 +237,12 @@ class PreviewScreenViewModel extends ChangeNotifier {
           datos
       );
       final tiempoLocal = DateTime.now().difference(now).inSeconds;
-
-
-
       // ============================================================
       // FASE 2: SINCRONIZACIÓN UNIFICADA EN BACKGROUND
       // ============================================================
-      _logger.i('🚀 Lanzando sincronización UNIFICADA en background...');
 
-
-
-      await _uploadService.enviarCensoUnificado(
+      _logger.i('ESTOY CENSANDO, GUARDANDO, Y ENVIANDO AL MISMO TIEMPO');
+      _uploadService.enviarCensoUnificado(
         censoActivoId: censoActivoId,
         usuarioId: usuarioId,
         edfVendedorId:edfVendedorId,
@@ -307,14 +302,14 @@ class PreviewScreenViewModel extends ChangeNotifier {
     } catch (e, stackTrace) {
       _logger.e('❌ Error en guardado local: $e', stackTrace: stackTrace);
 
-      await ErrorLogService.logError(
-        tableName: 'censo_activo',
-        operation: 'guardar_local',
-        errorMessage: 'Error crítico en guardado: $e',
-        errorType: 'general',
-        registroFailId: censoActivoId,
-        userId: usuarioId?.toString(),
-      );
+      // await ErrorLogService.logError(
+      //   tableName: 'censo_activo',
+      //   operation: 'guardar_local',
+      //   errorMessage: 'Error crítico en guardado: $e',
+      //   errorType: 'general',
+      //   registroFailId: censoActivoId,
+      //   userId: usuarioId?.toString(),
+      // );
 
       return {
         'success': false,
@@ -358,13 +353,13 @@ class PreviewScreenViewModel extends ChangeNotifier {
           _logger.w('⚠️ Sin edfVendedorId, marcando como error');
           await _estadoEquipoRepository.marcarComoError(estadoId, 'Sin edfVendedorId');
 
-          await ErrorLogService.logValidationError(
-            tableName: 'censo_activo',
-            operation: 'sync_unificado',
-            errorMessage: 'Sin edfVendedorId para sincronizar',
-            registroFailId: estadoId,
-            userId: usuarioId.toString(),
-          );
+          // await ErrorLogService.logValidationError(
+          //   tableName: 'censo_activo',
+          //   operation: 'sync_unificado',
+          //   errorMessage: 'Sin edfVendedorId para sincronizar',
+          //   registroFailId: estadoId,
+          //   userId: usuarioId.toString(),
+          // );
           return;
         }
 
@@ -401,54 +396,54 @@ class PreviewScreenViewModel extends ChangeNotifier {
         }
 
         // 🔥 LLAMADA AL SERVICIO UNIFICADO CON UUID DE BD
-        final respuesta = await CensoActivoPostService.enviarCensoActivo(
-          // ID del censo
-          censoId: estadoId, // 🔥 PASAR ID DE BD
-
-          // Datos del equipo (si es nuevo)
-          equipoId: equipoId,
-          codigoBarras: datos['codigo_barras']?.toString(),
-          marcaId: _safeCastToInt(datos['marca_id'], 'marca_id'),
-          modeloId: _safeCastToInt(datos['modelo_id'], 'modelo_id'),
-          logoId: _safeCastToInt(datos['logo_id'], 'logo_id'),
-          numeroSerie: datos['numero_serie']?.toString(),
-          esNuevoEquipo: esNuevoEquipo,
-
-          // Datos del pendiente
-          clienteId: clienteId,
-          edfVendedorId: edfVendedorId,
-          crearPendiente: crearPendiente,
-
-          // Datos del censo activo
-          usuarioId: usuarioId,
-          latitud: datos['latitud']?.toDouble() ?? 0.0,
-          longitud: datos['longitud']?.toDouble() ?? 0.0,
-          observaciones: datos['observaciones']?.toString(),
-          enLocal: true,
-          estadoCenso: yaAsignado ? 'asignado' : 'pendiente',
-
-          // Fotos
-          fotos: fotos,
-
-          // Datos adicionales del equipo
-          clienteNombre: (datos['cliente'] as Cliente?)?.nombre,
-          marca: datos['marca_nombre']?.toString(),
-          modelo: datos['modelo']?.toString(),
-          logo: datos['logo']?.toString(),
-
-          // Control
-          timeoutSegundos: 30,
-          userId: usuarioId.toString(),
-          guardarLog: true,
-        );
+        final respuesta = null;
+        // final respuesta = await CensoActivoPostService.enviarCensoActivo(
+        //   // ID del censo
+        //   censoId: estadoId, // 🔥 PASAR ID DE BD
+        //
+        //   // Datos del equipo (si es nuevo)
+        //   equipoId: equipoId,
+        //   codigoBarras: datos['codigo_barras']?.toString(),
+        //   marcaId: _safeCastToInt(datos['marca_id'], 'marca_id'),
+        //   modeloId: _safeCastToInt(datos['modelo_id'], 'modelo_id'),
+        //   logoId: _safeCastToInt(datos['logo_id'], 'logo_id'),
+        //   numeroSerie: datos['numero_serie']?.toString(),
+        //   esNuevoEquipo: esNuevoEquipo,
+        //
+        //   // Datos del pendiente
+        //   clienteId: clienteId,
+        //   edfVendedorId: edfVendedorId,
+        //   crearPendiente: crearPendiente,
+        //
+        //   // Datos del censo activo
+        //   usuarioId: usuarioId,
+        //   latitud: datos['latitud']?.toDouble() ?? 0.0,
+        //   longitud: datos['longitud']?.toDouble() ?? 0.0,
+        //   observaciones: datos['observaciones']?.toString(),
+        //   enLocal: true,
+        //   estadoCenso: yaAsignado ? 'asignado' : 'pendiente',
+        //
+        //   // Fotos
+        //   fotos: fotos,
+        //
+        //   // Datos adicionales del equipo
+        //   clienteNombre: (datos['cliente'] as Cliente?)?.nombre,
+        //   marca: datos['marca_nombre']?.toString(),
+        //   modelo: datos['modelo']?.toString(),
+        //   logo: datos['logo']?.toString(),
+        //
+        //   // Control
+        //   timeoutSegundos: 30,
+        //   userId: usuarioId.toString(),
+        //   guardarLog: true,
+        // );
 
         if (respuesta['exito'] == true) {
           // ✅ ÉXITO: Marcar todo como sincronizado
           _logger.i('✅ Sincronización unificada exitosa');
 
           await _estadoEquipoRepository.marcarComoMigrado(
-            estadoId,
-            servidorId: respuesta['servidor_id']?.toString(),
+            estadoId
           );
           await _estadoEquipoRepository.marcarComoSincronizado(estadoId);
 
@@ -484,15 +479,15 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
           await _estadoEquipoRepository.marcarComoError(estadoId, errorMsg);
 
-          await ErrorLogService.logError(
-            tableName: 'censo_activo',
-            operation: 'sync_unificado',
-            errorMessage: errorMsg,
-            errorType: 'sync',
-            errorCode: respuesta['codigo_error']?.toString(),
-            registroFailId: estadoId,
-            userId: usuarioId.toString(),
-          );
+          // await ErrorLogService.logError(
+          //   tableName: 'censo_activo',
+          //   operation: 'sync_unificado',
+          //   errorMessage: errorMsg,
+          //   errorType: 'sync',
+          //   errorCode: respuesta['codigo_error']?.toString(),
+          //   registroFailId: estadoId,
+          //   userId: usuarioId.toString(),
+          // );
         }
 
         _logger.i('═══════════════════════════════════════════════════════');
@@ -508,14 +503,14 @@ class PreviewScreenViewModel extends ChangeNotifier {
           'Excepción unificada: $e',
         );
 
-        await ErrorLogService.logError(
-          tableName: 'censo_activo',
-          operation: 'sync_unificado_background',
-          errorMessage: 'Error en sync unificado: $e',
-          errorType: 'sync',
-          registroFailId: estadoId,
-          userId: usuarioId.toString(),
-        );
+        // await ErrorLogService.logError(
+        //   tableName: 'censo_activo',
+        //   operation: 'sync_unificado_background',
+        //   errorMessage: 'Error en sync unificado: $e',
+        //   errorType: 'sync',
+        //   registroFailId: estadoId,
+        //   userId: usuarioId.toString(),
+        // );
       }
     });
   }
@@ -598,7 +593,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final estadoCenso = yaAsignado ? 'asignado' : 'pendiente';
 
       // 🔥 USAR MÉTODO EXISTENTE
-      final estadoCreado = await _estadoEquipoRepository.crearNuevoEstado(
+      final estadoCreado = await _estadoEquipoRepository.crearCensoActivo(
         equipoId: equipoId,
         clienteId: clienteId,
         latitud: datos['latitud'],
@@ -958,7 +953,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
           usuarioId,
           edfVendedorId
       );
-
     } catch (e) {
       await ErrorLogService.logError(
         tableName: 'censo_activo',

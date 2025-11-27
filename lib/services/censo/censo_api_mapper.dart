@@ -23,13 +23,6 @@ class CensoApiMapper {
     final now = DateTime.now().toLocal();
     final timestampId = _uuid.v4();
 
-    String estadoCenso;
-    if (yaAsignado) {
-      estadoCenso = 'asignado';
-    } else {
-      estadoCenso = 'pendiente';
-    }
-
     return {
       'id': estadoId,  // ✅ CAMBIO: usar 'id' en lugar de 'id_local'
       'timestamp_id': timestampId,
@@ -83,121 +76,121 @@ class CensoApiMapper {
   }
 
   /// Prepara los datos para enviar a la API de estados CON BASE64
-  static Map<String, dynamic> prepararDatosParaApi({
-    required Map<String, dynamic> datosLocales,
-    required int usuarioId,
-    String? edfVendedorId,
-    List<dynamic>? fotosConBase64,
-  }) {
-    final now = DateTime.now().toLocal();
-    final fotos = <Map<String, dynamic>>[];
-
-    if (fotosConBase64 != null && fotosConBase64.isNotEmpty) {
-      print('🔍 DEBUG: Usando fotos con base64 (${fotosConBase64.length} fotos)');
-
-      for (int i = 0; i < fotosConBase64.length; i++) {
-        final foto = fotosConBase64[i];
-
-        final fotoMap = {
-          'id': foto.id,
-          'base64': foto.imagenBase64,
-          'path': foto.imagenPath,
-          'tamano': foto.imagenTamano,
-          'orden': foto.orden ?? (i + 1),
-        };
-
-        fotos.add(fotoMap);
-        print('🔍 DEBUG: Foto $i agregada con base64: ${fotoMap['base64']?.toString().substring(0, 50) ?? 'NULL'}...');
-      }
-    }
-    // ✅ FALLBACK: USAR DATOS LOCALES (MÉTODO ANTERIOR)
-    else {
-      print('🔍 DEBUG: Usando datos locales (método anterior)');
-
-      // Agregar primera imagen si existe
-      if (datosLocales['tiene_imagen'] == true && datosLocales['imagen_base64'] != null) {
-        final foto1 = {
-          'id': datosLocales['imagen_id_1'],
-          'base64': datosLocales['imagen_base64'],
-          'path': datosLocales['imagen_path'],
-          'tamano': datosLocales['imagen_tamano'],
-          'orden': 1,
-        };
-        fotos.add(foto1);
-        print('🔍 DEBUG: Primera imagen agregada al array: $foto1');
-      }
-
-      // Agregar segunda imagen si existe
-      if (datosLocales['tiene_imagen2'] == true && datosLocales['imagen_base64_2'] != null) {
-        final foto2 = {
-          'id': datosLocales['imagen_id_2'],
-          'base64': datosLocales['imagen_base64_2'],
-          'path': datosLocales['imagen_path2'],
-          'tamano': datosLocales['imagen_tamano2'],
-          'orden': 2,
-        };
-        fotos.add(foto2);
-        print('🔍 DEBUG: Segunda imagen agregada al array: $foto2');
-      }
-    }
-
-    print('🔍   fotos.length: ${fotos.length}');
-    for (int i = 0; i < fotos.length; i++) {
-      final fotoLog = Map<String, dynamic>.from(fotos[i]);
-      // Ocultar base64 en logs para que no sea gigante
-      if (fotoLog.containsKey('base64')) {
-        fotoLog['base64'] = '[BASE64_${fotoLog['base64']?.toString().length ?? 0}_CHARS]';
-      }
-      print('🔍   Foto $i: $fotoLog');
-    }
-
-    String estadoCenso;
-    if (datosLocales['estado_censo'] != null) {
-      // Si ya viene el estado_censo en los datos locales, usarlo
-      estadoCenso = datosLocales['estado_censo'];
-    } else if (datosLocales['ya_asignado'] == true) {
-      estadoCenso = 'asignado';
-    } else {
-      estadoCenso = 'pendiente';
-    }
-
-    return {
-      'id': datosLocales['id']?.toString() ?? _uuid.v4(),
-      'edfVendedorSucursalId': '$edfVendedorId',
-      'edfEquipoId': (datosLocales['equipo_id'] ?? '').toString(),
-      'usuarioId': usuarioId,
-      'edfClienteId': datosLocales['cliente_id'] ?? 0,
-      'fecha_revision': datosLocales['fecha_revision'] ?? _formatearFechaLocal(now),
-      'latitud': datosLocales['latitud'] ?? 0.0,
-      'longitud': datosLocales['longitud'] ?? 0.0,
-      'enLocal': (datosLocales['en_local'] == 1) || (datosLocales['en_local'] == true),
-      'fechaDeRevision': datosLocales['fecha_revision'] ?? _formatearFechaLocal(now),
-      'estadoCenso': estadoCenso,
-      'estadoCenso': datosLocales['ya_asignado'] == true ? 'asignado' : 'pendiente',
-      'esNuevoEquipo': datosLocales['es_nuevo_equipo'] ?? false,
-
-      // ✅ ARRAY DE FOTOS CON BASE64 INCLUIDO
-      'fotos': fotos,
-      'total_imagenes': fotos.length,
-
-      // Resto de campos del censo
-      'observaciones': datosLocales['observaciones'] ?? '',
-      'estado_general': datosLocales['estado_general'] ?? '',
-      'usuario_id': usuarioId,
-      'cliente_id': datosLocales['cliente_id'] ?? 0,
-      'equipo_id': (datosLocales['equipo_id'] ?? '').toString(),
-      'equipo_codigo_barras': datosLocales['codigo_barras'] ?? '',
-      'equipo_numero_serie': datosLocales['numero_serie'] ?? '',
-      'equipo_modelo': datosLocales['modelo'] ?? '',
-      'equipo_marca': datosLocales['marca_nombre'] ?? '',
-      'equipo_logo': datosLocales['logo'] ?? '',
-      'cliente_nombre': datosLocales['cliente_nombre'] ?? '',
-      'en_local': (datosLocales['en_local'] == 1) || (datosLocales['en_local'] == true),
-      'dispositivo': datosLocales['dispositivo'] ?? 'android',
-      'es_censo': datosLocales['es_censo'] ?? true,
-      'version_app': datosLocales['version_app'] ?? '1.0.0',
-    };
-  }
+  // static Map<String, dynamic> prepararDatosParaApi({
+  //   required Map<String, dynamic> datosLocales,
+  //   required int usuarioId,
+  //   String? edfVendedorId,
+  //   List<dynamic>? fotosConBase64,
+  // }) {
+  //   final now = DateTime.now().toLocal();
+  //   final fotos = <Map<String, dynamic>>[];
+  //
+  //   if (fotosConBase64 != null && fotosConBase64.isNotEmpty) {
+  //     print('🔍 DEBUG: Usando fotos con base64 (${fotosConBase64.length} fotos)');
+  //
+  //     for (int i = 0; i < fotosConBase64.length; i++) {
+  //       final foto = fotosConBase64[i];
+  //
+  //       final fotoMap = {
+  //         'id': foto.id,
+  //         'base64': foto.imagenBase64,
+  //         'path': foto.imagenPath,
+  //         'tamano': foto.imagenTamano,
+  //         'orden': foto.orden ?? (i + 1),
+  //       };
+  //
+  //       fotos.add(fotoMap);
+  //       print('🔍 DEBUG: Foto $i agregada con base64: ${fotoMap['base64']?.toString().substring(0, 50) ?? 'NULL'}...');
+  //     }
+  //   }
+  //   // ✅ FALLBACK: USAR DATOS LOCALES (MÉTODO ANTERIOR)
+  //   else {
+  //     print('🔍 DEBUG: Usando datos locales (método anterior)');
+  //
+  //     // Agregar primera imagen si existe
+  //     if (datosLocales['tiene_imagen'] == true && datosLocales['imagen_base64'] != null) {
+  //       final foto1 = {
+  //         'id': datosLocales['imagen_id_1'],
+  //         'base64': datosLocales['imagen_base64'],
+  //         'path': datosLocales['imagen_path'],
+  //         'tamano': datosLocales['imagen_tamano'],
+  //         'orden': 1,
+  //       };
+  //       fotos.add(foto1);
+  //       print('🔍 DEBUG: Primera imagen agregada al array: $foto1');
+  //     }
+  //
+  //     // Agregar segunda imagen si existe
+  //     if (datosLocales['tiene_imagen2'] == true && datosLocales['imagen_base64_2'] != null) {
+  //       final foto2 = {
+  //         'id': datosLocales['imagen_id_2'],
+  //         'base64': datosLocales['imagen_base64_2'],
+  //         'path': datosLocales['imagen_path2'],
+  //         'tamano': datosLocales['imagen_tamano2'],
+  //         'orden': 2,
+  //       };
+  //       fotos.add(foto2);
+  //       print('🔍 DEBUG: Segunda imagen agregada al array: $foto2');
+  //     }
+  //   }
+  //
+  //   print('🔍   fotos.length: ${fotos.length}');
+  //   for (int i = 0; i < fotos.length; i++) {
+  //     final fotoLog = Map<String, dynamic>.from(fotos[i]);
+  //     // Ocultar base64 en logs para que no sea gigante
+  //     if (fotoLog.containsKey('base64')) {
+  //       fotoLog['base64'] = '[BASE64_${fotoLog['base64']?.toString().length ?? 0}_CHARS]';
+  //     }
+  //     print('🔍   Foto $i: $fotoLog');
+  //   }
+  //
+  //   String estadoCenso;
+  //   if (datosLocales['estado_censo'] != null) {
+  //     // Si ya viene el estado_censo en los datos locales, usarlo
+  //     estadoCenso = datosLocales['estado_censo'];
+  //   } else if (datosLocales['ya_asignado'] == true) {
+  //     estadoCenso = 'asignado';
+  //   } else {
+  //     estadoCenso = 'pendiente';
+  //   }
+  //
+  //   return {
+  //     'id': datosLocales['id']?.toString() ?? _uuid.v4(),
+  //     'edfVendedorSucursalId': '$edfVendedorId',
+  //     'edfEquipoId': (datosLocales['equipo_id'] ?? '').toString(),
+  //     'usuarioId': usuarioId,
+  //     'edfClienteId': datosLocales['cliente_id'] ?? 0,
+  //     'fecha_revision': datosLocales['fecha_revision'] ?? _formatearFechaLocal(now),
+  //     'latitud': datosLocales['latitud'] ?? 0.0,
+  //     'longitud': datosLocales['longitud'] ?? 0.0,
+  //     'enLocal': (datosLocales['en_local'] == 1) || (datosLocales['en_local'] == true),
+  //     'fechaDeRevision': datosLocales['fecha_revision'] ?? _formatearFechaLocal(now),
+  //     'estadoCenso': estadoCenso,
+  //     'estadoCenso': datosLocales['ya_asignado'] == true ? 'asignado' : 'pendiente',
+  //     'esNuevoEquipo': datosLocales['es_nuevo_equipo'] ?? false,
+  //
+  //     // ✅ ARRAY DE FOTOS CON BASE64 INCLUIDO
+  //     'fotos': fotos,
+  //     'total_imagenes': fotos.length,
+  //
+  //     // Resto de campos del censo
+  //     'observaciones': datosLocales['observaciones'] ?? '',
+  //     'estado_general': datosLocales['estado_general'] ?? '',
+  //     'usuario_id': usuarioId,
+  //     'cliente_id': datosLocales['cliente_id'] ?? 0,
+  //     'equipo_id': (datosLocales['equipo_id'] ?? '').toString(),
+  //     'equipo_codigo_barras': datosLocales['codigo_barras'] ?? '',
+  //     'equipo_numero_serie': datosLocales['numero_serie'] ?? '',
+  //     'equipo_modelo': datosLocales['modelo'] ?? '',
+  //     'equipo_marca': datosLocales['marca_nombre'] ?? '',
+  //     'equipo_logo': datosLocales['logo'] ?? '',
+  //     'cliente_nombre': datosLocales['cliente_nombre'] ?? '',
+  //     'en_local': (datosLocales['en_local'] == 1) || (datosLocales['en_local'] == true),
+  //     'dispositivo': datosLocales['dispositivo'] ?? 'android',
+  //     'es_censo': datosLocales['es_censo'] ?? true,
+  //     'version_app': datosLocales['version_app'] ?? '1.0.0',
+  //   };
+  // }
 
   /// Prepara datos simplificados para envío directo
   static Map<String, dynamic> prepararDatosSimplificados({

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
 import 'package:logger/logger.dart';
 import 'package:http/http.dart' as http;
@@ -13,7 +14,7 @@ import 'censo_log_service.dart';
 
 class CensoUploadService {
   final Logger _logger = Logger();
-  final EstadoEquipoRepository _estadoEquipoRepository;
+  final EstadoEquipoRepository estadoEquipoRepository;
   final CensoActivoFotoRepository _fotoRepository;
   final CensoLogService _logService;
   final EquipoPendienteRepository _equipoPendienteRepository;
@@ -36,15 +37,14 @@ class CensoUploadService {
     CensoLogService? logService,
     EquipoPendienteRepository? equipoPendienteRepository,
     EquipoRepository? equipoRepository,
-  })  : _estadoEquipoRepository = estadoEquipoRepository ?? EstadoEquipoRepository(),
+  })  : estadoEquipoRepository = estadoEquipoRepository ?? EstadoEquipoRepository(),
         _fotoRepository = fotoRepository ?? CensoActivoFotoRepository(),
         _logService = logService ?? CensoLogService(),
         _equipoPendienteRepository = equipoPendienteRepository ?? EquipoPendienteRepository(),
         _equipoRepository = equipoRepository ?? EquipoRepository();
 
-  // ==================== 🔥 MÉTODO PRIVADO CENTRALIZADO ====================
-  /// 🎯 ÚNICO PUNTO DE ENVÍO - Usa UUIDs de BD y evita duplicación
-  Future<Map<String, dynamic>> enviarCensoUnificado({
+  // ==================== METODO CENTRALIZADO DE CONSULTAS Y ENVIO DE CENSOS ====================
+  void enviarCensoUnificado({
     required String censoActivoId,
     required int usuarioId,
     required String edfVendedorId,
@@ -52,26 +52,18 @@ class CensoUploadService {
   }) async {
     try {
       _logger.i('📤 Enviando censo unificado: $censoActivoId');
-
-      // 1️⃣ Obtener datos frescos de BD
-      final maps = await _estadoEquipoRepository.dbHelper.consultar(
+      final maps = await estadoEquipoRepository.dbHelper.consultar(
         'censo_activo',
         where: 'id = ?',
         whereArgs: [censoActivoId],
         limit: 1,
       );
-
-
-
-
       if (maps.isEmpty) {
         throw Exception('Censo no encontrado en BD: $censoActivoId');
       }
-
       final censoActivoMap = Map<String, dynamic>.from(maps.first);
-
       var estado = censoActivoMap['estado_censo']?.toString();
-      if(estado=='migrado' ){ //TODO RONALDO PROBAR = CREAR UN CENSO TIENE QUE DAR ERROR DEL LADO ADACONTROL, QUEDARTE EN EL PRW, ESPERAR QUE VAYA EN BG Y LUEGO CLICK EN REINTENTAR
+      if(estado=='migrado' ){
         throw Exception('CENSO ACTIVO YA FUE MIGRADO: $censoActivoId');
       }
 
@@ -113,9 +105,8 @@ class CensoUploadService {
         limit: 1,
       );
 
-      // 6️⃣ Llamada al servicio POST unificado
-      final respuesta = await CensoActivoPostService.enviarCensoActivo(
-        censoId: censoActivoId, // 🔥 PASAR ID DE BD
+      CensoActivoPostService.enviarCensoActivo(
+        censoId: censoActivoId,
         equipoId: equipoId,
         codigoBarras: censoActivoMap['codigo_barras']?.toString(),
         marcaId: censoActivoMap['marca_id'] as int?,
@@ -138,35 +129,12 @@ class CensoUploadService {
         marca: censoActivoMap['marca_nombre']?.toString(),
         modelo: censoActivoMap['modelo']?.toString(),
         logo: censoActivoMap['logo']?.toString(),
-        userId: usuarioId.toString(),
         guardarLog: guardarLog,
-          equipoDataMap:equipoDataMap
+        equipoDataMap:equipoDataMap
           // censoActivoMap:censoActivoMap
       );
 
-      // 7️⃣ Procesar resultado
-      if (respuesta['exito'] == true) {
-        await _marcarComoSincronizadoCompleto(
-          estadoId: censoActivoId,
-          servidorId: respuesta['servidor_id'],
-          equipoId: equipoId,
-          clienteId: clienteId,
-          esNuevoEquipo: esNuevoEquipo,
-          crearPendiente: crearPendiente,
-          fotos: fotos,
-        );
-        _logger.i('✅ Censo sincronizado exitosamente: $censoActivoId');
-      } else {
-        await _estadoEquipoRepository.marcarComoError(
-          censoActivoId,
-          'Error: ${respuesta['mensaje']}',
-        );
-      }
-
-      return respuesta;
-
-    } catch (e) {
-      _logger.e('❌ Error enviando censo: $e');
+    } catch (e, stackTrace) {
       rethrow;
     }
   }
@@ -174,45 +142,45 @@ class CensoUploadService {
   // ==================== SINCRONIZACIÓN EN BACKGROUND ====================
 
   /// Sincronización individual en background
-  Future<void> sincronizarCensoEnBackground(
-      String estadoId,
-      Map<String, dynamic> datos,
-      ) async {
-    if (_censosEnProceso.contains(estadoId)) return;
-    _censosEnProceso.add(estadoId);
-
-    try {
-      _logger.i('🔄 Sincronización background: $estadoId');
-
-      final usuarioId = datos['usuario_id'] as int?;
-      if (usuarioId == null) {
-        throw Exception('usuario_id no encontrado');
-      }
-
-      final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(usuarioId);
-      if (edfVendedorId == null || edfVendedorId.isEmpty) {
-        throw Exception('edfVendedorId no encontrado');
-      }
-
-      await _actualizarUltimoIntento(estadoId, 1);
-      await enviarCensoUnificado(
-        censoActivoId: estadoId,
-        usuarioId: usuarioId,
-        edfVendedorId: edfVendedorId,
-        guardarLog: true, // 🔥 SIEMPRE GENERAR LOG
-      );
-
-    } catch (e) {
-      _logger.e('❌ Error en sync background: $e');
-      await _actualizarUltimoIntento(estadoId, 1);
-      await _estadoEquipoRepository.marcarComoError(
-        estadoId,
-        'Excepción: ${e.toString()}',
-      );
-    } finally {
-      _censosEnProceso.remove(estadoId);
-    }
-  }
+  // Future<void> sincronizarCensoEnBackground(
+  //     String estadoId,
+  //     Map<String, dynamic> datos,
+  //     ) async {
+  //   if (_censosEnProceso.contains(estadoId)) return;
+  //   _censosEnProceso.add(estadoId);
+  //
+  //   try {
+  //     _logger.i('🔄 Sincronización background: $estadoId');
+  //
+  //     final usuarioId = datos['usuario_id'] as int?;
+  //     if (usuarioId == null) {
+  //       throw Exception('usuario_id no encontrado');
+  //     }
+  //
+  //     final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(usuarioId);
+  //     if (edfVendedorId == null || edfVendedorId.isEmpty) {
+  //       throw Exception('edfVendedorId no encontrado');
+  //     }
+  //
+  //     await _actualizarUltimoIntento(estadoId, 1);
+  //     await enviarCensoUnificado(
+  //       censoActivoId: estadoId,
+  //       usuarioId: usuarioId,
+  //       edfVendedorId: edfVendedorId,
+  //       guardarLog: true, // 🔥 SIEMPRE GENERAR LOG
+  //     );
+  //
+  //   } catch (e) {
+  //     _logger.e('❌ Error en sync background: $e');
+  //     await _actualizarUltimoIntento(estadoId, 1);
+  //     await estadoEquipoRepository.marcarComoError(
+  //       estadoId,
+  //       'Excepción: ${e.toString()}',
+  //     );
+  //   } finally {
+  //     _censosEnProceso.remove(estadoId);
+  //   }
+  // }
 
   // ==================== SINCRONIZACIÓN PERIÓDICA ====================
 
@@ -226,8 +194,8 @@ class CensoUploadService {
     int totalFallidos = 0;
 
     try {
-      final registrosCreados = await _estadoEquipoRepository.obtenerCreados();
-      final registrosError = await _estadoEquipoRepository.obtenerConError();
+      final registrosCreados = await estadoEquipoRepository.obtenerCreados();
+      final registrosError = await estadoEquipoRepository.obtenerConError();
       final registrosErrorListos = await _filtrarRegistrosListosParaReintento(registrosError);
 
       final todosLosRegistros = [...registrosCreados, ...registrosErrorListos];
@@ -247,7 +215,7 @@ class CensoUploadService {
           totalFallidos++;
 
           if (registro.id != null) {
-            await _estadoEquipoRepository.marcarComoError(
+            await estadoEquipoRepository.marcarComoError(
               registro.id!,
               'Excepción: ${e.toString()}',
             );
@@ -281,91 +249,99 @@ class CensoUploadService {
   }
 
   /// 🔥 Sincronización individual (usa método centralizado)
-  Future<void> _sincronizarRegistroIndividualUnificado(
-      dynamic registro,
-      int usuarioId,
-      ) async {
-
-    final estadoId = registro.id as String;
-
-    // 1. Verificar límite de intentos
-    final intentosPrevios = await _obtenerNumeroIntentos(estadoId);
-    final numeroIntento = intentosPrevios + 1;
-
-    if (numeroIntento > maxIntentos) {
-      await _estadoEquipoRepository.marcarComoError(
-        estadoId,
-        'Fallo permanente: máximo de intentos alcanzado',
-      );
-      return;
-    }
-
-    _logger.i('🔄 Sincronizando $estadoId (intento #$numeroIntento/$maxIntentos)');
-
-    // 2. Obtener edfVendedorId
-    final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(usuarioId);
-    if (edfVendedorId == null || edfVendedorId.isEmpty) {
-      throw Exception('edfVendedorId no encontrado');
-    }
-
-    await _actualizarUltimoIntento(estadoId, numeroIntento);
-
-    // 🔥 USA MÉTODO CENTRALIZADO
-    await enviarCensoUnificado(
-      censoActivoId: estadoId,
-      usuarioId: usuarioId,
-      edfVendedorId: edfVendedorId,
-      guardarLog: true, // 🔥 SIEMPRE GENERAR LOG
-    );
-  }
+  // Future<void> _sincronizarRegistroIndividualUnificado(
+  //     dynamic registro,
+  //     int usuarioId,
+  //     ) async {
+  //
+  //   final estadoId = registro.id as String;
+  //
+  //   // 1. Verificar límite de intentos
+  //   final intentosPrevios = await _obtenerNumeroIntentos(estadoId);
+  //   final numeroIntento = intentosPrevios + 1;
+  //
+  //   if (numeroIntento > maxIntentos) {
+  //     await estadoEquipoRepository.marcarComoError(
+  //       estadoId,
+  //       'Fallo permanente: máximo de intentos alcanzado',
+  //     );
+  //     return;
+  //   }
+  //
+  //   _logger.i('🔄 Sincronizando $estadoId (intento #$numeroIntento/$maxIntentos)');
+  //
+  //   // 2. Obtener edfVendedorId
+  //   final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(usuarioId);
+  //   if (edfVendedorId == null || edfVendedorId.isEmpty) {
+  //     throw Exception('edfVendedorId no encontrado');
+  //   }
+  //
+  //   await _actualizarUltimoIntento(estadoId, numeroIntento);
+  //
+  //   // 🔥 USA MÉTODO CENTRALIZADO
+  //   await enviarCensoUnificado(
+  //     censoActivoId: estadoId,
+  //     usuarioId: usuarioId,
+  //     edfVendedorId: edfVendedorId,
+  //     guardarLog: true, // 🔥 SIEMPRE GENERAR LOG
+  //   );
+  // }
 
   // ==================== REINTENTO MANUAL ====================
 
   /// 🔥 Reintento manual (usa método centralizado)
   Future<Map<String, dynamic>> reintentarEnvioCenso(
-      String estadoId,
+      String censoActivoId,
       int usuarioId,
       String? edfVendedorId,
       ) async {
+    bool success = false;
+    String message = '';
     try {
-      _logger.i('🔄 Reintento manual: $estadoId');
+      _logger.i('🔄 Reintento manual: $censoActivoId');
 
       // Validar edfVendedorId
       if (edfVendedorId == null || edfVendedorId.isEmpty) {
         throw Exception('edfVendedorId es requerido');
       }
 
-      // 🔥 USA MÉTODO CENTRALIZADO
-      final respuesta = await enviarCensoUnificado(
-        censoActivoId: estadoId,
+      _logger.i('ESTOY REINTENTANDO ENVIAR MANUALMENTE UN CENSO');
+      enviarCensoUnificado(
+        censoActivoId: censoActivoId,
         usuarioId: usuarioId,
         edfVendedorId: edfVendedorId,
         guardarLog: true,
       );
 
-      if (respuesta['exito'] == true) {
-        _logger.i('✅ Reintento exitoso');
-        return {
-          'success': true,
-          'message': 'Registro sincronizado correctamente',
-        };
-      } else {
-        return {
-          'success': false,
-          'error': respuesta['mensaje'],
-        };
-      }
-    } catch (e) {
-      _logger.e('❌ Error en reintento: $e');
-      await _estadoEquipoRepository.marcarComoError(
-        estadoId,
-        'Excepción en reintento: ${e.toString()}',
+
+
+      //CONSULTAR EN BASE DE DATOS EL ESTADO ACTUAL DEL CENSO DESPUES DEL ENVIO
+
+      final censoActivoMapList = await estadoEquipoRepository.dbHelper.consultar(
+        'censo_activo',
+        where: 'id = ?',
+        whereArgs: [censoActivoId],
+        limit: 1,
       );
-      return {
-        'success': false,
-        'error': 'Error de conexión o datos: ${e.toString()}',
-      };
+      final censoActivoMap = Map<String, dynamic>.from(censoActivoMapList.first);
+      var estadoCenso = censoActivoMap['estado_censo'];
+
+
+      if (estadoCenso == 'migrado') {
+        success = true;
+        message = 'Registro sincronizado correctamente';
+      } else {
+        success = false;
+        message = censoActivoMap['error_mensaje'];
+      }
+    } catch (e, stacktrace) {
+      _logger.e('❌ Error en reintento: $stacktrace');
+      ErrorLogService.manejarExcepcion(e, censoActivoId, "", usuarioId, "censo_activo");
     }
+    return {
+      'success': success,
+      'message': message,
+    };
   }
 
   // ==================== MÉTODOS AUXILIARES PRIVADOS ====================
@@ -417,20 +393,18 @@ class CensoUploadService {
   }
 
   /// Marca el censo y todas sus dependencias como sincronizadas
-  Future<void> _marcarComoSincronizadoCompleto({
-    required String estadoId,
-    required dynamic servidorId,
+  Future<void> marcarComoSincronizadoCompleto({
+    required String censoId,
     required String? equipoId,
     required int clienteId,
     required bool esNuevoEquipo,
     required bool crearPendiente,
     required List<dynamic> fotos,
   }) async {
-    await _estadoEquipoRepository.marcarComoMigrado(
-      estadoId,
-      servidorId: servidorId,
+    await estadoEquipoRepository.marcarComoMigrado(
+      censoId
     );
-    await _estadoEquipoRepository.marcarComoSincronizado(estadoId);
+    await estadoEquipoRepository.marcarComoSincronizado(censoId);
 
     if (equipoId != null && esNuevoEquipo) {
       await _equipoRepository.marcarEquipoComoSincronizado(equipoId);
@@ -570,7 +544,7 @@ class CensoUploadService {
 
   Future<int> _obtenerNumeroIntentos(String estadoId) async {
     try {
-      final maps = await _estadoEquipoRepository.dbHelper.consultar(
+      final maps = await estadoEquipoRepository.dbHelper.consultar(
         'censo_activo',
         where: 'id = ?',
         whereArgs: [estadoId],
@@ -584,7 +558,7 @@ class CensoUploadService {
 
   Future<DateTime?> _obtenerUltimoIntento(String estadoId) async {
     try {
-      final maps = await _estadoEquipoRepository.dbHelper.consultar(
+      final maps = await estadoEquipoRepository.dbHelper.consultar(
         'censo_activo',
         where: 'id = ?',
         whereArgs: [estadoId],
@@ -604,7 +578,7 @@ class CensoUploadService {
 
   Future<void> _actualizarUltimoIntento(String estadoId, int numeroIntento) async {
     try {
-      await _estadoEquipoRepository.dbHelper.actualizar(
+      await estadoEquipoRepository.dbHelper.actualizar(
         'censo_activo',
         {
           'intentos_sync': numeroIntento,
@@ -623,7 +597,7 @@ class CensoUploadService {
   Future<String?> _obtenerEdfVendedorIdDesdeUsuarioId(int? usuarioId) async {
     try {
       if (usuarioId == null) return null;
-      final usuarioEncontrado = await _estadoEquipoRepository.dbHelper.consultar(
+      final usuarioEncontrado = await estadoEquipoRepository.dbHelper.consultar(
         'Users',
         where: 'id = ?',
         whereArgs: [usuarioId],

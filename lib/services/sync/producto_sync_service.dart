@@ -49,14 +49,14 @@ class ProductoSyncService extends BaseSyncService {
         BaseSyncService.logger.e('❌ Error del servidor: ${response.statusCode}');
 
         // 🚨 LOG ERROR: Error del servidor
-        await ErrorLogService.logServerError(
-          tableName: 'productos',
-          operation: 'sync_from_server',
-          errorMessage: BaseSyncService.extractErrorMessage(response),
-          errorCode: response.statusCode.toString(),
-          endpoint: currentEndpoint,
-          userId: edfVendedorId,
-        );
+        // await ErrorLogService.logServerError(
+        //   tableName: 'productos',
+        //   operation: 'sync_from_server',
+        //   errorMessage: BaseSyncService.extractErrorMessage(response),
+        //   errorCode: response.statusCode.toString(),
+        //   endpoint: currentEndpoint,
+        //   userId: edfVendedorId,
+        // );
 
         return _handleErrorResponse(response);
       }
@@ -79,13 +79,13 @@ class ProductoSyncService extends BaseSyncService {
     } on TimeoutException catch (timeoutError) {
       BaseSyncService.logger.e('⏰ Timeout obteniendo productos: $timeoutError');
 
-      await ErrorLogService.logNetworkError(
-        tableName: 'productos',
-        operation: 'sync_from_server',
-        errorMessage: 'Timeout de conexión: $timeoutError',
-        endpoint: currentEndpoint,
-        userId: edfVendedorId,
-      );
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'productos',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Timeout de conexión: $timeoutError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
 
       _ultimosProductos = [];
       return SyncResult(
@@ -97,13 +97,13 @@ class ProductoSyncService extends BaseSyncService {
     } on SocketException catch (socketError) {
       BaseSyncService.logger.e('📡 Error de red: $socketError');
 
-      await ErrorLogService.logNetworkError(
-        tableName: 'productos',
-        operation: 'sync_from_server',
-        errorMessage: 'Sin conexión de red: $socketError',
-        endpoint: currentEndpoint,
-        userId: edfVendedorId,
-      );
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'productos',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Sin conexión de red: $socketError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
 
       _ultimosProductos = [];
       return SyncResult(
@@ -115,15 +115,15 @@ class ProductoSyncService extends BaseSyncService {
     } catch (e) {
       BaseSyncService.logger.e('💥 Error obteniendo productos: $e');
 
-      await ErrorLogService.logError(
-        tableName: 'productos',
-        operation: 'sync_from_server',
-        errorMessage: 'Error general: $e',
-        errorType: 'unknown',
-        errorCode: 'GENERAL_ERROR',
-        endpoint: currentEndpoint,
-        userId: edfVendedorId,
-      );
+      // await ErrorLogService.logError(
+      //   tableName: 'productos',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Error general: $e',
+      //   errorType: 'unknown',
+      //   errorCode: 'GENERAL_ERROR',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
 
       _ultimosProductos = [];
       return SyncResult(

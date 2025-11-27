@@ -36,14 +36,14 @@ class CensusImageSyncService extends BaseSyncService {
 
       if (!_isSuccessStatusCode(response.statusCode)) {
         // 🚨 LOG ERROR: Error del servidor
-        await ErrorLogService.logServerError(
-          tableName: 'censo_activo_foto',
-          operation: 'sync_from_server',
-          errorMessage: BaseSyncService.extractErrorMessage(response),
-          errorCode: response.statusCode.toString(),
-          endpoint: currentEndpoint,
-          userId: edfVendedorId,
-        );
+        // await ErrorLogService.logServerError(
+        //   tableName: 'censo_activo_foto',
+        //   operation: 'sync_from_server',
+        //   errorMessage: BaseSyncService.extractErrorMessage(response),
+        //   errorCode: response.statusCode.toString(),
+        //   endpoint: currentEndpoint,
+        //   userId: edfVendedorId,
+        // );
 
         return _handleErrorResponse(response);
       }
@@ -62,13 +62,13 @@ class CensusImageSyncService extends BaseSyncService {
       BaseSyncService.logger.e('⏰ Timeout obteniendo imágenes: $timeoutError');
 
       // 🚨 LOG ERROR: Timeout
-      await ErrorLogService.logNetworkError(
-        tableName: 'censo_activo_foto',
-        operation: 'sync_from_server',
-        errorMessage: 'Timeout de conexión: $timeoutError',
-        endpoint: currentEndpoint,
-        userId: edfVendedorId,
-      );
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'censo_activo_foto',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Timeout de conexión: $timeoutError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
 
       return SyncResult(
         exito: false,
@@ -80,13 +80,13 @@ class CensusImageSyncService extends BaseSyncService {
       BaseSyncService.logger.e('📡 Error de red: $socketError');
 
       // 🚨 LOG ERROR: Sin conexión de red
-      await ErrorLogService.logNetworkError(
-        tableName: 'censo_activo_foto',
-        operation: 'sync_from_server',
-        errorMessage: 'Sin conexión de red: $socketError',
-        endpoint: currentEndpoint,
-        userId: edfVendedorId,
-      );
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'censo_activo_foto',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Sin conexión de red: $socketError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
 
       return SyncResult(
         exito: false,
@@ -98,15 +98,15 @@ class CensusImageSyncService extends BaseSyncService {
       BaseSyncService.logger.e('💥 Error obteniendo imágenes de censos: $e');
 
       // 🚨 LOG ERROR: Error general
-      await ErrorLogService.logError(
-        tableName: 'censo_activo_foto',
-        operation: 'sync_from_server',
-        errorMessage: 'Error general: $e',
-        errorType: 'unknown',
-        errorCode: 'GENERAL_ERROR',
-        endpoint: currentEndpoint,
-        userId: edfVendedorId,
-      );
+      // await ErrorLogService.logError(
+      //   tableName: 'censo_activo_foto',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Error general: $e',
+      //   errorType: 'unknown',
+      //   errorCode: 'GENERAL_ERROR',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
 
       return SyncResult(
         exito: false,

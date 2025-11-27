@@ -41,13 +41,13 @@ class FullSyncService {
           completedSteps.add('Datos anteriores limpiados');
           await Future.delayed(const Duration(milliseconds: 300));
         } catch (e) {
-          await ErrorLogService.logError(
-            tableName: 'N/A',
-            operation: 'clear_sync_data',
-            errorMessage: 'Error limpiando datos anteriores: $e',
-            errorType: 'database',
-            userId: edfVendedorNombre ?? edfVendedorId,
-          );
+          // await ErrorLogService.logError(
+          //   tableName: 'N/A',
+          //   operation: 'clear_sync_data',
+          //   errorMessage: 'Error limpiando datos anteriores: $e',
+          //   errorType: 'database',
+          //   userId: edfVendedorNombre ?? edfVendedorId,
+          // );
           throw Exception('Error limpiando datos anteriores: $e');
         }
       }
@@ -79,13 +79,13 @@ class FullSyncService {
         );
         await Future.delayed(const Duration(milliseconds: 200));
       } catch (e) {
-        await ErrorLogService.logServerError(
-          tableName: 'Users',
-          operation: 'sync_users',
-          errorMessage: 'Error sincronizando usuarios: $e',
-          errorCode: 'SYNC_ERROR',
-          userId: edfVendedorNombre ?? edfVendedorId,
-        );
+        // await ErrorLogService.logServerError(
+        //   tableName: 'Users',
+        //   operation: 'sync_users',
+        //   errorMessage: 'Error sincronizando usuarios: $e',
+        //   errorCode: 'SYNC_ERROR',
+        //   userId: edfVendedorNombre ?? edfVendedorId,
+        // );
         throw Exception('Error sincronizando usuarios: $e');
       }
 
@@ -170,13 +170,13 @@ class FullSyncService {
         }
 
       } catch (e) {
-        await ErrorLogService.logServerError(
-          tableName: 'ALL_DATA',
-          operation: 'full_sync',
-          errorMessage: 'Error en descarga masiva: $e',
-          errorCode: 'SYNC_ERROR',
-          userId: edfVendedorNombre ?? edfVendedorId,
-        );
+        // await ErrorLogService.logServerError(
+        //   tableName: 'ALL_DATA',
+        //   operation: 'full_sync',
+        //   errorMessage: 'Error en descarga masiva: $e',
+        //   errorCode: 'SYNC_ERROR',
+        //   userId: edfVendedorNombre ?? edfVendedorId,
+        // );
         throw Exception('Error en descarga masiva: $e');
       }
 
@@ -210,13 +210,13 @@ class FullSyncService {
       } catch (e) {
         debugPrint('⚠️ Excepción al descargar respuestas: $e');
 
-        await ErrorLogService.logServerError(
-          tableName: 'FormRespuestas',
-          operation: 'sync_responses',
-          errorMessage: 'Error crítico respuestas: $e',
-          errorCode: 'SYNC_RESP_ERROR',
-          userId: edfVendedorNombre ?? edfVendedorId,
-        );
+        // await ErrorLogService.logServerError(
+        //   tableName: 'FormRespuestas',
+        //   operation: 'sync_responses',
+        //   errorMessage: 'Error crítico respuestas: $e',
+        //   errorCode: 'SYNC_RESP_ERROR',
+        //   userId: edfVendedorNombre ?? edfVendedorId,
+        // );
 
         // ⛔ MODO ESTRICTO: Cancelamos todo
         throw Exception('Error crítico descargando respuestas: $e');
@@ -274,13 +274,13 @@ class FullSyncService {
       debugPrint('❌ Error en sincronización completa: $e');
 
       // Log final general por si acaso
-      await ErrorLogService.logError(
-        tableName: 'FULL_PROCESS',
-        operation: 'sync_all_data',
-        errorMessage: 'Fallo crítico en proceso completo: $e',
-        errorType: 'critical',
-        userId: edfVendedorNombre ?? edfVendedorId,
-      );
+      // await ErrorLogService.logError(
+      //   tableName: 'FULL_PROCESS',
+      //   operation: 'sync_all_data',
+      //   errorMessage: 'Fallo crítico en proceso completo: $e',
+      //   errorType: 'critical',
+      //   userId: edfVendedorNombre ?? edfVendedorId,
+      // );
 
       return SyncResult(
         exito: false,

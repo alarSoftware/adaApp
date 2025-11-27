@@ -340,7 +340,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
       _logger.i('Usando codigoBarras: $codigoBarras, clienteId: $clienteId');
 
-      final nuevoEstado = await _estadoEquipoRepository.crearNuevoEstado(
+      final nuevoEstado = await _estadoEquipoRepository.crearCensoActivo(
         equipoId: codigoBarras.toString(),
         clienteId: int.parse(clienteId.toString()),
         enLocal: _estadoUbicacionEquipo!,
@@ -350,30 +350,30 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       );
 
       // 2. Sincronizar con el servidor - AGREGAR TODOS LOS CAMPOS
-      try {
-        final resultadoSync = await CensoActivoPostService.enviarCambioEstado(
-          codigoBarras: codigoBarras.toString(),
-          clienteId: int.parse(clienteId.toString()),
-          enLocal: _estadoUbicacionEquipo!,
-          position: position,
-          observaciones: nuevoEstado.observaciones,
-          equipoId: equipoCliente['equipo_id']?.toString() ?? codigoBarras.toString(),
-          clienteNombre: equipoCliente['cliente_nombre']?.toString() ?? '',
-          numeroSerie: equipoCliente['numero_serie']?.toString() ?? '',
-          modelo: equipoCliente['modelo_nombre']?.toString() ?? '',
-          marca: equipoCliente['marca_nombre']?.toString() ?? '',
-          logo: equipoCliente['logo_nombre']?.toString() ?? '',
-        );
-
-        if (resultadoSync['exito']) {
-          _logger.i('✅ Sincronizado con servidor: ${resultadoSync['mensaje']}');
-        } else {
-          _logger.w('⚠️ Error al sincronizar: ${resultadoSync['mensaje']}');
-        }
-      } catch (syncError) {
-        _logger.w('⚠️ Excepción al sincronizar: $syncError');
-        // El guardado local ya se hizo, así que continuamos
-      }
+      // try {
+      //   final resultadoSync = await CensoActivoPostService.enviarCambioEstado(
+      //     codigoBarras: codigoBarras.toString(),
+      //     clienteId: int.parse(clienteId.toString()),
+      //     enLocal: _estadoUbicacionEquipo!,
+      //     position: position,
+      //     observaciones: nuevoEstado.observaciones,
+      //     equipoId: equipoCliente['equipo_id']?.toString() ?? codigoBarras.toString(),
+      //     clienteNombre: equipoCliente['cliente_nombre']?.toString() ?? '',
+      //     numeroSerie: equipoCliente['numero_serie']?.toString() ?? '',
+      //     modelo: equipoCliente['modelo_nombre']?.toString() ?? '',
+      //     marca: equipoCliente['marca_nombre']?.toString() ?? '',
+      //     logo: equipoCliente['logo_nombre']?.toString() ?? '',
+      //   );
+      //
+      //   if (resultadoSync['exito']) {
+      //     _logger.i('✅ Sincronizado con servidor: ${resultadoSync['mensaje']}');
+      //   } else {
+      //     _logger.w('⚠️ Error al sincronizar: ${resultadoSync['mensaje']}');
+      //   }
+      // } catch (syncError) {
+      //   _logger.w('⚠️ Excepción al sincronizar: $syncError');
+      //   // El guardado local ya se hizo, así que continuamos
+      // }
 
       _estadoLocalActual = _estadoUbicacionEquipo! ? 1 : 0;
       _estadoUbicacionEquipo = null;

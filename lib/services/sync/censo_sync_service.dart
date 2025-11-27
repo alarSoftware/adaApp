@@ -52,14 +52,14 @@ class CensusSyncService extends BaseSyncService {
         final errorMessage = BaseSyncService.extractErrorMessage(response);
 
         // 🚨 LOG ERROR: Error del servidor
-        await ErrorLogService.logServerError(
-          tableName: 'censo_activo',
-          operation: 'sync_from_server',
-          errorMessage: errorMessage,
-          errorCode: response.statusCode.toString(),
-          endpoint: currentEndpoint,
-          userId: edfVendedorId,
-        );
+        // await ErrorLogService.logServerError(
+        //   tableName: 'censo_activo',
+        //   operation: 'sync_from_server',
+        //   errorMessage: errorMessage,
+        //   errorCode: response.statusCode.toString(),
+        //   endpoint: currentEndpoint,
+        //   userId: edfVendedorId,
+        // );
 
         return _handleErrorResponse(response);
       }
@@ -81,13 +81,13 @@ class CensusSyncService extends BaseSyncService {
       BaseSyncService.logger.e('⏰ Timeout obteniendo censos: $timeoutError');
 
       // 🚨 LOG ERROR: Timeout
-      await ErrorLogService.logNetworkError(
-        tableName: 'censo_activo',
-        operation: 'sync_from_server',
-        errorMessage: 'Timeout de conexión: $timeoutError',
-        endpoint: currentEndpoint,
-        userId: edfVendedorId,
-      );
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'censo_activo',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Timeout de conexión: $timeoutError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
 
       _ultimosCensos = [];
       return SyncResult(
@@ -100,13 +100,13 @@ class CensusSyncService extends BaseSyncService {
       BaseSyncService.logger.e('📡 Error de red: $socketError');
 
       // 🚨 LOG ERROR: Sin conexión de red
-      await ErrorLogService.logNetworkError(
-        tableName: 'censo_activo',
-        operation: 'sync_from_server',
-        errorMessage: 'Sin conexión de red: $socketError',
-        endpoint: currentEndpoint,
-        userId: edfVendedorId,
-      );
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'censo_activo',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Sin conexión de red: $socketError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
 
       _ultimosCensos = [];
       return SyncResult(
@@ -119,15 +119,15 @@ class CensusSyncService extends BaseSyncService {
       BaseSyncService.logger.e('💥 Error obteniendo censos activos: $e');
 
       // 🚨 LOG ERROR: Error general
-      await ErrorLogService.logError(
-        tableName: 'censo_activo',
-        operation: 'sync_from_server',
-        errorMessage: 'Error general: $e',
-        errorType: 'unknown',
-        errorCode: 'GENERAL_ERROR',
-        endpoint: currentEndpoint,
-        userId: edfVendedorId,
-      );
+      // await ErrorLogService.logError(
+      //   tableName: 'censo_activo',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Error general: $e',
+      //   errorType: 'unknown',
+      //   errorCode: 'GENERAL_ERROR',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
 
       _ultimosCensos = [];
       return SyncResult(

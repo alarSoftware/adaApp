@@ -54,15 +54,16 @@ class OperacionesComercialesPostService {
       final result = _procesarRespuesta(response);
 
       if (!result['exito']) {
-        await _manejarErrorServidor(result, operacionId, fullUrl, operacion.usuarioId?.toString());
+        ErrorLogService.manejarExcepcion(result, operacionId, fullUrl, operacion.usuarioId, 'operacion_comercial');
       }
 
       return result;
 
     } catch (e, stackTrace) {
       _logger.e('❌ Error en envío de operación comercial: $e', stackTrace: stackTrace);
-      return await _manejarExcepcion(e, operacionId, fullUrl, operacion.usuarioId?.toString());
+      ErrorLogService.manejarExcepcion(e, operacionId, fullUrl, operacion.usuarioId, 'operacion_comercial');
     }
+    return {};
   }
 
   // =================================================================
@@ -169,62 +170,62 @@ class OperacionesComercialesPostService {
     }
   }
 
-  static Future<void> _manejarErrorServidor(
-      Map<String, dynamic> result,
-      String? operacionId,
-      String? fullUrl,
-      String? userId,
-      ) async {
-    final errorCode = result['serverAction']?.toString() ?? 'UNKNOWN';
-    final errorMessage = result['mensaje'] ?? 'Error del servidor';
+  // static Future<void> _manejarErrorServidor(
+  //     Map<String, dynamic> result,
+  //     String? operacionId,
+  //     String? fullUrl,
+  //     String? userId,
+  //     ) async {
+  //   final errorCode = result['serverAction']?.toString() ?? 'UNKNOWN';
+  //   final errorMessage = result['mensaje'] ?? 'Error del servidor';
+  //
+  //   await ErrorLogService.logServerError(
+  //     tableName: _tableName,
+  //     operation: 'POST_OPERACION_COMERCIAL_ERROR',
+  //     errorMessage: 'ServerAction $errorCode: $errorMessage',
+  //     errorCode: 'SERVER_ERROR_$errorCode',
+  //     registroFailId: operacionId,
+  //     endpoint: fullUrl,
+  //     userId: userId,
+  //   );
+  // }
 
-    await ErrorLogService.logServerError(
-      tableName: _tableName,
-      operation: 'POST_OPERACION_COMERCIAL_ERROR',
-      errorMessage: 'ServerAction $errorCode: $errorMessage',
-      errorCode: 'SERVER_ERROR_$errorCode',
-      registroFailId: operacionId,
-      endpoint: fullUrl,
-      userId: userId,
-    );
-  }
-
-  static Future<Map<String, dynamic>> _manejarExcepcion(
-      dynamic excepcion,
-      String? operacionId,
-      String? fullUrl,
-      String? userId,
-      ) async {
-    
-    String tipoError = 'crash';
-    String codigoError = 'UNEXPECTED_EXCEPTION';
-    String mensajeUsuario = 'Error interno al enviar operación';
-
-    if (excepcion is SocketException || excepcion is http.ClientException) {
-      tipoError = 'network';
-      codigoError = 'NETWORK_ERROR';
-      mensajeUsuario = 'Error de conexión. Verifique su internet.';
-    } else if (excepcion is TimeoutException) {
-      tipoError = 'network';
-      codigoError = 'TIMEOUT_ERROR';
-      mensajeUsuario = 'El servidor tardó demasiado en responder.';
-    }
-
-    await ErrorLogService.logError(
-      tableName: _tableName,
-      operation: 'POST_OPERACION_COMERCIAL_EXCEPTION',
-      errorMessage: excepcion.toString(),
-      errorType: tipoError,
-      errorCode: codigoError,
-      registroFailId: operacionId,
-      endpoint: fullUrl,
-      userId: userId,
-    );
-
-    return {
-      'exito': false,
-      'mensaje': mensajeUsuario,
-      'error': excepcion.toString(),
-    };
-  }
+  // static Future<Map<String, dynamic>> _manejarExcepcion(
+  //     dynamic excepcion,
+  //     String? operacionId,
+  //     String? fullUrl,
+  //     String? userId,
+  //     ) async {
+  //
+  //   String tipoError = 'crash';
+  //   String codigoError = 'UNEXPECTED_EXCEPTION';
+  //   String mensajeUsuario = 'Error interno al enviar operación';
+  //
+  //   if (excepcion is SocketException || excepcion is http.ClientException) {
+  //     tipoError = 'network';
+  //     codigoError = 'NETWORK_ERROR';
+  //     mensajeUsuario = 'Error de conexión. Verifique su internet.';
+  //   } else if (excepcion is TimeoutException) {
+  //     tipoError = 'network';
+  //     codigoError = 'TIMEOUT_ERROR';
+  //     mensajeUsuario = 'El servidor tardó demasiado en responder.';
+  //   }
+  //
+  //   await ErrorLogService.logError(
+  //     tableName: _tableName,
+  //     operation: 'POST_OPERACION_COMERCIAL_EXCEPTION',
+  //     errorMessage: excepcion.toString(),
+  //     errorType: tipoError,
+  //     errorCode: codigoError,
+  //     registroFailId: operacionId,
+  //     endpoint: fullUrl,
+  //     userId: userId,
+  //   );
+  //
+  //   return {
+  //     'exito': false,
+  //     'mensaje': mensajeUsuario,
+  //     'error': excepcion.toString(),
+  //   };
+  // }
 }

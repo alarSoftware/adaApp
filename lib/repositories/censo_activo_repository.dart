@@ -34,7 +34,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   // ========== MÉTODOS PRINCIPALES ==========
 
   /// Crear nuevo estado con GPS usando equipoId y clienteId
-  Future<EstadoEquipo> crearNuevoEstado({
+  Future<EstadoEquipo> crearCensoActivo({
     required String equipoId,
     required int clienteId,
     int? usuarioId,
@@ -49,13 +49,6 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     try {
       final now = DateTime.now();
       final uuidId = _uuid.v4();
-
-      _logger.i('📝 Creando nuevo estado en BD local');
-      _logger.i('   UUID (id): $uuidId');
-      _logger.i('   Equipo ID: $equipoId');
-      _logger.i('   Cliente ID: $clienteId');
-      _logger.i('   Usuario ID: $usuarioId');  // ← Nuevo log
-
       final censoActivoData = {
         'id': uuidId,
         'equipo_id': equipoId,
@@ -67,12 +60,12 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         'fecha_revision': fechaRevision.toIso8601String(),
         'fecha_creacion': now.toIso8601String(),
         'fecha_actualizacion': now.toIso8601String(),
-        'estado_censo': estadoCenso ?? EstadoEquipoCenso.creado.valor,
+        'estado_censo': EstadoEquipoCenso.creado.valor,
         'observaciones': observaciones,
         'edf_vendedor_id': edfVendedorId
       };
 
-      await dbHelper.insertar(tableName, censoActivoData);
+      var censoId = dbHelper.insertar(tableName, censoActivoData);
 
       _logger.i('✅ Estado insertado en BD con UUID: $uuidId');
 
@@ -96,61 +89,61 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
     }
   }
 
-  /// Crear nuevo estado con imágenes - DEPRECADO: Usar crearNuevoEstado() + CensoActivoFotoRepository
-  @Deprecated('Usar crearNuevoEstado() y CensoActivoFotoRepository.guardarFoto() por separado')
-  Future<EstadoEquipo> crearNuevoEstadoConImagenes({
-    required String equipoId,
-    required int clienteId,
-    int? usuarioId,  // ← Nuevo parámetro agregado
-    required bool enLocal,
-    required DateTime fechaRevision,
-    double? latitud,
-    double? longitud,
-    String? estadoCenso,
-    String? observaciones,
-    // Primera imagen - DEPRECADO
-    String? imagenPath,
-    String? imagenBase64,
-    bool tieneImagen = false,
-    int? imagenTamano,
-    // Segunda imagen - DEPRECADO
-    String? imagenPath2,
-    String? imagenBase64_2,
-    bool tieneImagen2 = false,
-    int? imagenTamano2,
-  }) async {
-    try {
-      _logger.w('⚠️ Método deprecado: crearNuevoEstadoConImagenes()');
-      _logger.w('   Usar crearNuevoEstado() + CensoActivoFotoRepository.guardarFoto()');
-
-      // Crear el estado sin imágenes
-      final estado = await crearNuevoEstado(
-        equipoId: equipoId,
-        clienteId: clienteId,
-        usuarioId: usuarioId,  // ← Nuevo parámetro pasado
-        enLocal: enLocal,
-        fechaRevision: fechaRevision,
-        latitud: latitud,
-        longitud: longitud,
-        estadoCenso: estadoCenso,
-        observaciones: observaciones,
-      );
-
-      // Log de advertencia para migrar imágenes manualmente
-      if (tieneImagen || tieneImagen2) {
-        _logger.w('⚠️ IMÁGENES DETECTADAS - Se necesita migración manual:');
-        _logger.w('   Estado creado con ID: ${estado.id}');
-        _logger.w('   Usar CensoActivoFotoRepository.guardarFoto() para guardar las imágenes');
-        if (tieneImagen) _logger.w('   - Imagen 1: ${imagenTamano ?? 0} bytes');
-        if (tieneImagen2) _logger.w('   - Imagen 2: ${imagenTamano2 ?? 0} bytes');
-      }
-
-      return estado;
-    } catch (e) {
-      _logger.e('❌ Error creando nuevo estado con imágenes: $e');
-      rethrow;
-    }
-  }
+  /// Crear nuevo estado con imágenes - DEPRECADO: Usar crearCensoActivo() + CensoActivoFotoRepository
+  // @Deprecated('Usar crearCensoActivo() y CensoActivoFotoRepository.guardarFoto() por separado')
+  // Future<EstadoEquipo> crearNuevoEstadoConImagenes({
+  //   required String equipoId,
+  //   required int clienteId,
+  //   int? usuarioId,  // ← Nuevo parámetro agregado
+  //   required bool enLocal,
+  //   required DateTime fechaRevision,
+  //   double? latitud,
+  //   double? longitud,
+  //   String? estadoCenso,
+  //   String? observaciones,
+  //   // Primera imagen - DEPRECADO
+  //   String? imagenPath,
+  //   String? imagenBase64,
+  //   bool tieneImagen = false,
+  //   int? imagenTamano,
+  //   // Segunda imagen - DEPRECADO
+  //   String? imagenPath2,
+  //   String? imagenBase64_2,
+  //   bool tieneImagen2 = false,
+  //   int? imagenTamano2,
+  // }) async {
+  //   try {
+  //     _logger.w('⚠️ Método deprecado: crearNuevoEstadoConImagenes()');
+  //     _logger.w('   Usar crearCensoActivo() + CensoActivoFotoRepository.guardarFoto()');
+  //
+  //     // Crear el estado sin imágenes
+  //     final estado = await crearCensoActivo(
+  //       equipoId: equipoId,
+  //       clienteId: clienteId,
+  //       usuarioId: usuarioId,  // ← Nuevo parámetro pasado
+  //       enLocal: enLocal,
+  //       fechaRevision: fechaRevision,
+  //       latitud: latitud,
+  //       longitud: longitud,
+  //       estadoCenso: estadoCenso,
+  //       observaciones: observaciones,
+  //     );
+  //
+  //     // Log de advertencia para migrar imágenes manualmente
+  //     if (tieneImagen || tieneImagen2) {
+  //       _logger.w('⚠️ IMÁGENES DETECTADAS - Se necesita migración manual:');
+  //       _logger.w('   Estado creado con ID: ${estado.id}');
+  //       _logger.w('   Usar CensoActivoFotoRepository.guardarFoto() para guardar las imágenes');
+  //       if (tieneImagen) _logger.w('   - Imagen 1: ${imagenTamano ?? 0} bytes');
+  //       if (tieneImagen2) _logger.w('   - Imagen 2: ${imagenTamano2 ?? 0} bytes');
+  //     }
+  //
+  //     return estado;
+  //   } catch (e) {
+  //     _logger.e('❌ Error creando nuevo estado con imágenes: $e');
+  //     rethrow;
+  //   }
+  // }
 
   /// Obtener último estado por equipo_id y cliente_id
   Future<EstadoEquipo?> obtenerUltimoEstado(String equipoId, int clienteId) async {
@@ -572,21 +565,21 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
   // ========== MÉTODOS PARA SYNC PANEL ==========
 
   /// Marcar registro como migrado exitosamente
-  Future<void> marcarComoMigrado(String estadoId, {dynamic servidorId}) async {
+  Future<void> marcarComoMigrado(String censoActivoId) async {
     try {
       await dbHelper.actualizar(
         tableName,
         {
           'estado_censo': EstadoEquipoCenso.migrado.valor,
           'fecha_actualizacion': DateTime.now().toIso8601String(),
+          'error_mensaje': null
         },
         where: 'id = ?',
-        whereArgs: [estadoId],
+        whereArgs: [censoActivoId],
       );
-      _logger.i('Estado $estadoId marcado como migrado exitosamente');
+      _logger.i('Estado $censoActivoId marcado como migrado exitosamente');
     } catch (e) {
-      _logger.e('Error al marcar como migrado: $e');
-      rethrow;
+      throw Exception('Error en Marcar como Migrado: $e');
     }
   }
 
@@ -598,6 +591,7 @@ class EstadoEquipoRepository extends BaseRepository<EstadoEquipo> {
         {
           'estado_censo': EstadoEquipoCenso.error.valor,
           'fecha_actualizacion': DateTime.now().toIso8601String(),
+          'error_mensaje': mensajeError
         },
         where: 'id = ?',
         whereArgs: [estadoId],

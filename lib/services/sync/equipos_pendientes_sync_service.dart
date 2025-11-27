@@ -95,21 +95,21 @@ class EquiposPendientesSyncService extends BaseSyncService {
       } else {
         // --- MANEJO DE ERROR HTTP ---
         final mensaje = BaseSyncService.extractErrorMessage(response);
-        await ErrorLogService.logServerError(
-          tableName: 'equipos_pendientes',
-          operation: 'sync_from_server',
-          errorMessage: mensaje,
-          errorCode: response.statusCode.toString(),
-          endpoint: currentEndpoint,
-          userId: edfVendedorId,
-        );
+        // await ErrorLogService.logServerError(
+        //   tableName: 'equipos_pendientes',
+        //   operation: 'sync_from_server',
+        //   errorMessage: mensaje,
+        //   errorCode: response.statusCode.toString(),
+        //   endpoint: currentEndpoint,
+        //   userId: edfVendedorId,
+        // );
         return SyncResult(exito: false, mensaje: mensaje, itemsSincronizados: 0);
       }
 
     } catch (e) {
       // --- MANEJO DE EXCEPCIONES GENERALES ---
       BaseSyncService.logger.e('💥 Error general: $e');
-      await ErrorLogService.logError(tableName: 'equipos_pendientes', operation: 'sync_from_server', errorMessage: 'Error general: $e', errorType: 'unknown', endpoint: currentEndpoint, userId: edfVendedorId);
+      //await ErrorLogService.logError(tableName: 'equipos_pendientes', operation: 'sync_from_server', errorMessage: 'Error general: $e', errorType: 'unknown', endpoint: currentEndpoint, userId: edfVendedorId);
       return SyncResult(exito: false, mensaje: BaseSyncService.getErrorMessage(e), itemsSincronizados: 0);
     }
   }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
+import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
@@ -10,13 +11,16 @@ import 'package:ada_app/services/api_config_service.dart';
 import 'package:ada_app/config/constants/server_constants.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
+import '../../config/constants/server_response.dart';
+import '../censo/censo_upload_service.dart';
+
 class CensoActivoPostService {
   static final Logger _logger = Logger();
   static const String _tableName = 'censo_activo';
   static const String _endpoint = '/censoActivo/insertCensoActivo';
   static const Uuid _uuid = Uuid();
 
-  static Future<Map<String, dynamic>> enviarCensoActivo({
+  static void enviarCensoActivo({
     String? censoId,
     String? equipoId,
     String? codigoBarras,
@@ -41,7 +45,6 @@ class CensoActivoPostService {
     String? modelo,
     String? logo,
     int timeoutSegundos = 60,
-    String? userId,
     bool guardarLog = false,
     var equipoDataMap
   }) async {
@@ -133,20 +136,31 @@ class CensoActivoPostService {
       _logger.i('📥 Response: ${response.statusCode}');
 
       // Procesar respuesta con validación estricta
-      final result = _procesarRespuesta(response);
 
-      // 🔥 MANEJO UNIFICADO DE ERRORES DEL SERVIDOR
-      if (!result['exito']) {
-        await _manejarErrorServidor(result, censoIdFinal, fullUrl, userId);
-      }
+      ServerResponse resultObject = ServerResponse.fromHttp(response);
+      if(!resultObject.success){
+        if(!resultObject.isDuplicate&&resultObject.message!=''){
+          final estadoEquipoRepository = new EstadoEquipoRepository();
+          estadoEquipoRepository.marcarComoError(censoId!, resultObject.message);
+          throw Exception(resultObject.message);
+        }
+      }else if(resultObject.success==true){
+         final censoUploadService= new CensoUploadService();
+          censoUploadService.marcarComoSincronizadoCompleto(
+          censoId: censoId!,
+          equipoId: equipoId,
+          clienteId: clienteId,
+          esNuevoEquipo: esNuevoEquipo,
+          crearPendiente: crearPendiente,
+          fotos: fotos!,
+        );
+      };
 
-      return result;
+
 
     } catch (e, stackTrace) {
-      _logger.e('❌ Error en envío: $e', stackTrace: stackTrace);
-
-      // 🔥 MANEJO UNIFICADO DE EXCEPCIONES
-      return await _manejarExcepcion(e, censoId, fullUrl, userId, timeoutSegundos);
+      rethrow;
+      //return await _manejarExcepcion(e, censoId, fullUrl, userId, timeoutSegundos);
     }
   }
 
@@ -155,101 +169,101 @@ class CensoActivoPostService {
   // =================================================================
 
   /// Maneja errores del servidor (serverAction != 100)
-  static Future<void> _manejarErrorServidor(
-      Map<String, dynamic> result,
-      String? censoId,
-      String? fullUrl,
-      String? userId,
-      ) async {
-    final errorCode = result['serverAction']?.toString() ?? 'UNKNOWN';
-    final errorMessage = result['mensaje'] ?? 'Error del servidor';
-
-    // Determinar tipo de error según serverAction
-    String tipoError;
-    String codigoError;
-
-    if (result['serverAction'] == ServerConstants.STOP_TRANSACTION) {
-      tipoError = 'business_logic';
-      codigoError = 'STOP_TRANSACTION_205';
-    } else if (result['serverAction'] == ServerConstants.ERROR) {
-      tipoError = 'server_error';
-      codigoError = 'SERVER_ERROR_-501';
-    } else {
-      tipoError = 'server_response';
-      codigoError = 'UNEXPECTED_ACTION_$errorCode';
-    }
-
-    // 🔥 REGISTRO AUTOMÁTICO POR TIPO
-    await ErrorLogService.logServerError(
-      tableName: _tableName,
-      operation: 'POST_CENSO_ACTIVO_SERVER_ERROR',
-      errorMessage: 'ServerAction $errorCode: $errorMessage',
-      errorCode: codigoError,
-      registroFailId: censoId,
-      endpoint: fullUrl,
-      userId: userId,
-    );
-
-    _logger.e('🚫 Error del servidor registrado: $codigoError');
-  }
+  // static Future<void> _manejarErrorServidor(
+  //     Map<String, dynamic> result,
+  //     String? censoId,
+  //     String? fullUrl,
+  //     String? userId,
+  //     ) async {
+  //   final errorCode = result['serverAction']?.toString() ?? 'UNKNOWN';
+  //   final errorMessage = result['mensaje'] ?? 'Error del servidor';
+  //
+  //   // Determinar tipo de error según serverAction
+  //   String tipoError;
+  //   String codigoError;
+  //
+  //   if (result['serverAction'] == ServerConstants.STOP_TRANSACTION) {
+  //     tipoError = 'business_logic';
+  //     codigoError = 'STOP_TRANSACTION_205';
+  //   } else if (result['serverAction'] == ServerConstants.ERROR) {
+  //     tipoError = 'server_error';
+  //     codigoError = 'SERVER_ERROR_-501';
+  //   } else {
+  //     tipoError = 'server_response';
+  //     codigoError = 'UNEXPECTED_ACTION_$errorCode';
+  //   }
+  //
+  //   // 🔥 REGISTRO AUTOMÁTICO POR TIPO
+  //   await ErrorLogService.logServerError(
+  //     tableName: _tableName,
+  //     operation: 'POST_CENSO_ACTIVO_SERVER_ERROR',
+  //     errorMessage: 'ServerAction $errorCode: $errorMessage',
+  //     errorCode: codigoError,
+  //     registroFailId: censoId,
+  //     endpoint: fullUrl,
+  //     userId: userId,
+  //   );
+  //
+  //   _logger.e('🚫 Error del servidor registrado: $codigoError');
+  // }
 
   /// Maneja todas las excepciones de red/timeout/crash de forma unificada
-  static Future<Map<String, dynamic>> _manejarExcepcion(
-      dynamic excepcion,
-      String? censoId,
-      String? fullUrl,
-      String? userId,
-      int timeoutSegundos,
-      ) async {
-
-    String tipoError;
-    String codigoError;
-    String mensajeUsuario;
-    String mensajeDetallado;
-
-    // 🎯 CLASIFICAR EXCEPCIÓN AUTOMÁTICAMENTE
-    if (excepcion is SocketException) {
-      tipoError = 'network';
-      codigoError = 'NETWORK_CONNECTION_ERROR';
-      mensajeUsuario = 'Sin conexión de red';
-      mensajeDetallado = 'Error de conexión de red: ${excepcion.message}';
-
-    } else if (excepcion is TimeoutException) {
-      tipoError = 'network';
-      codigoError = 'REQUEST_TIMEOUT_ERROR';
-      mensajeUsuario = 'Tiempo de espera agotado';
-      mensajeDetallado = 'Timeout tras ${timeoutSegundos}s: $excepcion';
-
-    } else if (excepcion is http.ClientException) {
-      tipoError = 'network';
-      codigoError = 'HTTP_CLIENT_ERROR';
-      mensajeUsuario = 'Error de red: ${excepcion.message}';
-      mensajeDetallado = 'Error HTTP del cliente: ${excepcion.message}';
-
-    } else {
-      tipoError = 'crash';
-      codigoError = 'UNEXPECTED_EXCEPTION';
-      mensajeUsuario = 'Error interno: $excepcion';
-      mensajeDetallado = 'Excepción no manejada: $excepcion';
-    }
-
-    // 🔥 REGISTRO AUTOMÁTICO UNIFICADO
-    await ErrorLogService.logError(
-      tableName: _tableName,
-      operation: 'POST_CENSO_ACTIVO_EXCEPTION',
-      errorMessage: mensajeDetallado,
-      errorType: tipoError,
-      errorCode: codigoError,
-      registroFailId: censoId,
-      endpoint: fullUrl,
-      userId: userId,
-    );
-
-    _logger.e('🚨 Excepción registrada: $codigoError');
-
-    // 🎯 RESPUESTA UNIFICADA DE ERROR
-    return _errorResponse(mensajeUsuario);
-  }
+  // static Future<Map<String, dynamic>> _manejarExcepcion(
+  //     dynamic excepcion,
+  //     String? censoId,
+  //     String? fullUrl,
+  //     String? userId,
+  //     int timeoutSegundos,
+  //     ) async {
+  //
+  //   String tipoError;
+  //   String codigoError;
+  //   String mensajeUsuario;
+  //   String mensajeDetallado;
+  //
+  //   // 🎯 CLASIFICAR EXCEPCIÓN AUTOMÁTICAMENTE
+  //   if (excepcion is SocketException) {
+  //     tipoError = 'network';
+  //     codigoError = 'NETWORK_CONNECTION_ERROR';
+  //     mensajeUsuario = 'Sin conexión de red';
+  //     mensajeDetallado = 'Error de conexión de red: ${excepcion.message}';
+  //
+  //   } else if (excepcion is TimeoutException) {
+  //     tipoError = 'network';
+  //     codigoError = 'REQUEST_TIMEOUT_ERROR';
+  //     mensajeUsuario = 'Tiempo de espera agotado';
+  //     mensajeDetallado = 'Timeout tras ${timeoutSegundos}s: $excepcion';
+  //
+  //   } else if (excepcion is http.ClientException) {
+  //     tipoError = 'network';
+  //     codigoError = 'HTTP_CLIENT_ERROR';
+  //     mensajeUsuario = 'Error de red: ${excepcion.message}';
+  //     mensajeDetallado = 'Error HTTP del cliente: ${excepcion.message}';
+  //
+  //   } else {
+  //     tipoError = 'crash';
+  //     codigoError = 'UNEXPECTED_EXCEPTION';
+  //     mensajeUsuario = 'Error interno: $excepcion';
+  //     mensajeDetallado = 'Excepción no manejada: $excepcion';
+  //   }
+  //
+  //   // 🔥 REGISTRO AUTOMÁTICO UNIFICADO
+  //   await ErrorLogService.logError(
+  //     tableName: _tableName,
+  //     operation: 'POST_CENSO_ACTIVO_EXCEPTION',
+  //     errorMessage: mensajeDetallado,
+  //     errorType: tipoError,
+  //     errorCode: codigoError,
+  //     registroFailId: censoId,
+  //     endpoint: fullUrl,
+  //     userId: userId,
+  //   );
+  //
+  //   _logger.e('🚨 Excepción registrada: $codigoError');
+  //
+  //   // 🎯 RESPUESTA UNIFICADA DE ERROR
+  //   return _errorResponse(mensajeUsuario);
+  // }
 
   // =================================================================
   // LOGGING TXT SIMPLE (estilo CensoLogService original)
@@ -786,6 +800,7 @@ class CensoActivoPostService {
 
   /// Procesar respuesta con validación estricta usando ServerConstants
   static Map<String, dynamic> _procesarRespuesta(http.Response response) {
+    //ServerResponse.fromHttp(response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       return {
         'exito': false,
@@ -797,8 +812,6 @@ class CensoActivoPostService {
 
     try {
       final responseBody = json.decode(response.body);
-
-      // Validación con serverAction usando ServerConstants
       if (responseBody is Map && responseBody.containsKey('serverAction')) {
         final serverAction = responseBody['serverAction'] as int?;
 
@@ -807,17 +820,26 @@ class CensoActivoPostService {
           return {
             'exito': true,
             'success': true,
-            'mensaje': responseBody['resultMessage'] ?? 'Censo activo procesado correctamente',
+            'mensaje': responseBody['resultMessage'] ??
+                'Censo activo procesado correctamente',
             'serverAction': serverAction,
             'servidor_id': responseBody['resultId'],
             'id': responseBody['resultId'],
+          };
+        } else if (serverAction == ServerConstants.ERROR) {
+          return {
+            'exito': false,
+            'success': false,
+            'mensaje': responseBody['resultError'],
+            'serverAction': serverAction,
           };
         } else {
           _logger.e('❌ Servidor rechazó censo activo (Action: $serverAction)');
           return {
             'exito': false,
             'success': false,
-            'mensaje': responseBody['resultError'] ?? responseBody['resultMessage'] ?? 'Error del servidor',
+            'mensaje': responseBody['resultError'] ??
+                responseBody['resultMessage'] ?? 'Error del servidor',
             'serverAction': serverAction,
           };
         }
@@ -831,6 +853,8 @@ class CensoActivoPostService {
         'mensaje': 'Censo activo procesado (sin serverAction)',
         'id': responseBody['id'],
       };
+
+
 
     } catch (e) {
       _logger.w('⚠️ Error parseando JSON: $e');
@@ -857,82 +881,83 @@ class CensoActivoPostService {
 
   /// Método de compatibilidad para enviar solo cambio de estado (sin equipo/pendiente)
   /// Usado por EquiposClienteDetailScreenViewModel
-  static Future<Map<String, dynamic>> enviarCambioEstado({
-    required String codigoBarras,
-    required int clienteId,
-    required bool enLocal,
-    required Position position,
-    String? observaciones,
-    String? equipoId,
-    String? clienteNombre,
-    String? numeroSerie,
-    String? modelo,
-    String? marca,
-    String? logo,
-    String? estadoCenso = 'pendiente',
-    int timeoutSegundos = 60,
-    String? userId,
-    bool guardarLog = true,
-  }) async {
-    try {
-      _logger.i('📤 === ENVIANDO CAMBIO DE ESTADO (COMPATIBILIDAD) ===');
-
-      // Obtener vendedorId del AuthService o usar valor por defecto
-      String edfVendedorId = '40_24'; // Valor por defecto
-      try {
-        // TODO: Implementar obtención real del vendedorId desde AuthService
-        // final usuario = await AuthService().getCurrentUser();
-        // edfVendedorId = usuario?.edfVendedorId ?? '40_24';
-      } catch (e) {
-        _logger.w('⚠️ No se pudo obtener vendedorId, usando valor por defecto: $edfVendedorId');
-      }
-
-      // Obtener usuarioId del AuthService o usar valor por defecto
-      int usuarioId = 1; // Valor por defecto
-      try {
-        // TODO: Implementar obtención real del usuarioId desde AuthService
-        // final usuario = await AuthService().getCurrentUser();
-        // usuarioId = usuario?.id ?? 1;
-      } catch (e) {
-        _logger.w('⚠️ No se pudo obtener usuarioId, usando valor por defecto: $usuarioId');
-      }
-
-      // Usar el método principal con parámetros para cambio de estado
-      return await enviarCensoActivo(
-        equipoId: equipoId ?? codigoBarras,
-        codigoBarras: codigoBarras,
-        esNuevoEquipo: false,
-        clienteId: clienteId,
-        edfVendedorId: edfVendedorId,
-        crearPendiente: false,
-
-        // Datos del censo (cambio de estado)
-        usuarioId: usuarioId,
-        latitud: position.latitude,
-        longitud: position.longitude,
-        observaciones: observaciones,
-        enLocal: enLocal,
-        estadoCenso: estadoCenso,
-
-        // Sin fotos para cambios de estado
-        fotos: [],
-
-        // Datos adicionales del equipo
-        clienteNombre: clienteNombre,
-        marca: marca,
-        modelo: modelo,
-        logo: logo,
-        numeroSerie: numeroSerie,
-
-        // Control
-        timeoutSegundos: timeoutSegundos,
-        userId: userId?.toString(),
-        guardarLog: guardarLog,
-      );
-
-    } catch (e) {
-      _logger.e('❌ Error en enviarCambioEstado: $e');
-      return _errorResponse('Error enviando cambio de estado: $e');
-    }
-  }
+  // static Future<Map<String, dynamic>> enviarCambioEstado({
+  //   required String codigoBarras,
+  //   required int clienteId,
+  //   required bool enLocal,
+  //   required Position position,
+  //   String? observaciones,
+  //   String? equipoId,
+  //   String? clienteNombre,
+  //   String? numeroSerie,
+  //   String? modelo,
+  //   String? marca,
+  //   String? logo,
+  //   String? estadoCenso = 'pendiente',
+  //   int timeoutSegundos = 60,
+  //   String? userId,
+  //   bool guardarLog = true,
+  // }) async {
+  //   try {
+  //     _logger.i('📤 === ENVIANDO CAMBIO DE ESTADO (COMPATIBILIDAD) ===');
+  //
+  //     // Obtener vendedorId del AuthService o usar valor por defecto
+  //     String edfVendedorId = '40_24'; // Valor por defecto
+  //     try {
+  //       // TODO: Implementar obtención real del vendedorId desde AuthService
+  //       // final usuario = await AuthService().getCurrentUser();
+  //       // edfVendedorId = usuario?.edfVendedorId ?? '40_24';
+  //     } catch (e) {
+  //       _logger.w('⚠️ No se pudo obtener vendedorId, usando valor por defecto: $edfVendedorId');
+  //     }
+  //
+  //     // Obtener usuarioId del AuthService o usar valor por defecto
+  //     int usuarioId = 1; // Valor por defecto
+  //     try {
+  //       // TODO: Implementar obtención real del usuarioId desde AuthService
+  //       // final usuario = await AuthService().getCurrentUser();
+  //       // usuarioId = usuario?.id ?? 1;
+  //     } catch (e) {
+  //       _logger.w('⚠️ No se pudo obtener usuarioId, usando valor por defecto: $usuarioId');
+  //     }
+  //
+  //     // Usar el método principal con parámetros para cambio de estado
+  //     return await enviarCensoActivo(
+  //       equipoId: equipoId ?? codigoBarras,
+  //       codigoBarras: codigoBarras,
+  //       esNuevoEquipo: false,
+  //       clienteId: clienteId,
+  //       edfVendedorId: edfVendedorId,
+  //       crearPendiente: false,
+  //
+  //       // Datos del censo (cambio de estado)
+  //       usuarioId: usuarioId,
+  //       latitud: position.latitude,
+  //       longitud: position.longitude,
+  //       observaciones: observaciones,
+  //       enLocal: enLocal,
+  //       estadoCenso: estadoCenso,
+  //
+  //       // Sin fotos para cambios de estado
+  //       fotos: [],
+  //
+  //       // Datos adicionales del equipo
+  //       clienteNombre: clienteNombre,
+  //       marca: marca,
+  //       modelo: modelo,
+  //       logo: logo,
+  //       numeroSerie: numeroSerie,
+  //
+  //       // Control
+  //       timeoutSegundos: timeoutSegundos,
+  //       userId: userId?.toString(),
+  //       guardarLog: guardarLog,
+  //     );
+  //
+  //   } catch (e) {
+  //     _logger.e('❌ Error en enviarCambioEstado: $e');
+  //     return _errorResponse('Error enviando cambio de estado: $e');
+  //   }
+  // }
 }
+//ESTANDARIZAR EL SETEO DE RESPUESTA DEL SERVIDOR, PASANDOLO POR PARAMETRO A UN METODO Y QUE ME DEVUKLEVA UN OBJETO DE UNA CLASE

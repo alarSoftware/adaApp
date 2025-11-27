@@ -99,12 +99,12 @@ class ClientSyncService {
             BaseSyncService.logger.w('Cliente fallido: $clienteJson');
 
             // 🚨 LOG ERROR: Cliente con datos inválidos
-            await ErrorLogService.logValidationError(
-              tableName: 'clientes',
-              operation: 'process_item',
-              errorMessage: 'Cliente con datos inválidos o faltantes',
-              userId: edfVendedorId,
-            );
+            // await ErrorLogService.logValidationError(
+            //   tableName: 'clientes',
+            //   operation: 'process_item',
+            //   errorMessage: 'Cliente con datos inválidos o faltantes',
+            //   userId: edfVendedorId,
+            // );
           }
         }
 
@@ -112,13 +112,13 @@ class ClientSyncService {
 
         if (clientes.isEmpty) {
           // 🚨 LOG ERROR: No se pudieron procesar clientes
-          await ErrorLogService.logError(
-            tableName: 'clientes',
-            operation: 'process_all',
-            errorMessage: 'No se pudieron procesar los clientes del servidor',
-            errorType: 'validation',
-            userId: edfVendedorId,
-          );
+          // await ErrorLogService.logError(
+          //   tableName: 'clientes',
+          //   operation: 'process_all',
+          //   errorMessage: 'No se pudieron procesar los clientes del servidor',
+          //   errorType: 'validation',
+          //   userId: edfVendedorId,
+          // );
 
           return SyncResult(
             exito: false,
@@ -158,14 +158,14 @@ class ClientSyncService {
         BaseSyncService.logger.e('Error del servidor: $mensaje');
 
         // 🚨 LOG ERROR: Error del servidor
-        await ErrorLogService.logServerError(
-          tableName: 'clientes',
-          operation: 'sync_from_server',
-          errorMessage: mensaje,
-          errorCode: response.statusCode.toString(),
-          endpoint: currentEndpoint,
-          userId: edfVendedorId,
-        );
+        // await ErrorLogService.logServerError(
+        //   tableName: 'clientes',
+        //   operation: 'sync_from_server',
+        //   errorMessage: mensaje,
+        //   errorCode: response.statusCode.toString(),
+        //   endpoint: currentEndpoint,
+        //   userId: edfVendedorId,
+        // );
 
         return SyncResult(
           exito: false,
@@ -178,13 +178,13 @@ class ClientSyncService {
       BaseSyncService.logger.e('⏰ Timeout sincronizando clientes: $timeoutError');
 
       // 🚨 LOG ERROR: Timeout
-      await ErrorLogService.logNetworkError(
-        tableName: 'clientes',
-        operation: 'sync_from_server',
-        errorMessage: 'Timeout de conexión: $timeoutError',
-        endpoint: currentEndpoint,
-        userId: edfVendedorId,
-      );
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'clientes',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Timeout de conexión: $timeoutError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
 
       return SyncResult(
         exito: false,
@@ -196,13 +196,13 @@ class ClientSyncService {
       BaseSyncService.logger.e('📡 Error de red: $socketError');
 
       // 🚨 LOG ERROR: Sin conexión de red
-      await ErrorLogService.logNetworkError(
-        tableName: 'clientes',
-        operation: 'sync_from_server',
-        errorMessage: 'Sin conexión de red: $socketError',
-        endpoint: currentEndpoint,
-        userId: edfVendedorId,
-      );
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'clientes',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Sin conexión de red: $socketError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
 
       return SyncResult(
         exito: false,
@@ -214,15 +214,15 @@ class ClientSyncService {
       BaseSyncService.logger.e('💥 Error en sincronización de clientes: $e');
 
       // 🚨 LOG ERROR: Error general
-      await ErrorLogService.logError(
-        tableName: 'clientes',
-        operation: 'sync_from_server',
-        errorMessage: 'Error general: $e',
-        errorType: 'unknown',
-        errorCode: 'GENERAL_ERROR',
-        endpoint: currentEndpoint,
-        userId: edfVendedorId,
-      );
+      // await ErrorLogService.logError(
+      //   tableName: 'clientes',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Error general: $e',
+      //   errorType: 'unknown',
+      //   errorCode: 'GENERAL_ERROR',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
 
       return SyncResult(
         exito: false,
