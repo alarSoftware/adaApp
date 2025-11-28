@@ -251,7 +251,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       };
 
     } catch (e, stackTrace) {
-      // ✅ CATCH PRINCIPAL - Aquí sí llamamos a manejarExcepcion
       _logger.e('Error en guardado local: $e', stackTrace: stackTrace);
 
       await ErrorLogService.manejarExcepcion(
