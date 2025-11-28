@@ -1,12 +1,8 @@
-import 'package:logger/logger.dart';
 import '../models/logo.dart';
-import '../services/database_helper.dart';
 import 'base_repository.dart';
 
-final _logger = Logger();
 
 class LogoRepository extends BaseRepository<Logo> {
-  static final _dbHelper = DatabaseHelper();
 
   @override
   String get tableName => 'logo';

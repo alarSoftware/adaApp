@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:async';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart';
 
 /// Servicio de sincronización de censos activos
 /// Formato del API: {"data": "[{...}]", "status": "OK"}
@@ -27,6 +30,8 @@ class CensusSyncService extends BaseSyncService {
     int? offset,
     String? edfVendedorId,
   }) async {
+    String? currentEndpoint;
+
     try {
       final queryParams = _buildQueryParams(
         clienteId: clienteId,
@@ -41,8 +46,21 @@ class CensusSyncService extends BaseSyncService {
       );
 
       final response = await _makeHttpRequest(queryParams);
+      currentEndpoint = response.request?.url.toString();
 
       if (!_isSuccessStatusCode(response.statusCode)) {
+        final errorMessage = BaseSyncService.extractErrorMessage(response);
+
+        // 🚨 LOG ERROR: Error del servidor
+        // await ErrorLogService.logServerError(
+        //   tableName: 'censo_activo',
+        //   operation: 'sync_from_server',
+        //   errorMessage: errorMessage,
+        //   errorCode: response.statusCode.toString(),
+        //   endpoint: currentEndpoint,
+        //   userId: edfVendedorId,
+        // );
+
         return _handleErrorResponse(response);
       }
 
@@ -59,8 +77,58 @@ class CensusSyncService extends BaseSyncService {
         totalEnAPI: processedResult.length,
       );
 
+    } on TimeoutException catch (timeoutError) {
+      BaseSyncService.logger.e('⏰ Timeout obteniendo censos: $timeoutError');
+
+      // 🚨 LOG ERROR: Timeout
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'censo_activo',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Timeout de conexión: $timeoutError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
+
+      _ultimosCensos = [];
+      return SyncResult(
+        exito: false,
+        mensaje: 'Timeout de conexión al servidor',
+        itemsSincronizados: 0,
+      );
+
+    } on SocketException catch (socketError) {
+      BaseSyncService.logger.e('📡 Error de red: $socketError');
+
+      // 🚨 LOG ERROR: Sin conexión de red
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'censo_activo',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Sin conexión de red: $socketError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
+
+      _ultimosCensos = [];
+      return SyncResult(
+        exito: false,
+        mensaje: 'Sin conexión de red',
+        itemsSincronizados: 0,
+      );
+
     } catch (e) {
-      BaseSyncService.logger.e('Error obteniendo censos activos: $e');
+      BaseSyncService.logger.e('💥 Error obteniendo censos activos: $e');
+
+      // 🚨 LOG ERROR: Error general
+      // await ErrorLogService.logError(
+      //   tableName: 'censo_activo',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Error general: $e',
+      //   errorType: 'unknown',
+      //   errorCode: 'GENERAL_ERROR',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
+
       _ultimosCensos = [];
       return SyncResult(
         exito: false,
@@ -72,9 +140,12 @@ class CensusSyncService extends BaseSyncService {
 
   /// Obtener censo específico por ID
   static Future<SyncResult> obtenerCensoPorId(int censoId) async {
+    String? currentEndpoint;
+
     try {
       final baseUrl = await BaseSyncService.getBaseUrl();
       final uri = Uri.parse('$baseUrl/api/getCensoActivo/$censoId');
+      currentEndpoint = uri.toString();
 
       final response = await http.get(
         uri,
@@ -82,6 +153,16 @@ class CensusSyncService extends BaseSyncService {
       ).timeout(BaseSyncService.timeout);
 
       if (!_isSuccessStatusCode(response.statusCode)) {
+        // 🚨 LOG ERROR: Error del servidor
+        await ErrorLogService.logServerError(
+          tableName: 'censo_activo',
+          operation: 'get_by_id',
+          errorMessage: BaseSyncService.extractErrorMessage(response),
+          errorCode: response.statusCode.toString(),
+          endpoint: currentEndpoint,
+          registroFailId: censoId.toString(),
+        );
+
         return _handleErrorResponse(response);
       }
 
@@ -118,6 +199,14 @@ class CensusSyncService extends BaseSyncService {
           itemsSincronizados: 1,
         );
       } else {
+        // 🚨 LOG ERROR: Censo no encontrado
+        await ErrorLogService.logValidationError(
+          tableName: 'censo_activo',
+          operation: 'get_by_id',
+          errorMessage: 'Censo no encontrado',
+          registroFailId: censoId.toString(),
+        );
+
         return SyncResult(
           exito: false,
           mensaje: 'Censo no encontrado',
@@ -125,8 +214,50 @@ class CensusSyncService extends BaseSyncService {
         );
       }
 
+    } on TimeoutException catch (timeoutError) {
+      await ErrorLogService.logNetworkError(
+        tableName: 'censo_activo',
+        operation: 'get_by_id',
+        errorMessage: 'Timeout: $timeoutError',
+        endpoint: currentEndpoint,
+        registroFailId: censoId.toString(),
+      );
+
+      _ultimoCenso = null;
+      return SyncResult(
+        exito: false,
+        mensaje: 'Timeout de conexión',
+        itemsSincronizados: 0,
+      );
+
+    } on SocketException catch (socketError) {
+      await ErrorLogService.logNetworkError(
+        tableName: 'censo_activo',
+        operation: 'get_by_id',
+        errorMessage: 'Sin conexión: $socketError',
+        endpoint: currentEndpoint,
+        registroFailId: censoId.toString(),
+      );
+
+      _ultimoCenso = null;
+      return SyncResult(
+        exito: false,
+        mensaje: 'Sin conexión de red',
+        itemsSincronizados: 0,
+      );
+
     } catch (e) {
       BaseSyncService.logger.e('Error obteniendo censo por ID: $e');
+
+      await ErrorLogService.logError(
+        tableName: 'censo_activo',
+        operation: 'get_by_id',
+        errorMessage: 'Error: $e',
+        errorType: 'unknown',
+        endpoint: currentEndpoint,
+        registroFailId: censoId.toString(),
+      );
+
       _ultimoCenso = null;
       return SyncResult(
         exito: false,
@@ -138,10 +269,13 @@ class CensusSyncService extends BaseSyncService {
 
   /// Buscar censos por código de barras
   static Future<SyncResult> buscarPorCodigoBarras(String codigoBarras) async {
+    String? currentEndpoint;
+
     try {
       final baseUrl = await BaseSyncService.getBaseUrl();
       final uri = Uri.parse('$baseUrl/api/getCensoActivo')
           .replace(queryParameters: {'codigoBarras': codigoBarras});
+      currentEndpoint = uri.toString();
 
       final response = await http.get(
         uri,
@@ -158,17 +292,65 @@ class CensusSyncService extends BaseSyncService {
           itemsSincronizados: censosData.length,
         );
       } else {
+        // 🚨 LOG ERROR: Error en búsqueda
+        await ErrorLogService.logServerError(
+          tableName: 'censo_activo',
+          operation: 'buscar_por_codigo',
+          errorMessage: BaseSyncService.extractErrorMessage(response),
+          errorCode: response.statusCode.toString(),
+          endpoint: currentEndpoint,
+        );
+
         _ultimosCensos = [];
-        final mensaje = BaseSyncService.extractErrorMessage(response);
         return SyncResult(
           exito: false,
-          mensaje: 'Error en búsqueda: $mensaje',
+          mensaje: 'Error en búsqueda: ${BaseSyncService.extractErrorMessage(response)}',
           itemsSincronizados: 0,
         );
       }
-    } catch (e) {
+
+    } on TimeoutException catch (timeoutError) {
+      await ErrorLogService.logNetworkError(
+        tableName: 'censo_activo',
+        operation: 'buscar_por_codigo',
+        errorMessage: 'Timeout: $timeoutError',
+        endpoint: currentEndpoint,
+      );
+
       _ultimosCensos = [];
+      return SyncResult(
+        exito: false,
+        mensaje: 'Timeout de conexión',
+        itemsSincronizados: 0,
+      );
+
+    } on SocketException catch (socketError) {
+      await ErrorLogService.logNetworkError(
+        tableName: 'censo_activo',
+        operation: 'buscar_por_codigo',
+        errorMessage: 'Sin conexión: $socketError',
+        endpoint: currentEndpoint,
+      );
+
+      _ultimosCensos = [];
+      return SyncResult(
+        exito: false,
+        mensaje: 'Sin conexión de red',
+        itemsSincronizados: 0,
+      );
+
+    } catch (e) {
       BaseSyncService.logger.e('Error buscando por código: $e');
+
+      await ErrorLogService.logError(
+        tableName: 'censo_activo',
+        operation: 'buscar_por_codigo',
+        errorMessage: 'Error: $e',
+        errorType: 'unknown',
+        endpoint: currentEndpoint,
+      );
+
+      _ultimosCensos = [];
       return SyncResult(
         exito: false,
         mensaje: BaseSyncService.getErrorMessage(e),
@@ -224,6 +406,13 @@ class CensusSyncService extends BaseSyncService {
       return await dbHelper.consultarPersonalizada(query, args);
     } catch (e) {
       BaseSyncService.logger.e('Error obteniendo censos locales: $e');
+
+      await ErrorLogService.logDatabaseError(
+        tableName: 'censo_activo',
+        operation: 'query_local',
+        errorMessage: 'Error consultando BD local: $e',
+      );
+
       return [];
     }
   }
@@ -239,6 +428,13 @@ class CensusSyncService extends BaseSyncService {
       return result.isNotEmpty ? (result.first['total'] as int? ?? 0) : 0;
     } catch (e) {
       BaseSyncService.logger.e('Error contando censos locales: $e');
+
+      await ErrorLogService.logDatabaseError(
+        tableName: 'censo_activo',
+        operation: 'count_local',
+        errorMessage: 'Error contando en BD local: $e',
+      );
+
       return 0;
     }
   }
@@ -321,6 +517,15 @@ class CensusSyncService extends BaseSyncService {
             return parsed;
           } catch (e) {
             BaseSyncService.logger.e('Error parseando data como JSON: $e');
+
+            await ErrorLogService.logError(
+              tableName: 'censo_activo',
+              operation: 'parse_response',
+              errorMessage: 'Error parseando data string: $e',
+              errorType: 'server',
+              errorCode: 'PARSE_ERROR',
+            );
+
             return [];
           }
         } else if (dataValue is List) {
@@ -335,6 +540,15 @@ class CensusSyncService extends BaseSyncService {
       return [];
     } catch (e) {
       BaseSyncService.logger.e('Error parseando respuesta: $e');
+
+      await ErrorLogService.logError(
+        tableName: 'censo_activo',
+        operation: 'parse_response',
+        errorMessage: 'Error parseando respuesta del servidor: $e',
+        errorType: 'server',
+        errorCode: 'PARSE_ERROR',
+      );
+
       throw Exception('Error parseando respuesta del servidor: $e');
     }
   }
@@ -356,14 +570,33 @@ class CensusSyncService extends BaseSyncService {
           censosParaGuardar.add(censoParaGuardar);
         } catch (e) {
           BaseSyncService.logger.e('Error procesando censo ID ${censo['id']}: $e');
+
+          await ErrorLogService.logError(
+            tableName: 'censo_activo',
+            operation: 'process_item',
+            errorMessage: 'Error procesando censo: $e',
+            errorType: 'database',
+            registroFailId: censo['id']?.toString(),
+          );
         }
       }
     }
 
     // Vaciar tabla e insertar todos los censos
-    final dbHelper = DatabaseHelper();
-    await dbHelper.vaciarEInsertar('censo_activo', censosParaGuardar);
+    try {
+      final dbHelper = DatabaseHelper();
+      await dbHelper.vaciarEInsertar('censo_activo', censosParaGuardar);
+    } catch (e) {
+      BaseSyncService.logger.e('Error guardando censos en BD: $e');
 
+      await ErrorLogService.logDatabaseError(
+        tableName: 'censo_activo',
+        operation: 'bulk_insert',
+        errorMessage: 'Error en vaciarEInsertar: $e',
+      );
+
+      // No lanzar excepción, los datos se obtuvieron correctamente del servidor
+    }
 
     return censosParaGuardar;
   }
@@ -423,6 +656,14 @@ class CensusSyncService extends BaseSyncService {
       await dbHelper.vaciarEInsertar('censo_activo', [censo]);
     } catch (e) {
       BaseSyncService.logger.e('Error guardando censo ID ${censo['id']} en BD: $e');
+
+      await ErrorLogService.logDatabaseError(
+        tableName: 'censo_activo',
+        operation: 'save_single',
+        errorMessage: 'Error guardando censo en BD: $e',
+        registroFailId: censo['id']?.toString(),
+      );
+
       rethrow;
     }
   }

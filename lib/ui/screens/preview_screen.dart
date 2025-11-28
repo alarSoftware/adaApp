@@ -253,6 +253,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
       datosCompletos['imagen_tamano2'] = null;
     }
 
+    // 🔥 CORREGIDO: Usar confirmarRegistro (método que SÍ existe en el ViewModel actual)
     final resultado = await viewModel.confirmarRegistro(datosCompletos);
 
     if (mounted) {
@@ -261,7 +262,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
         // Navegar INMEDIATAMENTE sin delays
         if (mounted) {
-          await _navegarAEquipoClienteDetail();
+          await _navegarAEquipoClienteDetail(resultado); // ✅ PASAR resultado
         }
       } else {
         // Si hay error, desbloquear para permitir reintentar
@@ -278,15 +279,30 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
   }
 
-  Future<void> _navegarAEquipoClienteDetail() async {
+  Future<void> _navegarAEquipoClienteDetail(Map<String, dynamic> resultado) async {
     try {
-      final cliente = widget.datos['cliente'] as Cliente;
-      final equipoCompleto = widget.datos['equipo_completo'];
 
-      if (cliente.id == null || equipoCompleto == null) {
+
+      final cliente = widget.datos['cliente'] as Cliente;
+
+      final equipoCompleto = resultado['equipo_completo'] ?? widget.datos['equipo_completo'];
+
+
+      if (cliente.id == null) {
+        debugPrint('❌ FALLA: cliente.id es NULL');
         Navigator.of(context).pop(true);
         return;
       }
+
+      if (equipoCompleto == null) {
+        debugPrint('❌ FALLA: equipoCompleto es NULL');
+        debugPrint('   resultado["equipo_completo"]: ${resultado['equipo_completo']}');
+        debugPrint('   widget.datos["equipo_completo"]: ${widget.datos['equipo_completo']}');
+        Navigator.of(context).pop(true);
+        return;
+      }
+
+      debugPrint('✅ Datos válidos, construyendo equipoCliente...');
 
       final equipoCliente = {
         'id': equipoCompleto['id'],
@@ -302,15 +318,23 @@ class _PreviewScreenState extends State<PreviewScreen> {
         'cliente_nombre': cliente.nombre,
         'cliente_telefono': cliente.telefono,
         'cliente_direccion': cliente.direccion,
-        'tipo_estado': widget.datos['ya_asignado'] == true ? 'asignado' : 'pendiente',
+        'tipo_estado': resultado['ya_asignado'] ?? widget.datos['ya_asignado'] == true
+            ? 'asignado'
+            : 'pendiente',
       };
+
+      debugPrint('✅ equipoCliente construido: $equipoCliente');
+      debugPrint('🚀 Ejecutando navegación...');
 
       // Esto te deja en ClienteDetailScreen
       Navigator.of(context).pop(); // Cierra PreviewScreen
+      debugPrint('✅ Pop 1 ejecutado');
+
       Navigator.of(context).pop(); // Cierra FormsScreen
+      debugPrint('✅ Pop 2 ejecutado');
 
       // Ahora navega a EquiposClientesDetailScreen
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => EquiposClientesDetailScreen(
@@ -318,18 +342,21 @@ class _PreviewScreenState extends State<PreviewScreen> {
           ),
         ),
       );
+
+      debugPrint('✅ Push ejecutado - navegación completada');
+
     } catch (e, stackTrace) {
+      debugPrint('❌ EXCEPCIÓN en navegación: $e');
+      debugPrint('📍 StackTrace: $stackTrace');
       Navigator.of(context).pop(true);
     }
   }
 
   Future<void> _reintentarEnvioHistorial(String? estadoId) async {
-    // 🔴 Verificar si ya se está reintentando
     if (_yaReintentando) {
       return; // Ignorar silenciosamente
     }
 
-    // 🔴 CRÍTICO: Marcar como reintentando INMEDIATAMENTE
     setState(() {
       _yaReintentando = true;
     });
@@ -355,14 +382,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
     if (mounted) {
       if (resultado['success']) {
         _mostrarSnackBar(resultado['message'], AppColors.success);
-
-        // 🔴 Mantener deshabilitado después del éxito
-        // porque ya no debería poder reintentar más
         setState(() {
-          // _yaReintentando permanece en true
         });
       } else {
-        // 🔴 Si falla, rehabilitar para permitir reintentar
         setState(() {
           _yaReintentando = false;
         });
@@ -481,11 +503,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
       final estadoId = widget.datos['id'] as String?;
 
       return FutureBuilder<Map<String, dynamic>>(
-        future: vm.obtenerInfoSincronizacion(estadoId),
+        future: vm.obtenerInfoSincronizacion(estadoId ),
         builder: (context, snapshot) {
           final info = snapshot.data;
-          // SOLO mostrar reintentar si el estado es 'error' (no 'creado' o 'pendiente')
-          final envioFallido = info?['estado'] == 'error';
+          final envioFallido = info?['envioFallido'] == true;
+
 
           return PreviewBottomBar(
             esHistorial: esHistorial,
@@ -575,14 +597,18 @@ class _PreviewScreenState extends State<PreviewScreen> {
         }
 
         final info = snapshot.data!;
+        final estado = info['estado'] as String;
         final mensaje = info['mensaje'] as String;
         final icono = info['icono'] as IconData;
         final color = info['color'] as Color;
+        final errorDetalle = info['error_detalle'] as String?;
 
+        // ✅ SIEMPRE MOSTRAR el indicador
         return SyncStatusIndicator(
           mensaje: mensaje,
           icono: icono,
           color: color,
+          errorDetalle: errorDetalle,
         );
       },
     );

@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:async';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/repositories/cliente_repository.dart';
 import 'package:ada_app/services/sync/user_sync_service.dart';
 import 'package:ada_app/models/cliente.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart';
 
 class ClientSyncService {
   static final _clienteRepo = ClienteRepository();
@@ -31,6 +34,15 @@ class ClientSyncService {
 
     } catch (e) {
       BaseSyncService.logger.e('Error obteniendo datos del usuario: $e');
+
+      // 🚨 LOG ERROR: Error obteniendo datos del usuario
+      await ErrorLogService.logError(
+        tableName: 'clientes',
+        operation: 'get_user_data',
+        errorMessage: 'Error obteniendo datos del usuario: $e',
+        errorType: 'validation',
+      );
+
       return SyncResult(
         exito: false,
         mensaje: 'Error obteniendo datos del usuario: $e',
@@ -40,12 +52,14 @@ class ClientSyncService {
   }
 
   static Future<SyncResult> sincronizarClientesPorVendedor(String edfVendedorId) async {
+    String? currentEndpoint;
+
     try {
       BaseSyncService.logger.i('Sincronizando clientes para vendedor: $edfVendedorId');
 
-      // CAMBIO AQUÍ: Obtener la URL dinámica
       final baseUrl = await BaseSyncService.getBaseUrl();
       final url = '$baseUrl/api/getEdfClientes?edfvendedorId=$edfVendedorId';
+      currentEndpoint = url;
       BaseSyncService.logger.i('URL completa: $url');
 
       final response = await http.get(
@@ -83,12 +97,29 @@ class ClientSyncService {
           } else {
             fallidos++;
             BaseSyncService.logger.w('Cliente fallido: $clienteJson');
+
+            // 🚨 LOG ERROR: Cliente con datos inválidos
+            // await ErrorLogService.logValidationError(
+            //   tableName: 'clientes',
+            //   operation: 'process_item',
+            //   errorMessage: 'Cliente con datos inválidos o faltantes',
+            //   userId: edfVendedorId,
+            // );
           }
         }
 
         BaseSyncService.logger.i('Procesamiento: $procesados total, ${clientes.length} exitosos, $fallidos fallidos');
 
         if (clientes.isEmpty) {
+          // 🚨 LOG ERROR: No se pudieron procesar clientes
+          // await ErrorLogService.logError(
+          //   tableName: 'clientes',
+          //   operation: 'process_all',
+          //   errorMessage: 'No se pudieron procesar los clientes del servidor',
+          //   errorType: 'validation',
+          //   userId: edfVendedorId,
+          // );
+
           return SyncResult(
             exito: false,
             mensaje: 'No se pudieron procesar los clientes del servidor',
@@ -98,10 +129,22 @@ class ClientSyncService {
 
         BaseSyncService.logger.i('Guardando ${clientes.length} clientes en base de datos...');
 
-        final clientesMapas = clientes.map((cliente) => cliente.toMap()).toList();
-        await _clienteRepo.limpiarYSincronizar(clientesMapas);
+        try {
+          final clientesMapas = clientes.map((cliente) => cliente.toMap()).toList();
+          await _clienteRepo.limpiarYSincronizar(clientesMapas);
+          BaseSyncService.logger.i('Clientes sincronizados exitosamente');
+        } catch (dbError) {
+          BaseSyncService.logger.e('Error guardando clientes en BD: $dbError');
 
-        BaseSyncService.logger.i('Clientes sincronizados exitosamente');
+          // 🚨 LOG ERROR: Error de base de datos
+          await ErrorLogService.logDatabaseError(
+            tableName: 'clientes',
+            operation: 'bulk_insert',
+            errorMessage: 'Error guardando clientes en BD local: $dbError',
+          );
+
+          // No retornar error, los datos se obtuvieron correctamente
+        }
 
         return SyncResult(
           exito: true,
@@ -109,17 +152,78 @@ class ClientSyncService {
           itemsSincronizados: clientes.length,
           totalEnAPI: clientes.length,
         );
+
       } else {
         final mensaje = BaseSyncService.extractErrorMessage(response);
         BaseSyncService.logger.e('Error del servidor: $mensaje');
+
+        // 🚨 LOG ERROR: Error del servidor
+        // await ErrorLogService.logServerError(
+        //   tableName: 'clientes',
+        //   operation: 'sync_from_server',
+        //   errorMessage: mensaje,
+        //   errorCode: response.statusCode.toString(),
+        //   endpoint: currentEndpoint,
+        //   userId: edfVendedorId,
+        // );
+
         return SyncResult(
           exito: false,
           mensaje: mensaje,
           itemsSincronizados: 0,
         );
       }
+
+    } on TimeoutException catch (timeoutError) {
+      BaseSyncService.logger.e('⏰ Timeout sincronizando clientes: $timeoutError');
+
+      // 🚨 LOG ERROR: Timeout
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'clientes',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Timeout de conexión: $timeoutError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Timeout de conexión al servidor',
+        itemsSincronizados: 0,
+      );
+
+    } on SocketException catch (socketError) {
+      BaseSyncService.logger.e('📡 Error de red: $socketError');
+
+      // 🚨 LOG ERROR: Sin conexión de red
+      // await ErrorLogService.logNetworkError(
+      //   tableName: 'clientes',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Sin conexión de red: $socketError',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Sin conexión de red',
+        itemsSincronizados: 0,
+      );
+
     } catch (e) {
-      BaseSyncService.logger.e('Error en sincronización de clientes: $e');
+      BaseSyncService.logger.e('💥 Error en sincronización de clientes: $e');
+
+      // 🚨 LOG ERROR: Error general
+      // await ErrorLogService.logError(
+      //   tableName: 'clientes',
+      //   operation: 'sync_from_server',
+      //   errorMessage: 'Error general: $e',
+      //   errorType: 'unknown',
+      //   errorCode: 'GENERAL_ERROR',
+      //   endpoint: currentEndpoint,
+      //   userId: edfVendedorId,
+      // );
+
       return SyncResult(
         exito: false,
         mensaje: BaseSyncService.getErrorMessage(e),
@@ -179,6 +283,14 @@ class ClientSyncService {
       );
 
     } catch (e) {
+      // 🚨 LOG ERROR: Error en envío
+      await ErrorLogService.logError(
+        tableName: 'clientes',
+        operation: 'enviar_pendientes',
+        errorMessage: 'Error inesperado: $e',
+        errorType: 'unknown',
+      );
+
       return SyncResult(
         exito: false,
         mensaje: 'Error inesperado: ${e.toString()}',
@@ -188,6 +300,8 @@ class ClientSyncService {
   }
 
   static Future<SyncResult> enviarClienteEspecifico(Cliente cliente) async {
+    String? currentEndpoint;
+
     try {
       final resultado = await _enviarClienteAAPI(cliente);
 
@@ -198,13 +312,59 @@ class ClientSyncService {
           itemsSincronizados: 1,
         );
       } else {
+        // 🚨 LOG ERROR: Error enviando cliente
+        await ErrorLogService.logServerError(
+          tableName: 'clientes',
+          operation: 'enviar_cliente',
+          errorMessage: resultado.mensaje,
+          errorCode: resultado.codigoEstado?.toString() ?? 'UNKNOWN',
+          registroFailId: cliente.id?.toString(),
+        );
+
         return SyncResult(
           exito: false,
           mensaje: resultado.mensaje,
           itemsSincronizados: 0,
         );
       }
+
+    } on TimeoutException catch (timeoutError) {
+      await ErrorLogService.logNetworkError(
+        tableName: 'clientes',
+        operation: 'enviar_cliente',
+        errorMessage: 'Timeout: $timeoutError',
+        registroFailId: cliente.id?.toString(),
+      );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Timeout de conexión',
+        itemsSincronizados: 0,
+      );
+
+    } on SocketException catch (socketError) {
+      await ErrorLogService.logNetworkError(
+        tableName: 'clientes',
+        operation: 'enviar_cliente',
+        errorMessage: 'Sin conexión: $socketError',
+        registroFailId: cliente.id?.toString(),
+      );
+
+      return SyncResult(
+        exito: false,
+        mensaje: 'Sin conexión de red',
+        itemsSincronizados: 0,
+      );
+
     } catch (e) {
+      await ErrorLogService.logError(
+        tableName: 'clientes',
+        operation: 'enviar_cliente',
+        errorMessage: 'Error: $e',
+        errorType: 'unknown',
+        registroFailId: cliente.id?.toString(),
+      );
+
       return SyncResult(
         exito: false,
         mensaje: 'Error enviando cliente: ${e.toString()}',
@@ -214,6 +374,8 @@ class ClientSyncService {
   }
 
   static Future<ApiResponse> _enviarClienteAAPI(Cliente cliente) async {
+    String? currentEndpoint;
+
     try {
       final clienteData = {
         'cliente': cliente.nombre,
@@ -223,11 +385,11 @@ class ClientSyncService {
         'propietario': cliente.propietario,
       };
 
-      // CAMBIO AQUÍ: Obtener la URL dinámica
       final baseUrl = await BaseSyncService.getBaseUrl();
+      currentEndpoint = '$baseUrl/api/getEdfClientes';
 
       final response = await http.post(
-        Uri.parse('$baseUrl/api/getEdfClientes'),
+        Uri.parse(currentEndpoint),
         headers: BaseSyncService.headers,
         body: jsonEncode(clienteData),
       ).timeout(BaseSyncService.timeout);

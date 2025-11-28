@@ -10,7 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
+  flutter_localizations:
+    sdk: flutter
   # Dependencias principales
   sqflite: ^2.3.0
   path: ^1.8.3
@@ -33,7 +34,6 @@ dependencies:
   permission_handler: ^11.0.0
   #workmanager: ^0.5.2
   flutter_background_service: ^5.0.5
-  intl: ^0.19.0
 
   # Para peticiones HTTP
   http: ^1.2.0

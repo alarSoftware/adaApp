@@ -31,7 +31,7 @@ class DeviceLogRepository {
       sincronizado: 0, // ✅ Por defecto no sincronizado
     );
 
-    await db.insert('device_log', log.toMap());
+    await db.insert('device_log', log.toMapLocal());
     _logger.i('✅ Device log guardado: ${log.id}');
     return log.id;
   }
@@ -41,7 +41,63 @@ class DeviceLogRepository {
     return maps.map((map) => DeviceLog.fromMap(map)).toList();
   }
 
-  // ==================== NUEVOS MÉTODOS PARA SINCRONIZACIÓN ====================
+  // ==================== 🆕 NUEVOS MÉTODOS ANTI-DUPLICADOS ====================
+
+  /// 🆕 Obtener el último log de un vendedor
+  Future<DeviceLog?> obtenerUltimoLog(String? edfVendedorId) async {
+    try {
+      // Si no hay vendedor, buscar el último log sin filtro
+      final List<Map<String, dynamic>> maps;
+
+      if (edfVendedorId != null) {
+        maps = await db.query(
+          'device_log',
+          where: 'edf_vendedor_id = ?',
+          whereArgs: [edfVendedorId],
+          orderBy: 'fecha_registro DESC',
+          limit: 1,
+        );
+      } else {
+        maps = await db.query(
+          'device_log',
+          orderBy: 'fecha_registro DESC',
+          limit: 1,
+        );
+      }
+
+      if (maps.isEmpty) return null;
+      return DeviceLog.fromMap(maps.first);
+    } catch (e) {
+      _logger.e('❌ Error obteniendo último log: $e');
+      return null;
+    }
+  }
+
+  /// 🆕 Verificar si existe un log muy reciente (prevenir duplicados)
+  Future<bool> existeLogReciente(String? edfVendedorId, {int minutos = 8}) async {
+    try {
+      final ultimoLog = await obtenerUltimoLog(edfVendedorId);
+
+      if (ultimoLog == null) return false;
+
+      final tiempoDesdeUltimo = DateTime.now().difference(
+          DateTime.parse(ultimoLog.fechaRegistro)
+      );
+
+      final esReciente = tiempoDesdeUltimo.inMinutes < minutos;
+
+      if (esReciente) {
+        _logger.i('⏭️ Log reciente encontrado (hace ${tiempoDesdeUltimo.inMinutes} min)');
+      }
+
+      return esReciente;
+    } catch (e) {
+      _logger.e('❌ Error verificando log reciente: $e');
+      return false; // En caso de error, permitir crear log
+    }
+  }
+
+  // ==================== MÉTODOS DE SINCRONIZACIÓN ====================
 
   /// Obtener todos los logs no sincronizados
   Future<List<DeviceLog>> obtenerNoSincronizados() async {

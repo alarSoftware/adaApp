@@ -1,20 +1,18 @@
-import 'package:ada_app/ui/screens/sync_panel_screen.dart';
-import 'package:ada_app/ui/screens/pending_data_screen.dart'; // 🆕 NUEVO
+import 'package:ada_app/ui/screens/pending_data_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
-import 'package:ada_app/services/app_services.dart';
+import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
 import 'package:ada_app/ui/widgets/app_connection_indicator.dart';
 import 'package:ada_app/ui/screens/equipos_screen.dart';
 import 'package:ada_app/ui/screens/modelos_screen.dart';
 import 'package:ada_app/ui/screens/logo_screen.dart';
 import 'package:ada_app/ui/screens/marca_screen.dart';
-import 'package:ada_app/ui/screens/device_log_screen.dart';
 import 'package:ada_app/viewmodels/select_screen_viewmodel.dart';
 import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
 import 'package:ada_app/services/database_validation_service.dart';
 import 'package:ada_app/services/database_helper.dart';
-import 'package:ada_app/repositories/device_log_repository.dart';
-import 'package:ada_app/services/device_log/device_log_service.dart';
+import 'package:ada_app/ui/screens/productos_screen.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -32,12 +30,20 @@ class _SelectScreenState extends State<SelectScreen> {
   int _pendingDataCount = 0;
   Timer? _pendingDataTimer;
 
+  // ✅ NUEVO: Variable para evitar múltiples verificaciones de batería
+  bool _batteryOptimizationChecked = false;
+
   @override
   void initState() {
     super.initState();
     _viewModel = SelectScreenViewModel();
     _setupEventListener();
     _startPendingDataMonitoring(); // 🆕 NUEVO
+
+    // ✅ NUEVO: Verificar optimización de batería cuando se carga la pantalla
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkBatteryOptimizationOnFirstLoad();
+    });
   }
 
   @override
@@ -50,28 +56,128 @@ class _SelectScreenState extends State<SelectScreen> {
 
   // 🆕 NUEVO: Monitoreo de datos pendientes
   void _startPendingDataMonitoring() {
-    _pendingDataTimer = Timer.periodic(
-      Duration(minutes: 2),
-          (_) => _checkPendingData(),
-    );
-    _checkPendingData(); // Verificar inmediatamente
+    // _pendingDataTimer = Timer.periodic(
+    //   Duration(minutes: 2),
+    //       (_) => _checkPendingData(),
+    // );
+    // _checkPendingData();
   }
 
   // 🆕 NUEVO: Verificar datos pendientes
+// 🆕 NUEVO: Verificar datos pendientes (CORREGIDO)
   Future<void> _checkPendingData() async {
     try {
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
+
+      // 🔥 CONTAR SOLO CENSOS ACTIVOS NO SINCRONIZADOS
+      final censosPendientes = await db.query(
+        'censo_activo',
+        where: 'sincronizado = ?',
+        whereArgs: [0],
+      );
+
+      final cantidadCensos = censosPendientes.length;
+
+      // 🔥 CONTAR OTROS DATOS PENDIENTES (excluyendo tablas relacionadas con censos)
       final validationService = DatabaseValidationService(db);
-      final status = await validationService.getPendingSyncSummary();
+      final summary = await validationService.getPendingSyncSummary();
+      final pendingByTable = summary['pending_by_table'] as List<dynamic>? ?? [];
+
+      // Tablas que se excluyen del conteo (ya están incluidas en censos)
+      final tablasExcluidas = {
+        'censo_activo',
+        'equipos_pendientes',
+        'censo_activo_foto',
+      };
+
+      int otrosDatos = 0;
+      for (var item in pendingByTable) {
+        final tableName = item['table'] as String;
+        if (!tablasExcluidas.contains(tableName)) {
+          otrosDatos += item['count'] as int;
+        }
+      }
+
+      // Total: censos + otros datos
+      final totalPendientes = cantidadCensos + otrosDatos;
 
       if (mounted) {
         setState(() {
-          _pendingDataCount = status['total_pending'] ?? 0;
+          _pendingDataCount = totalPendientes;
         });
       }
+
+      print('📊 Datos pendientes: $totalPendientes (Censos: $cantidadCensos, Otros: $otrosDatos)');
+
     } catch (e) {
+      print('❌ Error verificando datos pendientes: $e');
       // Silently ignore errors for background check
+    }
+  }
+
+  // ✅ NUEVO: Verificar optimización de batería en el primer acceso
+  Future<void> _checkBatteryOptimizationOnFirstLoad() async {
+    // Evitar múltiples verificaciones
+    if (_batteryOptimizationChecked) return;
+    _batteryOptimizationChecked = true;
+
+    try {
+      print('🔋 INICIANDO verificación de batería en SelectScreen...');
+      await BatteryOptimizationDialog.checkAndRequestBatteryOptimization(context);
+      print('🔋 ✅ COMPLETADO verificación de batería en SelectScreen');
+    } catch (e) {
+      print('🔋 ❌ ERROR verificando optimización de batería en SelectScreen: $e');
+    }
+  }
+
+  // ✅ NUEVO: Método para manejar logout correctamente
+  Future<void> _handleLogout() async {
+    try {
+      // Mostrar indicador de carga
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Center(
+          child: Card(
+            color: AppColors.surface,
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text(
+                    'Cerrando sesión...',
+                    style: TextStyle(color: AppColors.textPrimary),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Hacer logout
+      await AuthService().logout();
+
+      // Cerrar diálogo de carga
+      if (mounted) Navigator.of(context).pop();
+
+      // Navegar a login y limpiar stack completo
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/login',
+              (route) => false, // Elimina TODAS las pantallas anteriores
+        );
+      }
+    } catch (e) {
+      // Cerrar diálogo si está abierto
+      if (mounted) Navigator.of(context).pop();
+
+      _mostrarError('Error al cerrar sesión: $e');
     }
   }
 
@@ -89,7 +195,7 @@ class _SelectScreenState extends State<SelectScreen> {
               ),
             );
             // Refrescar contador después de volver
-            _checkPendingData();
+            // _checkPendingData();
           },
           icon: Icon(Icons.notifications, color: AppColors.onPrimary),
           tooltip: 'Datos pendientes de envío',
@@ -131,6 +237,8 @@ class _SelectScreenState extends State<SelectScreen> {
     );
   }
 
+
+
   void _setupEventListener() {
     _eventSubscription = _viewModel.uiEvents.listen((event) {
       if (!mounted) return;
@@ -140,7 +248,7 @@ class _SelectScreenState extends State<SelectScreen> {
       } else if (event is ShowSuccessEvent) {
         _mostrarExito(event.message);
         // 🆕 NUEVO: Refrescar contador después de sync exitoso
-        _checkPendingData();
+        // _checkPendingData();
       } else if (event is RequestSyncConfirmationEvent) {
         _handleSyncConfirmation();
       } else if (event is RequiredSyncEvent) {
@@ -154,9 +262,192 @@ class _SelectScreenState extends State<SelectScreen> {
       } else if (event is SyncCompletedEvent) {
         _mostrarExito(event.result.message);
         // 🆕 NUEVO: Refrescar contador después de sync
-        _checkPendingData();
+        // _checkPendingData();
+      } else if (event is SyncErrorEvent) {
+        // 🆕 NUEVO: Mostrar diálogo de error de sincronización
+        _mostrarDialogoErrorSync(event);
       }
     });
+  }
+
+  // 🆕 NUEVO: Diálogo para mostrar errores de sincronización
+  Future<void> _mostrarDialogoErrorSync(SyncErrorEvent event) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: Row(
+            children: [
+              Icon(Icons.error_outline, color: AppColors.error, size: 28),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '❌ Error de Sincronización',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Mensaje principal
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          color: AppColors.error,
+                          size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          event.message,
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Detalles técnicos si existen
+                if (event.details != null && event.details!.isNotEmpty) ...[
+                  SizedBox(height: 16),
+                  Text(
+                    'Detalles técnicos:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Text(
+                      event.details!,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                ],
+
+                SizedBox(height: 16),
+
+                // Recomendaciones
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.lightbulb_outline,
+                              color: AppColors.info,
+                              size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Recomendaciones:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.info,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                      _buildRecommendation('Verifica tu conexión a internet'),
+                      _buildRecommendation('Intenta nuevamente en unos momentos'),
+                      _buildRecommendation('Si el problema persiste, contacta a soporte'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cerrar',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _viewModel.requestSync(); // Reintentar sincronización
+              },
+              icon: Icon(Icons.refresh),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
+              ),
+              label: Text('Reintentar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 🆕 NUEVO: Widget helper para recomendaciones
+  Widget _buildRecommendation(String text) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 4, left: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '•  ',
+            style: TextStyle(
+              color: AppColors.info,
+              fontSize: 13,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _handleDeleteValidationFailed(DatabaseValidationResult validation) async {
@@ -262,15 +553,15 @@ class _SelectScreenState extends State<SelectScreen> {
                 style: TextStyle(color: AppColors.textSecondary),
               ),
             ),
-            // 🆕 NUEVO: Botón para ir a datos pendientes
+            // NUEVO: Botón para ir a datos pendientes
             TextButton(
               onPressed: () async {
                 Navigator.of(context).pop();
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => PendingDataScreen()),
+                   MaterialPageRoute(builder: (context) => PendingDataScreen()),
                 );
-                _checkPendingData();
+                // _checkPendingData();
               },
               child: Text(
                 'Ver Detalles',
@@ -787,41 +1078,23 @@ class _SelectScreenState extends State<SelectScreen> {
                           color: AppColors.primary,
                           page: const MarcaScreen(),
                         ),
-                        SizedBox(height: 12),
                         _buildMenuCard(
-                          label: 'Registro de Dispositivo',
-                          description: 'Ver datos del dispositivo registrados',
-                          icon: Icons.phone_android,
-                          color: AppColors.info,
-                          onTap: () async {
-                            try {
-                              final database = await DatabaseHelper().database;
-                              final repository = DeviceLogRepository(database);
-
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => DeviceLogScreen(
-                                    repository: repository,
-                                  ),
-                                ),
-                              );
-                            } catch (e) {
-                              _mostrarError('Error al abrir registro: $e');
-                            }
-                          },
+                          label: 'Productos',
+                          description: 'Catálogo completo de productos',
+                          icon: Icons.inventory_2,
+                          color: AppColors.primary,
+                          page: const ProductosScreen(),
                         ),
+                        SizedBox(height: 12),
                       ],
                     ),
                   ),
 
-                  // Botón de cerrar sesión
+                  // ✅ BOTÓN DE CERRAR SESIÓN CORREGIDO
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: TextButton.icon(
-                      onPressed: () {
-                        Navigator.pushReplacementNamed(context, '/login');
-                      },
+                      onPressed: _handleLogout, // ✅ Usar el método correcto
                       icon: Icon(Icons.logout, color: AppColors.textSecondary),
                       label: Text(
                         'Cerrar Sesión',

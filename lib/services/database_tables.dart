@@ -34,14 +34,18 @@ class DatabaseTables {
     await db.execute(_sqlCensoActivo());
     await db.execute(_sqlCensoActivoFoto());
     await db.execute(_sqlDeviceLog());
-    await db.execute(_sqlErrorLog()); // 🆕 NUEVA TABLA
+    await db.execute(_sqlErrorLog());
 
-    // Tablas de formularios dinámicos
     await db.execute(_sqlDynamicForm());
     await db.execute(_sqlDynamicFormDetail());
     await db.execute(_sqlDynamicFormResponse());
     await db.execute(_sqlDynamicFormResponseDetail());
     await db.execute(_sqlDynamicFormResponseImage());
+
+    await db.execute(_sqlProductos());
+    await db.execute(_sqlUnidadesMedida());
+    await db.execute(_sqlOperacionComercial());
+    await db.execute(_sqlOperacionComercialDetalle());
   }
 
   String _sqlModelos() => '''
@@ -73,12 +77,13 @@ class DatabaseTables {
       telefono TEXT,
       direccion TEXT,
       ruc_ci TEXT,
-      propietario TEXT
+      propietario TEXT,
+      condicio_venta TEXT
     )
   ''';
 
   String _sqlEquipos() => '''
-  CREATE TABLE equipos (
+    CREATE TABLE equipos (
     id TEXT PRIMARY KEY,
     cliente_id TEXT,                 
     cod_barras TEXT,                       
@@ -87,6 +92,9 @@ class DatabaseTables {
     numero_serie TEXT,                      
     logo_id INTEGER,
     app_insert INTEGER DEFAULT 0,
+    sincronizado INTEGER DEFAULT 0,              
+    fecha_creacion TEXT NOT NULL,                
+    fecha_actualizacion TEXT,                   
     FOREIGN KEY (marca_id) REFERENCES marcas (id),
     FOREIGN KEY (modelo_id) REFERENCES modelos (id),
     FOREIGN KEY (logo_id) REFERENCES logo (id),
@@ -97,6 +105,7 @@ class DatabaseTables {
   String _sqlEquiposPendientes() => '''
   CREATE TABLE equipos_pendientes (
     id TEXT PRIMARY KEY,
+    edf_vendedor_id TEXT,
     equipo_id TEXT,
     cliente_id TEXT,
     fecha_censo DATETIME,
@@ -104,7 +113,10 @@ class DatabaseTables {
     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion DATETIME,
     sincronizado INTEGER DEFAULT 0,
-    fecha_sincronizacion DATETIME,        
+    fecha_sincronizacion DATETIME,
+    intentos_sync INTEGER DEFAULT 0,
+    ultimo_intento TEXT,                  
+    error_mensaje TEXT,                    
     UNIQUE(equipo_id, cliente_id),
     FOREIGN KEY (equipo_id) REFERENCES equipos (id),
     FOREIGN KEY (cliente_id) REFERENCES clientes (id)
@@ -115,6 +127,7 @@ class DatabaseTables {
   CREATE TABLE Users (
     id INTEGER PRIMARY KEY,
     edf_vendedor_id TEXT,
+    edfVendedorNombre TEXT,
     code INTEGER,
     username TEXT NOT NULL,
     password TEXT NOT NULL,   
@@ -125,6 +138,7 @@ class DatabaseTables {
   String _sqlCensoActivo() => '''
   CREATE TABLE censo_activo (
     id TEXT PRIMARY KEY,
+    edf_vendedor_id TEXT,
     equipo_id TEXT NOT NULL,
     cliente_id INTEGER NOT NULL,
     usuario_id INTEGER,
@@ -134,9 +148,11 @@ class DatabaseTables {
     fecha_revision TEXT,
     fecha_creacion TEXT,
     fecha_actualizacion TEXT,
-    sincronizado INTEGER DEFAULT 0,
     observaciones TEXT,
-    estado_censo TEXT DEFAULT 'creado'
+    estado_censo TEXT DEFAULT 'creado',
+    intentos_sync INTEGER DEFAULT 0,   
+    ultimo_intento TEXT,  
+    error_mensaje TEXT
   )
 ''';
 
@@ -168,20 +184,25 @@ class DatabaseTables {
 ''';
 
   String _sqlErrorLog() => '''
-    CREATE TABLE error_log (
-      id TEXT PRIMARY KEY,
-      timestamp TEXT NOT NULL,
-      table_name TEXT NOT NULL,
-      operation TEXT NOT NULL,
-      registro_fail_id TEXT,
-      error_code TEXT,
-      error_message TEXT NOT NULL,
-      error_type TEXT,
-      sync_attempt INTEGER DEFAULT 1,
-      user_id TEXT,
-      endpoint TEXT
-    )
-  ''';
+  CREATE TABLE error_log (
+    id TEXT PRIMARY KEY,
+    timestamp TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    registro_fail_id TEXT,
+    error_code TEXT,
+    error_message TEXT NOT NULL,
+    error_type TEXT,
+    sync_attempt INTEGER DEFAULT 1,
+    user_id TEXT,
+    endpoint TEXT,
+    retry_count INTEGER DEFAULT 0, 
+    last_retry_at TEXT, 
+    next_retry_at TEXT,  
+    sincronizado INTEGER DEFAULT 0,
+    fecha_sincronizacion TEXT
+  )
+''';
 
   // ==================== TABLAS DE FORMULARIOS DINÁMICOS ====================
 
@@ -264,6 +285,74 @@ class DatabaseTables {
   )
 ''';
 
+  // ==================== TABLAS DE OPERACIONES COMERCIALES ====================
+
+  String _sqlOperacionComercial() => '''
+  CREATE TABLE operacion_comercial (
+    id TEXT PRIMARY KEY,
+    cliente_id INTEGER NOT NULL,
+    tipo_operacion TEXT NOT NULL,
+    fecha_creacion TEXT NOT NULL,
+    fecha_retiro TEXT,
+    estado TEXT DEFAULT 'borrador',
+    observaciones TEXT,
+    total_productos INTEGER DEFAULT 0,
+    usuario_id INTEGER,
+    sincronizado INTEGER DEFAULT 0,
+    fecha_sincronizacion TEXT,
+    server_id INTEGER,
+    sync_status TEXT DEFAULT 'pending',
+    intentos_sync INTEGER DEFAULT 0,
+    ultimo_intento_sync TEXT,
+    mensaje_error_sync TEXT,
+    FOREIGN KEY (cliente_id) REFERENCES clientes (id),
+    FOREIGN KEY (usuario_id) REFERENCES Users (id)
+  )
+''';
+
+  String _sqlOperacionComercialDetalle() => '''
+  CREATE TABLE operacion_comercial_detalle (
+    id TEXT PRIMARY KEY,
+    operacion_comercial_id TEXT NOT NULL,
+    producto_codigo TEXT NOT NULL,
+    producto_descripcion TEXT NOT NULL,
+    producto_categoria TEXT,
+    producto_id INTEGER,
+    cantidad REAL NOT NULL,
+    unidad_medida TEXT NOT NULL,
+    ticket TEXT,
+    precio_unitario REAL,
+    subtotal REAL,
+    orden INTEGER DEFAULT 1,
+    fecha_creacion TEXT NOT NULL,
+    sincronizado INTEGER DEFAULT 0,
+    producto_reemplazo_id INTEGER,
+    producto_reemplazo_codigo TEXT,
+    producto_reemplazo_descripcion TEXT,
+    producto_reemplazo_categoria TEXT,
+    FOREIGN KEY (operacion_comercial_id) REFERENCES operacion_comercial (id) ON DELETE CASCADE
+  )
+''';
+
+  String _sqlUnidadesMedida() => '''
+  CREATE TABLE unidades_medida (
+    id INTEGER PRIMARY KEY,
+    codigo TEXT NOT NULL,
+    descripcion TEXT NOT NULL,
+    activo INTEGER DEFAULT 1
+  )
+''';
+
+  String _sqlProductos() => '''
+  CREATE TABLE productos (
+    id INTEGER PRIMARY KEY,
+    codigo TEXT,
+    codigo_barras TEXT,
+    nombre TEXT,
+    categoria TEXT
+  )
+''';
+
   // ==================== ÍNDICES ====================
 
   Future<void> _crearIndices(Database db) async {
@@ -275,6 +364,7 @@ class DatabaseTables {
     await _crearIndicesDynamicForms(db);
     await _crearIndicesDeviceLog(db);
     await _crearIndicesErrorLog(db);
+    await _crearIndicesOperacionesComerciales(db);
   }
 
   Future<void> _crearIndicesClientes(Database db) async {
@@ -388,12 +478,38 @@ class DatabaseTables {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_device_log_fecha ON device_log (fecha_registro)');
   }
 
-  // 🆕 ÍNDICES PARA ERROR_LOG
   Future<void> _crearIndicesErrorLog(Database db) async {
     final indices = [
       'CREATE INDEX IF NOT EXISTS idx_error_log_timestamp ON error_log (timestamp)',
       'CREATE INDEX IF NOT EXISTS idx_error_log_table_name ON error_log (table_name)',
       'CREATE INDEX IF NOT EXISTS idx_error_log_error_type ON error_log (error_type)',
+    ];
+
+    for (final indice in indices) {
+      await db.execute(indice);
+    }
+  }
+
+  Future<void> _crearIndicesOperacionesComerciales(Database db) async {
+    final indices = [
+      // Índices para operacion_comercial
+      'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_cliente_id ON operacion_comercial (cliente_id)',
+      'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_tipo ON operacion_comercial (tipo_operacion)',
+      'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_estado ON operacion_comercial (estado)',
+      'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_sync_status ON operacion_comercial (sync_status)',
+      'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_fecha_creacion ON operacion_comercial (fecha_creacion)',
+      'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_usuario_id ON operacion_comercial (usuario_id)',
+      'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_server_id ON operacion_comercial (server_id)',
+
+      // Índices para operacion_comercial_detalle
+      'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_operacion_id ON operacion_comercial_detalle (operacion_comercial_id)',
+      'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_codigo ON operacion_comercial_detalle (producto_codigo)',
+      'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_categoria ON operacion_comercial_detalle (producto_categoria)',
+      'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_sincronizado ON operacion_comercial_detalle (sincronizado)',
+
+      // Índices para productos
+      'CREATE INDEX IF NOT EXISTS idx_productos_codigo ON productos (codigo)',
+      'CREATE INDEX IF NOT EXISTS idx_productos_categoria ON productos (categoria)',
     ];
 
     for (final indice in indices) {

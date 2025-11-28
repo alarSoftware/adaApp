@@ -1,17 +1,14 @@
-// lib/services/dynamic_form/dynamic_form_upload_service.dart
-
 import 'dart:async';
 import 'package:logger/logger.dart';
 import 'package:ada_app/repositories/dynamic_form_sync_repository.dart';
 import 'package:ada_app/services/post/dynamic_form_post_service.dart';
 import 'package:ada_app/services/dynamic_form/dynamic_form_log_service.dart';
-
+import 'package:ada_app/services/error_log/error_log_service.dart';
 class DynamicFormUploadService {
   final Logger _logger = Logger();
   final DynamicFormSyncRepository _syncRepository;
   final DynamicFormLogService _logService;
 
-  // Variables para sincronización automática
   static Timer? _syncTimer;
   static bool _syncActivo = false;
   static String? _usuarioActual;
@@ -26,6 +23,7 @@ class DynamicFormUploadService {
   Future<Map<String, dynamic>> enviarRespuestaAlServidor(
       String responseId, {
         bool guardarLog = false,
+        String? userId,
       }) async {
     try {
       _logger.i('📤 Preparando envío de respuesta: $responseId');
@@ -33,6 +31,15 @@ class DynamicFormUploadService {
       // Obtener datos completos de la BD
       final respuesta = await _syncRepository.getResponseById(responseId);
       if (respuesta == null) {
+        // 🚨 LOG: Respuesta no encontrada
+        // await ErrorLogService.logValidationError(
+        //   tableName: 'dynamic_form_response',
+        //   operation: 'enviar_respuesta',
+        //   errorMessage: 'Respuesta no encontrada en BD local',
+        //   registroFailId: responseId,
+        //   userId: userId,
+        // );
+
         return {'exito': false, 'mensaje': 'Respuesta no encontrada'};
       }
 
@@ -40,7 +47,7 @@ class DynamicFormUploadService {
       final imagenes = await _syncRepository.getResponseImages(responseId);
 
       // Preparar payload
-      final payload = await _prepararPayloadCompleto(respuesta, detalles, imagenes);
+      final payload = await _prepararPayloadCompleto(respuesta, detalles, imagenes, responseId, userId);
 
       final timestamp = DateTime.now().toIso8601String();
 
@@ -55,10 +62,11 @@ class DynamicFormUploadService {
         );
       }
 
-      // ✅ USAR DynamicFormPostService
+      // ✅ USAR DynamicFormPostService con userId
       final resultado = await DynamicFormPostService.enviarRespuestaFormulario(
         respuesta: payload,
         incluirLog: false,
+        userId: userId,
       );
 
       _logger.i('✅ Respuesta recibida: ${resultado['exito']}');
@@ -66,6 +74,17 @@ class DynamicFormUploadService {
 
     } catch (e) {
       _logger.e('❌ Error en envío: $e');
+
+      // 🚨 LOG: Error general en envío
+      // await ErrorLogService.logError(
+      //   tableName: 'dynamic_form_response',
+      //   operation: 'enviar_respuesta',
+      //   errorMessage: 'Error de conexión: $e',
+      //   errorType: 'upload',
+      //   registroFailId: responseId,
+      //   userId: userId,
+      // );
+
       return {
         'exito': false,
         'mensaje': 'Error de conexión: $e',
@@ -74,7 +93,7 @@ class DynamicFormUploadService {
   }
 
   /// Sincroniza una respuesta específica en segundo plano
-  Future<void> sincronizarRespuestaEnBackground(String responseId) async {
+  Future<void> sincronizarRespuestaEnBackground(String responseId, {String? userId}) async {
     Future.delayed(Duration.zero, () async {
       try {
         _logger.i('🔄 Sincronización background para: $responseId');
@@ -87,7 +106,7 @@ class DynamicFormUploadService {
         );
 
         // Enviar
-        final resultado = await enviarRespuestaAlServidor(responseId);
+        final resultado = await enviarRespuestaAlServidor(responseId, userId: userId);
 
         // Actualizar estado
         if (resultado['exito'] == true) {
@@ -102,10 +121,32 @@ class DynamicFormUploadService {
             'Error (intento #1): ${resultado['mensaje']}',
           );
 
+          // 🚨 LOG: Error en primer intento
+          // await ErrorLogService.logError(
+          //   tableName: 'dynamic_form_response',
+          //   operation: 'sync_background',
+          //   errorMessage: 'Error en primer intento: ${resultado['mensaje']}',
+          //   errorType: 'sync',
+          //   registroFailId: responseId,
+          //   syncAttempt: 1,
+          //   userId: userId,
+          // );
+
           _logger.w('⚠️ Error - reintento programado');
         }
       } catch (e) {
         _logger.e('💥 Excepción en sincronización: $e');
+
+        // 🚨 LOG: Excepción en background sync
+        // await ErrorLogService.logError(
+        //   tableName: 'dynamic_form_response',
+        //   operation: 'sync_background',
+        //   errorMessage: 'Excepción en sincronización: $e',
+        //   errorType: 'exception',
+        //   registroFailId: responseId,
+        //   userId: userId,
+        // );
+
         await _syncRepository.markResponseAsError(responseId, 'Excepción: $e');
       }
     });
@@ -135,37 +176,74 @@ class DynamicFormUploadService {
       for (final respuesta in todasLasRespuestas) {
         try {
           final responseId = respuesta['id'] as String;
-          await _sincronizarRespuestaIndividual(responseId);
+          await _sincronizarRespuestaIndividual(responseId, usuarioId);
           exitosos++;
         } catch (e) {
           _logger.e('❌ Error: $e');
+
+          // 🚨 LOG: Error en sincronización individual
+          // await ErrorLogService.logError(
+          //   tableName: 'dynamic_form_response',
+          //   operation: 'sync_pendientes',
+          //   errorMessage: 'Error sincronizando respuesta: $e',
+          //   errorType: 'sync_batch',
+          //   registroFailId: respuesta['id'] as String?,
+          //   userId: usuarioId,
+          // );
+
           fallidos++;
         }
       }
 
       _logger.i('✅ Completado - Exitosos: $exitosos, Fallidos: $fallidos');
 
+      // 🚨 LOG: Si hay muchos fallos, registrar
+      if (fallidos > 0 && fallidos >= exitosos) {
+        // await ErrorLogService.logError(
+        //   tableName: 'dynamic_form_response',
+        //   operation: 'sync_pendientes',
+        //   errorMessage: 'Alta tasa de fallos: $fallidos de ${todasLasRespuestas.length}',
+        //   errorType: 'sync_batch_high_failure',
+        //   userId: usuarioId,
+        // );
+      }
+
       return {
         'exitosos': exitosos,
         'fallidos': fallidos,
         'total': todasLasRespuestas.length,
       };
+
     } catch (e) {
       _logger.e('💥 Error en sincronización: $e');
+
+      // 🚨 LOG: Error general en sincronización batch
+      // await ErrorLogService.logError(
+      //   tableName: 'dynamic_form_response',
+      //   operation: 'sync_pendientes',
+      //   errorMessage: 'Error en sincronización masiva: $e',
+      //   errorType: 'sync_batch',
+      //   userId: usuarioId,
+      // );
+
       return {'exitosos': 0, 'fallidos': 0, 'total': 0};
     }
   }
 
   /// Reintenta el envío de una respuesta específica
-  Future<Map<String, dynamic>> reintentarEnvioRespuesta(String responseId) async {
+  Future<Map<String, dynamic>> reintentarEnvioRespuesta(String responseId, {String? userId}) async {
     try {
       _logger.i('🔁 Reintentando: $responseId');
+
+      // Obtener número de intentos previos
+      final intentosPrevios = await _obtenerNumeroIntentos(responseId);
+      final numeroIntento = intentosPrevios + 1;
 
       // Resetear intentos
       await _syncRepository.resetSyncAttempts(responseId);
 
       // Enviar
-      final resultado = await enviarRespuestaAlServidor(responseId);
+      final resultado = await enviarRespuestaAlServidor(responseId, userId: userId);
 
       if (resultado['exito'] == true) {
         await _syncRepository.markResponseAsSynced(responseId);
@@ -175,10 +253,34 @@ class DynamicFormUploadService {
         return {'success': true, 'message': 'Respuesta sincronizada'};
       } else {
         await _syncRepository.markResponseAsError(responseId, 'Error: ${resultado['mensaje']}');
+
+        // 🚨 LOG: Reintento fallido
+        // await ErrorLogService.logError(
+        //   tableName: 'dynamic_form_response',
+        //   operation: 'RETRY_POST',
+        //   errorMessage: 'Reintento #$numeroIntento falló: ${resultado['mensaje']}',
+        //   errorType: 'retry_failed',
+        //   registroFailId: responseId,
+        //   syncAttempt: numeroIntento,
+        //   userId: userId,
+        // );
+
         return {'success': false, 'error': resultado['mensaje']};
       }
+
     } catch (e) {
       _logger.e('💥 Error en reintento: $e');
+
+      // 🚨 LOG: Excepción en reintento
+      // await ErrorLogService.logError(
+      //   tableName: 'dynamic_form_response',
+      //   operation: 'RETRY_POST',
+      //   errorMessage: 'Excepción en reintento: $e',
+      //   errorType: 'retry_exception',
+      //   registroFailId: responseId,
+      //   userId: userId,
+      // );
+
       await _syncRepository.markResponseAsError(responseId, 'Excepción: $e');
       return {'success': false, 'error': 'Error: $e'};
     }
@@ -230,8 +332,18 @@ class DynamicFormUploadService {
       if (resultado['total']! > 0) {
         logger.i('✅ Auto-sync formularios: ${resultado['exitosos']}/${resultado['total']}');
       }
+
     } catch (e) {
       Logger().e('❌ Error en auto-sync formularios: $e');
+
+      // 🚨 LOG: Error en auto-sync
+      // await ErrorLogService.logError(
+      //   tableName: 'dynamic_form_response',
+      //   operation: 'auto_sync',
+      //   errorMessage: 'Error en sincronización automática: $e',
+      //   errorType: 'auto_sync',
+      //   userId: _usuarioActual,
+      // );
     }
   }
 
@@ -251,11 +363,13 @@ class DynamicFormUploadService {
 
   // ==================== MÉTODOS PRIVADOS ====================
 
-  /// ✅ CORREGIDO: Prepara el payload completo con detalles e imágenes
+  /// Prepara el payload completo con detalles e imágenes
   Future<Map<String, dynamic>> _prepararPayloadCompleto(
       Map<String, dynamic> respuesta,
       List<Map<String, dynamic>> detalles,
       List<Map<String, dynamic>> imagenes,
+      String responseId,
+      String? userId,
       ) async {
     try {
       _logger.i('📦 Preparando payload para: ${respuesta['id']}');
@@ -294,7 +408,6 @@ class DynamicFormUploadService {
         };
       }).toList();
 
-      // ✅ FIX: Obtener completedDate correctamente
       final completedDate = _getCompletedDate(respuesta);
       final estado = respuesta['estado'] as String?;
 
@@ -311,59 +424,55 @@ class DynamicFormUploadService {
             : null,
         'estado': estado,
         'creationDate': respuesta['creation_date'],
-        'completedDate': completedDate, // ✅ Usar método helper
+        'completedDate': completedDate,
         'lastUpdateDate': respuesta['last_update_date'] ?? respuesta['creation_date'],
         'details': detallesFormateados,
       };
 
-      // ✅ DEBUG adicional
       _logger.i('🔍 PAYLOAD FINAL:');
       _logger.i('  - ID: ${payload['id']}');
       _logger.i('  - Estado: ${payload['estado']}');
-      _logger.i('  - CreationDate: ${payload['creationDate']}');
-      _logger.i('  - CompletedDate: ${payload['completedDate']}');
-      _logger.i('  - LastUpdateDate: ${payload['lastUpdateDate']}');
       _logger.i('  - Details: ${(payload['details'] as List).length}');
 
       return payload;
+
     } catch (e) {
       _logger.e('❌ Error preparando payload: $e');
+
+      // 🚨 LOG: Error preparando payload
+      // await ErrorLogService.logError(
+      //   tableName: 'dynamic_form_response',
+      //   operation: 'preparar_payload',
+      //   errorMessage: 'Error preparando payload: $e',
+      //   errorType: 'preparation',
+      //   registroFailId: responseId,
+      //   userId: userId,
+      // );
+
       rethrow;
     }
   }
 
-  /// ✅ NUEVO: Método helper para obtener completedDate correctamente
+  /// Método helper para obtener completedDate correctamente
   String? _getCompletedDate(Map<String, dynamic> respuesta) {
     final estado = respuesta['estado'] as String?;
 
-    _logger.d('🔍 _getCompletedDate - Estado: $estado');
-
-    // Solo enviar completedDate si el formulario está completado o sincronizado
     if (estado == 'completed' || estado == 'synced') {
-      // Usar last_update_date como fecha de completado
       final lastUpdateDate = respuesta['last_update_date'] as String?;
 
-      _logger.d('🔍 LastUpdateDate en BD: $lastUpdateDate');
-
       if (lastUpdateDate != null && lastUpdateDate.isNotEmpty) {
-        _logger.i('✅ Usando lastUpdateDate como completedDate: $lastUpdateDate');
         return lastUpdateDate;
       }
 
-      // Fallback: usar creation_date si no hay last_update_date
       final creationDate = respuesta['creation_date'] as String?;
-      _logger.w('⚠️ No hay lastUpdateDate, usando creationDate: $creationDate');
-
       return creationDate ?? DateTime.now().toIso8601String();
     }
 
-    // Para drafts, no enviar completedDate (el servidor lo espera como null)
-    _logger.d('🔍 Estado es draft, completedDate será null');
     return null;
   }
 
   /// Sincroniza una respuesta individual con backoff
-  Future<void> _sincronizarRespuestaIndividual(String responseId) async {
+  Future<void> _sincronizarRespuestaIndividual(String responseId, String? userId) async {
     final intentosPrevios = await _obtenerNumeroIntentos(responseId);
     final numeroIntento = intentosPrevios + 1;
 
@@ -375,7 +484,7 @@ class DynamicFormUploadService {
       DateTime.now().toIso8601String(),
     );
 
-    final resultado = await enviarRespuestaAlServidor(responseId);
+    final resultado = await enviarRespuestaAlServidor(responseId, userId: userId);
 
     if (resultado['exito'] == true) {
       await _syncRepository.markResponseAsSynced(responseId);
@@ -388,6 +497,17 @@ class DynamicFormUploadService {
         responseId,
         'Error (intento #$numeroIntento): ${resultado['mensaje']}',
       );
+
+      // 🚨 LOG: Intento fallido con backoff
+      // await ErrorLogService.logError(
+      //   tableName: 'dynamic_form_response',
+      //   operation: 'sync_individual',
+      //   errorMessage: 'Error en intento #$numeroIntento: ${resultado['mensaje']}',
+      //   errorType: 'sync_retry',
+      //   registroFailId: responseId,
+      //   syncAttempt: numeroIntento,
+      //   userId: userId,
+      // );
 
       final proximoIntento = _calcularProximoIntento(numeroIntento);
       _logger.w('⚠️ Error intento #$numeroIntento - próximo en $proximoIntento min');

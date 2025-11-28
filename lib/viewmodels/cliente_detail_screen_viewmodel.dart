@@ -245,7 +245,7 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
 
     if (fechaStr != null) {
       try {
-        final fecha = DateTime.parse(fechaStr);
+        final fecha = DateTime.parse(fechaStr).toLocal();
         return 'Censado: ${formatearFecha(fecha)}';
       } catch (e) {
         _logger.w('Error parseando fecha: $fechaStr');
@@ -253,7 +253,6 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
     }
     return 'Fecha no disponible';
   }
-
   String getEquipoEstado(Map<String, dynamic> equipoData) {
     return equipoData['estado']?.toString() ?? 'Sin estado';
   }

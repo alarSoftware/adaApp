@@ -3,6 +3,7 @@ import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/ui/screens/cliente_detail_screen.dart';
 import 'package:ada_app/ui/screens/dynamic_form_responses_screen.dart';
+import 'package:ada_app/ui/screens/operaciones_comerciales/operaciones_comerciales_menu_screen.dart';
 import 'package:ada_app/ui/widgets/client_info_card.dart';
 
 /// Pantalla de selección de opciones para un cliente
@@ -76,6 +77,15 @@ class ClientOptionsScreen extends StatelessWidget {
                       icon: Icons.assignment_outlined,
                       color: AppColors.info,
                       onTap: () => _navigateToForms(context),
+                    ),
+                    SizedBox(height: 12),
+                    _buildOptionCard(
+                      context: context,
+                      title: 'Operaciones Comerciales',
+                      description: 'Pedidos, reposiciones y retiros',
+                      icon: Icons.receipt_long,
+                      color: AppColors.success,
+                      onTap: () => _navigateToOperacionesComerciales(context),
                     ),
                   ],
                 ),
@@ -170,6 +180,15 @@ class ClientOptionsScreen extends StatelessWidget {
       context,
       MaterialPageRoute(
         builder: (context) => DynamicFormResponsesScreen(cliente: cliente),
+      ),
+    );
+  }
+
+  void _navigateToOperacionesComerciales(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OperacionesComercialesMenuScreen(cliente: cliente),
       ),
     );
   }

@@ -1,5 +1,3 @@
-// lib/services/censo/censo_foto_service.dart
-
 import 'package:logger/logger.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/models/censo_activo_foto.dart'; // ← Agregar import

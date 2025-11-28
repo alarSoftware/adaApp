@@ -120,7 +120,6 @@ class CensoConFotos {
   String get infoResumen {
     if (!tieneFotos) return 'Sin fotos';
 
-    final sincronizadas = fotosSincronizadas.length;
     final pendientes = fotosPendientes.length;
 
     if (todasSincronizadas) {

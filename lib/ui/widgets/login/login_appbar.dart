@@ -4,7 +4,7 @@ import 'package:ada_app/viewmodels/login_screen_viewmodel.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 
 class LoginAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final Function(LoginScreenViewModel) onSync;
+  final VoidCallback onSync;  // ✅ CAMBIO: Ya no recibe LoginScreenViewModel
   final VoidCallback onDeleteUsers;
 
   const LoginAppBar({
@@ -35,8 +35,8 @@ class LoginAppBar extends StatelessWidget implements PreferredSizeWidget {
               onSelected: (String value) {
                 switch (value) {
                   case 'sync':
-                    if (!viewModel.isSyncingUsers) {
-                      onSync(viewModel);
+                    if (!viewModel.isSyncing) {  // ✅ CAMBIO: isSyncing en lugar de isSyncingUsers
+                      onSync();  // ✅ CAMBIO: Sin parámetro
                     }
                     break;
                   case 'delete_users':
@@ -50,10 +50,10 @@ class LoginAppBar extends StatelessWidget implements PreferredSizeWidget {
               itemBuilder: (BuildContext context) => [
                 PopupMenuItem<String>(
                   value: 'sync',
-                  enabled: !viewModel.isSyncingUsers,
+                  enabled: !viewModel.isSyncing,  // ✅ CAMBIO: isSyncing
                   child: Row(
                     children: [
-                      viewModel.isSyncingUsers
+                      viewModel.isSyncing  // ✅ CAMBIO: isSyncing
                           ? SizedBox(
                         width: 20,
                         height: 20,
@@ -69,7 +69,7 @@ class LoginAppBar extends StatelessWidget implements PreferredSizeWidget {
                       Text(
                         'Sincronizar usuarios',
                         style: TextStyle(
-                          color: viewModel.isSyncingUsers
+                          color: viewModel.isSyncing  // ✅ CAMBIO: isSyncing
                               ? AppColors.textSecondary.withOpacity(0.5)
                               : AppColors.textPrimary,
                           fontSize: 14,

@@ -16,7 +16,6 @@ class Equipo {
   final bool nuevoEquipo;
   final DateTime fechaCreacion;
   final DateTime? fechaActualizacion;
-  final int sincronizado;
 
   // Campos adicionales para JOIN (no se almacenan en DB)
   final String? marcaNombre;
@@ -34,15 +33,11 @@ class Equipo {
     this.nuevoEquipo = false,
     required this.fechaCreacion,
     this.fechaActualizacion,
-    this.sincronizado = 0,
     this.marcaNombre,
     this.modeloNombre,
     this.logoNombre,
   });
 
-  // ==========================================================================
-  // FACTORY CONSTRUCTORS
-  // ==========================================================================
 
   /// Constructor desde Map (base de datos local)
   factory Equipo.fromMap(Map<String, dynamic> map) {
@@ -61,7 +56,6 @@ class Equipo {
       fechaActualizacion: ParsingHelpers.parseDateTime(
         map['fecha_actualizacion'],
       ),
-      sincronizado: ParsingHelpers.parseInt(map['sincronizado']),
       marcaNombre: ParsingHelpers.parseString(map['marca_nombre']),
       modeloNombre: ParsingHelpers.parseString(map['modelo_nombre']),
       logoNombre: ParsingHelpers.parseString(map['logo_nombre']),
@@ -91,7 +85,6 @@ class Equipo {
       fechaActualizacion: ParsingHelpers.parseDateTime(
         json['fecha_actualizacion'] ?? json['fechaActualizacion'],
       ),
-      sincronizado: 0, // Siempre 0 para datos que vienen de API
       marcaNombre: null, // Se llenará con JOIN posteriormente
       modeloNombre: modeloNombreLimpio,
       logoNombre: null, // Se llenará con JOIN posteriormente
@@ -113,8 +106,11 @@ class Equipo {
       'numero_serie': numeroSerie,
       'logo_id': logoId,
       'app_insert': ParsingHelpers.boolToInt(nuevoEquipo),
+      'fecha_creacion': fechaCreacion.toIso8601String(),
+      'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
     };
   }
+
 
   /// Convertir a JSON para API externa
   Map<String, dynamic> toJson() {
@@ -153,9 +149,6 @@ class Equipo {
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
       'fechaActualizacion': fechaActualizacion?.toIso8601String(),
 
-      // Estado de sincronización
-      'sincronizado': sincronizado,
-
       // Nombres de relaciones (para JOINs)
       'marca_nombre': marcaNombre,
       'modelo_nombre': modeloNombre,
@@ -179,7 +172,6 @@ class Equipo {
     bool? nuevoEquipo,
     DateTime? fechaCreacion,
     DateTime? fechaActualizacion,
-    int? sincronizado,
     String? marcaNombre,
     String? modeloNombre,
     String? logoNombre,
@@ -195,7 +187,6 @@ class Equipo {
       nuevoEquipo: nuevoEquipo ?? this.nuevoEquipo,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
-      sincronizado: sincronizado ?? this.sincronizado,
       marcaNombre: marcaNombre ?? this.marcaNombre,
       modeloNombre: modeloNombre ?? this.modeloNombre,
       logoNombre: logoNombre ?? this.logoNombre,
@@ -205,9 +196,6 @@ class Equipo {
   // ==========================================================================
   // GETTERS
   // ==========================================================================
-
-  /// Verificar si el equipo está sincronizado
-  bool get estaSincronizado => sincronizado == 1;
 
   /// Obtener nombre completo (marca + modelo)
   String get nombreCompleto {
@@ -237,7 +225,7 @@ class Equipo {
   String toString() {
     return 'Equipo{id: $id, codBarras: $codBarras, clienteId: $clienteId, '
         'marca: $marcaId/$marcaNombre, modelo: $modeloId/$modeloNombre, '
-        'logo: $logoId/$logoNombre, nuevo: $nuevoEquipo, sync: $sincronizado}';
+        'logo: $logoId/$logoNombre, nuevo: $nuevoEquipo}';
   }
 
   @override

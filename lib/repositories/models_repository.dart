@@ -1,6 +1,4 @@
-// repositories/modelo_repository.dart
 import 'package:logger/logger.dart';
-import '../services/sync/sync_service.dart';
 import '../models/modelo.dart';
 import 'base_repository.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';

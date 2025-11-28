@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/viewmodels/login_screen_viewmodel.dart';
 import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/database_validation_service.dart';
 import 'package:ada_app/services/sync/full_sync_service.dart';
 import 'package:ada_app/ui/theme/colors.dart';
-import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
 import 'package:ada_app/ui/common/snackbar_helper.dart';
 
 class SyncDialog {
@@ -44,8 +45,8 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async => false,
+    return PopScope(
+      canPop: !_isSyncing,
       child: AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -53,12 +54,12 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
         backgroundColor: AppColors.cardBackground,
         title: Row(
           children: [
-            Icon(Icons.sync_problem, color: AppColors.warning, size: 28),
-            const SizedBox(width: 12),
+            Icon(Icons.sync_problem, color: AppColors.warning, size: 24),
+            const SizedBox(width: 8),
             const Expanded(
               child: Text(
-                'Sincronización Obligatoria',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                'Sincronización Requerida',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -69,15 +70,13 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildReasonContainer(),
-              const SizedBox(height: 16),
-              _buildImportantInfo(),
+              const SizedBox(height: 12),
+              _buildVendorInfo(), // 👈 Aquí se mostrarán los nombres
+              const SizedBox(height: 12),
+              _buildWarningContainer(),
               if (_isSyncing) ...[
                 const SizedBox(height: 16),
-                SyncProgressWidget(
-                  progress: _progress,
-                  currentStep: _currentStep,
-                  completedSteps: _completedSteps,
-                ),
+                _buildSyncProgress(),
               ],
             ],
           ),
@@ -92,13 +91,13 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
               ),
             ),
           ),
-          ElevatedButton(
+          ElevatedButton.icon(
             onPressed: _isSyncing ? null : _startSync,
             style: ElevatedButton.styleFrom(
               backgroundColor: _isSyncing ? AppColors.buttonDisabled : AppColors.warning,
               foregroundColor: Colors.white,
             ),
-            child: _isSyncing
+            icon: _isSyncing
                 ? const SizedBox(
               height: 16,
               width: 16,
@@ -107,7 +106,11 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
               ),
             )
-                : const Text('Sincronizar Ahora'),
+                : const Icon(Icons.sync, size: 20),
+            label: Text(
+              _isSyncing ? 'Sincronizando...' : 'Sincronizar',
+              style: const TextStyle(fontSize: 14),
+            ),
           ),
         ],
       ),
@@ -116,7 +119,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
 
   Widget _buildReasonContainer() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: AppColors.warning.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
@@ -124,7 +127,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline, color: AppColors.warning, size: 20),
+          Icon(Icons.info_outline, color: AppColors.warning, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -132,7 +135,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
               style: TextStyle(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.bold,
-                fontSize: 14,
+                fontSize: 13,
               ),
             ),
           ),
@@ -141,63 +144,103 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
     );
   }
 
-  Widget _buildImportantInfo() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.warning_amber, color: AppColors.warning, size: 18),
-              const SizedBox(width: 8),
-              Text(
-                'Importante',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Debes sincronizar para continuar. Esto descargará:',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-          ),
-          const SizedBox(height: 8),
-          _buildBulletPoint('Usuarios actualizados'),
-          _buildBulletPoint('Clientes de tu zona'),
-          _buildBulletPoint('Equipos y datos maestros'),
+  // ✅ MODIFICADO: Muestra el NOMBRE en lugar del ID
+  Widget _buildVendorInfo() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.validation.vendedorAnteriorId != null) ...[
+          // Muestra nombre anterior o 'Desconocido'
+          _buildInfoRow('Anterior:', widget.validation.vendedorAnteriorNombre ?? 'Desconocido'),
+          const SizedBox(height: 6),
         ],
-      ),
+        // Muestra nombre actual
+        _buildInfoRow('Actual:', widget.validation.vendedorActualNombre),
+      ],
     );
   }
 
-  Widget _buildBulletPoint(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 8.0, bottom: 4.0),
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWarningContainer() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
       child: Row(
         children: [
-          Icon(Icons.circle, size: 6, color: AppColors.textSecondary),
+          Icon(Icons.warning_amber, color: Colors.orange.shade700, size: 18),
           const SizedBox(width: 8),
-          Expanded(
+          const Expanded(
             child: Text(
-              text,
+              'Debe sincronizar antes de continuar',
               style: TextStyle(
-                color: AppColors.textSecondary,
                 fontSize: 12,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSyncProgress() {
+    return Column(
+      children: [
+        LinearProgressIndicator(
+          value: _progress,
+          backgroundColor: Colors.grey.shade200,
+          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _currentStep,
+          style: TextStyle(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        if (_completedSteps.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            '${(_progress * 100).toInt()}%',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: AppColors.primary,
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -208,6 +251,25 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
   }
 
   Future<void> _startSync() async {
+    try {
+      final db = await DatabaseHelper().database;
+      final validationService = DatabaseValidationService(db);
+      final validationResult = await validationService.canDeleteDatabase();
+
+      if (!validationResult.canDelete) {
+        if (!mounted) return;
+        await showDialog(
+          context: context,
+          builder: (context) => _buildPendingRecordsDialog(validationResult),
+        );
+        return;
+      }
+    } catch (e) {
+      if (!mounted) return;
+      SnackbarHelper.showError(context, 'Error validando datos: $e');
+      return;
+    }
+
     setState(() {
       _isSyncing = true;
       _progress = 0.0;
@@ -216,26 +278,35 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
     });
 
     try {
-      // ✅ USAR SERVICIO CENTRALIZADO
+      // ✅ AQUÍ USAMOS LOS ID PARA LA LÓGICA DE SINCRONIZACIÓN (LA API PIDE IDs)
       final result = await FullSyncService.syncAllDataWithProgress(
-        edfVendedorId: widget.validation.vendedorActual,
-        previousVendedorId: widget.validation.vendedorAnterior,
+        edfVendedorId: widget.validation.vendedorActualId, // Usamos ID
+        previousVendedorId: widget.validation.vendedorAnteriorId, // Usamos ID
         onProgress: ({
           required double progress,
           required String currentStep,
           required List<String> completedSteps,
         }) {
-          setState(() {
-            _progress = progress;
-            _currentStep = currentStep;
-            _completedSteps = List.from(completedSteps);
-          });
+          if (mounted) {
+            setState(() {
+              _progress = progress;
+              _currentStep = currentStep;
+              _completedSteps = List.from(completedSteps);
+            });
+          }
         },
       );
 
       if (!result.exito) {
         throw Exception(result.mensaje);
       }
+
+      // ✅ AQUÍ ESTÁ LA CORRECCIÓN CLAVE PARA EL ERROR DE "MARK SYNC"
+      final authService = AuthService();
+      await authService.markSyncCompleted(
+        widget.validation.vendedorActualId, // ID
+        widget.validation.vendedorActualNombre, // NOMBRE (Nuevo parámetro requerido)
+      );
 
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -250,14 +321,124 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
       Navigator.of(context).pushReplacementNamed('/home');
 
     } catch (e) {
-      setState(() {
-        _isSyncing = false;
-        _currentStep = '';
-      });
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+          _currentStep = '';
+        });
+      }
 
       if (!mounted) return;
       Navigator.of(context).pop();
       SnackbarHelper.showError(context, 'Error en sincronización: $e');
     }
+  }
+
+  // ... (El resto de los widgets _buildPendingRecordsDialog, _getIconForTable, etc. quedan igual)
+  Widget _buildPendingRecordsDialog(DatabaseValidationResult validationResult) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.warning_amber, color: Colors.orange, size: 24),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Registros Pendientes',
+              style: TextStyle(fontSize: 16),
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Hay registros que aún no han sido sincronizados con el servidor:',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            ...validationResult.pendingItems.map((item) => _buildPendingItem(
+              _getIconForTable(item.tableName),
+              item.displayName,
+              item.count,
+            )),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.red.shade700, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Sincronice estos registros antes de continuar',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Entendido'),
+        ),
+      ],
+    );
+  }
+
+  IconData _getIconForTable(String tableName) {
+    if (tableName.contains('equipo')) return Icons.devices;
+    if (tableName.contains('censo')) return Icons.assignment;
+    if (tableName.contains('form') || tableName.contains('response')) return Icons.description;
+    if (tableName.contains('foto') || tableName.contains('image')) return Icons.photo;
+    if (tableName.contains('log')) return Icons.article;
+    return Icons.info_outline;
+  }
+
+  Widget _buildPendingItem(IconData icon, String label, int count) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.orange),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade100,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              count.toString(),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.orange.shade900,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

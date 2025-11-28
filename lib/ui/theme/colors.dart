@@ -261,4 +261,32 @@ class AppColors {
     end: Alignment.bottomRight,
     colors: [secondary, secondaryDark],
   );
+
+  /// Gradiente de éxito para elementos positivos
+  static const LinearGradient successGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [successLight, success],
+  );
+
+  /// Gradiente de advertencia para alertas
+  static const LinearGradient warningGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [warningLight, warning],
+  );
+
+  /// Gradiente de error para estados críticos
+  static const LinearGradient errorGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [errorLight, error],
+  );
+
+  /// Gradiente suave para fondos de cards
+  static const LinearGradient cardGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xFFFFFFFF), Color(0xFFF8F9FA)],
+  );
 }

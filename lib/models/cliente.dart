@@ -36,7 +36,7 @@ class Cliente {
     return Cliente(
       id: json['id'] as int?,
       nombre: _parseString(json['cliente']) ?? '',
-      codigo: _parseIntFromString(json['clienteIdGc']) ?? 0,
+      codigo: _parseIntFromString(json['clienteIdGc']),
       telefono: _parseString(json['telefono']) ?? '',
       direccion: _parseString(json['direccion']) ?? '',
       rucCi: _parseString(json['ruc'] ?? json['cedula']) ?? '',

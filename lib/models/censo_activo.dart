@@ -1,8 +1,4 @@
-enum EstadoEquipoCenso {
-  creado,
-  migrado,
-  error,
-}
+enum EstadoEquipoCenso { creado, migrado, error }
 
 extension EstadoEquipoCensoExtension on EstadoEquipoCenso {
   String get valor {
@@ -32,43 +28,50 @@ extension EstadoEquipoCensoExtension on EstadoEquipoCenso {
   }
 }
 
-class EstadoEquipo {
+class CensoActivo {
   final String? id;
+  final String? edfVendedorId;
   final String equipoId;
   final int clienteId;
-  final int? usuarioId;  // ← Nuevo campo agregado
+  final int? usuarioId;
   final bool enLocal;
   final double? latitud;
   final double? longitud;
   final DateTime fechaRevision;
   final DateTime fechaCreacion;
   final DateTime? fechaActualizacion;
-  final bool estaSincronizado;
   final String? estadoCenso;
   final String? observaciones;
+  final int intentosSync;
+  final DateTime? ultimoIntento;
+  final String? errorMensaje;
 
-  EstadoEquipo({
+  CensoActivo({
     this.id,
+    this.edfVendedorId,
     required this.equipoId,
     required this.clienteId,
-    this.usuarioId,  // ← Agregado al constructor
+    this.usuarioId,
     required this.enLocal,
     this.latitud,
     this.longitud,
     required this.fechaRevision,
     required this.fechaCreacion,
     this.fechaActualizacion,
-    this.estaSincronizado = false,
     this.estadoCenso,
     this.observaciones,
+    this.intentosSync = 0,
+    this.ultimoIntento,
+    this.errorMensaje,
   });
 
-  factory EstadoEquipo.fromMap(Map<String, dynamic> map) {
-    return EstadoEquipo(
+  factory CensoActivo.fromMap(Map<String, dynamic> map) {
+    return CensoActivo(
       id: map['id'] as String?,
+      edfVendedorId: map['edf_vendedor_id'],
       equipoId: map['equipo_id'] as String? ?? '0',
       clienteId: map['cliente_id'] as int? ?? 0,
-      usuarioId: map['usuario_id'] as int?,  // ← Agregado al fromMap
+      usuarioId: map['usuario_id'] as int?,
       enLocal: (map['en_local'] as int?) == 1,
       latitud: map['latitud'] as double?,
       longitud: map['longitud'] as double?,
@@ -81,9 +84,13 @@ class EstadoEquipo {
       fechaActualizacion: map['fecha_actualizacion'] != null
           ? DateTime.parse(map['fecha_actualizacion'] as String)
           : null,
-      estaSincronizado: (map['sincronizado'] as int?) == 1,
       estadoCenso: map['estado_censo'] as String?,
       observaciones: map['observaciones'] as String?,
+      intentosSync: map['intentos_sync'] as int? ?? 0,
+      ultimoIntento: map['ultimo_intento'] != null
+          ? DateTime.parse(map['ultimo_intento'] as String)
+          : null,
+      errorMensaje: map['error_mensaje'] as String?,
     );
   }
 
@@ -92,15 +99,18 @@ class EstadoEquipo {
       'id': id,
       'equipo_id': equipoId,
       'cliente_id': clienteId,
-      'usuario_id': usuarioId,  // ← Agregado al toMap
+      'usuario_id': usuarioId,
       'en_local': enLocal ? 1 : 0,
       'latitud': latitud,
       'longitud': longitud,
       'fecha_revision': fechaRevision.toIso8601String(),
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
-      'sincronizado': estaSincronizado ? 1 : 0,
+      'estado_censo': estadoCenso,
       'observaciones': observaciones,
+      'intentos_sync': intentosSync,
+      'ultimo_intento': ultimoIntento?.toIso8601String(),
+      'error_mensaje': errorMensaje,
     };
 
     if (estadoCenso != null) {
@@ -115,35 +125,39 @@ class EstadoEquipo {
       'id': id,
       'equipo_id': equipoId,
       'cliente_id': clienteId,
-      'usuario_id': usuarioId,  // ← Agregado al toJson
+      'usuario_id': usuarioId,
       'en_local': enLocal,
       'latitud': latitud,
       'longitud': longitud,
       'fecha_revision': fechaRevision.toIso8601String(),
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_actualizacion': fechaActualizacion?.toIso8601String(),
-      'sincronizado': estaSincronizado,
       'estado_censo': estadoCenso,
       'observaciones': observaciones,
+      'intentos_sync': intentosSync,
+      'ultimo_intento': ultimoIntento?.toIso8601String(),
+      'error_mensaje': errorMensaje,
     };
   }
 
-  EstadoEquipo copyWith({
+  CensoActivo copyWith({
     String? id,
     String? equipoId,
     int? clienteId,
-    int? usuarioId,  // ← Agregado al copyWith
+    int? usuarioId,
     bool? enLocal,
     double? latitud,
     double? longitud,
     DateTime? fechaRevision,
     DateTime? fechaCreacion,
     DateTime? fechaActualizacion,
-    bool? estaSincronizado,
     String? estadoCenso,
     String? observaciones,
+    int? intentosSync,
+    DateTime? ultimoIntento,
+    String? errorMensaje,
   }) {
-    return EstadoEquipo(
+    return CensoActivo(
       id: id ?? this.id,
       equipoId: equipoId ?? this.equipoId,
       clienteId: clienteId ?? this.clienteId,
@@ -154,15 +168,42 @@ class EstadoEquipo {
       fechaRevision: fechaRevision ?? this.fechaRevision,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       fechaActualizacion: fechaActualizacion ?? this.fechaActualizacion,
-      estaSincronizado: estaSincronizado ?? this.estaSincronizado,
       estadoCenso: estadoCenso ?? this.estadoCenso,
       observaciones: observaciones ?? this.observaciones,
+      intentosSync: intentosSync ?? this.intentosSync,
+      ultimoIntento: ultimoIntento ?? this.ultimoIntento,
+      errorMensaje: errorMensaje ?? this.errorMensaje,
     );
   }
 
   // Estados del censo
-  EstadoEquipoCenso get estadoCensoEnum => EstadoEquipoCensoExtension.fromString(estadoCenso);
+  EstadoEquipoCenso get estadoCensoEnum =>
+      EstadoEquipoCensoExtension.fromString(estadoCenso);
   bool get estaCreado => estadoCenso == EstadoEquipoCenso.creado.valor;
   bool get estaMigrado => estadoCenso == EstadoEquipoCenso.migrado.valor;
   bool get tieneError => estadoCenso == EstadoEquipoCenso.error.valor;
+
+  // Helpers para reintentos
+  bool get necesitaReintento => !estaMigrado && intentosSync < 10;
+  bool get puedeReintentar {
+    if (ultimoIntento == null) return true;
+    final minutos = _calcularEsperaMinutos(intentosSync);
+    final proximoIntento = ultimoIntento!.add(Duration(minutes: minutos));
+    return DateTime.now().isAfter(proximoIntento);
+  }
+
+  int _calcularEsperaMinutos(int intentos) {
+    switch (intentos) {
+      case 0:
+        return 0;
+      case 1:
+        return 1;
+      case 2:
+        return 5;
+      case 3:
+        return 10;
+      default:
+        return 30;
+    }
+  }
 }

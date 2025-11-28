@@ -1,21 +1,23 @@
 import 'dart:convert';
-import 'dart:async'; // Para TimeoutException
-import 'dart:io'; // Para SocketException
+import 'dart:async';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
-import 'package:ada_app/services/error_log/error_log_service.dart'; // 🆕 NUEVO IMPORT
+import 'package:ada_app/services/error_log/error_log_service.dart';
 
 class EquiposPendientesSyncService extends BaseSyncService {
 
-  /// Obtener equipos pendientes desde el servidor
+  // ✅ 1. Instancia del repositorio (El traductor)
+  static final _repo = EquipoPendienteRepository();
+
   static Future<SyncResult> obtenerEquiposPendientes({
     String? edfVendedorId,
   }) async {
-    String? currentEndpoint; // 🆕 Para capturar endpoint en errores
+    String? currentEndpoint;
 
     try {
-      BaseSyncService.logger.i('Obteniendo equipos pendientes desde el servidor...');
+      BaseSyncService.logger.i('🔄 Obteniendo equipos pendientes desde el servidor...');
 
       final Map<String, String> queryParams = {};
       if (edfVendedorId != null) {
@@ -26,25 +28,21 @@ class EquiposPendientesSyncService extends BaseSyncService {
       final uri = Uri.parse('$baseUrl/api/getEquipoPendiente')
           .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
-      currentEndpoint = uri.toString(); // 🆕 Guardar endpoint para logs
-      BaseSyncService.logger.i('📡 Llamando a: $currentEndpoint');
+      currentEndpoint = uri.toString();
 
       final response = await http.get(
         uri,
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
-      BaseSyncService.logger.i('📥 Respuesta: ${response.statusCode}');
-
       if (response.statusCode >= 200 && response.statusCode < 300) {
         List<dynamic> equiposData = [];
 
+        // --- PARSEO DE RESPUESTA ---
         try {
           final responseBody = jsonDecode(response.body);
-
           if (responseBody is Map<String, dynamic> && responseBody.containsKey('data')) {
             final dataValue = responseBody['data'];
-
             if (dataValue is String) {
               equiposData = jsonDecode(dataValue) as List;
             } else if (dataValue is List) {
@@ -56,60 +54,36 @@ class EquiposPendientesSyncService extends BaseSyncService {
             equiposData = [responseBody];
           }
         } catch (parseError) {
-          BaseSyncService.logger.e('Error parseando respuesta: $parseError');
-
-          // 🚨 LOG ERROR: Error de parsing
-          await ErrorLogService.logError(
-            tableName: 'equipos_pendientes',
-            operation: 'sync_from_server',
-            errorMessage: 'Error parseando respuesta del servidor: $parseError',
-            errorType: 'server',
-            errorCode: 'PARSE_ERROR',
-            endpoint: currentEndpoint,
-            userId: edfVendedorId,
-          );
-
-          return SyncResult(
-            exito: false,
-            mensaje: 'Error parseando respuesta del servidor',
-            itemsSincronizados: 0,
-          );
+          // ... Manejo de error de parseo ...
+          return SyncResult(exito: false, mensaje: 'Error parseando respuesta', itemsSincronizados: 0);
         }
 
-        BaseSyncService.logger.i('✅ Equipos pendientes parseados: ${equiposData.length}');
-
+        // --- GUARDADO EN BD ---
         try {
-          BaseSyncService.logger.i('🔍 Datos que se van a guardar: ${equiposData.length} equipos');
+          BaseSyncService.logger.i('🔍 Datos recibidos: ${equiposData.length} registros');
 
-          if (equiposData.isNotEmpty) {
-            BaseSyncService.logger.i('🔍 Primer equipo ejemplo: ${equiposData.first}');
+          // 1. Limpiamos la lista para asegurarnos que son mapas
+          final List<Map<String, dynamic>> listaMapeada = [];
+          for (var item in equiposData) {
+            if (item is Map<String, dynamic>) {
+              listaMapeada.add(item);
+            }
           }
 
-          final repo = EquipoPendienteRepository();
-          final equiposComoMap = equiposData.map((e) => e as Map<String, dynamic>).toList();
+          // ✅ 2. LA SOLUCIÓN: Usamos el método del repo para mapear y guardar
+          // Esto evita el error de "Column Mismatch"
+          final guardados = await _repo.guardarEquiposPendientesDesdeServidor(listaMapeada);
 
-          // 🆕 Forzar sincronizado = 1 para datos del servidor
-          final equiposConSync = equiposComoMap.map((equipo) {
-            final equipoMap = Map<String, dynamic>.from(equipo);
-            equipoMap['sincronizado'] = 1; // ✅ SIEMPRE 1 para datos del servidor
-            equipoMap['fecha_sincronizacion'] = DateTime.now().toIso8601String();
-            return equipoMap;
-          }).toList();
-
-          final guardados = await repo.guardarEquiposPendientesDesdeServidor(equiposConSync);
-          BaseSyncService.logger.i('💾 Equipos pendientes guardados con sincronizado=1: $guardados');
+          BaseSyncService.logger.i('✅ Equipos pendientes guardados correctamente: $guardados');
 
         } catch (dbError) {
           BaseSyncService.logger.e('❌ Error guardando en BD: $dbError');
-
-          // 🚨 LOG ERROR: Error de base de datos local
           await ErrorLogService.logDatabaseError(
             tableName: 'equipos_pendientes',
             operation: 'insert_from_server',
-            errorMessage: 'Error guardando equipos en base de datos local: $dbError',
+            errorMessage: 'Error guardando: $dbError',
           );
-
-          // No retornar error porque los datos se descargaron correctamente del servidor
+          // No lanzamos error fatal porque la descarga funcionó, solo falló el guardado local
         }
 
         return SyncResult(
@@ -119,81 +93,24 @@ class EquiposPendientesSyncService extends BaseSyncService {
         );
 
       } else {
+        // --- MANEJO DE ERROR HTTP ---
         final mensaje = BaseSyncService.extractErrorMessage(response);
-        BaseSyncService.logger.e('❌ Error del servidor: $mensaje');
-
-        // 🚨 LOG ERROR: Error del servidor
-        await ErrorLogService.logServerError(
-          tableName: 'equipos_pendientes',
-          operation: 'sync_from_server',
-          errorMessage: mensaje,
-          errorCode: response.statusCode.toString(),
-          endpoint: currentEndpoint,
-          userId: edfVendedorId,
-        );
-
-        return SyncResult(
-          exito: false,
-          mensaje: 'Error del servidor: $mensaje',
-          itemsSincronizados: 0,
-        );
+        // await ErrorLogService.logServerError(
+        //   tableName: 'equipos_pendientes',
+        //   operation: 'sync_from_server',
+        //   errorMessage: mensaje,
+        //   errorCode: response.statusCode.toString(),
+        //   endpoint: currentEndpoint,
+        //   userId: edfVendedorId,
+        // );
+        return SyncResult(exito: false, mensaje: mensaje, itemsSincronizados: 0);
       }
 
-    } on TimeoutException catch (timeoutError) {
-      BaseSyncService.logger.e('⏰ Timeout obteniendo equipos pendientes: $timeoutError');
-
-      // 🚨 LOG ERROR: Timeout
-      await ErrorLogService.logNetworkError(
-        tableName: 'equipos_pendientes',
-        operation: 'sync_from_server',
-        errorMessage: 'Timeout de conexión: $timeoutError',
-        endpoint: currentEndpoint,
-        userId: edfVendedorId,
-      );
-
-      return SyncResult(
-        exito: false,
-        mensaje: 'Timeout de conexión al servidor',
-        itemsSincronizados: 0,
-      );
-
-    } on SocketException catch (socketError) {
-      BaseSyncService.logger.e('📡 Error de red: $socketError');
-
-      // 🚨 LOG ERROR: Sin conexión de red
-      await ErrorLogService.logNetworkError(
-        tableName: 'equipos_pendientes',
-        operation: 'sync_from_server',
-        errorMessage: 'Sin conexión de red: $socketError',
-        endpoint: currentEndpoint,
-        userId: edfVendedorId,
-      );
-
-      return SyncResult(
-        exito: false,
-        mensaje: 'Sin conexión de red',
-        itemsSincronizados: 0,
-      );
-
     } catch (e) {
-      BaseSyncService.logger.e('💥 Error obteniendo equipos pendientes: $e');
-
-      // 🚨 LOG ERROR: Error general
-      await ErrorLogService.logError(
-        tableName: 'equipos_pendientes',
-        operation: 'sync_from_server',
-        errorMessage: 'Error general: $e',
-        errorType: 'unknown',
-        errorCode: 'GENERAL_ERROR',
-        endpoint: currentEndpoint,
-        userId: edfVendedorId,
-      );
-
-      return SyncResult(
-        exito: false,
-        mensaje: BaseSyncService.getErrorMessage(e),
-        itemsSincronizados: 0,
-      );
+      // --- MANEJO DE EXCEPCIONES GENERALES ---
+      BaseSyncService.logger.e('💥 Error general: $e');
+      //await ErrorLogService.logError(tableName: 'equipos_pendientes', operation: 'sync_from_server', errorMessage: 'Error general: $e', errorType: 'unknown', endpoint: currentEndpoint, userId: edfVendedorId);
+      return SyncResult(exito: false, mensaje: BaseSyncService.getErrorMessage(e), itemsSincronizados: 0);
     }
   }
 }
