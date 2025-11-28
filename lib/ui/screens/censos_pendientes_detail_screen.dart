@@ -53,52 +53,52 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
     }
   }
 
-  Future<void> _reintentarTodos() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reintentar Todos'),
-        content: Text(
-            '¿Desea reintentar el envío de todos los ${_censosFallidos.length} censos pendientes?'
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Reintentar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    setState(() => _isRetrying = true);
-
-    final resultado = await widget.viewModel.reintentarTodosCensos();
-
-    setState(() => _isRetrying = false);
-
-    if (resultado['success'] == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(resultado['message'] ?? 'Censos sincronizados'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      _loadCensosFallidos();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(resultado['error'] ?? 'Error en sincronización'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
+  // Future<void> _reintentarTodos() async {
+  //   final confirm = await showDialog<bool>(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text('Reintentar Todos'),
+  //       content: Text(
+  //           '¿Desea reintentar el envío de todos los ${_censosFallidos.length} censos pendientes?'
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context, false),
+  //           child: const Text('Cancelar'),
+  //         ),
+  //         ElevatedButton(
+  //           onPressed: () => Navigator.pop(context, true),
+  //           child: const Text('Reintentar'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  //
+  //   if (confirm != true) return;
+  //
+  //   setState(() => _isRetrying = true);
+  //
+  //   // final resultado = await widget.viewModel.reintentarTodosCensos();
+  //
+  //   setState(() => _isRetrying = false);
+  //
+  //   if (resultado['success'] == true) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(
+  //         content: Text(resultado['message'] ?? 'Censos sincronizados'),
+  //         backgroundColor: Colors.green,
+  //       ),
+  //     );
+  //     _loadCensosFallidos();
+  //   } else {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(
+  //         content: Text(resultado['error'] ?? 'Error en sincronización'),
+  //         backgroundColor: Colors.red,
+  //       ),
+  //     );
+  //   }
+  // }
 
   Future<void> _navegarAPreviewHistorial(Map<String, dynamic> censo) async {
     try {
@@ -315,8 +315,7 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
       ),
       body: _buildBody(),
       bottomNavigationBar: _censosFallidos.isNotEmpty
-          ? _buildBottomBar()
-          : null,
+          ? null : null
     );
   }
 
@@ -565,53 +564,53 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
     );
   }
 
-  Widget _buildBottomBar() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(
-          top: BorderSide(color: Theme.of(context).dividerColor),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            offset: const Offset(0, -2),
-            blurRadius: 4,
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _isRetrying ? null : _reintentarTodos,
-            icon: _isRetrying
-                ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-                : const Icon(Icons.sync),
-            label: Text(
-              _isRetrying
-                  ? 'Reintentando...'
-                  : 'Reintentar Todos (${_censosFallidos.length})',
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  // Widget _buildBottomBar() {
+  //   return Container(
+  //     padding: const EdgeInsets.all(16),
+  //     decoration: BoxDecoration(
+  //       color: Theme.of(context).scaffoldBackgroundColor,
+  //       border: Border(
+  //         top: BorderSide(color: Theme.of(context).dividerColor),
+  //       ),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: Colors.black.withOpacity(0.05),
+  //           offset: const Offset(0, -2),
+  //           blurRadius: 4,
+  //         ),
+  //       ],
+  //     ),
+  //     child: SafeArea(
+  //       child: SizedBox(
+  //         width: double.infinity,
+  //         child: ElevatedButton.icon(
+  //           onPressed: _isRetrying ? null : _reintentarTodos,
+  //           icon: _isRetrying
+  //               ? const SizedBox(
+  //             width: 16,
+  //             height: 16,
+  //             child: CircularProgressIndicator(
+  //               strokeWidth: 2,
+  //               color: Colors.white,
+  //             ),
+  //           )
+  //               : const Icon(Icons.sync),
+  //           label: Text(
+  //             _isRetrying
+  //                 ? 'Reintentando...'
+  //                 : 'Reintentar Todos (${_censosFallidos.length})',
+  //           ),
+  //           style: ElevatedButton.styleFrom(
+  //             backgroundColor: Theme.of(context).primaryColor,
+  //             foregroundColor: Colors.white,
+  //             padding: const EdgeInsets.symmetric(vertical: 16),
+  //             shape: RoundedRectangleBorder(
+  //               borderRadius: BorderRadius.circular(8),
+  //             ),
+  //           ),
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 }

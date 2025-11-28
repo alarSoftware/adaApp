@@ -139,19 +139,16 @@ class CensoActivoPostService {
 
       ServerResponse resultObject = ServerResponse.fromHttp(response);
 
-      // 1. Validación de seguridad para evitar saltos inesperados
       if (censoId == null) throw Exception("censoId es nulo");
 
       if (!resultObject.success) {
-        // CASO ERROR: Si NO es duplicado y tiene mensaje -> Marcar error y lanzar excepción
         if (!resultObject.isDuplicate && resultObject.message != '') {
           final estadoEquipoRepository = EstadoEquipoRepository();
           await estadoEquipoRepository.marcarComoError(censoId, resultObject.message);
           throw Exception(resultObject.message);
         }
-        // CASO DUPLICADO: Si el servidor dice que ya existe, lo marcamos como éxito localmente
         else if (resultObject.isDuplicate) {
-          _logger.w('⚠️ Registro duplicado en servidor, marcando como sincronizado localmente.');
+          _logger.w('Registro duplicado en servidor, marcando como sincronizado localmente.');
           final censoUploadService = CensoUploadService();
           final fotosSeguras = fotos ?? [];
 
@@ -165,9 +162,8 @@ class CensoActivoPostService {
           );
         }
       } else {
-        // CASO ÉXITO (success == true)
         final censoUploadService = CensoUploadService();
-        final fotosSeguras = fotos ?? []; // Evita crash si fotos es null
+        final fotosSeguras = fotos ?? [];
 
         await censoUploadService.marcarComoSincronizadoCompleto(
           censoId: censoId,

@@ -264,7 +264,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       // FASE 3: RETORNO INMEDIATO AL USUARIO
       // ============================================================
 
-      // 🔥 AGREGAR equipo_completo para navegación (especialmente equipos nuevos)
+      // AGREGAR equipo_completo para navegación (especialmente equipos nuevos)
       Map<String, dynamic>? equipoCompleto;
 
       if (esNuevoEquipo) {
