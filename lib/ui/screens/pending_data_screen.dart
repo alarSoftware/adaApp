@@ -47,10 +47,6 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
         // El progreso se maneja automáticamente via notifyListeners
           break;
 
-        case SendCompletedEvent:
-          final completedEvent = event as SendCompletedEvent;
-          _showSendCompletedDialog(completedEvent.result);
-          break;
       }
     });
   }
@@ -281,18 +277,6 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => _showCancelConfirmation(),
-              icon: const Icon(Icons.cancel, size: 18),
-              label: const Text('Cancelar Envío'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red,
-                side: const BorderSide(color: Colors.red),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -538,34 +522,6 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
                 ),
               ),
             ],
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: viewModel.isSending || !viewModel.isConnected
-                    ? null
-                    : viewModel.requestBulkSend,
-                icon: viewModel.isSending
-                    ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-                    : const Icon(Icons.cloud_upload),
-                label: Text(viewModel.isSending
-                    ? 'Enviando...'
-                    : 'Enviar Todo (${viewModel.totalPendingItems})'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: viewModel.isSending || !viewModel.isConnected
-                      ? Colors.grey
-                      : Theme.of(context).primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -656,168 +612,10 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _viewModel.executeBulkSend();
-            },
-            icon: const Icon(Icons.send),
-            label: const Text('Enviar'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  void _showCancelConfirmation() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.warning, color: Colors.orange),
-            const SizedBox(width: 8),
-            const Text('Cancelar Envío'),
-          ],
-        ),
-        content: const Text(
-          '¿Está seguro que desea cancelar el envío?\n\nLos datos ya enviados se mantendrán, pero el proceso se detendrá.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Continuar Enviando'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _viewModel.cancelSend();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Cancelar Envío'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSendCompletedDialog(BulkSendResult result) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              result.allSuccess ? Icons.check_circle : Icons.warning,
-              color: result.allSuccess ? Colors.green : Colors.orange,
-            ),
-            const SizedBox(width: 8),
-            Text(result.allSuccess ? 'Envío Completado' : 'Envío Parcial'),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: result.allSuccess
-                      ? Colors.green.withOpacity(0.1)
-                      : Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  result.summary,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                ),
-              ),
-              if (!result.allSuccess && result.results.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text(
-                  'Detalles por categoría:',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                ...result.results.map((r) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        r.success ? Icons.check_circle : Icons.error,
-                        size: 16,
-                        color: r.success ? Colors.green : Colors.red,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              r.message,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            if (r.error != null)
-                              Text(
-                                'Error: ${r.error}',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.red[600],
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                )),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          if (!result.allSuccess)
-            TextButton.icon(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _viewModel.refresh();
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reintentar Pendientes'),
-            ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: result.allSuccess ? Colors.green : Colors.orange,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Entendido'),
-          ),
-        ],
-      ),
-    );
-  }
 
   // ========== HELPERS ==========
 
