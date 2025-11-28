@@ -60,7 +60,10 @@ class ErrorLogService {
       final db = await dbHelper.database;
 
       _logger.i('INTENTANDO insertar en error_log...');
+
+      //TODO RONALDO, ANTES DE INSERTAR VERIFICAR SI YA EXISTE UNO SIMILAR PARA EVITAR DUPLICADOS
       await db.insert('error_log', errorLog);
+
       _logger.i('Error log guardado localmente con ID: $errorId');
 
       // Verificar que se guardó
@@ -388,12 +391,12 @@ class ErrorLogService {
       final updated = await db.update(
         'error_log',
         {
-          'error_type': 'resuelto',
+          'error_status': 'done',
           'next_retry_at': null,
           'last_retry_at': DateTime.now().toIso8601String(),
         },
-        where: 'registro_fail_id = ? AND table_name = ? AND error_type != ?',
-        whereArgs: [registroFailId, tableName, 'resuelto'],
+        where: 'registro_fail_id = ? AND table_name = ? AND error_status != ?',
+        whereArgs: [registroFailId, tableName, 'done'],
       );
 
       if (updated > 0) {

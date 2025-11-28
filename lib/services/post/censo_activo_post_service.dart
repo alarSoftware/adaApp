@@ -132,43 +132,14 @@ class CensoActivoPostService {
 
       if (!resultObject.success) {
         if (!resultObject.isDuplicate && resultObject.message != '') {
-          final estadoEquipoRepository = EstadoEquipoRepository();
-          await estadoEquipoRepository.marcarComoError(censoId, resultObject.message);
-
-          await ErrorLogService.logServerError(
-            tableName: _tableName,
-            operation: 'POST_CENSO_ACTIVO',
-            errorMessage: resultObject.message,
-            errorCode: 'SERVER_ERROR_${response.statusCode}',
-            registroFailId: censoId,
-            endpoint: fullUrl,
-            userId: usuarioId,
-          );
-
+          // final censoActivoRepository = CensoActivoRepository();
+          // await censoActivoRepository.marcarComoError(censoId, resultObject.message);
           throw Exception(resultObject.message);
-        } else if (resultObject.isDuplicate) {
-          _logger.w('Registro duplicado en servidor, marcando como sincronizado localmente.');
-          final censoUploadService = CensoUploadService();
-          final fotosSeguras = fotos ?? [];
-
-          await censoUploadService.marcarComoSincronizadoCompleto(
-            censoId: censoId,
-            equipoId: equipoId,
-            clienteId: clienteId,
-            esNuevoEquipo: esNuevoEquipo,
-            crearPendiente: crearPendiente,
-            fotos: fotosSeguras,
-          );
-
-          await ErrorLogService.marcarErroresComoResueltos(
-            registroFailId: censoId,
-            tableName: _tableName,
-          );
         }
-      } else {
+      }
+      if(resultObject.success||resultObject.isDuplicate){
         final censoUploadService = CensoUploadService();
         final fotosSeguras = fotos ?? [];
-
         await censoUploadService.marcarComoSincronizadoCompleto(
           censoId: censoId,
           equipoId: equipoId,
@@ -177,106 +148,8 @@ class CensoActivoPostService {
           crearPendiente: crearPendiente,
           fotos: fotosSeguras,
         );
-
-        await ErrorLogService.marcarErroresComoResueltos(
-          registroFailId: censoId,
-          tableName: _tableName,
-        );
       }
-
-    } on SocketException catch (e) {
-      _logger.e('Error de red: $e');
-
-      await ErrorLogService.logNetworkError(
-        tableName: _tableName,
-        operation: 'POST_CENSO_ACTIVO',
-        errorMessage: 'Error de conexión de red: ${e.message}',
-        registroFailId: censoId,
-        endpoint: fullUrl,
-        userId: usuarioId,
-      );
-
-      if (censoId != null) {
-        final estadoEquipoRepository = EstadoEquipoRepository();
-        await estadoEquipoRepository.marcarComoError(
-          censoId,
-          'Sin conexión de red',
-        );
-      }
-
-      rethrow;
-
-    } on TimeoutException catch (e) {
-      _logger.e('Timeout: $e');
-
-      await ErrorLogService.logError(
-        tableName: _tableName,
-        operation: 'POST_CENSO_ACTIVO',
-        errorMessage: 'Timeout tras ${timeoutSegundos}s: $e',
-        errorType: 'network',
-        errorCode: 'REQUEST_TIMEOUT',
-        registroFailId: censoId,
-        endpoint: fullUrl,
-        userId: usuarioId,
-      );
-
-      if (censoId != null) {
-        final estadoEquipoRepository = EstadoEquipoRepository();
-        await estadoEquipoRepository.marcarComoError(
-          censoId,
-          'Tiempo de espera agotado',
-        );
-      }
-
-      rethrow;
-
-    } on http.ClientException catch (e) {
-      _logger.e('Error HTTP del cliente: $e');
-
-      await ErrorLogService.logError(
-        tableName: _tableName,
-        operation: 'POST_CENSO_ACTIVO',
-        errorMessage: 'Error HTTP del cliente: ${e.message}',
-        errorType: 'network',
-        errorCode: 'HTTP_CLIENT_ERROR',
-        registroFailId: censoId,
-        endpoint: fullUrl,
-        userId: usuarioId,
-      );
-
-      if (censoId != null) {
-        final estadoEquipoRepository = EstadoEquipoRepository();
-        await estadoEquipoRepository.marcarComoError(
-          censoId,
-          'Error de red: ${e.message}',
-        );
-      }
-
-      rethrow;
-
     } catch (e, stackTrace) {
-      _logger.e('Error inesperado: $e');
-      _logger.e('Stack trace: $stackTrace');
-
-      await ErrorLogService.logError(
-        tableName: _tableName,
-        operation: 'POST_CENSO_ACTIVO',
-        errorMessage: 'Error inesperado: $e',
-        errorType: 'crash',
-        errorCode: 'UNEXPECTED_ERROR',
-        registroFailId: censoId,
-        endpoint: fullUrl,
-        userId: usuarioId,
-      );
-
-      if (censoId != null) {
-        final estadoEquipoRepository = EstadoEquipoRepository();
-        await estadoEquipoRepository.marcarComoError(
-          censoId,
-          'Error interno: $e',
-        );
-      }
-
       rethrow;
     }
   }
@@ -562,47 +435,47 @@ class CensoActivoPostService {
     var equipoDataMap
   }) {
     final Map<String, dynamic> payload = {};
+    try {
+      if (esNuevoEquipo && marcaId != null && modeloId != null && logoId != null) {
+        payload['equipo'] = _construirJsonEquipo(equipoDataMap);
+        _logger.i('JSON Equipo agregado (nuevo equipo)');
+      } else {
+        payload['equipo'] = {};
+        _logger.i('JSON Equipo vacío (equipo existente)');
+      }
 
-    if (esNuevoEquipo && marcaId != null && modeloId != null && logoId != null) {
-      payload['equipo'] = _construirJsonEquipo(equipoDataMap);
-      _logger.i('JSON Equipo agregado (nuevo equipo)');
-    } else {
-      payload['equipo'] = {};
-      _logger.i('JSON Equipo vacío (equipo existente)');
+      if (pendienteExistente != null && (pendienteExistente is List && pendienteExistente.isNotEmpty)) {
+        payload['equipo_pendiente'] = _construirJsonEquipoPendiente(pendienteExistente);
+        _logger.i('JSON Equipo_Pendiente agregado (crear asignación)');
+      } else {
+        payload['equipo_pendiente'] = {};
+        _logger.i('JSON Equipo_Pendiente vacío (ya asignado)');
+      }
+
+      payload['censo_activo'] = _construirJsonCensoActivo(
+        censoId: censoId,
+        equipoId: equipoId,
+        clienteId: clienteId,
+        usuarioId: usuarioId,
+        edfVendedorId: edfVendedorId,
+        latitud: latitud,
+        longitud: longitud,
+        observaciones: observaciones,
+        enLocal: enLocal,
+        estadoCenso: estadoCenso ?? 'pendiente',
+        fotos: fotos,
+        codigoBarras: codigoBarras,
+        numeroSerie: numeroSerie,
+        marca: marca,
+        modelo: modelo,
+        logo: logo,
+        clienteNombre: clienteNombre,
+        now: now,
+        esNuevoEquipo: esNuevoEquipo,
+      );
+    } catch (e) {
+      rethrow;
     }
-
-    if (pendienteExistente != null && (pendienteExistente is List && pendienteExistente.isNotEmpty)) {
-      payload['equipo_pendiente'] = _construirJsonEquipoPendiente(pendienteExistente);
-      _logger.i('JSON Equipo_Pendiente agregado (crear asignación)');
-    } else {
-      payload['equipo_pendiente'] = {};
-      _logger.i('JSON Equipo_Pendiente vacío (ya asignado)');
-    }
-
-    payload['censo_activo'] = _construirJsonCensoActivo(
-      censoId: censoId,
-      equipoId: equipoId,
-      clienteId: clienteId,
-      usuarioId: usuarioId,
-      edfVendedorId: edfVendedorId,
-      latitud: latitud,
-      longitud: longitud,
-      observaciones: observaciones,
-      enLocal: enLocal,
-      estadoCenso: estadoCenso ?? 'pendiente',
-      fotos: fotos,
-      codigoBarras: codigoBarras,
-      numeroSerie: numeroSerie,
-      marca: marca,
-      modelo: modelo,
-      logo: logo,
-      clienteNombre: clienteNombre,
-      now: now,
-      esNuevoEquipo: esNuevoEquipo,
-    );
-
-    _logger.i('JSON Censo_Activo agregado (SIEMPRE completo)');
-
     return payload;
   }
 
@@ -748,77 +621,5 @@ class CensoActivoPostService {
     }
 
     return censo;
-  }
-
-  static Map<String, dynamic> _procesarRespuesta(http.Response response) {
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      return {
-        'exito': false,
-        'success': false,
-        'mensaje': 'Error del servidor: ${response.statusCode}',
-        'status_code': response.statusCode,
-      };
-    }
-
-    try {
-      final responseBody = json.decode(response.body);
-      if (responseBody is Map && responseBody.containsKey('serverAction')) {
-        final serverAction = responseBody['serverAction'] as int?;
-
-        if (serverAction == ServerConstants.SUCCESS_TRANSACTION) {
-          _logger.i('Censo activo procesado correctamente (Action 100)');
-          return {
-            'exito': true,
-            'success': true,
-            'mensaje': responseBody['resultMessage'] ??
-                'Censo activo procesado correctamente',
-            'serverAction': serverAction,
-            'servidor_id': responseBody['resultId'],
-            'id': responseBody['resultId'],
-          };
-        } else if (serverAction == ServerConstants.ERROR) {
-          return {
-            'exito': false,
-            'success': false,
-            'mensaje': responseBody['resultError'],
-            'serverAction': serverAction,
-          };
-        } else {
-          _logger.e('Servidor rechazó censo activo (Action: $serverAction)');
-          return {
-            'exito': false,
-            'success': false,
-            'mensaje': responseBody['resultError'] ??
-                responseBody['resultMessage'] ?? 'Error del servidor',
-            'serverAction': serverAction,
-          };
-        }
-      }
-
-      _logger.w('Respuesta sin serverAction, asumiendo éxito');
-      return {
-        'exito': true,
-        'success': true,
-        'mensaje': 'Censo activo procesado (sin serverAction)',
-        'id': responseBody['id'],
-      };
-
-    } catch (e) {
-      _logger.w('Error parseando JSON: $e');
-      return {
-        'exito': false,
-        'success': false,
-        'mensaje': 'Error en formato de respuesta',
-      };
-    }
-  }
-
-  static Map<String, dynamic> _errorResponse(String message) {
-    return {
-      'exito': false,
-      'success': false,
-      'mensaje': message,
-      'error': message,
-    };
   }
 }

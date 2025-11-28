@@ -518,7 +518,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
             onConfirmar: null, // No mostrar confirmar en historial
             // 🔴 Deshabilitar si ya está reintentando
             onReintentarEnvio: (envioFallido && estadoId != null && !_yaReintentando)
-                ? () => _reintentarEnvioHistorial(estadoId)
+                ? null //() => _reintentarEnvioHistorial(estadoId)
                 : null,
           );
         },

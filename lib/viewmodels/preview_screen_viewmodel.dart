@@ -28,7 +28,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   String? _currentProcessId;
 
   final EquipoRepository _equipoRepository = EquipoRepository();
-  final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
+  final CensoActivoRepository _estadoEquipoRepository = CensoActivoRepository();
   final CensoActivoFotoRepository _fotoRepository = CensoActivoFotoRepository();
   final EquipoPendienteRepository _equipoPendienteRepository = EquipoPendienteRepository();
 
@@ -94,7 +94,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     _isProcessing = true;
 
     try {
-      return await _guardarYSincronizarUnificado(datos, processId);
+      return await _insertarEnviarCensoActivo(datos, processId);
     } finally {
       if (_currentProcessId == processId) {
         _isProcessing = false;
@@ -104,7 +104,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   // GUARDADO LOCAL Y SINCRONIZACIÓN UNIFICADA
-  Future<Map<String, dynamic>> _guardarYSincronizarUnificado(
+  Future<Map<String, dynamic>> _insertarEnviarCensoActivo(
       Map<String, dynamic> datos, String processId) async {
 
     _setSaving(true);
@@ -207,9 +207,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       );
       final tiempoLocal = DateTime.now().difference(now).inSeconds;
 
-      // FASE 2: SINCRONIZACIÓN UNIFICADA EN BACKGROUND
-      _logger.i('Iniciando sincronización unificada en background');
-
+      //==ESTOY CENSANDO GUARDANDO Y ENVIANDO EL CENSO ACTIVO==
       await _uploadService.enviarCensoUnificado(
           censoActivoId: censoActivoId,
           usuarioId: usuarioId,
@@ -251,15 +249,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
       };
 
     } catch (e, stackTrace) {
-      _logger.e('Error en guardado local: $e', stackTrace: stackTrace);
-
-      await ErrorLogService.manejarExcepcion(
-        e,
-        censoActivoId,
-        null,
-        usuarioId,
-        'censo_activo',
-      );
+      _logger.e('Error en _insertarEnviarCensoActivo: $e', stackTrace: stackTrace);
+      CensoActivoRepository censoActivoRepository = CensoActivoRepository();
+      await censoActivoRepository.marcarComoError(censoActivoId!,'Excepción: ${e.toString()}');
+      await ErrorLogService.manejarExcepcion(e, censoActivoId, null, usuarioId, 'censo_activo');
 
       return {
         'success': false,

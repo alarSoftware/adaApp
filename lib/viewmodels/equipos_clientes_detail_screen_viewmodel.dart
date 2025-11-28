@@ -60,7 +60,7 @@ class EquiposClienteDetailState {
 // ========== VIEWMODEL LIMPIO ==========
 class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
-  final EstadoEquipoRepository _estadoEquipoRepository;
+  final CensoActivoRepository _estadoEquipoRepository;
   final EquipoRepository _equipoRepository;
   final LocationService _locationService = LocationService();
 
