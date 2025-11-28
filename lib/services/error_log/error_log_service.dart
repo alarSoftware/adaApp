@@ -33,8 +33,6 @@ class ErrorLogService {
       final now = DateTime.now();
 
       _logger.i('INICIANDO logError para $tableName - $operation');
-      _logger.i('   registro_fail_id: $registroFailId');
-      _logger.i('   error_message: $errorMessage');
 
       final errorLog = {
         'id': errorId,
@@ -92,10 +90,7 @@ class ErrorLogService {
           whereArgs: [errorId],
         );
         _logger.i('Marcado como sincronizado. Filas actualizadas: $updated');
-      } else {
-        _logger.w('Error log NO enviado, programado para reintentos automáticos');
       }
-
     } catch (e, stackTrace) {
       _logger.e('Error en logError: $e');
       _logger.e('Stack trace: $stackTrace');
@@ -201,13 +196,10 @@ class ErrorLogService {
             erroresEnviados.add(error['id'] as String);
           } else {
             fallidos++;
-            // Actualizar para el siguiente reintento
             await _actualizarParaReintento(error);
           }
         } catch (e) {
           fallidos++;
-          _logger.e('Error reenviando log ${error['id']}: $e');
-          // Actualizar para el siguiente reintento
           await _actualizarParaReintento(error);
         }
       }
@@ -215,11 +207,7 @@ class ErrorLogService {
       // 3. Marcar errores enviados exitosamente (NO eliminar)
       if (erroresEnviados.isNotEmpty) {
         await _marcarErrorsComoEnviados(erroresEnviados);
-        _logger.i('Marcados $enviados error logs como sincronizados');
       }
-
-      _logger.i('Reintento completado: $enviados enviados, $fallidos programados para próximo reintento');
-
       return SyncErrorLogsResult(
         exito: true,
         mensaje: 'Error logs: $enviados enviados, $fallidos programados para reintento',
@@ -228,7 +216,6 @@ class ErrorLogService {
       );
 
     } catch (e) {
-      _logger.e('Error general en reintentos: $e');
       return SyncErrorLogsResult(
         exito: false,
         mensaje: 'Error en reintentos: $e',
