@@ -354,14 +354,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   Future<void> _reintentarEnvioHistorial(String? estadoId) async {
     if (_yaReintentando) {
-      return; // Ignorar silenciosamente
+      return;
     }
 
     setState(() {
       _yaReintentando = true;
     });
 
-    if (estadoId == null) {
+    if (estadoId == null || estadoId.isEmpty) {
       _mostrarSnackBar('Error: ID de estado no disponible', AppColors.error);
       setState(() {
         _yaReintentando = false;
@@ -380,19 +380,29 @@ class _PreviewScreenState extends State<PreviewScreen> {
     final resultado = await viewModel.reintentarEnvio(estadoId);
 
     if (mounted) {
-      if (resultado['success']) {
-        _mostrarSnackBar(resultado['message'], AppColors.success);
-        setState(() {
-        });
-      } else {
-        setState(() {
-          _yaReintentando = false;
-        });
+      setState(() {
+        _yaReintentando = false;
+      });
 
-        await PreviewDialogs.mostrarErrorConReintentar(
-          context,
-          resultado['error'],
-              () => _reintentarEnvioHistorial(estadoId),
+      if (resultado['success'] == true) {
+        final mensaje = resultado['message'] as String? ?? 'Reintento exitoso';
+        _mostrarSnackBar(mensaje, AppColors.success);
+      } else {
+        final error = resultado['error'] as String? ?? 'Error al reintentar envío';
+
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Error en el Reintento'),
+            content: Text(error),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Entendido'),
+              ),
+            ],
+          ),
         );
       }
     }
@@ -518,7 +528,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
             onConfirmar: null, // No mostrar confirmar en historial
             // 🔴 Deshabilitar si ya está reintentando
             onReintentarEnvio: (envioFallido && estadoId != null && !_yaReintentando)
-                ? null //() => _reintentarEnvioHistorial(estadoId)
+                ? () => _reintentarEnvioHistorial(estadoId)
                 : null,
           );
         },

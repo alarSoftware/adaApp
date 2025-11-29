@@ -55,7 +55,6 @@ class CensoUploadService {
       _logger.i('Enviando censo unificado: $censoActivoId');
 
       final baseUrl = await BaseSyncService.getBaseUrl();
-      fullUrl = '$baseUrl/censoActivo/insertCensoActivo';
 
       final maps = await censoActivoRepository.dbHelper.consultar(
         'censo_activo',
@@ -143,6 +142,21 @@ class CensoUploadService {
 
     } catch (e, stackTrace) {
       _logger.e('Error en enviarCensoUnificado: $e', stackTrace: stackTrace);
+
+      // ✅ REGISTRAR EL ERROR AQUÍ
+      await censoActivoRepository.marcarComoError(
+        censoActivoId,
+        'Excepción: ${e.toString()}',
+      );
+
+      await ErrorLogService.manejarExcepcion(
+        e,
+        censoActivoId,
+        fullUrl,
+        usuarioId,
+        _tableName,
+      );
+
       rethrow;
     }
   }
@@ -274,9 +288,12 @@ class CensoUploadService {
         throw Exception('edfVendedorId es requerido');
       }
 
-      //===ESTOY REINTENANDO EL ENVIO MANUALMENTE DESDE EL PREVIEW===
-      await enviarCensoUnificado(censoActivoId: censoActivoId, usuarioId: usuarioId,
-        edfVendedorId: edfVendedorId,guardarLog: true);
+      await enviarCensoUnificado(
+          censoActivoId: censoActivoId,
+          usuarioId: usuarioId,
+          edfVendedorId: edfVendedorId,
+          guardarLog: true
+      );
 
       final censoActivoMapList = await censoActivoRepository.dbHelper.consultar(
         'censo_activo',
@@ -302,8 +319,8 @@ class CensoUploadService {
 
     } catch (e, stackTrace) {
       _logger.e('Error en reintentarEnvioCenso: $e', stackTrace: stackTrace);
-      await censoActivoRepository.marcarComoError(censoActivoId,'Excepción: ${e.toString()}');
-      await ErrorLogService.manejarExcepcion(e, censoActivoId, null, usuarioId, _tableName);
+      success = false;
+      message = e.toString();
     }
 
     return {

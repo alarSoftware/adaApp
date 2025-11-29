@@ -361,8 +361,6 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
     }
   }
 
-  /// Guardar equipos pendientes desde el servidor con mapeo de campos
-  /// ✅ MEJORADO: Extrae y guarda usuario_censo_id correctamente
   Future<int> guardarEquiposPendientesDesdeServidor(List<Map<String, dynamic>> equiposAPI) async {
     final db = await dbHelper.database;
     int guardados = 0;
@@ -375,7 +373,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
 
       for (var equipoAPI in equiposAPI) {
         try {
-          // ✅ MAPEO MEJORADO: Incluir usuario y fecha de sincronización
+          // ✅ MAPEO MEJORADO: Incluir usuario, fecha y edf_vendedor_id
           final equipoLocal = {
             'id': equipoAPI['id'],
             'equipo_id': equipoAPI['edfEquipoId'],
@@ -384,6 +382,11 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
             'fecha_actualizacion': DateTime.now().toIso8601String(),
             'fecha_censo': equipoAPI['creationDate'],
             'usuario_censo_id': equipoAPI['usuarioId'] ?? equipoAPI['usuario']?['id'] ?? 1,
+
+            // --- CORRECCIÓN AQUÍ: Guardar edf_vendedor_id ---
+            'edf_vendedor_id': equipoAPI['edfVendedorSucursalId'] ?? equipoAPI['edfVendedorId'],
+            // ------------------------------------------------
+
             'sincronizado': 1,
             'fecha_sincronizacion': DateTime.now().toIso8601String(),
           };

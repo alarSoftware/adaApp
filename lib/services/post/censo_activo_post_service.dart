@@ -46,7 +46,7 @@ class CensoActivoPostService {
     String? logo,
     int timeoutSegundos = 60,
     bool guardarLog = false,
-    var equipoDataMap
+    var equipoDataMap,
   }) async {
     String? fullUrl;
 
@@ -62,7 +62,8 @@ class CensoActivoPostService {
         _logger.w('No se proporcionó censoId, generando nuevo: $censoIdFinal');
       }
 
-      final equipoIdFinal = equipoId ?? codigoBarras ?? 'EQUIPO_${censoIdFinal}';
+      final equipoIdFinal =
+          equipoId ?? codigoBarras ?? 'EQUIPO_${censoIdFinal}';
 
       _logger.i('Preparando payload unificado...');
       _logger.i('   - Censo ID: $censoIdFinal');
@@ -72,34 +73,36 @@ class CensoActivoPostService {
       _logger.i('   - Crear pendiente: $crearPendiente');
 
       final payloadUnificado = _construirPayloadUnificado(
-          equipoId: equipoIdFinal,
-          codigoBarras: codigoBarras ?? equipoIdFinal,
-          marcaId: marcaId,
-          modeloId: modeloId,
-          logoId: logoId,
-          numeroSerie: numeroSerie,
-          esNuevoEquipo: esNuevoEquipo,
-          clienteId: clienteId,
-          edfVendedorId: edfVendedorId,
-          crearPendiente: crearPendiente,
-          pendienteExistente: pendienteExistente,
-          censoId: censoIdFinal,
-          usuarioId: usuarioId,
-          latitud: latitud,
-          longitud: longitud,
-          observaciones: observaciones,
-          enLocal: enLocal,
-          estadoCenso: estadoCenso,
-          fotos: fotos,
-          clienteNombre: clienteNombre,
-          marca: marca,
-          modelo: modelo,
-          logo: logo,
-          now: now,
-          equipoDataMap: equipoDataMap
+        equipoId: equipoIdFinal,
+        codigoBarras: codigoBarras ?? equipoIdFinal,
+        marcaId: marcaId,
+        modeloId: modeloId,
+        logoId: logoId,
+        numeroSerie: numeroSerie,
+        esNuevoEquipo: esNuevoEquipo,
+        clienteId: clienteId,
+        edfVendedorId: edfVendedorId,
+        crearPendiente: crearPendiente,
+        pendienteExistente: pendienteExistente,
+        censoId: censoIdFinal,
+        usuarioId: usuarioId,
+        latitud: latitud,
+        longitud: longitud,
+        observaciones: observaciones,
+        enLocal: enLocal,
+        estadoCenso: estadoCenso,
+        fotos: fotos,
+        clienteNombre: clienteNombre,
+        marca: marca,
+        modelo: modelo,
+        logo: logo,
+        now: now,
+        equipoDataMap: equipoDataMap,
       );
 
-      _logger.i('Payload size: ${jsonEncode(payloadUnificado).length} caracteres');
+      _logger.i(
+        'Payload size: ${jsonEncode(payloadUnificado).length} caracteres',
+      );
 
       final baseUrl = await ApiConfigService.getBaseUrl();
       fullUrl = '$baseUrl$_endpoint';
@@ -114,15 +117,17 @@ class CensoActivoPostService {
         );
       }
 
-      final response = await http.post(
-        Uri.parse(fullUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-        },
-        body: jsonEncode(payloadUnificado),
-      ).timeout(Duration(seconds: timeoutSegundos));
+      final response = await http
+          .post(
+            Uri.parse(fullUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'ngrok-skip-browser-warning': 'true',
+            },
+            body: jsonEncode(payloadUnificado),
+          )
+          .timeout(Duration(seconds: timeoutSegundos));
 
       _logger.i('Response: ${response.statusCode}');
 
@@ -137,7 +142,7 @@ class CensoActivoPostService {
           throw Exception(resultObject.message);
         }
       }
-      if(resultObject.success||resultObject.isDuplicate){
+      if (resultObject.success || resultObject.isDuplicate) {
         final censoUploadService = CensoUploadService();
         final fotosSeguras = fotos ?? [];
         await censoUploadService.marcarComoSincronizadoCompleto(
@@ -185,7 +190,6 @@ class CensoActivoPostService {
       );
 
       await file.writeAsString(contenido);
-
     } catch (e, stackTrace) {
       _logger.e('Error guardando log: $e');
       rethrow;
@@ -238,9 +242,9 @@ class CensoActivoPostService {
   }
 
   static void _agregarResumenSimple(
-      StringBuffer buffer,
-      Map<String, dynamic> payload,
-      ) {
+    StringBuffer buffer,
+    Map<String, dynamic> payload,
+  ) {
     final censo = payload['censo_activo'] != null
         ? Map<String, dynamic>.from(payload['censo_activo'] as Map)
         : null;
@@ -262,11 +266,17 @@ class CensoActivoPostService {
     final equipoCompleto = equipo != null && equipo.isNotEmpty;
     final pendienteCompleto = pendiente != null && pendiente.isNotEmpty;
 
-    buffer.writeln('Sección equipo: ${equipoCompleto ? 'COMPLETA (nuevo equipo)' : 'VACÍA (equipo existente)'}');
-    buffer.writeln('Sección equipo_pendiente: ${pendienteCompleto ? 'COMPLETA (crear asignación)' : 'VACÍA (ya asignado)'}');
+    buffer.writeln(
+      'Sección equipo: ${equipoCompleto ? 'COMPLETA (nuevo equipo)' : 'VACÍA (equipo existente)'}',
+    );
+    buffer.writeln(
+      'Sección equipo_pendiente: ${pendienteCompleto ? 'COMPLETA (crear asignación)' : 'VACÍA (ya asignado)'}',
+    );
 
     if (pendienteCompleto && pendiente != null) {
-      buffer.writeln('UUID Pendiente (BD): ${pendiente['uuid'] ?? 'NO DISPONIBLE'}');
+      buffer.writeln(
+        'UUID Pendiente (BD): ${pendiente['uuid'] ?? 'NO DISPONIBLE'}',
+      );
     }
 
     buffer.writeln('Sección censo_activo: COMPLETA (siempre)');
@@ -283,11 +293,15 @@ class CensoActivoPostService {
 
       if (censo['imageBase64_1'] != null) {
         final tamano1 = censo['imageBase64_1'].toString().length;
-        buffer.writeln('Tamaño imagen 1: ${(tamano1 / 1024).toStringAsFixed(1)} KB');
+        buffer.writeln(
+          'Tamaño imagen 1: ${(tamano1 / 1024).toStringAsFixed(1)} KB',
+        );
       }
       if (censo['imageBase64_2'] != null) {
         final tamano2 = censo['imageBase64_2'].toString().length;
-        buffer.writeln('Tamaño imagen 2: ${(tamano2 / 1024).toStringAsFixed(1)} KB');
+        buffer.writeln(
+          'Tamaño imagen 2: ${(tamano2 / 1024).toStringAsFixed(1)} KB',
+        );
       }
 
       buffer.writeln('Observaciones: ${censo['observaciones'] ?? 'N/A'}');
@@ -297,21 +311,25 @@ class CensoActivoPostService {
   }
 
   static void _agregarBodyJson(
-      StringBuffer buffer,
-      Map<String, dynamic> payload,
-      ) {
+    StringBuffer buffer,
+    Map<String, dynamic> payload,
+  ) {
     final payloadSimplificado = Map<String, dynamic>.from(payload);
 
     if (payloadSimplificado.containsKey('censo_activo')) {
-      final censo = Map<String, dynamic>.from(payloadSimplificado['censo_activo']);
+      final censo = Map<String, dynamic>.from(
+        payloadSimplificado['censo_activo'],
+      );
 
       if (censo.containsKey('imageBase64_1')) {
         final tamano1 = censo['imageBase64_1']?.toString().length ?? 0;
-        censo['imageBase64_1'] = '[BASE64 - ${(tamano1 / 1024).toStringAsFixed(1)} KB]';
+        censo['imageBase64_1'] =
+            '[BASE64 - ${(tamano1 / 1024).toStringAsFixed(1)} KB]';
       }
       if (censo.containsKey('imageBase64_2')) {
         final tamano2 = censo['imageBase64_2']?.toString().length ?? 0;
-        censo['imageBase64_2'] = '[BASE64 - ${(tamano2 / 1024).toStringAsFixed(1)} KB]';
+        censo['imageBase64_2'] =
+            '[BASE64 - ${(tamano2 / 1024).toStringAsFixed(1)} KB]';
       }
 
       if (censo.containsKey('fotos') && censo['fotos'] is List) {
@@ -322,7 +340,9 @@ class CensoActivoPostService {
       payloadSimplificado['censo_activo'] = censo;
     }
 
-    final prettyJson = JsonEncoder.withIndent('  ').convert(payloadSimplificado);
+    final prettyJson = JsonEncoder.withIndent(
+      '  ',
+    ).convert(payloadSimplificado);
     buffer.writeln(prettyJson);
   }
 
@@ -348,7 +368,8 @@ class CensoActivoPostService {
       }
 
       final now = DateTime.now();
-      final fechaFormateada = '${now.year}${now.month.toString().padLeft(2, '0')}'
+      final fechaFormateada =
+          '${now.year}${now.month.toString().padLeft(2, '0')}'
           '${now.day.toString().padLeft(2, '0')}_'
           '${now.hour.toString().padLeft(2, '0')}'
           '${now.minute.toString().padLeft(2, '0')}_'
@@ -432,11 +453,14 @@ class CensoActivoPostService {
     String? modelo,
     String? logo,
     required DateTime now,
-    var equipoDataMap
+    var equipoDataMap,
   }) {
     final Map<String, dynamic> payload = {};
     try {
-      if (esNuevoEquipo && marcaId != null && modeloId != null && logoId != null) {
+      if (esNuevoEquipo &&
+          marcaId != null &&
+          modeloId != null &&
+          logoId != null) {
         payload['equipo'] = _construirJsonEquipo(equipoDataMap);
         _logger.i('JSON Equipo agregado (nuevo equipo)');
       } else {
@@ -444,8 +468,11 @@ class CensoActivoPostService {
         _logger.i('JSON Equipo vacío (equipo existente)');
       }
 
-      if (pendienteExistente != null && (pendienteExistente is List && pendienteExistente.isNotEmpty)) {
-        payload['equipo_pendiente'] = _construirJsonEquipoPendiente(pendienteExistente);
+      if (pendienteExistente != null &&
+          (pendienteExistente is List && pendienteExistente.isNotEmpty)) {
+        payload['equipo_pendiente'] = _construirJsonEquipoPendiente(
+          pendienteExistente,
+        );
         _logger.i('JSON Equipo_Pendiente agregado (crear asignación)');
       } else {
         payload['equipo_pendiente'] = {};
@@ -481,13 +508,13 @@ class CensoActivoPostService {
 
   static Map<String, dynamic> _construirJsonEquipo(var equipoDataMap) {
     final now = DateTime.now().toIso8601String();
-    var id              = equipoDataMap['id'];
-    var edfEquipoId     = equipoDataMap['cod_barras'];
-    var codigoBarras    = equipoDataMap['cod_barras'];
-    var modeloId     = equipoDataMap['modelo_id'];
-    var marcaId         = equipoDataMap['marca_id'];
-    var logoId          = equipoDataMap['logo_id'];
-    var numeroSerie     = equipoDataMap['numero_serie'];
+    var id = equipoDataMap['id'];
+    var edfEquipoId = equipoDataMap['cod_barras'];
+    var codigoBarras = equipoDataMap['cod_barras'];
+    var modeloId = equipoDataMap['modelo_id'];
+    var marcaId = equipoDataMap['marca_id'];
+    var logoId = equipoDataMap['logo_id'];
+    var numeroSerie = equipoDataMap['numero_serie'];
 
     return {
       'id': id,
@@ -501,18 +528,20 @@ class CensoActivoPostService {
     };
   }
 
-  static Map<String, dynamic> _construirJsonEquipoPendiente(dynamic pendienteExistenteList) {
+  static Map<String, dynamic> _construirJsonEquipoPendiente(
+    dynamic pendienteExistenteList,
+  ) {
     var pendienteExistente = pendienteExistenteList[0];
-    String id            = pendienteExistente['id'];
+    String id = pendienteExistente['id'];
     var edfVendedorId = pendienteExistente['edf_vendedor_id'];
-    var equipoId      = pendienteExistente['equipo_id'];
-    var codigoBarras  = pendienteExistente['codigo_barras'];
-    var clienteId     = pendienteExistente['cliente_id'];
-    var numeroSerie   = pendienteExistente['numero_serie'];
-    var estado        = pendienteExistente['estado'];
-    var marcaId       = pendienteExistente['marca_id'];
-    var modeloId      = pendienteExistente['modelo_id'];
-    var logoId        = pendienteExistente['logo_id'];
+    var equipoId = pendienteExistente['equipo_id'];
+    var codigoBarras = pendienteExistente['codigo_barras'];
+    var clienteId = pendienteExistente['cliente_id'];
+    var numeroSerie = pendienteExistente['numero_serie'];
+    var estado = pendienteExistente['estado'];
+    var marcaId = pendienteExistente['marca_id'];
+    var modeloId = pendienteExistente['modelo_id'];
+    var logoId = pendienteExistente['logo_id'];
     final partes = edfVendedorId.split('_');
     final vendedorIdValue = partes.isNotEmpty ? partes[0] : edfVendedorId;
     int? sucursalIdValue;

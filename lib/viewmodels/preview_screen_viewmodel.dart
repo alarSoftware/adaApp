@@ -54,7 +54,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
   String? get statusMessage => _statusMessage;
   bool get canConfirm => !_isProcessing && !_isSaving;
 
-  // GETTERS DE USUARIO
   Future<int> get _getUsuarioId async {
     try {
       if (_usuarioActual != null && _usuarioActual!.id != null) return _usuarioActual!.id!;
@@ -65,7 +64,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       return 1;
     } catch (e) {
       _logger.e('Error obteniendo usuario: $e');
-      rethrow; // Escala el error
+      rethrow;
     }
   }
 
@@ -76,11 +75,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
       return _usuarioActual?.edfVendedorId;
     } catch (e) {
       _logger.e('Error obteniendo edf_vendedor_id: $e');
-      rethrow; // Escala el error
+      rethrow;
     }
   }
 
-  // MÉTODO PRINCIPAL - LOCAL FIRST, SYNC UNIFICADO
   Future<Map<String, dynamic>> confirmarRegistro(Map<String, dynamic> datos) async {
     if (_isProcessing) {
       return {
@@ -103,7 +101,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // GUARDADO LOCAL Y SINCRONIZACIÓN UNIFICADA
   Future<Map<String, dynamic>> _insertarEnviarCensoActivo(
       Map<String, dynamic> datos, String processId) async {
 
@@ -137,9 +134,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       usuarioId = await _getUsuarioId;
       final now = DateTime.now().toLocal();
 
-      // FASE 1: GUARDADO LOCAL COMPLETO
-
-      // Crear/obtener equipo LOCAL
       if (esNuevoEquipo) {
         _setStatusMessage('Registrando equipo...');
         equipoId = await _crearEquipoNuevo(
@@ -169,7 +163,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
         throw Exception('edfVendedorId no encontrado');
       }
 
-      // Crear pendiente LOCAL SOLO si NO está asignado
       if (!yaAsignado) {
         _setStatusMessage('Registrando asignación pendiente...');
         await _equipoPendienteRepository.procesarEscaneoCenso(
@@ -200,14 +193,12 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       _logger.i('Censo creado localmente: $censoActivoId (estado: ${yaAsignado ? "asignado" : "pendiente"})');
 
-      // Guardar fotos LOCAL
       final idsImagenes = await _fotoService.guardarFotosDelCenso(
           censoActivoId,
           datos
       );
       final tiempoLocal = DateTime.now().difference(now).inSeconds;
 
-      //==ESTOY CENSANDO GUARDANDO Y ENVIANDO EL CENSO ACTIVO==
       await _uploadService.enviarCensoUnificado(
           censoActivoId: censoActivoId,
           usuarioId: usuarioId,
@@ -215,7 +206,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
           guardarLog: true
       );
 
-      // FASE 3: RETORNO INMEDIATO AL USUARIO
       Map<String, dynamic>? equipoCompleto;
 
       if (esNuevoEquipo) {
@@ -250,9 +240,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
     } catch (e, stackTrace) {
       _logger.e('Error en _insertarEnviarCensoActivo: $e', stackTrace: stackTrace);
-      CensoActivoRepository censoActivoRepository = CensoActivoRepository();
-      await censoActivoRepository.marcarComoError(censoActivoId!,'Excepción: ${e.toString()}');
-      await ErrorLogService.manejarExcepcion(e, censoActivoId, null, usuarioId, 'censo_activo');
 
       return {
         'success': false,
@@ -348,7 +335,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       );
 
       if (censoActivo.id != null) {
-        // Actualizar el usuario_id
         await _estadoEquipoRepository.dbHelper.actualizar(
           'censo_activo',
           {
@@ -361,7 +347,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
         _logger.i('Censo creado y usuario_id actualizado: $usuarioId');
 
-        // Verificar que se guardó correctamente
         final verificacion = await _estadoEquipoRepository.dbHelper.consultar(
           'censo_activo',
           where: 'id = ?',
@@ -389,7 +374,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // MÉTODOS PÚBLICOS DE UTILIDAD
   String formatearFecha(String? fechaIso) {
     if (fechaIso == null) return 'No disponible';
     try {
@@ -666,14 +650,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
           edfVendedorId
       );
     } catch (e) {
-      await ErrorLogService.manejarExcepcion(
-        e,
-        estadoId,
-        null,
-        null,
-        'censo_activo',
-      );
-
       return {
         'success': false,
         'error': 'Error al reintentar: $e',
@@ -713,4 +689,3 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 }
-
