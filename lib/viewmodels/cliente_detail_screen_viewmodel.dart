@@ -76,7 +76,7 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
   final EquipoRepository _equipoRepository = EquipoRepository();
   final EquipoPendienteRepository _equipoPendienteRepository = EquipoPendienteRepository();
-  final EstadoEquipoRepository _estadoEquipoRepository = EstadoEquipoRepository();
+  final CensoActivoRepository _estadoEquipoRepository = CensoActivoRepository();
 
   // ========== ESTADO INTERNO ==========
   ClienteDetailState _state = ClienteDetailState();

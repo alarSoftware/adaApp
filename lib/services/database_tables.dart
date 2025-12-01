@@ -200,7 +200,8 @@ class DatabaseTables {
     last_retry_at TEXT, 
     next_retry_at TEXT,  
     sincronizado INTEGER DEFAULT 0,
-    fecha_sincronizacion TEXT
+    fecha_sincronizacion TEXT,
+    error_status TEXT
   )
 ''';
 

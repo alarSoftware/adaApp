@@ -3,7 +3,7 @@ import 'base_repository.dart';
 import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
 
-class EstadoEquipoRepository extends BaseRepository<CensoActivo> {
+class CensoActivoRepository extends BaseRepository<CensoActivo> {
   final Logger _logger = Logger();
   final Uuid _uuid = Uuid();
 
@@ -317,53 +317,6 @@ class EstadoEquipoRepository extends BaseRepository<CensoActivo> {
       _logger.i('Usuario actualizado en estado $estadoId: $usuarioId');
     } catch (e) {
       _logger.e('Error al actualizar usuario del estado: $e');
-      rethrow;
-    }
-  }
-
-  /// Marcar como sincronizado
-  Future<void> marcarComoSincronizado(String estadoId) async {
-    try {
-      // 1. Obtener datos del censo antes de actualizarlo
-      final censoMaps = await dbHelper.consultar(
-        tableName,
-        where: 'id = ?',
-        whereArgs: [estadoId],
-        limit: 1,
-      );
-
-      if (censoMaps.isEmpty) {
-        _logger.w('Censo $estadoId no encontrado');
-        return;
-      }
-
-      final censo = censoMaps.first;
-      final equipoId = censo['equipo_id'];
-      final clienteId = censo['cliente_id'];
-
-      // 2. Marcar censo como sincronizado
-      await dbHelper.actualizar(
-        tableName,
-        {
-          'estado_censo': EstadoEquipoCenso.migrado.valor,
-          'fecha_actualizacion': DateTime.now().toIso8601String(),
-        },
-        where: 'id = ?',
-        whereArgs: [estadoId],
-      );
-      final equiposPendientesActualizados = await dbHelper.actualizar(
-        'equipos_pendientes',
-        {'fecha_actualizacion': DateTime.now().toIso8601String()},
-        where: 'CAST(equipo_id AS TEXT) = ? AND CAST(cliente_id AS TEXT) = ?',
-        whereArgs: [equipoId.toString(), clienteId.toString()],
-      );
-
-      _logger.i('✅ Estado $estadoId marcado como sincronizado (migrado)');
-      _logger.i(
-        '📈 Equipos pendientes actualizados: $equiposPendientesActualizados',
-      );
-    } catch (e) {
-      _logger.e('❌ Error al marcar como sincronizado: $e');
       rethrow;
     }
   }

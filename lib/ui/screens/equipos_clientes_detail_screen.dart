@@ -32,7 +32,7 @@ class _EquiposClientesDetailScreenState extends State<EquiposClientesDetailScree
     _checkDatabase();
     _viewModel = EquiposClienteDetailScreenViewModel(
       widget.equipoCliente,
-      EstadoEquipoRepository(),
+      CensoActivoRepository(),
       EquipoRepository(), // Agregar esta línea
     );
     _setupEventListener();
