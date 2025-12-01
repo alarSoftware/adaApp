@@ -299,13 +299,10 @@ class DatabaseTables {
     observaciones TEXT,
     total_productos INTEGER DEFAULT 0,
     usuario_id INTEGER,
-    sincronizado INTEGER DEFAULT 0,
-    fecha_sincronizacion TEXT,
     server_id INTEGER,
-    sync_status TEXT DEFAULT 'pending',
-    intentos_sync INTEGER DEFAULT 0,
-    ultimo_intento_sync TEXT,
-    mensaje_error_sync TEXT,
+    sync_status TEXT DEFAULT 'creado',
+    sync_error TEXT,
+    synced_at TEXT,
     FOREIGN KEY (cliente_id) REFERENCES clientes (id),
     FOREIGN KEY (usuario_id) REFERENCES Users (id)
   )
@@ -326,7 +323,6 @@ class DatabaseTables {
     subtotal REAL,
     orden INTEGER DEFAULT 1,
     fecha_creacion TEXT NOT NULL,
-    sincronizado INTEGER DEFAULT 0,
     producto_reemplazo_id INTEGER,
     producto_reemplazo_codigo TEXT,
     producto_reemplazo_descripcion TEXT,
@@ -506,7 +502,6 @@ class DatabaseTables {
       'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_operacion_id ON operacion_comercial_detalle (operacion_comercial_id)',
       'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_codigo ON operacion_comercial_detalle (producto_codigo)',
       'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_categoria ON operacion_comercial_detalle (producto_categoria)',
-      'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_sincronizado ON operacion_comercial_detalle (sincronizado)',
 
       // Índices para productos
       'CREATE INDEX IF NOT EXISTS idx_productos_codigo ON productos (codigo)',

@@ -1,18 +1,12 @@
+// lib/viewmodels/pending_data_viewmodel.dart
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:ada_app/services/database_validation_service.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/services/sync/sync_service.dart';
-import 'package:ada_app/services/post/base_post_service.dart';
-import 'package:ada_app/services/post/dynamic_form_post_service.dart';
-import 'package:ada_app/services/censo/censo_upload_service.dart';
-import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
-import 'package:ada_app/services/post/device_log_post_service.dart';
-import 'package:ada_app/models/device_log.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:ada_app/services/sync/sync_tables_config.dart';
 import 'package:logger/logger.dart';
 import 'dart:async';
-import 'dart:convert';
 
 // ========== MODELOS DE DATOS ==========
 class PendingDataGroup {
@@ -36,6 +30,7 @@ enum PendingDataType {
   census,
   images,
   logs,
+  operations, // 👈 Nuevo tipo para operaciones comerciales
 }
 
 class SendResult {
@@ -128,7 +123,6 @@ class PendingDataViewModel extends ChangeNotifier {
   final Logger _logger = Logger();
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final SendConfiguration _config = const SendConfiguration();
-  final CensoActivoFotoRepository _fotoRepository = CensoActivoFotoRepository();
 
   // ========== ESTADO INTERNO ==========
   bool _isLoading = false;
@@ -200,7 +194,7 @@ class PendingDataViewModel extends ChangeNotifier {
     _autoSyncEnabled = true;
     _logger.i('🚀 Iniciando sincronización automática cada ${_config.autoSyncInterval.inMinutes} minutos');
 
-    // Primera sincronización después de 2 minutos (para dar tiempo al inicio)
+    // Primera sincronización después de 2 minutos
     Timer(const Duration(minutes: 2), () async {
       if (_autoSyncEnabled) {
         await _ejecutarAutoSync();
@@ -226,7 +220,7 @@ class PendingDataViewModel extends ChangeNotifier {
     }
   }
 
-  /// Toggle para activar/desactivar auto-sync manualmente
+  /// Toggle para activar/desactivar auto-sync
   void toggleAutoSync() {
     if (_autoSyncEnabled) {
       detenerSincronizacionAutomatica();
@@ -239,20 +233,17 @@ class PendingDataViewModel extends ChangeNotifier {
 
   /// Ejecuta la sincronización automática en background
   Future<void> _ejecutarAutoSync() async {
-    // No ejecutar si ya hay un envío en progreso
     if (_isSending) {
       _logger.i('⏭️ Auto-sync saltado: envío manual en progreso');
       return;
     }
 
-    // No ejecutar si no hay conexión
     final connected = await _checkConnectivity();
     if (!connected) {
       _logger.i('⏭️ Auto-sync saltado: sin conexión');
       return;
     }
 
-    // Recargar datos para ver si hay pendientes
     await loadPendingData();
 
     if (!hasPendingData) {
@@ -269,7 +260,7 @@ class PendingDataViewModel extends ChangeNotifier {
     }
   }
 
-  /// Ejecuta el envío automático de forma silenciosa (sin mostrar todos los diálogos)
+  /// Ejecuta el envío automático silencioso
   Future<void> _executarAutoSyncSilencioso() async {
     _setSending(true);
     _resetSendProgress();
@@ -294,7 +285,6 @@ class PendingDataViewModel extends ChangeNotifier {
         );
 
         try {
-          // Solo intentar una vez (sin reintentos) en auto-sync
           final result = await _sendDataGroup(group);
           results.add(result);
 
@@ -315,19 +305,16 @@ class PendingDataViewModel extends ChangeNotifier {
         completedCount: _pendingGroups.length,
       );
 
-      // Recargar datos
       await loadPendingData();
 
-      // Solo mostrar mensaje si se envió algo
       if (totalSent > 0) {
         final successCount = results.where((r) => r.success).length;
         _eventController.add(ShowSuccessEvent(
-            '🔄 Auto-sync: $totalSent elementos enviados ($successCount/${results.length} categorías)'
+          '🔄 Auto-sync: $totalSent elementos enviados ($successCount/${results.length} categorías)',
         ));
       }
 
       _logger.i('✅ Auto-sync completado: $totalSent elementos enviados');
-
     } catch (e) {
       _logger.e('💥 Error en auto-sync: $e');
     } finally {
@@ -345,66 +332,29 @@ class PendingDataViewModel extends ChangeNotifier {
     try {
       _logger.i('🔍 Cargando datos pendientes...');
 
-      final db = await _dbHelper.database;
-
-      final censosPendientes = await db.query(
-        'censo_activo',
-        where: 'estado_censo = ?',
-        whereArgs: ['error'],
-      );
-      final cantidadCensos = censosPendientes.length;
-
-      _logger.i('📋 Censos pendientes de sincronización: $cantidadCensos');
-
-      // Obtener otros datos pendientes (formularios, logs, etc.)
-      final validationService = DatabaseValidationService(db);
-      final summary = await validationService.getPendingSyncSummary();
-      final pendingByTable = summary['pending_by_table'] as List<dynamic>? ?? [];
+      // 🔥 USAR EL CONFIGURADOR CENTRALIZADO
+      final counts = await SyncTablesConfig.getPendingCounts();
+      final configs = SyncTablesConfig.getAllTableConfigs();
 
       final grupos = <PendingDataGroup>[];
 
-      // Tablas relacionadas con censos que NO deben aparecer por separado
-      final tablasExcluidas = {
-        'censo_activo',
-        'equipos_pendientes',
-        'censo_activo_foto',
-      };
-
-      // 🔥 AGREGAR SOLO LA TARJETA DE CENSOS SI HAY CENSOS SIN SINCRONIZAR
-      if (cantidadCensos > 0) {
-        grupos.add(PendingDataGroup(
-          tableName: 'censo_activo',
-          displayName: 'Censos Activos',
-          count: cantidadCensos, // 🔑 SOLO los censos no sincronizados
-          type: PendingDataType.census,
-          description: 'Censos pendientes de sincronización',
-        ));
-      }
-
-      // Agregar otras categorías (formularios, logs, etc.)
-      for (var item in pendingByTable) {
-        final tableName = item['table'] as String;
-
-        // Saltar tablas relacionadas con censos
-        if (tablasExcluidas.contains(tableName)) {
-          continue;
-        }
-
-        final displayName = item['display_name'] as String;
-        final count = item['count'] as int;
+      for (final config in configs) {
+        final count = counts[config.tableName] ?? 0;
 
         if (count > 0) {
           grupos.add(PendingDataGroup(
-            tableName: tableName,
-            displayName: displayName,
+            tableName: config.tableName,
+            displayName: config.displayName,
             count: count,
-            type: _getDataType(tableName),
-            description: _getDescription(tableName),
+            type: _getDataType(config.tableName),
+            description: config.description,
           ));
+
+          _logger.i('📋 ${config.displayName}: $count pendientes');
         }
       }
 
-      // Ordenar por tipo y luego por nombre
+      // Ordenar por tipo y nombre
       grupos.sort((a, b) {
         final typeCompare = a.type.index.compareTo(b.type.index);
         if (typeCompare != 0) return typeCompare;
@@ -412,15 +362,10 @@ class PendingDataViewModel extends ChangeNotifier {
       });
 
       _pendingGroups = grupos;
-
-      // 🔥 TOTAL: Sumar solo los grupos que se muestran
       _totalPendingItems = grupos.fold(0, (sum, group) => sum + group.count);
-
       _lastUpdateTime = DateTime.now().toString().substring(0, 19);
 
       _logger.i('✅ Datos pendientes cargados: $_totalPendingItems items en ${_pendingGroups.length} grupos');
-      _logger.i('   - Censos activos: $cantidadCensos');
-
     } catch (e) {
       _logger.e('❌ Error cargando datos pendientes: $e');
       _eventController.add(ShowErrorEvent('Error cargando datos: $e'));
@@ -448,16 +393,15 @@ class PendingDataViewModel extends ChangeNotifier {
     if (_isSending || _pendingGroups.isEmpty) return;
 
     try {
-      // Verificar conexión
       final connected = await _checkConnectivity();
       if (!connected) {
-        _eventController.add(ShowErrorEvent('Sin conexión al servidor. Verifique su conexión a Internet.'));
+        _eventController.add(ShowErrorEvent(
+          'Sin conexión al servidor. Verifique su conexión a Internet.',
+        ));
         return;
       }
 
-      // Solicitar confirmación
       _eventController.add(RequestBulkSendConfirmationEvent(_pendingGroups, _totalPendingItems));
-
     } catch (e) {
       _eventController.add(ShowErrorEvent('Error verificando conexión: $e'));
     }
@@ -474,22 +418,21 @@ class PendingDataViewModel extends ChangeNotifier {
     try {
       _logger.i('🚀 Iniciando envío masivo de datos pendientes...');
 
-      // Verificar conexión una vez más antes de empezar
       final connected = await _checkConnectivity();
       if (!connected) {
-        _eventController.add(ShowErrorEvent('Conexión perdida. No se puede proceder con el envío.'));
+        _eventController.add(ShowErrorEvent(
+          'Conexión perdida. No se puede proceder con el envío.',
+        ));
         return;
       }
 
       final results = <SendResult>[];
       int totalSent = 0;
 
-      // Configurar progreso
       _sendTotalCount = _pendingGroups.length;
       _sendCompletedCount = 0;
 
       for (int i = 0; i < _pendingGroups.length; i++) {
-        // Verificar cancelación
         if (_isCancelled) {
           _logger.i('🛑 Envío cancelado por el usuario');
           _eventController.add(ShowErrorEvent('Envío cancelado por el usuario'));
@@ -514,7 +457,6 @@ class PendingDataViewModel extends ChangeNotifier {
           } else {
             _logger.w('⚠️ ${group.displayName}: ${result.error}');
           }
-
         } catch (e) {
           _logger.e('❌ Error enviando ${group.displayName}: $e');
           results.add(SendResult(
@@ -526,18 +468,15 @@ class PendingDataViewModel extends ChangeNotifier {
           ));
         }
 
-        // Pequeña pausa para no saturar el servidor
         await Future.delayed(const Duration(milliseconds: 100));
       }
 
-      // Completar progreso
       _updateSendProgress(
         progress: 1.0,
         currentStep: 'Envío completado',
         completedCount: _pendingGroups.length,
       );
 
-      // Crear resultado final
       final allSuccess = results.every((r) => r.success);
       final successCount = results.where((r) => r.success).length;
 
@@ -554,7 +493,6 @@ class PendingDataViewModel extends ChangeNotifier {
 
       _eventController.add(SendCompletedEvent(bulkResult));
 
-      // Recargar datos para actualizar la vista
       await loadPendingData();
 
       if (allSuccess) {
@@ -562,7 +500,6 @@ class PendingDataViewModel extends ChangeNotifier {
       }
 
       _logger.i('✅ Envío masivo completado: $summary');
-
     } catch (e) {
       _logger.e('💥 Error en envío masivo: $e');
       _eventController.add(ShowErrorEvent('Error en envío masivo: $e'));
@@ -585,20 +522,18 @@ class PendingDataViewModel extends ChangeNotifier {
     await loadPendingData();
   }
 
-  // ========== MÉTODOS PARA CENSOS PENDIENTES DETALLADOS ==========
-
-  /// Obtiene la lista detallada de censos fallidos con información completa
+  /// Obtiene la lista de censos fallidos (con error de sincronización)
   Future<List<Map<String, dynamic>>> getCensosFallidos() async {
     try {
+      _logger.i('🔍 Obteniendo censos fallidos...');
+
       final db = await _dbHelper.database;
 
-      _logger.i('🔍 Buscando censos fallidos...');
-
-      // Query con información completa
       final censos = await db.rawQuery('''
         SELECT 
           ca.*,
           eq.cod_barras,
+          eq.numero_serie,
           c.nombre as cliente_nombre,
           m.nombre as marca_nombre,
           mo.nombre as modelo_nombre
@@ -611,15 +546,7 @@ class PendingDataViewModel extends ChangeNotifier {
         ORDER BY ca.fecha_creacion DESC
       ''');
 
-      _logger.i('📋 Censos fallidos encontrados: ${censos.length}');
-
-      if (censos.isNotEmpty) {
-        final conError = censos.where((c) => c['estado_censo'] == 'error').length;
-        final creados = censos.where((c) => c['estado_censo'] == 'creado').length;
-        _logger.i('   - Con estado error: $conError');
-        _logger.i('   - Con estado creado: $creados');
-      }
-
+      _logger.i('✅ Censos fallidos obtenidos: ${censos.length}');
       return censos;
 
     } catch (e) {
@@ -628,138 +555,31 @@ class PendingDataViewModel extends ChangeNotifier {
     }
   }
 
-  // /// Reintenta enviar un censo específico
-  // Future<Map<String, dynamic>> reintentarCenso(String censoId) async {
-  //   try {
-  //     _logger.i('🔄 Reintentando censo: $censoId');
-  //
-  //     final db = await _dbHelper.database;
-  //
-  //     // Obtener datos del censo
-  //     final censos = await db.query(
-  //       'censo_activo',
-  //       where: 'id = ?',
-  //       whereArgs: [censoId],
-  //     );
-  //
-  //     if (censos.isEmpty) {
-  //       return {
-  //         'success': false,
-  //         'error': 'Censo no encontrado',
-  //       };
-  //     }
-  //
-  //     final censo = censos.first;
-  //
-  //     // Verificar si ya está sincronizado
-  //     if ((censo['sincronizado'] as int?) == 1) {
-  //       _logger.w('⚠️ Censo $censoId ya está sincronizado');
-  //       return {
-  //         'success': true,
-  //         'message': 'El censo ya estaba sincronizado',
-  //       };
-  //     }
-  //
-  //     // Preparar datos para envío
-  //     final position = Position(
-  //       latitude: (censo['latitud'] as num?)?.toDouble() ?? 0.0,
-  //       longitude: (censo['longitud'] as num?)?.toDouble() ?? 0.0,
-  //       timestamp: DateTime.now(),
-  //       accuracy: 0.0,
-  //       altitude: 0.0,
-  //       altitudeAccuracy: 0.0,
-  //       heading: 0.0,
-  //       headingAccuracy: 0.0,
-  //       speed: 0.0,
-  //       speedAccuracy: 0.0,
-  //     );
-  //     final response = null;
-  //     // 🔥 USAR EL SERVICIO UNIFICADO
-  //     //TODO RONALDO COMENTADO
-  //     // final response = await CensoActivoPostService.enviarCambioEstado(
-  //     //   codigoBarras: censo['equipo_id']?.toString() ?? '',
-  //     //   clienteId: (censo['cliente_id'] as num?)?.toInt() ?? 0,
-  //     //   enLocal: (censo['en_local'] as num?) == 1,
-  //     //   position: position,
-  //     //   observaciones: censo['observaciones']?.toString(),
-  //     //   equipoId: censo['equipo_id']?.toString(),
-  //     // );
-  //
-  //     if (response['exito'] == true) {
-  //       _logger.i('✅ Censo $censoId sincronizado exitosamente');
-  //
-  //       return {
-  //         'success': true,
-  //         'message': 'Censo sincronizado correctamente',
-  //       };
-  //     } else {
-  //       return {
-  //         'success': false,
-  //         'error': response['mensaje'] ?? 'Error al sincronizar censo',
-  //       };
-  //     }
-  //
-  //   } catch (e) {
-  //     _logger.e('💥 Error reintentando censo $censoId: $e');
-  //     return {
-  //       'success': false,
-  //       'error': 'Error interno: $e',
-  //     };
-  //   }
-  // }
+  Future<List<Map<String, dynamic>>> getOperacionesFallidas() async {
+    try {
+      _logger.i('🔍 Obteniendo operaciones fallidas...');
 
-  // /// Reintenta enviar todos los censos pendientes
-  // Future<Map<String, dynamic>> reintentarTodosCensos() async {
-  //   try {
-  //     _logger.i('🔄 Reintentando todos los censos pendientes...');
-  //
-  //     final censosFallidos = await getCensosFallidos();
-  //
-  //     if (censosFallidos.isEmpty) {
-  //       return {
-  //         'success': true,
-  //         'message': 'No hay censos pendientes',
-  //       };
-  //     }
-  //
-  //     int exitosos = 0;
-  //     int fallidos = 0;
-  //
-  //     for (final censo in censosFallidos) {
-  //       final resultado = await reintentarCenso(censo['id']);
-  //
-  //       if (resultado['success'] == true) {
-  //         exitosos++;
-  //       } else {
-  //         fallidos++;
-  //       }
-  //
-  //       // Pequeña pausa para no saturar
-  //       await Future.delayed(const Duration(milliseconds: 200));
-  //     }
-  //
-  //     _logger.i('✅ Reintentos completados: $exitosos exitosos, $fallidos fallidos');
-  //
-  //     // Recargar datos principales
-  //     await loadPendingData();
-  //
-  //     return {
-  //       'success': exitosos > 0,
-  //       'message': exitosos > 0
-  //           ? '$exitosos de ${censosFallidos.length} censos sincronizados${fallidos > 0 ? " ($fallidos fallaron)" : ""}'
-  //           : 'No se pudieron sincronizar los censos',
-  //       'exitosos': exitosos,
-  //       'fallidos': fallidos,
-  //     };
-  //
-  //   } catch (e) {
-  //     _logger.e('❌ Error reintentando todos los censos: $e');
-  //     return {
-  //       'success': false,
-  //       'error': 'Error: $e',
-  //     };
-  //   }
-  // }
+      final db = await _dbHelper.database;
+
+      final operaciones = await db.rawQuery('''
+      SELECT 
+        oc.*,
+        c.nombre as cliente_nombre,
+        c.telefono as cliente_telefono
+      FROM operacion_comercial oc
+      LEFT JOIN clientes c ON oc.cliente_id = c.id
+      WHERE oc.sync_status = 'error'
+      ORDER BY oc.fecha_creacion DESC
+    ''');
+
+      _logger.i('✅ Operaciones fallidas obtenidas: ${operaciones.length}');
+      return operaciones;
+
+    } catch (e) {
+      _logger.e('❌ Error obteniendo operaciones fallidas: $e');
+      rethrow;
+    }
+  }
 
   // ========== MÉTODOS PRIVADOS ==========
 
@@ -807,7 +627,9 @@ class PendingDataViewModel extends ChangeNotifier {
         final result = await _sendDataGroup(group);
         return await Future.any([
           Future.value(result),
-          Future.delayed(_config.timeout).then((_) => throw TimeoutException('Timeout', _config.timeout)),
+          Future.delayed(_config.timeout).then(
+                (_) => throw TimeoutException('Timeout', _config.timeout),
+          ),
         ]);
       } catch (e) {
         if (attempt == _config.maxRetries) {
@@ -833,62 +655,48 @@ class PendingDataViewModel extends ChangeNotifier {
     );
   }
 
-  PendingDataType _getDataType(String tableName) {
-    switch (tableName) {
-      case 'dynamic_form_response':
-      case 'dynamic_form_response_detail':
-      case 'dynamic_form_response_image':
-        return PendingDataType.forms;
-      case 'censo_activo':
-      case 'censo_activo_foto':
-        return PendingDataType.census;
-      case 'device_log':
-        return PendingDataType.logs;
-      default:
-        return PendingDataType.forms;
-    }
-  }
-
-  String _getDescription(String tableName) {
-    switch (tableName) {
-      case 'dynamic_form_response':
-        return 'Respuestas de formularios completados';
-      case 'dynamic_form_response_detail':
-        return 'Detalles de respuestas de formularios';
-      case 'dynamic_form_response_image':
-        return 'Imágenes adjuntas a formularios';
-      case 'censo_activo':
-        return 'Censos realizados pendientes de envío';
-      case 'censo_activo_foto':
-        return 'Fotos tomadas durante censos';
-      case 'device_log':
-        return 'Registros de actividad del dispositivo';
-      default:
-        return 'Datos pendientes de sincronización';
-    }
-  }
-
-  /// Envía un grupo específico de datos
+  /// Envía un grupo específico de datos usando la configuración centralizada
   Future<SendResult> _sendDataGroup(PendingDataGroup group) async {
     try {
       _logger.i('📤 Enviando ${group.displayName} (${group.count} elementos)...');
 
-      switch (group.type) {
-        case PendingDataType.forms:
-          return await _sendForms(group);
+      final db = await _dbHelper.database;
 
-        case PendingDataType.census:
-        // 🔥 ENVIAR TODOS LOS CENSOS (incluye censos_activo, equipos_pendientes, fotos)
-          return await _sendCensus(group);
+      // 🔥 BUSCAR LA CONFIGURACIÓN DE LA TABLA
+      final config = SyncTablesConfig.getAllTableConfigs().firstWhere(
+            (c) => c.tableName == group.tableName,
+        orElse: () => throw Exception('Configuración no encontrada para ${group.tableName}'),
+      );
 
-        case PendingDataType.images:
-          return await _sendImages(group);
+      // Obtener items pendientes usando la configuración
+      final items = await db.query(
+        config.tableName,
+        where: config.whereClause,
+        whereArgs: config.whereArgs,
+        orderBy: 'fecha_creacion ASC',
+      );
 
-        case PendingDataType.logs:
-          return await _sendLogs(group);
+      if (items.isEmpty) {
+        return SendResult(
+          success: true,
+          tableName: group.tableName,
+          itemsSent: 0,
+          message: 'No hay elementos pendientes',
+        );
       }
 
+      // 🔥 EJECUTAR LA FUNCIÓN DE SINCRONIZACIÓN DESDE EL CONFIG
+      final result = await config.syncFunction(items);
+
+      return SendResult(
+        success: result.success,
+        tableName: group.tableName,
+        itemsSent: result.itemsSent,
+        message: result.message,
+        error: result.error,
+      );
     } catch (e) {
+      _logger.e('❌ Error enviando ${group.tableName}: $e');
       return SendResult(
         success: false,
         tableName: group.tableName,
@@ -899,353 +707,23 @@ class PendingDataViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== IMPLEMENTACIÓN USANDO TU ESQUEMA REAL ==========
-
-  Future<SendResult> _sendForms(PendingDataGroup group) async {
-    try {
-      final db = await _dbHelper.database;
-
-      // Usar sync_status como está en tu esquema
-      final pendingForms = await db.query(
-        'dynamic_form_response',
-        where: 'sync_status = ?',
-        whereArgs: ['pending'],
-        orderBy: 'creation_date ASC',
-      );
-
-      if (pendingForms.isEmpty) {
-        return SendResult(
-          success: true,
-          tableName: group.tableName,
-          itemsSent: 0,
-          message: 'No hay formularios pendientes',
-        );
-      }
-
-      int sentCount = 0;
-      final errors = <String>[];
-
-      for (final form in pendingForms) {
-        if (_isCancelled) break;
-
-        try {
-          // Preparar respuesta como lo espera el servicio existente
-          final respuesta = await _prepareFormResponse(form);
-
-          // Usar el servicio existente DynamicFormPostService
-          final response = await DynamicFormPostService.enviarRespuestaFormulario(
-            respuesta: respuesta,
-            incluirLog: true,
-          );
-
-          if (response['exito'] == true) {
-            // Marcar como enviado usando campos de tu esquema
-            await db.update(
-              'dynamic_form_response',
-              {
-                'sync_status': 'sent',
-                'fecha_sincronizado': DateTime.now().toIso8601String(),
-                'last_update_date': DateTime.now().toIso8601String(),
-              },
-              where: 'id = ?',
-              whereArgs: [form['id']],
-            );
-
-            // Marcar detalles como enviados
-            await db.update(
-              'dynamic_form_response_detail',
-              {'sync_status': 'sent'},
-              where: 'dynamic_form_response_id = ?',
-              whereArgs: [form['id']],
-            );
-
-            // Marcar imágenes como enviadas
-            await db.execute('''
-              UPDATE dynamic_form_response_image 
-              SET sync_status = 'sent' 
-              WHERE dynamic_form_response_detail_id IN (
-                SELECT id FROM dynamic_form_response_detail 
-                WHERE dynamic_form_response_id = ?
-              )
-            ''', [form['id']]);
-
-            sentCount++;
-          } else {
-            // Incrementar intentos de sync
-            await db.update(
-              'dynamic_form_response',
-              {
-                'intentos_sync': (form['intentos_sync'] as int? ?? 0) + 1,
-                'ultimo_intento_sync': DateTime.now().toIso8601String(),
-                'mensaje_error_sync': response['mensaje'] ?? 'Error desconocido',
-              },
-              where: 'id = ?',
-              whereArgs: [form['id']],
-            );
-
-            errors.add('Formulario ${form['id']}: ${response['mensaje'] ?? 'Error desconocido'}');
-          }
-
-        } catch (e) {
-          errors.add('Formulario ${form['id']}: $e');
-        }
-      }
-
-      final success = sentCount > 0;
-      final message = success
-          ? '$sentCount de ${pendingForms.length} formularios enviados'
-          : 'No se pudieron enviar formularios: ${errors.join(', ')}';
-
-      return SendResult(
-        success: success,
-        tableName: group.tableName,
-        itemsSent: sentCount,
-        message: message,
-        error: errors.isNotEmpty ? errors.join('; ') : null,
-      );
-
-    } catch (e) {
-      return SendResult(
-        success: false,
-        tableName: group.tableName,
-        itemsSent: 0,
-        message: 'Error en envío de formularios',
-        error: e.toString(),
-      );
-    }
-  }
-
-  Future<Map<String, dynamic>> _prepareFormResponse(Map<String, Object?> form) async {
-    final db = await _dbHelper.database;
-
-    // Obtener detalles del formulario
-    final details = await db.query(
-      'dynamic_form_response_detail',
-      where: 'dynamic_form_response_id = ?',
-      whereArgs: [form['id']],
-    );
-
-    // Obtener imágenes del formulario (relación a través de detail)
-    final images = await db.rawQuery('''
-      SELECT dri.* FROM dynamic_form_response_image dri
-      INNER JOIN dynamic_form_response_detail drd ON dri.dynamic_form_response_detail_id = drd.id
-      WHERE drd.dynamic_form_response_id = ?
-    ''', [form['id']]);
-
-    // Preparar la respuesta en el formato que espera tu servicio
-    return {
-      'id': form['id'],
-      'dynamic_form_id': form['dynamic_form_id'],
-      'usuario_id': form['usuario_id'],
-      'contacto_id': form['contacto_id'],
-      'edf_vendedor_id': form['edf_vendedor_id'],
-      'creation_date': form['creation_date'],
-      'last_update_date': form['last_update_date'],
-      'estado': form['estado'],
-      'details': details,
-      'images': images,
-    };
-  }
-
-  /// Envia censos usando el servicio unificado CensoUploadService
-  Future<SendResult> _sendCensus(PendingDataGroup group) async {
-    try {
-      final db = await _dbHelper.database;
-
-      // Obtener usuario actual
-      final usuarios = await db.query('Users', limit: 1);
-      if (usuarios.isEmpty) {
-        _logger.w('Usuario no encontrado para sincronizacion de censos');
-        return SendResult(
-          success: false,
-          tableName: group.tableName,
-          itemsSent: 0,
-          message: 'Usuario no encontrado',
-        );
-      }
-
-      final usuarioId = usuarios.first['id'] as int;
-
-      _logger.i('Iniciando sincronizacion de censos para usuario: $usuarioId');
-
-      // Usar el servicio unificado
-      final censoService = CensoUploadService();
-      final resultado = await censoService.sincronizarCensosNoMigrados(usuarioId);
-
-      final censosExitosos = resultado['censos_exitosos'] ?? 0;
-      final censosFallidos = resultado['fallidos'] ?? 0;
-
-      _logger.i('Sincronizacion completada - Exitosos: $censosExitosos, Fallidos: $censosFallidos');
-
-      return SendResult(
-        success: censosExitosos > 0 || censosFallidos == 0,
-        tableName: group.tableName,
-        itemsSent: censosExitosos,
-        message: censosExitosos > 0
-            ? '$censosExitosos censos sincronizados correctamente'
-            : 'No hay censos pendientes para sincronizar',
-        error: censosFallidos > 0 ? '$censosFallidos censos fallaron' : null,
-      );
-
-    } catch (e) {
-      _logger.e('Error en sincronizacion de censos: $e');
-      return SendResult(
-        success: false,
-        tableName: group.tableName,
-        itemsSent: 0,
-        message: 'Error en sincronizacion de censos',
-        error: e.toString(),
-      );
-    }
-  }
-
-  Future<SendResult> _sendImages(PendingDataGroup group) async {
-    try {
-      final db = await _dbHelper.database;
-
-      final pendingImages = await db.query(
-        'dynamic_form_response_image',
-        where: 'sync_status = ? AND imagen_base64 IS NOT NULL',
-        whereArgs: ['pending'],
-        orderBy: 'created_at ASC',
-      );
-
-      if (pendingImages.isEmpty) {
-        return SendResult(
-          success: true,
-          tableName: group.tableName,
-          itemsSent: 0,
-          message: 'No hay imágenes pendientes',
-        );
-      }
-
-      int sentCount = 0;
-      final errors = <String>[];
-
-      for (int i = 0; i < pendingImages.length; i += _config.batchSize) {
-        if (_isCancelled) break;
-
-        final batch = pendingImages.skip(i).take(_config.batchSize).toList();
-
-        for (final image in batch) {
-          try {
-            final response = await BasePostService.post(
-              endpoint: '/api/upload-image',
-              body: {
-                'image_id': image['id'],
-                'dynamic_form_response_detail_id': image['dynamic_form_response_detail_id'],
-                'imagen_base64': image['imagen_base64'],
-                'mime_type': image['mime_type'],
-                'orden': image['orden'],
-              },
-              timeout: const Duration(seconds: 60),
-            );
-
-            if (response['exito'] == true) {
-              await db.update(
-                'dynamic_form_response_image',
-                {'sync_status': 'sent'},
-                where: 'id = ?',
-                whereArgs: [image['id']],
-              );
-
-              sentCount++;
-            } else {
-              errors.add('Imagen ${image['id']}: ${response['mensaje'] ?? 'Error desconocido'}');
-            }
-
-          } catch (e) {
-            errors.add('Imagen ${image['id']}: $e');
-          }
-        }
-
-        await Future.delayed(const Duration(milliseconds: 200));
-      }
-
-      final success = sentCount > 0;
-      final message = success
-          ? '$sentCount de ${pendingImages.length} imágenes enviadas'
-          : 'No se pudieron enviar imágenes: ${errors.join(', ')}';
-
-      return SendResult(
-        success: success,
-        tableName: group.tableName,
-        itemsSent: sentCount,
-        message: message,
-        error: errors.isNotEmpty ? errors.join('; ') : null,
-      );
-
-    } catch (e) {
-      return SendResult(
-        success: false,
-        tableName: group.tableName,
-        itemsSent: 0,
-        message: 'Error en envío de imágenes',
-        error: e.toString(),
-      );
-    }
-  }
-
-  Future<SendResult> _sendLogs(PendingDataGroup group) async {
-    try {
-      final db = await _dbHelper.database;
-
-      final pendingLogsData = await db.query(
-        'device_log',
-        where: 'sincronizado = ?',
-        whereArgs: [0],
-        orderBy: 'fecha_registro DESC',
-        limit: 1000,
-      );
-
-      if (pendingLogsData.isEmpty) {
-        return SendResult(
-          success: true,
-          tableName: group.tableName,
-          itemsSent: 0,
-          message: 'No hay logs pendientes',
-        );
-      }
-
-      final pendingLogs = pendingLogsData.map((logData) => DeviceLog.fromMap(logData)).toList();
-
-      final resultado = await DeviceLogPostService.enviarDeviceLogsBatch(pendingLogs);
-
-      final sentCount = resultado['exitosos'] ?? 0;
-      final failedCount = resultado['fallidos'] ?? 0;
-
-      if (sentCount > 0) {
-        if (sentCount > failedCount) {
-          await db.update(
-            'device_log',
-            {'sincronizado': 1},
-            where: 'sincronizado = ?',
-            whereArgs: [0],
-          );
-        }
-      }
-
-      final success = sentCount > 0;
-      final message = success
-          ? '$sentCount de ${pendingLogs.length} logs enviados${failedCount > 0 ? ' ($failedCount fallaron)' : ''}'
-          : 'No se pudieron enviar logs';
-
-      return SendResult(
-        success: success,
-        tableName: group.tableName,
-        itemsSent: sentCount,
-        message: message,
-        error: failedCount > 0 ? '$failedCount logs fallaron' : null,
-      );
-
-    } catch (e) {
-      return SendResult(
-        success: false,
-        tableName: group.tableName,
-        itemsSent: 0,
-        message: 'Error en envío de logs',
-        error: e.toString(),
-      );
+  /// Obtiene el tipo de dato según el nombre de la tabla
+  PendingDataType _getDataType(String tableName) {
+    switch (tableName) {
+      case 'dynamic_form_response':
+      case 'dynamic_form_response_detail':
+      case 'dynamic_form_response_image':
+        return PendingDataType.forms;
+      case 'censo_activo':
+      case 'censo_activo_foto':
+        return PendingDataType.census;
+      case 'operacion_comercial':
+      case 'operacion_comercial_detalle':
+        return PendingDataType.operations;
+      case 'device_log':
+        return PendingDataType.logs;
+      default:
+        return PendingDataType.forms;
     }
   }
 }

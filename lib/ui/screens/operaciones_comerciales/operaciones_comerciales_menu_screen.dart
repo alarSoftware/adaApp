@@ -524,6 +524,7 @@ class _OperacionesComercialesMenuViewState
           cliente: widget.cliente,
           tipoOperacion: operacion.tipoOperacion,
           operacionExistente: operacion,
+          isViewOnly: true, //SIEMPRE solo lectura para operaciones existentes
         ),
       ),
     );
@@ -531,12 +532,5 @@ class _OperacionesComercialesMenuViewState
     if (result == true && mounted) {
       await viewModel.cargarOperaciones();
     }
-  }
-
-  Future<void> _confirmarEliminar(
-      String operacionId,
-      OperacionesComercialesMenuViewModel viewModel,
-      ) async {
-    // ... lógica de eliminar (puedes descomentarla si la necesitas)
   }
 }

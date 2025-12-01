@@ -13,13 +13,10 @@ class OperacionComercial {
   final String? observaciones;
   final int totalProductos;
   final int? usuarioId;
-  final bool estaSincronizado;
-  final DateTime? fechaSincronizacion;
   final int? serverId;
   final String syncStatus;
-  final int intentosSync;
-  final DateTime? ultimoIntentoSync;
-  final String? mensajeErrorSync;
+  final String? syncError;
+  final DateTime? syncedAt;
 
   // ✅ CAMPO CALCULADO - NO VA A LA BASE DE DATOS
   final List<OperacionComercialDetalle> detalles;
@@ -34,13 +31,10 @@ class OperacionComercial {
     this.observaciones,
     this.totalProductos = 0,
     this.usuarioId,
-    this.estaSincronizado = false,
-    this.fechaSincronizacion,
     this.serverId,
-    this.syncStatus = 'pending',
-    this.intentosSync = 0,
-    this.ultimoIntentoSync,
-    this.mensajeErrorSync,
+    this.syncStatus = 'creado',
+    this.syncError,
+    this.syncedAt,
     this.detalles = const [],
   });
 
@@ -59,17 +53,12 @@ class OperacionComercial {
       observaciones: map['observaciones'] as String?,
       totalProductos: map['total_productos'] as int? ?? 0,
       usuarioId: map['usuario_id'] as int?,
-      estaSincronizado: (map['sincronizado'] as int?) == 1,
-      fechaSincronizacion: map['fecha_sincronizacion'] != null
-          ? DateTime.parse(map['fecha_sincronizacion'] as String)
-          : null,
       serverId: map['server_id'] as int?,
-      syncStatus: map['sync_status'] as String? ?? 'pending',
-      intentosSync: map['intentos_sync'] as int? ?? 0,
-      ultimoIntentoSync: map['ultimo_intento_sync'] != null
-          ? DateTime.parse(map['ultimo_intento_sync'] as String)
+      syncStatus: map['sync_status'] as String? ?? 'creado',
+      syncError: map['sync_error'] as String?,
+      syncedAt: map['synced_at'] != null
+          ? DateTime.parse(map['synced_at'] as String)
           : null,
-      mensajeErrorSync: map['mensaje_error_sync'] as String?,
     );
   }
 
@@ -84,13 +73,10 @@ class OperacionComercial {
       'observaciones': observaciones,
       'total_productos': totalProductos,
       'usuario_id': usuarioId,
-      'sincronizado': estaSincronizado ? 1 : 0,
-      'fecha_sincronizacion': fechaSincronizacion?.toIso8601String(),
       'server_id': serverId,
       'sync_status': syncStatus,
-      'intentos_sync': intentosSync,
-      'ultimo_intento_sync': ultimoIntentoSync?.toIso8601String(),
-      'mensaje_error_sync': mensajeErrorSync,
+      'sync_error': syncError,
+      'synced_at': syncedAt?.toIso8601String(),
     };
   }
 
@@ -117,13 +103,10 @@ class OperacionComercial {
     String? observaciones,
     int? totalProductos,
     int? usuarioId,
-    bool? estaSincronizado,
-    DateTime? fechaSincronizacion,
     int? serverId,
     String? syncStatus,
-    int? intentosSync,
-    DateTime? ultimoIntentoSync,
-    String? mensajeErrorSync,
+    String? syncError,
+    DateTime? syncedAt,
     List<OperacionComercialDetalle>? detalles,
   }) {
     return OperacionComercial(
@@ -136,13 +119,10 @@ class OperacionComercial {
       observaciones: observaciones ?? this.observaciones,
       totalProductos: totalProductos ?? this.totalProductos,
       usuarioId: usuarioId ?? this.usuarioId,
-      estaSincronizado: estaSincronizado ?? this.estaSincronizado,
-      fechaSincronizacion: fechaSincronizacion ?? this.fechaSincronizacion,
       serverId: serverId ?? this.serverId,
       syncStatus: syncStatus ?? this.syncStatus,
-      intentosSync: intentosSync ?? this.intentosSync,
-      ultimoIntentoSync: ultimoIntentoSync ?? this.ultimoIntentoSync,
-      mensajeErrorSync: mensajeErrorSync ?? this.mensajeErrorSync,
+      syncError: syncError ?? this.syncError,
+      syncedAt: syncedAt ?? this.syncedAt,
       detalles: detalles ?? this.detalles,
     );
   }
@@ -151,8 +131,8 @@ class OperacionComercial {
   bool get esBorrador => estado == EstadoOperacion.borrador;
   bool get estaPendiente => estado == EstadoOperacion.pendiente;
   bool get fueEnviado => estado == EstadoOperacion.enviado;
-  bool get estaSinc => estaSincronizado || estado == EstadoOperacion.sincronizado;
-  bool get tieneError => estado == EstadoOperacion.error || syncStatus == 'error';
+  bool get estaSincronizado => syncStatus == 'migrado';
+  bool get tieneError => syncStatus == 'error';
   bool get tieneDetalles => detalles.isNotEmpty;
   bool get necesitaFechaRetiro =>
       tipoOperacion == TipoOperacion.notaRetiro ||
@@ -160,6 +140,18 @@ class OperacionComercial {
 
   String get displayTipo => tipoOperacion.displayName;
   String get displayEstado => estado.displayName;
+  String get displaySyncStatus {
+    switch (syncStatus) {
+      case 'creado':
+        return 'Pendiente';
+      case 'migrado':
+        return 'Sincronizado';
+      case 'error':
+        return 'Error';
+      default:
+        return syncStatus;
+    }
+  }
 
   @override
   bool operator ==(Object other) =>

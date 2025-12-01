@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:ada_app/viewmodels/pending_data_viewmodel.dart';
-import 'package:ada_app/ui/screens/censos_pendientes_detail_screen.dart';
+import 'package:ada_app/ui/screens/pantallaPendientesMigrado/censos_pendientes_detail_screen.dart';
+import 'package:ada_app/ui/screens/pantallaPendientesMigrado/operaciones_pendientes_detail_screen.dart'; // 🆕 AGREGAR ESTA LÍNEA
 
 class PendingDataScreen extends StatefulWidget {
   static const String routeName = '/pending-data';
@@ -354,9 +355,13 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
       margin: const EdgeInsets.only(bottom: 12.0),
       elevation: 2,
       child: InkWell(
-        onTap: group.type == PendingDataType.census
-            ? () => _navigateToCensosDetail(group)
-            : null,
+        onTap: () {
+          if (group.type == PendingDataType.census) {
+            _navigateToCensosDetail(group);
+          } else if (group.type == PendingDataType.operations) {
+            _navigateToOperacionesDetail(group);
+          }
+        },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -406,7 +411,8 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
                       ),
                     ),
                   ),
-                  if (group.type == PendingDataType.census) ...[
+                  if (group.type == PendingDataType.census ||
+                      group.type == PendingDataType.operations) ...[
                     const SizedBox(width: 8),
                     Icon(
                       Icons.arrow_forward_ios,
@@ -438,6 +444,20 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
       _viewModel.refresh();
     });
   }
+  void _navigateToOperacionesDetail(PendingDataGroup group) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OperacionesPendientesDetailScreen(
+          viewModel: _viewModel,
+          group: group,
+        ),
+      ),
+    ).then((_) {
+      // Recargar cuando regrese de la pantalla de detalle
+      _viewModel.refresh();
+    });
+  }
 
   Widget _buildTypeIcon(PendingDataType type) {
     IconData iconData;
@@ -452,9 +472,6 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
         iconData = Icons.inventory;
         color = Colors.green;
         break;
-        // iconData = Icons.devices;
-        // color = Colors.purple;
-        // break;
       case PendingDataType.images:
         iconData = Icons.photo_library;
         color = Colors.pink;
@@ -462,6 +479,10 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
       case PendingDataType.logs:
         iconData = Icons.description;
         color = Colors.orange;
+        break;
+      case PendingDataType.operations: // 🆕 AGREGADO
+        iconData = Icons.business_center;
+        color = Colors.purple;
         break;
     }
 

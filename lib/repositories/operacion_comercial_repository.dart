@@ -3,6 +3,7 @@ import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart'
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/estado_operacion.dart';
+import 'package:ada_app/services/post/operaciones_comerciales_post_service.dart';
 import 'base_repository.dart';
 import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
@@ -14,14 +15,14 @@ abstract class OperacionComercialRepository {
   Future<OperacionComercial?> obtenerOperacionPorId(String id);
   Future<List<OperacionComercial>> obtenerOperacionesPorCliente(int clienteId);
   Future<List<OperacionComercial>> obtenerOperacionesPorTipo(TipoOperacion tipo);
-  Future<List<OperacionComercial>> obtenerOperacionesPorClienteYTipo(int clienteId, TipoOperacion tipo); // ✅ AGREGAR ESTA LÍNEA
+  Future<List<OperacionComercial>> obtenerOperacionesPorClienteYTipo(int clienteId, TipoOperacion tipo);
   Future<void> eliminarOperacion(String id);
   Future<void> sincronizarOperacionesPendientes();
   Future<void> marcarPendienteSincronizacion(String operacionId);
   Future<List<OperacionComercial>> obtenerOperacionesPendientes();
 }
 
-/// Implementación usando tu BaseRepository existente + tu modelo real
+/// Implementación usando BaseRepository
 class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial>
     implements OperacionComercialRepository {
 
@@ -54,7 +55,7 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
   String getEntityName() => 'OperacionComercial';
 
   // ═══════════════════════════════════════════════════════════════════
-  // IMPLEMENTACIÓN DE LA INTERFACE - USANDO TU MODELO REAL
+  // IMPLEMENTACIÓN DE LA INTERFACE
   // ═══════════════════════════════════════════════════════════════════
 
   @override
@@ -62,36 +63,31 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
     try {
       _logger.i('📝 Creando operación comercial...');
 
-      // Generar UUID si no tiene ID
       final operacionId = operacion.id ?? _uuid.v4();
       final now = DateTime.now();
 
-      // Usar tu modelo completo con todos los campos
       final operacionConId = operacion.copyWith(
         id: operacionId,
         fechaCreacion: now,
         estado: EstadoOperacion.borrador,
-        estaSincronizado: false,
-        syncStatus: 'pending',
-        intentosSync: 0,
+        syncStatus: 'creado',
         totalProductos: operacion.detalles.length,
       );
 
       final db = await dbHelper.database;
 
       await db.transaction((txn) async {
-        // 1. Insertar operación principal usando tu toMap()
+        // 1. Insertar operación principal
         await txn.insert(tableName, operacionConId.toMap());
         _logger.i('✅ Operación insertada con ID: $operacionId');
 
-        // 2. Insertar detalles en tabla separada
+        // 2. Insertar detalles
         for (int i = 0; i < operacion.detalles.length; i++) {
           final detalle = operacion.detalles[i].copyWith(
             id: _uuid.v4(),
             operacionComercialId: operacionId,
             orden: i + 1,
             fechaCreacion: now,
-            estaSincronizado: false,
           );
 
           await txn.insert('operacion_comercial_detalle', detalle.toMap());
@@ -120,11 +116,9 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
     try {
       _logger.i('🔄 Actualizando operación ${operacion.id}...');
 
-      // Usar copyWith de tu modelo con los campos correctos
       final operacionActualizada = operacion.copyWith(
         estado: EstadoOperacion.pendiente,
-        estaSincronizado: false,
-        syncStatus: 'pending',
+        syncStatus: 'creado',
         totalProductos: operacion.detalles.length,
       );
 
@@ -154,7 +148,6 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
             operacionComercialId: operacion.id!,
             orden: i + 1,
             fechaCreacion: DateTime.now(),
-            estaSincronizado: false,
           );
 
           await txn.insert('operacion_comercial_detalle', detalle.toMap());
@@ -175,7 +168,6 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
   @override
   Future<OperacionComercial?> obtenerOperacionPorId(String id) async {
     try {
-      // 1. Obtener operación principal
       final operacionMaps = await dbHelper.consultar(
         tableName,
         where: 'id = ?',
@@ -185,7 +177,6 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
 
       if (operacionMaps.isEmpty) return null;
 
-      // 2. Obtener detalles
       final detallesMaps = await dbHelper.consultar(
         'operacion_comercial_detalle',
         where: 'operacion_comercial_id = ?',
@@ -197,7 +188,6 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
           .map((map) => OperacionComercialDetalle.fromMap(map))
           .toList();
 
-      // 3. Crear operación con detalles usando tu fromMap
       final operacion = fromMap(operacionMaps.first);
       return operacion.copyWith(detalles: detalles);
 
@@ -219,7 +209,6 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
 
       final operaciones = <OperacionComercial>[];
 
-      // Obtener detalles para cada operación
       for (final operacionMap in operacionesMaps) {
         final operacionId = operacionMap['id'];
 
@@ -252,7 +241,7 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
       final operacionesMaps = await dbHelper.consultar(
         tableName,
         where: 'tipo_operacion = ?',
-        whereArgs: [tipo.valor], // Usar .valor de tu enum
+        whereArgs: [tipo.valor],
         orderBy: getDefaultOrderBy(),
       );
 
@@ -286,7 +275,6 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
 
       final operaciones = <OperacionComercial>[];
 
-      // Obtener detalles para cada operación
       for (final operacionMap in operacionesMaps) {
         final operacionId = operacionMap['id'];
 
@@ -322,7 +310,7 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
       final db = await dbHelper.database;
 
       await db.transaction((txn) async {
-        // 1. Eliminar detalles
+        // 1. Eliminar detalles (CASCADE debería hacerlo automáticamente)
         await txn.delete(
           'operacion_comercial_detalle',
           where: 'operacion_comercial_id = ?',
@@ -361,9 +349,11 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
 
       for (final operacion in operacionesPendientes) {
         try {
-          await _enviarOperacionAlServidor(operacion);
-          await _marcarComoSincronizado(operacion.id!);
-          _logger.i('✅ Operación ${operacion.id} sincronizada');
+          final operacionCompleta = await obtenerOperacionPorId(operacion.id!);
+          if (operacionCompleta != null) {
+            await _enviarOperacionAlServidor(operacionCompleta);
+            _logger.i('✅ Operación ${operacionCompleta.id} sincronizada');
+          }
 
         } catch (e) {
           await _marcarComoError(operacion.id!, e.toString());
@@ -385,8 +375,7 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
       await dbHelper.actualizar(
         tableName,
         {
-          'sincronizado': 0,
-          'sync_status': 'pending',
+          'sync_status': 'creado',
           'estado': EstadoOperacion.pendiente.valor,
         },
         where: 'id = ?',
@@ -406,8 +395,8 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
-        where: 'sincronizado = ? OR sync_status = ?',
-        whereArgs: [0, 'pending'],
+        where: 'sync_status = ?',
+        whereArgs: ['creado'],
         orderBy: getDefaultOrderBy(),
       );
 
@@ -420,10 +409,9 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  // MÉTODOS ESPECÍFICOS PARA TU MODELO
+  // MÉTODOS ESPECÍFICOS
   // ═══════════════════════════════════════════════════════════════════
 
-  /// Obtener operaciones por estado
   Future<List<OperacionComercial>> obtenerOperacionesPorEstado(EstadoOperacion estado) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
@@ -441,18 +429,16 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
     }
   }
 
-  /// Obtener borradores
   Future<List<OperacionComercial>> obtenerBorradores() async {
     return await obtenerOperacionesPorEstado(EstadoOperacion.borrador);
   }
 
-  /// Obtener operaciones con errores
   Future<List<OperacionComercial>> obtenerOperacionesConError() async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
-        where: 'estado = ? OR sync_status = ?',
-        whereArgs: [EstadoOperacion.error.valor, 'error'],
+        where: 'sync_status = ?',
+        whereArgs: ['error'],
         orderBy: getDefaultOrderBy(),
       );
 
@@ -464,7 +450,6 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
     }
   }
 
-  /// Actualizar estado de operación
   Future<void> actualizarEstado(String operacionId, EstadoOperacion nuevoEstado) async {
     try {
       await dbHelper.actualizar(
@@ -485,43 +470,27 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  // MÉTODOS PRIVADOS Y UTILITARIOS
+  // MÉTODOS PRIVADOS - SINCRONIZACIÓN
   // ═══════════════════════════════════════════════════════════════════
 
   Future<void> _enviarOperacionAlServidor(OperacionComercial operacion) async {
     _logger.i('📤 Enviando operación ${operacion.id} al servidor...');
 
     try {
-      // Incrementar intentos
-      await _incrementarIntentosSync(operacion.id!);
+      final resultado = await OperacionesComercialesPostService.enviarOperacion(operacion);
 
-      // TODO: Implementar integración real con tu API
-      // Usar operacion.toJson() que ya está implementado en tu modelo
+      if (resultado['exito'] == true) {
+        _logger.i('✅ Operación enviada exitosamente al servidor');
 
-      // Simular envío por ahora
-      await Future.delayed(const Duration(seconds: 1));
-
-      /*
-      final payload = operacion.toJson(); // Tu método ya implementado
-
-      final response = await http.post(
-        Uri.parse('https://tu-api.com/operaciones-comerciales'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(payload),
-      );
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final responseData = json.decode(response.body);
-        final serverId = responseData['id'];
-
-        // Marcar como sincronizado con server_id
-        await _marcarComoSincronizadoConServerId(operacion.id!, serverId);
+        if (resultado['id'] != null) {
+          await _marcarComoMigrado(operacion.id!, resultado['id']);
+        } else {
+          await _marcarComoMigrado(operacion.id!, null);
+        }
       } else {
-        throw Exception('Error del servidor: ${response.statusCode}');
+        final mensajeError = resultado['mensaje'] ?? 'Error desconocido del servidor';
+        throw Exception(mensajeError);
       }
-      */
-
-      _logger.i('✅ Operación enviada al servidor (simulado)');
 
     } catch (e) {
       _logger.e('❌ Error enviando al servidor: $e');
@@ -529,27 +498,26 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
     }
   }
 
-  Future<void> _marcarComoSincronizado(String operacionId) async {
+  Future<void> _marcarComoMigrado(String operacionId, dynamic serverId) async {
     try {
       final now = DateTime.now();
 
       await dbHelper.actualizar(
         tableName,
         {
-          'sincronizado': 1,
-          'estado': EstadoOperacion.sincronizado.valor,
-          'sync_status': 'success',
-          'fecha_sincronizacion': now.toIso8601String(),
-          'mensaje_error_sync': null,
+          'sync_status': 'migrado',
+          'synced_at': now.toIso8601String(),
+          'server_id': serverId,
+          'sync_error': null,
         },
         where: 'id = ?',
         whereArgs: [operacionId],
       );
 
-      _logger.i('✅ Operación $operacionId marcada como sincronizada');
+      _logger.i('✅ Operación $operacionId migrada${serverId != null ? ' con server ID: $serverId' : ''}');
 
     } catch (e) {
-      _logger.e('❌ Error marcando como sincronizado: $e');
+      _logger.e('❌ Error marcando como migrado: $e');
       rethrow;
     }
   }
@@ -561,8 +529,7 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
         {
           'estado': EstadoOperacion.error.valor,
           'sync_status': 'error',
-          'mensaje_error_sync': mensajeError,
-          'ultimo_intento_sync': DateTime.now().toIso8601String(),
+          'sync_error': mensajeError,
         },
         where: 'id = ?',
         whereArgs: [operacionId],
@@ -576,59 +543,12 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
     }
   }
 
-  Future<void> _incrementarIntentosSync(String operacionId) async {
-    try {
-      final operacion = await obtenerOperacionPorId(operacionId);
-      if (operacion != null) {
-        await dbHelper.actualizar(
-          tableName,
-          {
-            'intentos_sync': operacion.intentosSync + 1,
-            'ultimo_intento_sync': DateTime.now().toIso8601String(),
-          },
-          where: 'id = ?',
-          whereArgs: [operacionId],
-        );
-      }
-    } catch (e) {
-      _logger.w('⚠️ Error incrementando intentos: $e');
-    }
-  }
-
-  Future<void> _marcarComoSincronizadoConServerId(String operacionId, int serverId) async {
-    try {
-      final now = DateTime.now();
-
-      await dbHelper.actualizar(
-        tableName,
-        {
-          'sincronizado': 1,
-          'estado': EstadoOperacion.sincronizado.valor,
-          'sync_status': 'success',
-          'fecha_sincronizacion': now.toIso8601String(),
-          'server_id': serverId,
-          'mensaje_error_sync': null,
-        },
-        where: 'id = ?',
-        whereArgs: [operacionId],
-      );
-
-      _logger.i('✅ Operación $operacionId sincronizada con server ID: $serverId');
-
-    } catch (e) {
-      _logger.e('❌ Error marcando como sincronizado: $e');
-      rethrow;
-    }
-  }
-
   void _sincronizarEnBackground(String operacionId) {
-    // Sincronización asíncrona sin bloquear UI
     Future.microtask(() async {
       try {
         final operacion = await obtenerOperacionPorId(operacionId);
         if (operacion != null) {
           await _enviarOperacionAlServidor(operacion);
-          await _marcarComoSincronizado(operacionId);
         }
       } catch (e) {
         await _marcarComoError(operacionId, e.toString());
@@ -638,10 +558,9 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  // ESTADÍSTICAS USANDO TU MODELO COMPLETO
+  // ESTADÍSTICAS
   // ═══════════════════════════════════════════════════════════════════
 
-  /// Obtener estadísticas completas
   Future<Map<String, dynamic>> obtenerEstadisticasCompletas() async {
     try {
       final stats = await obtenerEstadisticas();

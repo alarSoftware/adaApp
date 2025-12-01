@@ -12,6 +12,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
   final Function(int) onEliminarProducto;
   final Function(int, double) onActualizarCantidad;
   final Function(int, dynamic)? onSeleccionarReemplazo;
+  final bool isReadOnly;
 
   const ProductosSeleccionadosWidget({
     Key? key,
@@ -20,6 +21,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     required this.onEliminarProducto,
     required this.onActualizarCantidad,
     this.onSeleccionarReemplazo,
+    this.isReadOnly = false,
   }) : super(key: key);
 
   @override
@@ -29,8 +31,8 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(Icons.shopping_cart_outlined, 
-              size: 20, 
+            Icon(Icons.shopping_cart_outlined,
+              size: 20,
               color: AppColors.primary,
             ),
             const SizedBox(width: 8),
@@ -107,8 +109,8 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              Icons.inventory_2_outlined, 
-              size: 48, 
+              Icons.inventory_2_outlined,
+              size: 48,
               color: AppColors.primary.withValues(alpha: 0.6),
             ),
           ),
@@ -170,16 +172,16 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
         gradient: AppColors.cardGradient,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: esDiscontinuos 
-            ? AppColors.error.withValues(alpha: 0.2)
-            : AppColors.border.withValues(alpha: 0.3),
+          color: esDiscontinuos
+              ? AppColors.error.withValues(alpha: 0.2)
+              : AppColors.border.withValues(alpha: 0.3),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
             color: esDiscontinuos
-              ? AppColors.error.withValues(alpha: 0.1)
-              : AppColors.shadow.withValues(alpha: 0.08),
+                ? AppColors.error.withValues(alpha: 0.1)
+                : AppColors.shadow.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -197,7 +199,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                   gradient: AppColors.errorGradient,
                 ),
               ),
-            
+
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -210,14 +212,14 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                         width: 56,
                         height: 56,
                         decoration: BoxDecoration(
-                          gradient: esDiscontinuos 
-                            ? AppColors.errorGradient
-                            : AppColors.primaryGradient,
+                          gradient: esDiscontinuos
+                              ? AppColors.errorGradient
+                              : AppColors.primaryGradient,
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
                               color: (esDiscontinuos ? AppColors.error : AppColors.primary)
-                                .withValues(alpha: 0.3),
+                                  .withValues(alpha: 0.3),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
@@ -229,26 +231,27 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                           size: 28,
                         ),
                       ),
-                      
+
                       const SizedBox(width: 16),
-                      
+
                       // Información del producto
                       Expanded(
                         child: _buildProductInfo(detalle, esDiscontinuos),
                       ),
-                      
+
                       const SizedBox(width: 12),
-                      
+
                       // Campo de cantidad
                       _buildQuantityField(index, detalle),
-                      
-                      const SizedBox(width: 8),
-                      
-                      // Botón eliminar
-                      _buildDeleteButton(index),
+
+                      // Botón eliminar (oculto en modo solo lectura)
+                      if (!isReadOnly) ...[
+                        const SizedBox(width: 8),
+                        _buildDeleteButton(index),
+                      ],
                     ],
                   ),
-                  
+
                   // Sección de intercambio para discontinuos
                   if (esDiscontinuos) ...[
                     const SizedBox(height: 16),
@@ -323,7 +326,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
             ),
           ],
         ),
-        if (detalle.productoCategoria != null) ...[ 
+        if (detalle.productoCategoria != null) ...[
           const SizedBox(height: 4),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -349,13 +352,15 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     return Container(
       width: 70,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isReadOnly ? Colors.grey.shade100 : Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.3),
+          color: isReadOnly
+              ? Colors.grey.shade300
+              : AppColors.primary.withValues(alpha: 0.3),
           width: 1.5,
         ),
-        boxShadow: [
+        boxShadow: isReadOnly ? [] : [
           BoxShadow(
             color: AppColors.shadow.withValues(alpha: 0.05),
             blurRadius: 4,
@@ -367,6 +372,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
         initialValue: detalle.cantidad > 0 ? detalle.cantidad.toInt().toString() : '',
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
+        enabled: !isReadOnly,
         decoration: InputDecoration(
           hintText: '0',
           hintStyle: TextStyle(
@@ -383,17 +389,21 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           focusedBorder: InputBorder.none,
           errorBorder: InputBorder.none,
           focusedErrorBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
         ),
         style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.bold,
-          color: AppColors.textPrimary,
+          color: isReadOnly ? AppColors.textSecondary : AppColors.textPrimary,
         ),
         onChanged: (value) {
-          final cantidad = int.tryParse(value) ?? 0;
-          onActualizarCantidad(index, cantidad.toDouble());
+          if (!isReadOnly) {
+            final cantidad = int.tryParse(value) ?? 0;
+            onActualizarCantidad(index, cantidad.toDouble());
+          }
         },
         validator: (value) {
+          if (isReadOnly) return null;
           final cantidad = int.tryParse(value ?? '');
           if (cantidad == null || cantidad <= 0) {
             return '';
@@ -417,8 +427,8 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
-            Icons.delete_outline_rounded, 
-            color: AppColors.error, 
+            Icons.delete_outline_rounded,
+            color: AppColors.error,
             size: 20,
           ),
         ),
@@ -505,6 +515,41 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
   }
 
   Widget _buildSelectReplacementButton(int index, OperacionComercialDetalle detalle) {
+    // Si está en modo solo lectura, mostrar mensaje en lugar del botón
+    if (isReadOnly) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.grey.shade300,
+            width: 2,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.info_outline,
+              color: AppColors.textSecondary,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Sin producto de reemplazo',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -543,8 +588,8 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                   ],
                 ),
                 child: const Icon(
-                  Icons.add_rounded, 
-                  color: Colors.white, 
+                  Icons.add_rounded,
+                  color: Colors.white,
                   size: 20,
                 ),
               ),
@@ -573,8 +618,8 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                 ),
               ),
               Icon(
-                Icons.arrow_forward_ios_rounded, 
-                size: 16, 
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
                 color: AppColors.success,
               ),
             ],
@@ -667,25 +712,27 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
               ],
             ),
           ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => onSeleccionarReemplazo?.call(index, detalle),
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.edit_rounded, 
-                  color: AppColors.success, 
-                  size: 18,
+          // Botón de editar (oculto en modo solo lectura)
+          if (!isReadOnly)
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => onSeleccionarReemplazo?.call(index, detalle),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.edit_rounded,
+                    color: AppColors.success,
+                    size: 18,
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
