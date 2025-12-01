@@ -12,10 +12,9 @@ class OperacionComercialDetalle {
   final double? subtotal;
   final int orden;
   final DateTime fechaCreacion;
-  final bool estaSincronizado;
 
   // 🆕 CAMPOS PARA INTERCAMBIO (RETIRO DISCONTINUOS)
-  final int? productoReemplazoId; // 👈 AGREGAR ESTE CAMPO
+  final int? productoReemplazoId;
   final String? productoReemplazoCodigo;
   final String? productoReemplazoDescripcion;
   final String? productoReemplazoCategoria;
@@ -34,8 +33,7 @@ class OperacionComercialDetalle {
     this.subtotal,
     this.orden = 1,
     required this.fechaCreacion,
-    this.estaSincronizado = false,
-    this.productoReemplazoId, // 👈 AGREGAR AQUÍ
+    this.productoReemplazoId,
     this.productoReemplazoCodigo,
     this.productoReemplazoDescripcion,
     this.productoReemplazoCategoria,
@@ -58,8 +56,7 @@ class OperacionComercialDetalle {
       fechaCreacion: map['fecha_creacion'] != null
           ? DateTime.parse(map['fecha_creacion'] as String)
           : DateTime.now(),
-      estaSincronizado: (map['sincronizado'] as int?) == 1,
-      productoReemplazoId: map['producto_reemplazo_id'] as int?, // 👈 AGREGAR
+      productoReemplazoId: map['producto_reemplazo_id'] as int?,
       productoReemplazoCodigo: map['producto_reemplazo_codigo'] as String?,
       productoReemplazoDescripcion: map['producto_reemplazo_descripcion'] as String?,
       productoReemplazoCategoria: map['producto_reemplazo_categoria'] as String?,
@@ -81,8 +78,7 @@ class OperacionComercialDetalle {
       'subtotal': subtotal,
       'orden': orden,
       'fecha_creacion': fechaCreacion.toIso8601String(),
-      'sincronizado': estaSincronizado ? 1 : 0,
-      'producto_reemplazo_id': productoReemplazoId, // 👈 AGREGAR
+      'producto_reemplazo_id': productoReemplazoId,
       'producto_reemplazo_codigo': productoReemplazoCodigo,
       'producto_reemplazo_descripcion': productoReemplazoDescripcion,
       'producto_reemplazo_categoria': productoReemplazoCategoria,
@@ -102,7 +98,7 @@ class OperacionComercialDetalle {
       'precio_unitario': precioUnitario,
       'subtotal': subtotal,
       'orden': orden,
-      'producto_reemplazo_id': productoReemplazoId, // 👈 AGREGAR
+      'producto_reemplazo_id': productoReemplazoId,
       'producto_reemplazo_codigo': productoReemplazoCodigo,
       'producto_reemplazo_descripcion': productoReemplazoDescripcion,
       'producto_reemplazo_categoria': productoReemplazoCategoria,
@@ -123,8 +119,7 @@ class OperacionComercialDetalle {
     double? subtotal,
     int? orden,
     DateTime? fechaCreacion,
-    bool? estaSincronizado,
-    int? productoReemplazoId, // 👈 AGREGAR
+    int? productoReemplazoId,
     String? productoReemplazoCodigo,
     String? productoReemplazoDescripcion,
     String? productoReemplazoCategoria,
@@ -143,8 +138,7 @@ class OperacionComercialDetalle {
       subtotal: subtotal ?? this.subtotal,
       orden: orden ?? this.orden,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
-      estaSincronizado: estaSincronizado ?? this.estaSincronizado,
-      productoReemplazoId: productoReemplazoId ?? this.productoReemplazoId, // 👈 AGREGAR
+      productoReemplazoId: productoReemplazoId ?? this.productoReemplazoId,
       productoReemplazoCodigo: productoReemplazoCodigo ?? this.productoReemplazoCodigo,
       productoReemplazoDescripcion: productoReemplazoDescripcion ?? this.productoReemplazoDescripcion,
       productoReemplazoCategoria: productoReemplazoCategoria ?? this.productoReemplazoCategoria,

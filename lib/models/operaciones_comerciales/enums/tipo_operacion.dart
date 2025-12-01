@@ -12,11 +12,11 @@ extension TipoOperacionExtension on TipoOperacion {
       case TipoOperacion.pedidoVenta:
         return 'PEDIDO_VENTA';
       case TipoOperacion.notaReposicion:
-        return 'NOTA_REPOSICION';
+        return 'REPOSICION';
       case TipoOperacion.notaRetiro:
-        return 'NOTA_RETIRO';
+        return 'NOTA_DE_RETIRO';
       case TipoOperacion.notaRetiroDiscontinuos:
-        return 'NOTA_RETIRO_DISCONTINUOS';
+        return 'NDR_DISCONTINUO';
       case TipoOperacion.ventaDirecta:
         return 'VENTA_DIRECTA';
     }
@@ -49,11 +49,11 @@ extension TipoOperacionExtension on TipoOperacion {
     switch (tipo.toUpperCase()) {
       case 'PEDIDO_VENTA':
         return TipoOperacion.pedidoVenta;
-      case 'NOTA_REPOSICION':
+      case 'REPOSICION':
         return TipoOperacion.notaReposicion;
-      case 'NOTA_RETIRO':
+      case 'NOTA_DE_RETIRO':
         return TipoOperacion.notaRetiro;
-      case 'NOTA_RETIRO_DISCONTINUOS':
+      case 'NDR_DISCONTINUO':
         return TipoOperacion.notaRetiroDiscontinuos;
       case 'VENTA_DIRECTA':
         return TipoOperacion.ventaDirecta;
