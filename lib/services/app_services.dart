@@ -8,6 +8,7 @@ import 'package:ada_app/services/dynamic_form/dynamic_form_upload_service.dart';
 import 'package:ada_app/services/device_log/device_log_upload_service.dart';
 import 'package:ada_app/services/auth_service.dart';
 import 'package:ada_app/models/usuario.dart';
+import 'package:ada_app/services/sync/operacion_comercial_sync_service.dart';
 import 'package:logger/logger.dart';
 
 class AppServices {
@@ -122,23 +123,17 @@ class AppServices {
   /// Detener todas las sincronizaciones automáticas
   Future<void> _detenerSincronizacionesAutomaticas() async {
     try {
-      _logger.i('🛑 Deteniendo sincronizaciones automáticas...');
-
       // Detener Censos
       CensoUploadService.detenerSincronizacionAutomatica();
-      _logger.i('  ✅ Censos detenidos');
+      OperacionComercialSyncService.detenerSincronizacionAutomatica();
 
       // Detener Formularios
       DynamicFormUploadService.detenerSincronizacionAutomatica();
-      _logger.i('  ✅ Formularios detenidos');
 
       // Detener Device Logs
       DeviceLogUploadService.detenerSincronizacionAutomatica();
-      _logger.i('  ✅ Device Logs detenidos');
 
-      _logger.i('✅ Sincronizaciones automáticas detenidas');
     } catch (e) {
-      _logger.e('Error deteniendo sincronizaciones: $e');
     }
   }
 
@@ -149,7 +144,7 @@ class AppServices {
       _logger.i('Inicializando servicios de la aplicación');
 
       if (_isUserLoggedIn) {
-        // ❌ CAMBIO: NO inicializar device logging automáticamente
+        //NO inicializar device logging automáticamente
         // Solo los servicios básicos
         _logger.i('Servicios básicos inicializados (device logging pendiente)');
       } else {
@@ -157,22 +152,6 @@ class AppServices {
       }
     } catch (e) {
       _logger.e('Error al inicializar servicios: $e');
-    }
-  }
-
-  // ❌ MÉTODO REMOVIDO/RENOMBRADO
-  // Este método SOLO se llamará después de sincronización exitosa
-  Future<void> _inicializarExtensionLogging() async {
-    try {
-      if (!_isUserLoggedIn) {
-        _logger.w('⚠️ No se puede iniciar logging sin usuario logueado');
-        return;
-      }
-
-      await DeviceLogBackgroundExtension.inicializar();
-      _logger.i('✅ Extensión de logging iniciada para usuario');
-    } catch (e) {
-      _logger.e('💥 Error inicializando extensión: $e');
     }
   }
 

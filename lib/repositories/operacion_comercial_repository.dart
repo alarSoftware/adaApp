@@ -356,7 +356,7 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
           }
 
         } catch (e) {
-          await _marcarComoError(operacion.id!, e.toString());
+          await marcarComoError(operacion.id!, e.toString());
           _logger.e('❌ Error sincronizando ${operacion.id}: $e');
         }
       }
@@ -522,27 +522,6 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
     }
   }
 
-  Future<void> _marcarComoError(String operacionId, String mensajeError) async {
-    try {
-      await dbHelper.actualizar(
-        tableName,
-        {
-          'estado': EstadoOperacion.error.valor,
-          'sync_status': 'error',
-          'sync_error': mensajeError,
-        },
-        where: 'id = ?',
-        whereArgs: [operacionId],
-      );
-
-      _logger.e('❌ Operación $operacionId marcada con error: $mensajeError');
-
-    } catch (e) {
-      _logger.e('❌ Error marcando como error: $e');
-      rethrow;
-    }
-  }
-
   void _sincronizarEnBackground(String operacionId) {
     Future.microtask(() async {
       try {
@@ -551,10 +530,101 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
           await _enviarOperacionAlServidor(operacion);
         }
       } catch (e) {
-        await _marcarComoError(operacionId, e.toString());
+        await marcarComoError(operacionId, e.toString());
         _logger.e('❌ Error en sincronización background: $e');
       }
     });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // MÉTODOS PARA SISTEMA DE REINTENTOS AUTOMÁTICOS
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Actualiza el contador de intentos de sincronización
+  Future<void> actualizarIntentoSync(String operacionId, int numeroIntento) async {
+    try {
+      await dbHelper.actualizar(
+        tableName,
+        {
+          'sync_retry_count': numeroIntento,
+          'synced_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [operacionId],
+      );
+
+      _logger.d('🔄 Intento #$numeroIntento registrado para operación $operacionId');
+    } catch (e) {
+      _logger.e('❌ Error actualizando intento sync: $e');
+      rethrow;
+    }
+  }
+
+  /// Marca una operación como error con el contador de reintentos
+  Future<void> marcarComoError(String operacionId, String mensajeError) async {
+    try {
+      // Obtener el contador actual
+      final operacionMaps = await dbHelper.consultar(
+        tableName,
+        where: 'id = ?',
+        whereArgs: [operacionId],
+        limit: 1,
+      );
+
+      int retryCount = 0;
+      if (operacionMaps.isNotEmpty) {
+        retryCount = operacionMaps.first['sync_retry_count'] as int? ?? 0;
+      }
+
+      await dbHelper.actualizar(
+        tableName,
+        {
+          'sync_status': 'error',
+          'sync_error': mensajeError,
+          'synced_at': DateTime.now().toIso8601String(),
+          'sync_retry_count': retryCount, // Mantener el contador actual
+        },
+        where: 'id = ?',
+        whereArgs: [operacionId],
+      );
+
+      _logger.e('❌ Operación $operacionId marcada con error (intento #$retryCount): $mensajeError');
+    } catch (e) {
+      _logger.e('❌ Error marcando operación como error: $e');
+      rethrow;
+    }
+  }
+
+  /// Sincroniza una operación individual (usado por el servicio de sync automático)
+  Future<void> sincronizarOperacion(String operacionId) async {
+    try {
+      _logger.i('🔄 Sincronizando operación individual: $operacionId');
+
+      // 1. Obtener la operación completa con sus detalles
+      final operacion = await obtenerOperacionPorId(operacionId);
+
+      if (operacion == null) {
+        throw Exception('Operación no encontrada: $operacionId');
+      }
+
+      // 2. Validar que tenga detalles
+      if (operacion.detalles.isEmpty) {
+        throw Exception('La operación no tiene productos');
+      }
+
+      // 3. Enviar al servidor
+      await _enviarOperacionAlServidor(operacion);
+
+      _logger.i('✅ Operación $operacionId sincronizada exitosamente');
+
+    } catch (e, stackTrace) {
+      _logger.e('❌ Error sincronizando operación $operacionId: $e', stackTrace: stackTrace);
+
+      // Marcar como error en la base de datos
+      await marcarComoError(operacionId, e.toString());
+
+      rethrow;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════

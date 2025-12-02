@@ -3,6 +3,12 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/viewmodels/pending_data_viewmodel.dart';
 import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/ui/screens/operaciones_comerciales/operacion_comercial_form_screen.dart';
+import 'package:ada_app/repositories/cliente_repository.dart';
+import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
+import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
+import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
+import 'package:ada_app/models/operaciones_comerciales/enums/estado_operacion.dart';
 import 'package:intl/intl.dart';
 
 class OperacionesPendientesDetailScreen extends StatefulWidget {
@@ -50,6 +56,165 @@ class _OperacionesPendientesDetailScreenState
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  // 🆕 MÉTODO PARA NAVEGAR AL HISTORIAL DE LA OPERACIÓN
+  Future<void> _navegarAHistorialOperacion(Map<String, dynamic> operacion) async {
+    try {
+      // Mostrar indicador de carga
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      // Obtener datos completos de la operación
+      final operacionCompleta = await _obtenerOperacionCompleta(operacion['id']);
+
+      // Cerrar indicador de carga
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      if (operacionCompleta == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No se pudieron cargar los datos de la operación'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 🔥 NAVEGAR A OperacionComercialFormScreen en modo historial
+      final resultado = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => OperacionComercialFormScreen(
+            cliente: operacionCompleta['cliente'],
+            tipoOperacion: operacionCompleta['tipo_operacion'],
+            operacionExistente: operacionCompleta['operacion'],
+            isViewOnly: true, // Siempre en modo solo lectura
+          ),
+        ),
+      );
+
+      // Si se reintentó y tuvo éxito, recargar lista
+      if (resultado == true && mounted) {
+        await _loadOperacionesFallidas();
+      }
+
+    } catch (e) {
+      // Cerrar indicador de carga si está abierto
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      debugPrint('Error navegando al historial: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // 🆕 MÉTODO AUXILIAR - Obtener OperacionComercial completa
+  Future<Map<String, dynamic>?> _obtenerOperacionCompleta(dynamic operacionId) async {
+    try {
+      final db = await _dbHelper.database;
+
+      // Obtener operación base (SIN JOIN a clientes)
+      final operaciones = await db.rawQuery('''
+        SELECT oc.*
+        FROM operacion_comercial oc
+        WHERE oc.id = ?
+      ''', [operacionId]);
+
+      if (operaciones.isEmpty) return null;
+
+      final operacionData = operaciones.first;
+
+      // Obtener cliente completo desde el repository
+      final clienteRepository = ClienteRepository();
+      final clienteId = operacionData['cliente_id'];
+
+      if (clienteId == null) {
+        throw Exception('Cliente ID no encontrado');
+      }
+
+      final cliente = await clienteRepository.obtenerPorId(
+          clienteId is int ? clienteId : int.parse(clienteId.toString())
+      );
+
+      if (cliente == null) {
+        throw Exception('Cliente no encontrado en la base de datos');
+      }
+
+      // Obtener productos/detalles de la operación
+      final productosRaw = await db.rawQuery('''
+        SELECT 
+          ocd.*,
+          p.nombre as producto_nombre,
+          p.codigo as producto_codigo,
+          p.categoria as producto_categoria
+        FROM operacion_comercial_detalle ocd
+        LEFT JOIN productos p ON ocd.producto_id = p.id
+        WHERE ocd.operacion_comercial_id = ?
+        ORDER BY ocd.orden
+      ''', [operacionId]);
+
+      // Parsear tipo de operación
+      final tipoOperacionStr = operacionData['tipo_operacion'] as String;
+      final tipoOperacion = TipoOperacion.values.firstWhere(
+            (t) => t.name == tipoOperacionStr,
+        orElse: () => TipoOperacion.notaRetiroDiscontinuos,
+      );
+
+      // Construir OperacionComercial base usando fromMap
+      final operacion = OperacionComercial.fromMap(operacionData);
+
+      // Construir lista de detalles usando OperacionComercialDetalle.fromMap
+      final detalles = productosRaw.map((prod) {
+        // Construir un mapa compatible con OperacionComercialDetalle.fromMap
+        final detalleMap = {
+          'id': prod['id'],
+          'operacion_comercial_id': prod['operacion_comercial_id'],
+          'producto_id': prod['producto_id'],
+          'producto_codigo': prod['producto_codigo'],
+          'producto_descripcion': prod['producto_descripcion'],
+          'producto_categoria': prod['producto_categoria'],
+          'cantidad': prod['cantidad'],
+          'unidad_medida': prod['unidad_medida'],
+          'orden': prod['orden'],
+          'producto_reemplazo_id': prod['producto_reemplazo_id'],
+          'producto_reemplazo_codigo': prod['producto_reemplazo_codigo'],
+          'producto_reemplazo_descripcion': prod['producto_reemplazo_descripcion'],
+        };
+        return OperacionComercialDetalle.fromMap(detalleMap);
+      }).toList();
+
+      // Usar copyWith para agregar los detalles
+      final operacionConDetalles = operacion.copyWith(detalles: detalles);
+
+      return {
+        'cliente': cliente,
+        'tipo_operacion': tipoOperacion,
+        'operacion': operacionConDetalles,
+      };
+
+    } catch (e, stackTrace) {
+      debugPrint('Error obteniendo operación completa: $e');
+      debugPrint('StackTrace: $stackTrace');
+      return null;
     }
   }
 
@@ -150,13 +315,12 @@ class _OperacionesPendientesDetailScreenState
         ? DateTime.parse(operacion['fecha_creacion'])
         : null;
     final mensajeError = operacion['sync_error']?.toString();
-    final montoTotal = 0;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       child: InkWell(
-        onTap: () => _mostrarDetalleOperacion(operacion),
+        onTap: () => _navegarAHistorialOperacion(operacion), // 🆕 NAVEGAR AL HISTORIAL
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -201,6 +365,7 @@ class _OperacionesPendientesDetailScreenState
                       ],
                     ),
                   ),
+                  // 🆕 Indicador de que es clickeable
                   Icon(
                     Icons.arrow_forward_ios,
                     size: 16,
@@ -265,7 +430,7 @@ class _OperacionesPendientesDetailScreenState
                 ),
               ],
 
-              // Hint de tap para ver más
+              // 🆕 Hint de tap para ver más
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -277,7 +442,7 @@ class _OperacionesPendientesDetailScreenState
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    'Toca para ver detalles completos',
+                    'Toca para ver detalles completos y reintentar',
                     style: TextStyle(
                       fontSize: 11,
                       color: Theme.of(context).hintColor,
@@ -292,6 +457,7 @@ class _OperacionesPendientesDetailScreenState
       ),
     );
   }
+
   Widget _buildInfoRow(IconData icon, String label, String value,
       {Color? valueColor}) {
     return Padding(
@@ -317,78 +483,6 @@ class _OperacionesPendientesDetailScreenState
                 color: valueColor ??
                     Theme.of(context).textTheme.bodyLarge?.color,
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _mostrarDetalleOperacion(Map<String, dynamic> operacion) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Detalle de Operación'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildDetailRow('ID', operacion['id']?.toString() ?? 'N/A'),
-              _buildDetailRow('Tipo', operacion['tipo_operacion']?.toString() ?? 'N/A'),
-              _buildDetailRow('Cliente', operacion['cliente_nombre']?.toString() ?? 'N/A'),
-              _buildDetailRow('Estado', operacion['estado']?.toString() ?? 'N/A'),
-              _buildDetailRow('Total Productos', operacion['total_productos']?.toString() ?? '0'),
-              _buildDetailRow('Estado Sync', operacion['sync_status']?.toString() ?? 'N/A'),
-              if (operacion['sync_error'] != null)
-                _buildDetailRow('Error', operacion['sync_error']?.toString() ?? 'N/A'),
-              if (operacion['observaciones'] != null && operacion['observaciones'].toString().isNotEmpty)
-                _buildDetailRow('Observaciones', operacion['observaciones']?.toString() ?? 'N/A'),
-              if (operacion['fecha_creacion'] != null)
-                _buildDetailRow(
-                  'Fecha Creación',
-                  DateFormat('dd/MM/yyyy HH:mm:ss')
-                      .format(DateTime.parse(operacion['fecha_creacion'])),
-                ),
-              if (operacion['synced_at'] != null)
-                _buildDetailRow(
-                  'Última Sync',
-                  DateFormat('dd/MM/yyyy HH:mm:ss')
-                      .format(DateTime.parse(operacion['synced_at'])),
-                ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 13),
             ),
           ),
         ],

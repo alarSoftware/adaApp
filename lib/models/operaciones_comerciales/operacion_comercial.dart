@@ -17,6 +17,7 @@ class OperacionComercial {
   final String syncStatus;
   final String? syncError;
   final DateTime? syncedAt;
+  final int syncRetryCount; // 🆕 NUEVO CAMPO
 
   // ✅ CAMPO CALCULADO - NO VA A LA BASE DE DATOS
   final List<OperacionComercialDetalle> detalles;
@@ -35,6 +36,7 @@ class OperacionComercial {
     this.syncStatus = 'creado',
     this.syncError,
     this.syncedAt,
+    this.syncRetryCount = 0, // 🆕 NUEVO CAMPO
     this.detalles = const [],
   });
 
@@ -59,6 +61,7 @@ class OperacionComercial {
       syncedAt: map['synced_at'] != null
           ? DateTime.parse(map['synced_at'] as String)
           : null,
+      syncRetryCount: map['sync_retry_count'] as int? ?? 0, // 🆕 NUEVO CAMPO
     );
   }
 
@@ -77,6 +80,7 @@ class OperacionComercial {
       'sync_status': syncStatus,
       'sync_error': syncError,
       'synced_at': syncedAt?.toIso8601String(),
+      'sync_retry_count': syncRetryCount, // 🆕 NUEVO CAMPO
     };
   }
 
@@ -107,6 +111,7 @@ class OperacionComercial {
     String? syncStatus,
     String? syncError,
     DateTime? syncedAt,
+    int? syncRetryCount, // 🆕 NUEVO CAMPO
     List<OperacionComercialDetalle>? detalles,
   }) {
     return OperacionComercial(
@@ -123,6 +128,7 @@ class OperacionComercial {
       syncStatus: syncStatus ?? this.syncStatus,
       syncError: syncError ?? this.syncError,
       syncedAt: syncedAt ?? this.syncedAt,
+      syncRetryCount: syncRetryCount ?? this.syncRetryCount, // 🆕 NUEVO CAMPO
       detalles: detalles ?? this.detalles,
     );
   }
@@ -167,6 +173,6 @@ class OperacionComercial {
 
   @override
   String toString() {
-    return 'OperacionComercial{id: $id, tipo: ${tipoOperacion.valor}, cliente: $clienteId, estado: ${estado.valor}, detalles: ${detalles.length}, sync: $syncStatus}';
+    return 'OperacionComercial{id: $id, tipo: ${tipoOperacion.valor}, cliente: $clienteId, estado: ${estado.valor}, detalles: ${detalles.length}, sync: $syncStatus, retries: $syncRetryCount}';
   }
 }

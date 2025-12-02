@@ -303,6 +303,7 @@ class DatabaseTables {
     sync_status TEXT DEFAULT 'creado',
     sync_error TEXT,
     synced_at TEXT,
+    sync_retry_count INTEGER DEFAULT 0,
     FOREIGN KEY (cliente_id) REFERENCES clientes (id),
     FOREIGN KEY (usuario_id) REFERENCES Users (id)
   )

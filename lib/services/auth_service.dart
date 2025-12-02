@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:ada_app/services/sync/operacion_comercial_sync_service.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bcrypt/bcrypt.dart';
@@ -349,6 +350,7 @@ class AuthService {
       // Sincronización automática de censos
       if (usuarioEncontrado.id != null) {
         CensoUploadService.iniciarSincronizacionAutomatica(usuarioEncontrado.id!);
+        OperacionComercialSyncService.iniciarSincronizacionAutomatica(usuarioEncontrado.id!);
       }
 
       return AuthResult(
@@ -399,6 +401,7 @@ class AuthService {
 
       if (currentUser.id != null) {
         CensoUploadService.iniciarSincronizacionAutomatica(currentUser.id!);
+        OperacionComercialSyncService.iniciarSincronizacionAutomatica(currentUser.id!);
       }
 
       return AuthResult(
