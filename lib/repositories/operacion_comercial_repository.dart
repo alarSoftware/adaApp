@@ -5,35 +5,40 @@ import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart
 import 'package:ada_app/models/operaciones_comerciales/enums/estado_operacion.dart';
 import 'package:ada_app/services/post/operaciones_comerciales_post_service.dart';
 import 'base_repository.dart';
-import 'package:logger/logger.dart';
+
 import 'package:uuid/uuid.dart';
 
 /// Interface para el repository de operaciones comerciales
 abstract class OperacionComercialRepository {
   Future<String> crearOperacion(OperacionComercial operacion);
-  Future<void> actualizarOperacion(OperacionComercial operacion);
+
   Future<OperacionComercial?> obtenerOperacionPorId(String id);
   Future<List<OperacionComercial>> obtenerOperacionesPorCliente(int clienteId);
-  Future<List<OperacionComercial>> obtenerOperacionesPorTipo(TipoOperacion tipo);
-  Future<List<OperacionComercial>> obtenerOperacionesPorClienteYTipo(int clienteId, TipoOperacion tipo);
+  Future<List<OperacionComercial>> obtenerOperacionesPorTipo(
+    TipoOperacion tipo,
+  );
+  Future<List<OperacionComercial>> obtenerOperacionesPorClienteYTipo(
+    int clienteId,
+    TipoOperacion tipo,
+  );
   Future<void> eliminarOperacion(String id);
-  Future<void> sincronizarOperacionesPendientes();
+
   Future<void> marcarPendienteSincronizacion(String operacionId);
   Future<List<OperacionComercial>> obtenerOperacionesPendientes();
 }
 
 /// Implementación usando BaseRepository
-class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial>
+class OperacionComercialRepositoryImpl
+    extends BaseRepository<OperacionComercial>
     implements OperacionComercialRepository {
-
-  final Logger _logger = Logger();
   final Uuid _uuid = Uuid();
 
   @override
   String get tableName => 'operacion_comercial';
 
   @override
-  OperacionComercial fromMap(Map<String, dynamic> map) => OperacionComercial.fromMap(map);
+  OperacionComercial fromMap(Map<String, dynamic> map) =>
+      OperacionComercial.fromMap(map);
 
   @override
   Map<String, dynamic> toMap(OperacionComercial operacion) => operacion.toMap();
@@ -54,15 +59,9 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
   @override
   String getEntityName() => 'OperacionComercial';
 
-  // ═══════════════════════════════════════════════════════════════════
-  // IMPLEMENTACIÓN DE LA INTERFACE
-  // ═══════════════════════════════════════════════════════════════════
-
   @override
   Future<String> crearOperacion(OperacionComercial operacion) async {
     try {
-      _logger.i('📝 Creando operación comercial...');
-
       final operacionId = operacion.id ?? _uuid.v4();
       final now = DateTime.now();
 
@@ -77,11 +76,8 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
       final db = await dbHelper.database;
 
       await db.transaction((txn) async {
-        // 1. Insertar operación principal
         await txn.insert(tableName, operacionConId.toMap());
-        _logger.i('✅ Operación insertada con ID: $operacionId');
 
-        // 2. Insertar detalles
         for (int i = 0; i < operacion.detalles.length; i++) {
           final detalle = operacion.detalles[i].copyWith(
             id: _uuid.v4(),
@@ -92,75 +88,14 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
 
           await txn.insert('operacion_comercial_detalle', detalle.toMap());
         }
-
-        _logger.i('✅ ${operacion.detalles.length} detalles insertados');
       });
 
-      // 3. Marcar para sincronización
       await marcarPendienteSincronizacion(operacionId);
+      //TODO ESTOY CREANDO INSERTANDO Y ENVIANDO AL SERVIDOR
+      await OperacionesComercialesPostService.enviarOperacion(operacion);
 
-      // 4. Intentar sincronizar inmediatamente (background)
-      _sincronizarEnBackground(operacionId);
-
-      _logger.i('✅ Operación creada exitosamente: $operacionId');
       return operacionId;
-
     } catch (e) {
-      _logger.e('❌ Error creando operación: $e');
-      rethrow;
-    }
-  }
-
-  @override
-  Future<void> actualizarOperacion(OperacionComercial operacion) async {
-    try {
-      _logger.i('🔄 Actualizando operación ${operacion.id}...');
-
-      final operacionActualizada = operacion.copyWith(
-        estado: EstadoOperacion.pendiente,
-        syncStatus: 'creado',
-        totalProductos: operacion.detalles.length,
-      );
-
-      final db = await dbHelper.database;
-
-      await db.transaction((txn) async {
-        // 1. Actualizar operación principal
-        await txn.update(
-          tableName,
-          operacionActualizada.toMap(),
-          where: 'id = ?',
-          whereArgs: [operacion.id],
-        );
-
-        // 2. Eliminar detalles anteriores
-        await txn.delete(
-          'operacion_comercial_detalle',
-          where: 'operacion_comercial_id = ?',
-          whereArgs: [operacion.id],
-        );
-
-        // 3. Insertar nuevos detalles
-        for (int i = 0; i < operacion.detalles.length; i++) {
-          final detalleOriginal = operacion.detalles[i];
-          final detalle = detalleOriginal.copyWith(
-            id: detalleOriginal.id ?? _uuid.v4(),
-            operacionComercialId: operacion.id!,
-            orden: i + 1,
-            fechaCreacion: DateTime.now(),
-          );
-
-          await txn.insert('operacion_comercial_detalle', detalle.toMap());
-        }
-      });
-
-      await marcarPendienteSincronizacion(operacion.id!);
-      _sincronizarEnBackground(operacion.id!);
-
-      _logger.i('✅ Operación actualizada exitosamente');
-
-    } catch (e) {
-      _logger.e('❌ Error actualizando operación: $e');
       rethrow;
     }
   }
@@ -190,15 +125,15 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
 
       final operacion = fromMap(operacionMaps.first);
       return operacion.copyWith(detalles: detalles);
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo operación $id: $e');
       return null;
     }
   }
 
   @override
-  Future<List<OperacionComercial>> obtenerOperacionesPorCliente(int clienteId) async {
+  Future<List<OperacionComercial>> obtenerOperacionesPorCliente(
+    int clienteId,
+  ) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -228,15 +163,15 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
       }
 
       return operaciones;
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo operaciones del cliente $clienteId: $e');
       return [];
     }
   }
 
   @override
-  Future<List<OperacionComercial>> obtenerOperacionesPorTipo(TipoOperacion tipo) async {
+  Future<List<OperacionComercial>> obtenerOperacionesPorTipo(
+    TipoOperacion tipo,
+  ) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -246,21 +181,17 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
       );
 
       return operacionesMaps.map((map) => fromMap(map)).toList();
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo operaciones del tipo $tipo: $e');
       return [];
     }
   }
 
   @override
   Future<List<OperacionComercial>> obtenerOperacionesPorClienteYTipo(
-      int clienteId,
-      TipoOperacion tipo,
-      ) async {
+    int clienteId,
+    TipoOperacion tipo,
+  ) async {
     try {
-      _logger.i('📋 Obteniendo operaciones de cliente $clienteId tipo ${tipo.valor}');
-
       final operacionesMaps = await dbHelper.consultar(
         tableName,
         where: 'cliente_id = ? AND tipo_operacion = ?',
@@ -269,7 +200,6 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
       );
 
       if (operacionesMaps.isEmpty) {
-        _logger.d('No se encontraron operaciones');
         return [];
       }
 
@@ -293,11 +223,8 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
         operaciones.add(operacion);
       }
 
-      _logger.i('✅ ${operaciones.length} operaciones obtenidas');
       return operaciones;
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo operaciones: $e');
       return [];
     }
   }
@@ -305,66 +232,18 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
   @override
   Future<void> eliminarOperacion(String id) async {
     try {
-      _logger.i('🗑️ Eliminando operación $id...');
-
       final db = await dbHelper.database;
 
       await db.transaction((txn) async {
-        // 1. Eliminar detalles (CASCADE debería hacerlo automáticamente)
         await txn.delete(
           'operacion_comercial_detalle',
           where: 'operacion_comercial_id = ?',
           whereArgs: [id],
         );
 
-        // 2. Eliminar operación principal
-        await txn.delete(
-          tableName,
-          where: 'id = ?',
-          whereArgs: [id],
-        );
+        await txn.delete(tableName, where: 'id = ?', whereArgs: [id]);
       });
-
-      _logger.i('✅ Operación eliminada exitosamente');
-
     } catch (e) {
-      _logger.e('❌ Error eliminando operación: $e');
-      rethrow;
-    }
-  }
-
-  @override
-  Future<void> sincronizarOperacionesPendientes() async {
-    try {
-      _logger.i('🔄 Sincronizando operaciones pendientes...');
-
-      final operacionesPendientes = await obtenerOperacionesPendientes();
-
-      if (operacionesPendientes.isEmpty) {
-        _logger.i('✅ No hay operaciones pendientes');
-        return;
-      }
-
-      _logger.i('📤 Sincronizando ${operacionesPendientes.length} operaciones...');
-
-      for (final operacion in operacionesPendientes) {
-        try {
-          final operacionCompleta = await obtenerOperacionPorId(operacion.id!);
-          if (operacionCompleta != null) {
-            await _enviarOperacionAlServidor(operacionCompleta);
-            _logger.i('✅ Operación ${operacionCompleta.id} sincronizada');
-          }
-
-        } catch (e) {
-          await marcarComoError(operacion.id!, e.toString());
-          _logger.e('❌ Error sincronizando ${operacion.id}: $e');
-        }
-      }
-
-      _logger.i('✅ Sincronización completada');
-
-    } catch (e) {
-      _logger.e('❌ Error en sincronización: $e');
       rethrow;
     }
   }
@@ -377,15 +256,12 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
         {
           'sync_status': 'creado',
           'estado': EstadoOperacion.pendiente.valor,
+          'sync_error': null,
         },
         where: 'id = ?',
         whereArgs: [operacionId],
       );
-
-      _logger.i('⏳ Operación $operacionId marcada como pendiente');
-
     } catch (e) {
-      _logger.e('❌ Error marcando como pendiente: $e');
       rethrow;
     }
   }
@@ -401,9 +277,7 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
       );
 
       return operacionesMaps.map((map) => fromMap(map)).toList();
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo operaciones pendientes: $e');
       return [];
     }
   }
@@ -412,7 +286,9 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
   // MÉTODOS ESPECÍFICOS
   // ═══════════════════════════════════════════════════════════════════
 
-  Future<List<OperacionComercial>> obtenerOperacionesPorEstado(EstadoOperacion estado) async {
+  Future<List<OperacionComercial>> obtenerOperacionesPorEstado(
+    EstadoOperacion estado,
+  ) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -422,9 +298,7 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
       );
 
       return operacionesMaps.map((map) => fromMap(map)).toList();
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo operaciones por estado: $e');
       return [];
     }
   }
@@ -443,28 +317,23 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
       );
 
       return operacionesMaps.map((map) => fromMap(map)).toList();
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo operaciones con error: $e');
       return [];
     }
   }
 
-  Future<void> actualizarEstado(String operacionId, EstadoOperacion nuevoEstado) async {
+  Future<void> actualizarEstado(
+    String operacionId,
+    EstadoOperacion nuevoEstado,
+  ) async {
     try {
       await dbHelper.actualizar(
         tableName,
-        {
-          'estado': nuevoEstado.valor,
-        },
+        {'estado': nuevoEstado.valor},
         where: 'id = ?',
         whereArgs: [operacionId],
       );
-
-      _logger.i('✅ Estado de operación $operacionId actualizado a ${nuevoEstado.valor}');
-
     } catch (e) {
-      _logger.e('❌ Error actualizando estado: $e');
       rethrow;
     }
   }
@@ -473,32 +342,7 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
   // MÉTODOS PRIVADOS - SINCRONIZACIÓN
   // ═══════════════════════════════════════════════════════════════════
 
-  Future<void> _enviarOperacionAlServidor(OperacionComercial operacion) async {
-    _logger.i('📤 Enviando operación ${operacion.id} al servidor...');
-
-    try {
-      final resultado = await OperacionesComercialesPostService.enviarOperacion(operacion);
-
-      if (resultado['exito'] == true) {
-        _logger.i('✅ Operación enviada exitosamente al servidor');
-
-        if (resultado['id'] != null) {
-          await _marcarComoMigrado(operacion.id!, resultado['id']);
-        } else {
-          await _marcarComoMigrado(operacion.id!, null);
-        }
-      } else {
-        final mensajeError = resultado['mensaje'] ?? 'Error desconocido del servidor';
-        throw Exception(mensajeError);
-      }
-
-    } catch (e) {
-      _logger.e('❌ Error enviando al servidor: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> _marcarComoMigrado(String operacionId, dynamic serverId) async {
+  Future<void> marcarComoMigrado(String operacionId, dynamic serverId) async {
     try {
       final now = DateTime.now();
 
@@ -513,27 +357,9 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
         where: 'id = ?',
         whereArgs: [operacionId],
       );
-
-      _logger.i('✅ Operación $operacionId migrada${serverId != null ? ' con server ID: $serverId' : ''}');
-
     } catch (e) {
-      _logger.e('❌ Error marcando como migrado: $e');
       rethrow;
     }
-  }
-
-  void _sincronizarEnBackground(String operacionId) {
-    Future.microtask(() async {
-      try {
-        final operacion = await obtenerOperacionPorId(operacionId);
-        if (operacion != null) {
-          await _enviarOperacionAlServidor(operacion);
-        }
-      } catch (e) {
-        await marcarComoError(operacionId, e.toString());
-        _logger.e('❌ Error en sincronización background: $e');
-      }
-    });
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -541,7 +367,10 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
   // ═══════════════════════════════════════════════════════════════════
 
   /// Actualiza el contador de intentos de sincronización
-  Future<void> actualizarIntentoSync(String operacionId, int numeroIntento) async {
+  Future<void> actualizarIntentoSync(
+    String operacionId,
+    int numeroIntento,
+  ) async {
     try {
       await dbHelper.actualizar(
         tableName,
@@ -552,18 +381,13 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
         where: 'id = ?',
         whereArgs: [operacionId],
       );
-
-      _logger.d('🔄 Intento #$numeroIntento registrado para operación $operacionId');
     } catch (e) {
-      _logger.e('❌ Error actualizando intento sync: $e');
       rethrow;
     }
   }
 
-  /// Marca una operación como error con el contador de reintentos
   Future<void> marcarComoError(String operacionId, String mensajeError) async {
     try {
-      // Obtener el contador actual
       final operacionMaps = await dbHelper.consultar(
         tableName,
         where: 'id = ?',
@@ -582,47 +406,12 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
           'sync_status': 'error',
           'sync_error': mensajeError,
           'synced_at': DateTime.now().toIso8601String(),
-          'sync_retry_count': retryCount, // Mantener el contador actual
+          'sync_retry_count': retryCount,
         },
         where: 'id = ?',
         whereArgs: [operacionId],
       );
-
-      _logger.e('❌ Operación $operacionId marcada con error (intento #$retryCount): $mensajeError');
     } catch (e) {
-      _logger.e('❌ Error marcando operación como error: $e');
-      rethrow;
-    }
-  }
-
-  /// Sincroniza una operación individual (usado por el servicio de sync automático)
-  Future<void> sincronizarOperacion(String operacionId) async {
-    try {
-      _logger.i('🔄 Sincronizando operación individual: $operacionId');
-
-      // 1. Obtener la operación completa con sus detalles
-      final operacion = await obtenerOperacionPorId(operacionId);
-
-      if (operacion == null) {
-        throw Exception('Operación no encontrada: $operacionId');
-      }
-
-      // 2. Validar que tenga detalles
-      if (operacion.detalles.isEmpty) {
-        throw Exception('La operación no tiene productos');
-      }
-
-      // 3. Enviar al servidor
-      await _enviarOperacionAlServidor(operacion);
-
-      _logger.i('✅ Operación $operacionId sincronizada exitosamente');
-
-    } catch (e, stackTrace) {
-      _logger.e('❌ Error sincronizando operación $operacionId: $e', stackTrace: stackTrace);
-
-      // Marcar como error en la base de datos
-      await marcarComoError(operacionId, e.toString());
-
       rethrow;
     }
   }
@@ -659,9 +448,7 @@ class OperacionComercialRepositoryImpl extends BaseRepository<OperacionComercial
         'por_tipo': porTipo,
         'por_estado': porEstado,
       };
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo estadísticas: $e');
       return {};
     }
   }

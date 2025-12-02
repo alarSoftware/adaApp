@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/services/sync/sync_service.dart';
 import 'package:ada_app/services/sync/sync_tables_config.dart';
-import 'package:logger/logger.dart';
+
 import 'dart:async';
 
 // ========== MODELOS DE DATOS ==========
@@ -120,7 +120,6 @@ class SendConfiguration {
 
 // ========== VIEWMODEL ==========
 class PendingDataViewModel extends ChangeNotifier {
-  final Logger _logger = Logger();
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final SendConfiguration _config = const SendConfiguration();
 
@@ -147,7 +146,7 @@ class PendingDataViewModel extends ChangeNotifier {
 
   // ========== STREAMS PARA COMUNICACIÓN ==========
   final StreamController<PendingDataUIEvent> _eventController =
-  StreamController<PendingDataUIEvent>.broadcast();
+      StreamController<PendingDataUIEvent>.broadcast();
   Stream<PendingDataUIEvent> get uiEvents => _eventController.stream;
 
   // ========== GETTERS PÚBLICOS ==========
@@ -186,13 +185,7 @@ class PendingDataViewModel extends ChangeNotifier {
 
   /// Inicia la sincronización automática periódica
   void iniciarSincronizacionAutomatica() {
-    if (_autoSyncEnabled) {
-      _logger.i('⚠️ Sincronización automática ya está activa');
-      return;
-    }
-
     _autoSyncEnabled = true;
-    _logger.i('🚀 Iniciando sincronización automática cada ${_config.autoSyncInterval.inMinutes} minutos');
 
     // Primera sincronización después de 2 minutos
     Timer(const Duration(minutes: 2), () async {
@@ -215,7 +208,7 @@ class PendingDataViewModel extends ChangeNotifier {
       _autoSyncTimer!.cancel();
       _autoSyncTimer = null;
       _autoSyncEnabled = false;
-      _logger.i('⏹️ Sincronización automática detenida');
+
       notifyListeners();
     }
   }
@@ -224,40 +217,37 @@ class PendingDataViewModel extends ChangeNotifier {
   void toggleAutoSync() {
     if (_autoSyncEnabled) {
       detenerSincronizacionAutomatica();
-      _eventController.add(ShowSuccessEvent('Sincronización automática desactivada'));
+      _eventController.add(
+        ShowSuccessEvent('Sincronización automática desactivada'),
+      );
     } else {
       iniciarSincronizacionAutomatica();
-      _eventController.add(ShowSuccessEvent('Sincronización automática activada'));
+      _eventController.add(
+        ShowSuccessEvent('Sincronización automática activada'),
+      );
     }
   }
 
   /// Ejecuta la sincronización automática en background
   Future<void> _ejecutarAutoSync() async {
     if (_isSending) {
-      _logger.i('⏭️ Auto-sync saltado: envío manual en progreso');
       return;
     }
 
     final connected = await _checkConnectivity();
     if (!connected) {
-      _logger.i('⏭️ Auto-sync saltado: sin conexión');
       return;
     }
 
     await loadPendingData();
 
     if (!hasPendingData) {
-      _logger.i('✅ Auto-sync: No hay datos pendientes');
       return;
     }
 
-    _logger.i('🔄 Ejecutando auto-sync: $_totalPendingItems elementos pendientes');
-
     try {
       await _executarAutoSyncSilencioso();
-    } catch (e) {
-      _logger.e('❌ Error en auto-sync: $e');
-    }
+    } catch (e) {}
   }
 
   /// Ejecuta el envío automático silencioso
@@ -290,11 +280,8 @@ class PendingDataViewModel extends ChangeNotifier {
 
           if (result.success) {
             totalSent += result.itemsSent;
-            _logger.i('✅ Auto-sync ${group.displayName}: ${result.itemsSent} elementos');
           }
-        } catch (e) {
-          _logger.w('⚠️ Auto-sync error en ${group.displayName}: $e');
-        }
+        } catch (e) {}
 
         await Future.delayed(const Duration(milliseconds: 100));
       }
@@ -309,14 +296,13 @@ class PendingDataViewModel extends ChangeNotifier {
 
       if (totalSent > 0) {
         final successCount = results.where((r) => r.success).length;
-        _eventController.add(ShowSuccessEvent(
-          '🔄 Auto-sync: $totalSent elementos enviados ($successCount/${results.length} categorías)',
-        ));
+        _eventController.add(
+          ShowSuccessEvent(
+            '🔄 Auto-sync: $totalSent elementos enviados ($successCount/${results.length} categorías)',
+          ),
+        );
       }
-
-      _logger.i('✅ Auto-sync completado: $totalSent elementos enviados');
     } catch (e) {
-      _logger.e('💥 Error en auto-sync: $e');
     } finally {
       _setSending(false);
       _resetSendProgress();
@@ -330,8 +316,6 @@ class PendingDataViewModel extends ChangeNotifier {
     _setLoading(true);
 
     try {
-      _logger.i('🔍 Cargando datos pendientes...');
-
       // 🔥 USAR EL CONFIGURADOR CENTRALIZADO
       final counts = await SyncTablesConfig.getPendingCounts();
       final configs = SyncTablesConfig.getAllTableConfigs();
@@ -342,15 +326,15 @@ class PendingDataViewModel extends ChangeNotifier {
         final count = counts[config.tableName] ?? 0;
 
         if (count > 0) {
-          grupos.add(PendingDataGroup(
-            tableName: config.tableName,
-            displayName: config.displayName,
-            count: count,
-            type: _getDataType(config.tableName),
-            description: config.description,
-          ));
-
-          _logger.i('📋 ${config.displayName}: $count pendientes');
+          grupos.add(
+            PendingDataGroup(
+              tableName: config.tableName,
+              displayName: config.displayName,
+              count: count,
+              type: _getDataType(config.tableName),
+              description: config.description,
+            ),
+          );
         }
       }
 
@@ -364,10 +348,7 @@ class PendingDataViewModel extends ChangeNotifier {
       _pendingGroups = grupos;
       _totalPendingItems = grupos.fold(0, (sum, group) => sum + group.count);
       _lastUpdateTime = DateTime.now().toString().substring(0, 19);
-
-      _logger.i('✅ Datos pendientes cargados: $_totalPendingItems items en ${_pendingGroups.length} grupos');
     } catch (e) {
-      _logger.e('❌ Error cargando datos pendientes: $e');
       _eventController.add(ShowErrorEvent('Error cargando datos: $e'));
     } finally {
       _setLoading(false);
@@ -395,13 +376,17 @@ class PendingDataViewModel extends ChangeNotifier {
     try {
       final connected = await _checkConnectivity();
       if (!connected) {
-        _eventController.add(ShowErrorEvent(
-          'Sin conexión al servidor. Verifique su conexión a Internet.',
-        ));
+        _eventController.add(
+          ShowErrorEvent(
+            'Sin conexión al servidor. Verifique su conexión a Internet.',
+          ),
+        );
         return;
       }
 
-      _eventController.add(RequestBulkSendConfirmationEvent(_pendingGroups, _totalPendingItems));
+      _eventController.add(
+        RequestBulkSendConfirmationEvent(_pendingGroups, _totalPendingItems),
+      );
     } catch (e) {
       _eventController.add(ShowErrorEvent('Error verificando conexión: $e'));
     }
@@ -416,13 +401,13 @@ class PendingDataViewModel extends ChangeNotifier {
     _isCancelled = false;
 
     try {
-      _logger.i('🚀 Iniciando envío masivo de datos pendientes...');
-
       final connected = await _checkConnectivity();
       if (!connected) {
-        _eventController.add(ShowErrorEvent(
-          'Conexión perdida. No se puede proceder con el envío.',
-        ));
+        _eventController.add(
+          ShowErrorEvent(
+            'Conexión perdida. No se puede proceder con el envío.',
+          ),
+        );
         return;
       }
 
@@ -434,8 +419,9 @@ class PendingDataViewModel extends ChangeNotifier {
 
       for (int i = 0; i < _pendingGroups.length; i++) {
         if (_isCancelled) {
-          _logger.i('🛑 Envío cancelado por el usuario');
-          _eventController.add(ShowErrorEvent('Envío cancelado por el usuario'));
+          _eventController.add(
+            ShowErrorEvent('Envío cancelado por el usuario'),
+          );
           return;
         }
 
@@ -443,7 +429,8 @@ class PendingDataViewModel extends ChangeNotifier {
 
         _updateSendProgress(
           progress: (i / _pendingGroups.length),
-          currentStep: 'Enviando ${group.displayName}... (${group.count} elementos)',
+          currentStep:
+              'Enviando ${group.displayName}... (${group.count} elementos)',
           completedCount: i,
         );
 
@@ -453,19 +440,17 @@ class PendingDataViewModel extends ChangeNotifier {
 
           if (result.success) {
             totalSent += result.itemsSent;
-            _logger.i('✅ ${group.displayName}: ${result.itemsSent} elementos enviados');
-          } else {
-            _logger.w('⚠️ ${group.displayName}: ${result.error}');
-          }
+          } else {}
         } catch (e) {
-          _logger.e('❌ Error enviando ${group.displayName}: $e');
-          results.add(SendResult(
-            success: false,
-            tableName: group.tableName,
-            itemsSent: 0,
-            message: 'Error en envío: $e',
-            error: e.toString(),
-          ));
+          results.add(
+            SendResult(
+              success: false,
+              tableName: group.tableName,
+              itemsSent: 0,
+              message: 'Error en envío: $e',
+              error: e.toString(),
+            ),
+          );
         }
 
         await Future.delayed(const Duration(milliseconds: 100));
@@ -496,12 +481,11 @@ class PendingDataViewModel extends ChangeNotifier {
       await loadPendingData();
 
       if (allSuccess) {
-        _eventController.add(ShowSuccessEvent('¡Envío completado exitosamente!'));
+        _eventController.add(
+          ShowSuccessEvent('¡Envío completado exitosamente!'),
+        );
       }
-
-      _logger.i('✅ Envío masivo completado: $summary');
     } catch (e) {
-      _logger.e('💥 Error en envío masivo: $e');
       _eventController.add(ShowErrorEvent('Error en envío masivo: $e'));
     } finally {
       _setSending(false);
@@ -513,7 +497,6 @@ class PendingDataViewModel extends ChangeNotifier {
   void cancelSend() {
     if (_isSending) {
       _isCancelled = true;
-      _logger.i('🛑 Cancelación solicitada...');
     }
   }
 
@@ -525,8 +508,6 @@ class PendingDataViewModel extends ChangeNotifier {
   /// Obtiene la lista de censos fallidos (con error de sincronización)
   Future<List<Map<String, dynamic>>> getCensosFallidos() async {
     try {
-      _logger.i('🔍 Obteniendo censos fallidos...');
-
       final db = await _dbHelper.database;
 
       final censos = await db.rawQuery('''
@@ -546,19 +527,14 @@ class PendingDataViewModel extends ChangeNotifier {
         ORDER BY ca.fecha_creacion DESC
       ''');
 
-      _logger.i('✅ Censos fallidos obtenidos: ${censos.length}');
       return censos;
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo censos fallidos: $e');
       rethrow;
     }
   }
 
   Future<List<Map<String, dynamic>>> getOperacionesFallidas() async {
     try {
-      _logger.i('🔍 Obteniendo operaciones fallidas...');
-
       final db = await _dbHelper.database;
 
       final operaciones = await db.rawQuery('''
@@ -572,11 +548,8 @@ class PendingDataViewModel extends ChangeNotifier {
       ORDER BY oc.fecha_creacion DESC
     ''');
 
-      _logger.i('✅ Operaciones fallidas obtenidas: ${operaciones.length}');
       return operaciones;
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo operaciones fallidas: $e');
       rethrow;
     }
   }
@@ -610,12 +583,14 @@ class PendingDataViewModel extends ChangeNotifier {
     _sendCurrentStep = currentStep;
     _sendCompletedCount = completedCount;
 
-    _eventController.add(SendProgressEvent(
-      progress: progress,
-      currentStep: currentStep,
-      completedCount: completedCount,
-      totalCount: _sendTotalCount,
-    ));
+    _eventController.add(
+      SendProgressEvent(
+        progress: progress,
+        currentStep: currentStep,
+        completedCount: completedCount,
+        totalCount: _sendTotalCount,
+      ),
+    );
 
     notifyListeners();
   }
@@ -627,9 +602,9 @@ class PendingDataViewModel extends ChangeNotifier {
         final result = await _sendDataGroup(group);
         return await Future.any([
           Future.value(result),
-          Future.delayed(_config.timeout).then(
-                (_) => throw TimeoutException('Timeout', _config.timeout),
-          ),
+          Future.delayed(
+            _config.timeout,
+          ).then((_) => throw TimeoutException('Timeout', _config.timeout)),
         ]);
       } catch (e) {
         if (attempt == _config.maxRetries) {
@@ -642,7 +617,6 @@ class PendingDataViewModel extends ChangeNotifier {
           );
         }
 
-        _logger.w('🔄 Reintentando ${group.displayName} (intento ${attempt + 1}/${_config.maxRetries + 1})');
         await Future.delayed(_config.retryDelay);
       }
     }
@@ -658,14 +632,14 @@ class PendingDataViewModel extends ChangeNotifier {
   /// Envía un grupo específico de datos usando la configuración centralizada
   Future<SendResult> _sendDataGroup(PendingDataGroup group) async {
     try {
-      _logger.i('📤 Enviando ${group.displayName} (${group.count} elementos)...');
-
       final db = await _dbHelper.database;
 
       // 🔥 BUSCAR LA CONFIGURACIÓN DE LA TABLA
       final config = SyncTablesConfig.getAllTableConfigs().firstWhere(
-            (c) => c.tableName == group.tableName,
-        orElse: () => throw Exception('Configuración no encontrada para ${group.tableName}'),
+        (c) => c.tableName == group.tableName,
+        orElse: () => throw Exception(
+          'Configuración no encontrada para ${group.tableName}',
+        ),
       );
 
       // Obtener items pendientes usando la configuración
@@ -696,7 +670,6 @@ class PendingDataViewModel extends ChangeNotifier {
         error: result.error,
       );
     } catch (e) {
-      _logger.e('❌ Error enviando ${group.tableName}: $e');
       return SendResult(
         success: false,
         tableName: group.tableName,

@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
+import 'package:ada_app/config/constants/server_response.dart';
+import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 import 'package:http/http.dart' as http;
-import 'package:logger/logger.dart';
+
 import 'package:ada_app/services/api_config_service.dart';
 import 'package:ada_app/config/constants/server_constants.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
@@ -11,16 +13,14 @@ import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detal
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 
 class OperacionesComercialesPostService {
-  static final Logger _logger = Logger();
-  static const String _endpoint = '/operacionComercial/insertOperacionComercial';
+  static const String _endpoint =
+      '/operacionComercial/insertOperacionComercial';
 
-  static Future<Map<String, dynamic>> enviarOperacion(
-      OperacionComercial operacion, {
-        int timeoutSegundos = 60,
-      }) async {
+  static Future<void> enviarOperacion(
+    OperacionComercial operacion, {
+    int timeoutSegundos = 60,
+  }) async {
     String? fullUrl;
-    String? operacionId = operacion.id;
-
     try {
       if (operacion.id == null || operacion.id!.isEmpty) {
         throw Exception('ID de operación es requerido');
@@ -28,66 +28,33 @@ class OperacionesComercialesPostService {
       if (operacion.detalles.isEmpty) {
         throw Exception('La operación debe tener al menos un detalle');
       }
-
-      _logger.i('Enviando operacion comercial');
-      _logger.i('Operacion ID: ${operacion.id}');
-      _logger.i('Cliente ID: ${operacion.clienteId}');
-      _logger.i('Tipo: ${operacion.tipoOperacion.valor}');
-      _logger.i('Total productos: ${operacion.detalles.length}');
-
       final payload = _construirPayload(operacion);
-
-      _logger.i('Payload size: ${jsonEncode(payload).length} caracteres');
-
       final baseUrl = await ApiConfigService.getBaseUrl();
       final cleanBaseUrl = baseUrl.endsWith('/')
           ? baseUrl.substring(0, baseUrl.length - 1)
           : baseUrl;
       fullUrl = '$cleanBaseUrl$_endpoint';
-
-      _logger.i('Enviando a: $fullUrl');
-
-      final response = await http.post(
-        Uri.parse(fullUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-        },
-        body: jsonEncode(payload),
-      ).timeout(Duration(seconds: timeoutSegundos));
-
-      _logger.i('Response: ${response.statusCode}');
-
-      final result = _procesarRespuesta(response);
-
-      if (!result['exito'] && result['duplicado'] != true) {
-        ErrorLogService.manejarExcepcion(
-          result,
-          operacionId,
-          fullUrl,
-          operacion.usuarioId,
-          'operacion_comercial',
-        );
+      final response = await http
+          .post(
+            Uri.parse(fullUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'ngrok-skip-browser-warning': 'true',
+            },
+            body: jsonEncode(payload),
+          )
+          .timeout(Duration(seconds: timeoutSegundos));
+      ServerResponse resultObject = ServerResponse.fromHttp(response);
+      if (!resultObject.success) {
+        if (!resultObject.isDuplicate && resultObject.message != '') {
+          throw Exception(resultObject.message);
+        }
       }
-
-      return result;
-
-    } catch (e, stackTrace) {
-      _logger.e('Error en envio de operacion comercial: $e', stackTrace: stackTrace);
-      ErrorLogService.manejarExcepcion(
-        e,
-        operacionId,
-        fullUrl,
-        operacion.usuarioId,
-        'operacion_comercial',
-      );
-
-      return {
-        'exito': false,
-        'mensaje': _obtenerMensajeUsuario(e),
-        'error': e.toString(),
-      };
+      if (resultObject.success || resultObject.isDuplicate) {}
+    } catch (e) {
+      //TODO RONALDO ESCALAR ERROR
+      rethrow;
     }
   }
 
@@ -102,7 +69,9 @@ class OperacionesComercialesPostService {
       'totalProductos': operacion.totalProductos,
     };
 
-    final detalles = operacion.detalles.map((d) => _construirDetalle(d, operacion.tipoOperacion)).toList();
+    final detalles = operacion.detalles
+        .map((d) => _construirDetalle(d, operacion.tipoOperacion))
+        .toList();
 
     return {
       'operacionComercial': operacionComercialData,
@@ -112,9 +81,9 @@ class OperacionesComercialesPostService {
   }
 
   static Map<String, dynamic> _construirDetalle(
-      OperacionComercialDetalle detalle,
-      TipoOperacion tipoOperacion,
-      ) {
+    OperacionComercialDetalle detalle,
+    TipoOperacion tipoOperacion,
+  ) {
     final detalleBase = {
       'productoCodigo': detalle.productoCodigo,
       'productoDescripcion': detalle.productoDescripcion,
@@ -124,7 +93,8 @@ class OperacionesComercialesPostService {
       'unidadMedida': detalle.unidadMedida,
     };
 
-    if (tipoOperacion == TipoOperacion.notaRetiroDiscontinuos && detalle.productoReemplazoId != null) {
+    if (tipoOperacion == TipoOperacion.notaRetiroDiscontinuos &&
+        detalle.productoReemplazoId != null) {
       detalleBase['productoIntercambio'] = [
         {
           'productoId': detalle.productoReemplazoId,
@@ -132,7 +102,7 @@ class OperacionesComercialesPostService {
           'productoDescripcion': detalle.productoReemplazoDescripcion,
           'productoCategoria': detalle.productoReemplazoCategoria,
           'cantidad': detalle.cantidad,
-        }
+        },
       ];
     }
 
@@ -159,23 +129,27 @@ class OperacionesComercialesPostService {
         if (serverAction == ServerConstants.SUCCESS_TRANSACTION) {
           return {
             'exito': true,
-            'mensaje': mensaje.isNotEmpty ? mensaje : 'Operación procesada correctamente',
+            'mensaje': mensaje.isNotEmpty
+                ? mensaje
+                : 'Operación procesada correctamente',
             'serverAction': serverAction,
             'id': responseBody['resultId'],
           };
-        }
-        else if (_esDuplicado(mensaje) || _esDuplicado(error)) {
+        } else if (_esDuplicado(mensaje) || _esDuplicado(error)) {
           return {
             'exito': true,
             'duplicado': true,
             'mensaje': mensaje.isNotEmpty ? mensaje : error,
             'serverAction': serverAction,
           };
-        }
-        else {
+        } else {
           return {
             'exito': false,
-            'mensaje': error.isNotEmpty ? error : mensaje.isNotEmpty ? mensaje : 'Error del servidor',
+            'mensaje': error.isNotEmpty
+                ? error
+                : mensaje.isNotEmpty
+                ? mensaje
+                : 'Error del servidor',
             'serverAction': serverAction,
           };
         }
@@ -186,7 +160,6 @@ class OperacionesComercialesPostService {
         'mensaje': 'Operación enviada correctamente',
         'data': responseBody,
       };
-
     } catch (e) {
       return {
         'exito': false,

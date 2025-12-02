@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:logger/logger.dart';
+
 import 'package:uuid/uuid.dart';
 import '../models/dynamic_form/dynamic_form_response.dart';
 import '../models/dynamic_form/dynamic_form_response_detail.dart';
@@ -9,7 +9,6 @@ import 'package:path_provider/path_provider.dart';
 import '../services/database_helper.dart';
 
 class DynamicFormResponseRepository {
-  final Logger _logger = Logger();
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final Uuid _uuid = Uuid();
 
@@ -19,7 +18,13 @@ class DynamicFormResponseRepository {
   static const String _detailTable = 'dynamic_form_response_detail';
   static const String _imageTable = 'dynamic_form_response_image';
 
-  static const Set<String> _imageExtensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp'};
+  static const Set<String> _imageExtensions = {
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.gif',
+    '.webp',
+  };
 
   static const Map<String, String> _mimeTypes = {
     '.png': 'image/png',
@@ -33,10 +38,7 @@ class DynamicFormResponseRepository {
 
   Future<bool> save(DynamicFormResponse response) async {
     try {
-      _logger.i('💾 Guardando respuesta: ${response.id}');
-
       if (response.id.isEmpty || response.formTemplateId.isEmpty) {
-        _logger.e('❌ Response con ID o formTemplateId vacío');
         return false;
       }
 
@@ -44,10 +46,8 @@ class DynamicFormResponseRepository {
       await _upsertResponse(response.id, responseData);
       await _saveResponseDetails(response);
 
-      _logger.i('✅ Respuesta guardada exitosamente: ${response.id}');
       return true;
-    } catch (e, stackTrace) {
-      _logger.e('❌ Error guardando respuesta: $e\n$stackTrace');
+    } catch (e) {
       return false;
     }
   }
@@ -61,7 +61,6 @@ class DynamicFormResponseRepository {
 
       return await _mapListToResponses(maps);
     } catch (e) {
-      _logger.e('❌ Error obteniendo respuestas: $e');
       return [];
     }
   }
@@ -78,7 +77,6 @@ class DynamicFormResponseRepository {
       if (maps.isEmpty) return null;
       return await _mapToResponseWithDetails(maps.first);
     } catch (e) {
-      _logger.e('❌ Error obteniendo respuesta por ID: $e');
       return null;
     }
   }
@@ -94,7 +92,6 @@ class DynamicFormResponseRepository {
 
       return await _mapListToResponses(maps);
     } catch (e) {
-      _logger.e('❌ Error obteniendo respuestas por estado: $e');
       return [];
     }
   }
@@ -108,29 +105,22 @@ class DynamicFormResponseRepository {
         orderBy: 'creation_date ASC',
       );
 
-      _logger.d('📤 Formularios completados para sincronizar: ${maps.length}');
       return await _mapListToResponses(maps);
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo pendientes: $e');
       return [];
     }
   }
 
   Future<bool> delete(String responseId) async {
     try {
-      _logger.i('🗑️ Eliminando respuesta: $responseId');
-
       final images = await getImagesForResponse(responseId);
       await _deleteImageFiles(images);
       await _deleteImageRecords(images);
       await _deleteDetails(responseId);
       await _deleteResponse(responseId);
 
-      _logger.i('✅ Respuesta eliminada completamente: $responseId');
       return true;
     } catch (e) {
-      _logger.e('❌ Error eliminando respuesta: $e');
       return false;
     }
   }
@@ -144,8 +134,6 @@ class DynamicFormResponseRepository {
     required String imagePath,
   }) async {
     try {
-      _logger.i('📸 Guardando imagen inmediatamente para campo: $fieldId');
-
       // 1. Crear o buscar el detailId para este campo
       String detailId = await _getOrCreateDetailId(responseId, fieldId);
 
@@ -156,7 +144,6 @@ class DynamicFormResponseRepository {
       final imageData = await _convertImageToBase64(imagePath);
 
       if (imageData['base64'] == null) {
-        _logger.e('❌ No se pudo convertir la imagen a Base64');
         return null;
       }
 
@@ -174,10 +161,8 @@ class DynamicFormResponseRepository {
         'sync_status': 'pending',
       });
 
-      _logger.i('✅ Imagen guardada inmediatamente: $imageId (${imageData['tamano']} bytes)');
       return imageId;
-    } catch (e, stackTrace) {
-      _logger.e('❌ Error guardando imagen inmediatamente: $e\n$stackTrace');
+    } catch (e) {
       return null;
     }
   }
@@ -208,10 +193,8 @@ class DynamicFormResponseRepository {
         'sync_status': 'pending',
       });
 
-      _logger.d('➕ Detail creado para imagen: $detailId');
       return detailId;
     } catch (e) {
-      _logger.e('❌ Error obteniendo/creando detailId: $e');
       rethrow;
     }
   }
@@ -234,39 +217,30 @@ class DynamicFormResponseRepository {
         whereArgs: [detailId],
       );
 
-      if (images.isNotEmpty) {
-        _logger.d('🗑️ ${images.length} imagen(es) anterior(es) eliminada(s)');
-      }
-    } catch (e) {
-      _logger.w('⚠️ Error eliminando imágenes previas: $e');
-    }
+      if (images.isNotEmpty) {}
+    } catch (e) {}
   }
 
   // ==================== MÉTODOS PÚBLICOS - CONTADORES ====================
 
   Future<int> countPendingSync() async {
     try {
-      final result = await _dbHelper.database.then((db) =>
-          db.rawQuery(
-              'SELECT COUNT(*) as count FROM dynamic_form_response WHERE estado = ?',
-              ['completed']
-          )
+      final result = await _dbHelper.database.then(
+        (db) => db.rawQuery(
+          'SELECT COUNT(*) as count FROM dynamic_form_response WHERE estado = ?',
+          ['completed'],
+        ),
       );
 
       final count = result.first['count'] as int?;
       return count ?? 0;
-
     } catch (e) {
-      _logger.e('❌ Error contando pendientes: $e');
       return 0;
     }
   }
 
   Future<int> countSynced() async {
-    return await _count(
-      where: 'sync_status = ?',
-      whereArgs: ['synced'],
-    );
+    return await _count(where: 'sync_status = ?', whereArgs: ['synced']);
   }
 
   // ==================== MÉTODOS PÚBLICOS - METADATA ====================
@@ -290,7 +264,6 @@ class DynamicFormResponseRepository {
         'fecha_sincronizado': map['fecha_sincronizado'],
       };
     } catch (e) {
-      _logger.e('❌ Error obteniendo sync metadata: $e');
       return _getDefaultSyncMetadata();
     }
   }
@@ -307,14 +280,15 @@ class DynamicFormResponseRepository {
 
       return maps.map((map) => DynamicFormResponseDetail.fromMap(map)).toList();
     } catch (e) {
-      _logger.e('❌ Error obteniendo detalles: $e');
       return [];
     }
   }
 
   // ==================== MÉTODOS PÚBLICOS - IMÁGENES ====================
 
-  Future<List<DynamicFormResponseImage>> getImagesForDetail(String detailId) async {
+  Future<List<DynamicFormResponseImage>> getImagesForDetail(
+    String detailId,
+  ) async {
     try {
       final maps = await _dbHelper.consultar(
         _imageTable,
@@ -325,26 +299,29 @@ class DynamicFormResponseRepository {
 
       return maps.map((map) => DynamicFormResponseImage.fromMap(map)).toList();
     } catch (e) {
-      _logger.e('❌ Error obteniendo imágenes del detalle: $e');
       return [];
     }
   }
 
-  Future<List<DynamicFormResponseImage>> getImagesForResponse(String responseId) async {
+  Future<List<DynamicFormResponseImage>> getImagesForResponse(
+    String responseId,
+  ) async {
     try {
       final db = await _dbHelper.database;
-      final maps = await db.rawQuery('''
+      final maps = await db.rawQuery(
+        '''
         SELECT i.* 
         FROM $_imageTable i
         INNER JOIN $_detailTable d 
           ON i.dynamic_form_response_detail_id = d.id
         WHERE d.dynamic_form_response_id = ?
         ORDER BY i.orden ASC
-      ''', [responseId]);
+      ''',
+        [responseId],
+      );
 
       return maps.map((map) => DynamicFormResponseImage.fromMap(map)).toList();
     } catch (e) {
-      _logger.e('❌ Error obteniendo imágenes de la respuesta: $e');
       return [];
     }
   }
@@ -356,16 +333,15 @@ class DynamicFormResponseRepository {
       final file = File(image.imagenPath!);
       if (await file.exists()) {
         await file.delete();
-        _logger.d('🗑️ Archivo eliminado: ${image.imagenPath}');
       }
-    } catch (e) {
-      _logger.w('⚠️ No se pudo eliminar archivo: ${image.imagenPath} - $e');
-    }
+    } catch (e) {}
   }
 
   // ==================== MÉTODOS PÚBLICOS - SINCRONIZACIÓN CON SERVIDOR ====================
 
-  Future<int> saveResponsesFromServer(List<Map<String, dynamic>> responses) async {
+  Future<int> saveResponsesFromServer(
+    List<Map<String, dynamic>> responses,
+  ) async {
     int count = 0;
 
     for (var responseData in responses) {
@@ -379,16 +355,15 @@ class DynamicFormResponseRepository {
         }
 
         count++;
-      } catch (e, stackTrace) {
-        _logger.e('❌ Error guardando response desde servidor: $e\n$stackTrace');
-      }
+      } catch (e) {}
     }
 
-    _logger.i('💾 Total de responses guardados desde servidor: $count');
     return count;
   }
 
-  Future<int> saveResponseDetailsFromServer(List<Map<String, dynamic>> details) async {
+  Future<int> saveResponseDetailsFromServer(
+    List<Map<String, dynamic>> details,
+  ) async {
     int count = 0;
 
     for (var detailData in details) {
@@ -397,23 +372,24 @@ class DynamicFormResponseRepository {
           'id': detailData['id']?.toString() ?? _uuid.v4(),
           'version': 1,
           'response': detailData['response']?.toString() ?? '',
-          'dynamic_form_response_id': detailData['dynamicFormResponseId']?.toString() ?? '',
-          'dynamic_form_detail_id': detailData['dynamicFormDetailId']?.toString() ?? '',
+          'dynamic_form_response_id':
+              detailData['dynamicFormResponseId']?.toString() ?? '',
+          'dynamic_form_detail_id':
+              detailData['dynamicFormDetailId']?.toString() ?? '',
           'sync_status': 'synced',
         };
 
         await _dbHelper.insertar(_detailTable, detailForDB);
         count++;
-      } catch (e) {
-        _logger.e('❌ Error guardando detalle desde servidor: $e');
-      }
+      } catch (e) {}
     }
 
-    _logger.i('✅ Total detalles guardados: $count');
     return count;
   }
 
-  Future<int> saveResponseImagesFromServer(List<Map<String, dynamic>> images) async {
+  Future<int> saveResponseImagesFromServer(
+    List<Map<String, dynamic>> images,
+  ) async {
     int count = 0;
 
     for (var imageData in images) {
@@ -422,7 +398,8 @@ class DynamicFormResponseRepository {
         int? imageSize;
 
         // 👇 DECODIFICAR BASE64 Y GUARDAR LOCALMENTE
-        if (imageData['imageBase64'] != null && imageData['imageBase64'].toString().isNotEmpty) {
+        if (imageData['imageBase64'] != null &&
+            imageData['imageBase64'].toString().isNotEmpty) {
           final base64String = imageData['imageBase64'].toString();
           final bytes = base64Decode(base64String);
 
@@ -434,31 +411,32 @@ class DynamicFormResponseRepository {
           await file.writeAsBytes(bytes);
           localPath = file.path;
           imageSize = bytes.length;
-
-          _logger.d('💾 Imagen reconstruida localmente: $localPath');
         }
 
         final imageForDB = {
           'id': imageData['id']?.toString() ?? _uuid.v4(),
-          'dynamic_form_response_detail_id': imageData['dynamicFormResponseDetail']?['id']?.toString() ?? '',
-          'imagen_path': localPath ?? imageData['imagePath']?.toString(), // 👈 USA PATH LOCAL
+          'dynamic_form_response_detail_id':
+              imageData['dynamicFormResponseDetail']?['id']?.toString() ?? '',
+          'imagen_path':
+              localPath ??
+              imageData['imagePath']?.toString(), // 👈 USA PATH LOCAL
           'imagen_base64': imageData['imageBase64']?.toString(),
           'imagen_tamano': imageSize,
           'mime_type': imageData['mimeType']?.toString() ?? 'image/jpeg',
-          'orden': imageData['orden'] != null ? int.tryParse(imageData['orden'].toString()) ?? 1 : 1,
-          'created_at': imageData['creationDate']?.toString() ?? DateTime.now().toIso8601String(),
+          'orden': imageData['orden'] != null
+              ? int.tryParse(imageData['orden'].toString()) ?? 1
+              : 1,
+          'created_at':
+              imageData['creationDate']?.toString() ??
+              DateTime.now().toIso8601String(),
           'sync_status': 'synced',
         };
 
         await _upsertImage(imageForDB['id']!.toString(), imageForDB);
         count++;
-
-      } catch (e, stackTrace) {
-        _logger.e('❌ Error guardando imagen desde servidor: $e\n$stackTrace');
-      }
+      } catch (e) {}
     }
 
-    _logger.i('🖼️ Total de imágenes guardadas desde servidor: $count');
     return count;
   }
 
@@ -472,12 +450,15 @@ class DynamicFormResponseRepository {
       'edf_vendedor_id': response.edfVendedorId,
       'last_update_user_id': null,
       'dynamic_form_id': response.formTemplateId,
-      'usuario_id': response.userId != null ? int.tryParse(response.userId!) : null,
+      'usuario_id': response.userId != null
+          ? int.tryParse(response.userId!)
+          : null,
       'estado': response.status,
       'sync_status': 'pending',
       'intentos_sync': 0,
       'creation_date': response.createdAt.toIso8601String(),
-      'last_update_date': response.completedAt?.toIso8601String() ??
+      'last_update_date':
+          response.completedAt?.toIso8601String() ??
           DateTime.now().toIso8601String(),
     };
   }
@@ -490,7 +471,9 @@ class DynamicFormResponseRepository {
       'edf_vendedor_id': data['edfVendedorId']?.toString(),
       'last_update_user_id': null,
       'dynamic_form_id': data['dynamicFormId'].toString(),
-      'usuario_id': data['usuarioId'] != null ? int.tryParse(data['usuarioId'].toString()) : null,
+      'usuario_id': data['usuarioId'] != null
+          ? int.tryParse(data['usuarioId'].toString())
+          : null,
       'estado': data['estado'] as String? ?? 'completed',
       'sync_status': 'synced',
       'intentos_sync': 0,
@@ -511,11 +494,14 @@ class DynamicFormResponseRepository {
     );
 
     if (existing.isNotEmpty) {
-      await _dbHelper.actualizar(_responseTable, data, where: 'id = ?', whereArgs: [id]);
-      _logger.d('🔄 Respuesta actualizada');
+      await _dbHelper.actualizar(
+        _responseTable,
+        data,
+        where: 'id = ?',
+        whereArgs: [id],
+      );
     } else {
       await _dbHelper.insertar(_responseTable, data);
-      _logger.d('➕ Respuesta insertada');
     }
   }
 
@@ -528,21 +514,20 @@ class DynamicFormResponseRepository {
     );
 
     if (existing.isNotEmpty) {
-      await _dbHelper.actualizar(_imageTable, data, where: 'id = ?', whereArgs: [id]);
-      _logger.d('🔄 Imagen actualizada: $id');
+      await _dbHelper.actualizar(
+        _imageTable,
+        data,
+        where: 'id = ?',
+        whereArgs: [id],
+      );
     } else {
       await _dbHelper.insertar(_imageTable, data);
-      _logger.d('➕ Imagen insertada: $id');
     }
   }
 
   Future<void> _saveResponseDetails(DynamicFormResponse response) async {
-    _logger.d('📝 Guardando ${response.answers.length} respuestas detalle');
-    _logger.d('🔍 Respuestas: ${response.answers}');
-
     for (var entry in response.answers.entries) {
       if (entry.key.isEmpty) {
-        _logger.w('⚠️ Campo con ID vacío, omitiendo');
         continue;
       }
 
@@ -563,7 +548,7 @@ class DynamicFormResponseRepository {
           where: 'id = ?',
           whereArgs: [detailId],
         );
-        _logger.d('  ✓ Campo ${entry.key}: [YA EXISTÍA]');
+
         continue;
       }
 
@@ -593,8 +578,6 @@ class DynamicFormResponseRepository {
           'dynamic_form_detail_id': entry.key,
           'sync_status': 'pending',
         });
-
-        _logger.d('  ✓ Campo ${entry.key}: [IMAGEN]');
       } else {
         await _dbHelper.insertar(_detailTable, {
           'id': detailId,
@@ -604,8 +587,6 @@ class DynamicFormResponseRepository {
           'dynamic_form_detail_id': entry.key,
           'sync_status': 'pending',
         });
-
-        _logger.d('  ✓ Campo ${entry.key}: ${entry.value}');
       }
     }
   }
@@ -629,9 +610,10 @@ class DynamicFormResponseRepository {
     }
   }
 
-  Future<void> _saveServerDetails(String responseId, List<dynamic> details) async {
-    _logger.d('📝 Guardando ${details.length} detalles desde servidor');
-
+  Future<void> _saveServerDetails(
+    String responseId,
+    List<dynamic> details,
+  ) async {
     await _dbHelper.eliminar(
       _detailTable,
       where: 'dynamic_form_response_id = ?',
@@ -680,10 +662,7 @@ class DynamicFormResponseRepository {
         'created_at': DateTime.now().toIso8601String(),
         'sync_status': 'pending',
       });
-
-      _logger.d('✅ Imagen guardada: $imageId');
     } catch (e) {
-      _logger.e('❌ Error guardando imagen: $e');
       rethrow;
     }
   }
@@ -694,11 +673,16 @@ class DynamicFormResponseRepository {
     }
   }
 
-  Future<void> _deleteImageRecords(List<DynamicFormResponseImage> images) async {
+  Future<void> _deleteImageRecords(
+    List<DynamicFormResponseImage> images,
+  ) async {
     for (var image in images) {
-      await _dbHelper.eliminar(_imageTable, where: 'id = ?', whereArgs: [image.id]);
+      await _dbHelper.eliminar(
+        _imageTable,
+        where: 'id = ?',
+        whereArgs: [image.id],
+      );
     }
-    _logger.d('🗑️ ${images.length} registros de imágenes eliminados');
   }
 
   Future<void> _deleteDetails(String responseId) async {
@@ -710,14 +694,21 @@ class DynamicFormResponseRepository {
   }
 
   Future<void> _deleteResponse(String responseId) async {
-    await _dbHelper.eliminar(_responseTable, where: 'id = ?', whereArgs: [responseId]);
+    await _dbHelper.eliminar(
+      _responseTable,
+      where: 'id = ?',
+      whereArgs: [responseId],
+    );
   }
 
   Future<int> _count({String? where, List<dynamic>? whereArgs}) async {
     try {
-      return await _dbHelper.contarRegistros(_responseTable, where: where, whereArgs: whereArgs);
+      return await _dbHelper.contarRegistros(
+        _responseTable,
+        where: where,
+        whereArgs: whereArgs,
+      );
     } catch (e) {
-      _logger.e('❌ Error contando registros: $e');
       return 0;
     }
   }
@@ -725,8 +716,8 @@ class DynamicFormResponseRepository {
   // ==================== MÉTODOS PRIVADOS - MAPEO ====================
 
   Future<List<DynamicFormResponse>> _mapListToResponses(
-      List<Map<String, dynamic>> maps,
-      ) async {
+    List<Map<String, dynamic>> maps,
+  ) async {
     final List<DynamicFormResponse> responses = [];
 
     for (var map in maps) {
@@ -740,11 +731,10 @@ class DynamicFormResponseRepository {
   }
 
   Future<DynamicFormResponse?> _mapToResponseWithDetails(
-      Map<String, dynamic> map,
-      ) async {
+    Map<String, dynamic> map,
+  ) async {
     try {
       if (map['id'] == null) {
-        _logger.e('❌ Response sin ID');
         return null;
       }
 
@@ -765,8 +755,7 @@ class DynamicFormResponseRepository {
         edfVendedorId: map['edf_vendedor_id']?.toString(),
         errorMessage: map['mensaje_error_sync']?.toString(),
       );
-    } catch (e, stackTrace) {
-      _logger.e('❌ Error mapeando response: $e\n$stackTrace');
+    } catch (e) {
       return null;
     }
   }
@@ -806,7 +795,6 @@ class DynamicFormResponseRepository {
     try {
       return DateTime.parse(value.toString());
     } catch (e) {
-      _logger.w('⚠️ Error parseando fecha: $value');
       return null;
     }
   }
@@ -840,12 +828,8 @@ class DynamicFormResponseRepository {
       }
 
       final bytes = await file.readAsBytes();
-      return {
-        'base64': base64Encode(bytes),
-        'tamano': bytes.length,
-      };
+      return {'base64': base64Encode(bytes), 'tamano': bytes.length};
     } catch (e) {
-      _logger.w('⚠️ Error convirtiendo imagen: $e');
       return {'base64': null, 'tamano': null};
     }
   }

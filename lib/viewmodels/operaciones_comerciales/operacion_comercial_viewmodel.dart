@@ -54,8 +54,9 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     this.isViewOnly = false,
     OperacionComercialRepository? operacionRepository,
     ProductoRepository? productoRepository,
-  })  : _operacionRepository = operacionRepository ?? OperacionComercialRepositoryImpl(),
-        _productoRepository = productoRepository ?? ProductoRepositoryImpl() {
+  }) : _operacionRepository =
+           operacionRepository ?? OperacionComercialRepositoryImpl(),
+       _productoRepository = productoRepository ?? ProductoRepositoryImpl() {
     _initializeForm();
   }
 
@@ -70,7 +71,8 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       List.unmodifiable(_productosSeleccionados);
   String get observaciones => _observaciones;
   String get searchQuery => _searchQuery;
-  List<Producto> get productosFiltrados => List.unmodifiable(_productosFiltrados);
+  List<Producto> get productosFiltrados =>
+      List.unmodifiable(_productosFiltrados);
 
   bool get isLoading => _formState == FormState.loading;
   bool get isSaving => _formState == FormState.saving;
@@ -103,9 +105,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   Future<void> _cargarProductosIniciales() async {
     try {
       // Opcional: Cargar productos disponibles
-    } catch (e) {
-      print('Error carga inicial productos: $e');
-    }
+    } catch (e) {}
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -153,9 +153,10 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     }
 
     try {
-      _productosFiltrados = await _productoRepository.buscarProductos(_searchQuery);
+      _productosFiltrados = await _productoRepository.buscarProductos(
+        _searchQuery,
+      );
     } catch (e) {
-      print('Error filtrando productos: $e');
       _productosFiltrados = [];
     }
   }
@@ -166,7 +167,9 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
   bool isProductoSeleccionado(String? codigoProducto) {
     if (codigoProducto == null) return false;
-    return _productosSeleccionados.any((detalle) => detalle.productoCodigo == codigoProducto);
+    return _productosSeleccionados.any(
+      (detalle) => detalle.productoCodigo == codigoProducto,
+    );
   }
 
   void agregarProducto(Producto producto) {
@@ -201,7 +204,9 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       _productosSeleccionados.removeAt(index);
       // Reordenar
       for (int i = 0; i < _productosSeleccionados.length; i++) {
-        _productosSeleccionados[i] = _productosSeleccionados[i].copyWith(orden: i + 1);
+        _productosSeleccionados[i] = _productosSeleccionados[i].copyWith(
+          orden: i + 1,
+        );
       }
       notifyListeners();
     }
@@ -224,9 +229,10 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   // MANEJO DE PRODUCTOS DE REEMPLAZO
   // ═══════════════════════════════════════════════════════════════════
 
-  Future<List<Producto>> obtenerProductosReemplazo(Producto productoOriginal) async {
+  Future<List<Producto>> obtenerProductosReemplazo(
+    Producto productoOriginal,
+  ) async {
     if (productoOriginal.categoria == null) {
-      print('Producto sin categoría: ${productoOriginal.nombre}');
       return [];
     }
 
@@ -236,16 +242,15 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         excluirId: productoOriginal.id,
       );
     } catch (e) {
-      print('Error obteniendo productos de reemplazo: $e');
       return [];
     }
   }
 
   Future<List<Producto>> getProductosReemplazo(
-      String? categoriaOriginal,
-      String? codigoOriginal,
-      int? idProductoActual,
-      ) async {
+    String? categoriaOriginal,
+    String? codigoOriginal,
+    int? idProductoActual,
+  ) async {
     if (categoriaOriginal == null) return [];
 
     try {
@@ -254,7 +259,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         excluirId: idProductoActual,
       );
     } catch (e) {
-      print('Error obteniendo productos de reemplazo: $e');
       return [];
     }
   }
@@ -292,7 +296,9 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
     // 2. Mínimo un producto
     if (_productosSeleccionados.isEmpty) {
-      return ValidationResult.error('⚠️ Debes agregar al menos un producto a la operación');
+      return ValidationResult.error(
+        '⚠️ Debes agregar al menos un producto a la operación',
+      );
     }
 
     // 3. Cantidades válidas
@@ -306,8 +312,9 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
           .map((d) => '• ${d.productoDescripcion}')
           .join('\n');
       return ValidationResult.error(
-          '⚠️ Productos con cantidad 0:\n$nombres' +
-              (productosSinCantidad.length > 3 ? '\n...y más.' : ''));
+        '⚠️ Productos con cantidad 0:\n$nombres' +
+            (productosSinCantidad.length > 3 ? '\n...y más.' : ''),
+      );
     }
 
     // 4. Validación específica para DISCONTINUOS
@@ -322,25 +329,31 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
             .map((d) => '• ${d.productoDescripcion}')
             .join('\n');
         return ValidationResult.error(
-            '⚠️ Debes seleccionar un reemplazo para:\n$nombres');
+          '⚠️ Debes seleccionar un reemplazo para:\n$nombres',
+        );
       }
 
       final categoriasDiferentes = _productosSeleccionados
-          .where((detalle) =>
-      detalle.productoReemplazoId != null &&
-          detalle.productoCategoria != detalle.productoReemplazoCategoria)
+          .where(
+            (detalle) =>
+                detalle.productoReemplazoId != null &&
+                detalle.productoCategoria != detalle.productoReemplazoCategoria,
+          )
           .toList();
 
       if (categoriasDiferentes.isNotEmpty) {
         final detalles = categoriasDiferentes
             .take(2)
-            .map((d) =>
-        '• ${d.productoDescripcion} (${d.productoCategoria}) \n'
-            '   → Intenta reemplazar con (${d.productoReemplazoCategoria})')
+            .map(
+              (d) =>
+                  '• ${d.productoDescripcion} (${d.productoCategoria}) \n'
+                  '   → Intenta reemplazar con (${d.productoReemplazoCategoria})',
+            )
             .join('\n\n');
 
         return ValidationResult.error(
-            '⚠️ Los reemplazos deben ser de la misma categoría:\n\n$detalles');
+          '⚠️ Los reemplazos deben ser de la misma categoría:\n\n$detalles',
+        );
       }
     }
 
@@ -389,7 +402,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       );
 
       if (operacionExistente != null) {
-        await _operacionRepository.actualizarOperacion(operacion);
       } else {
         await _operacionRepository.crearOperacion(operacion);
       }
@@ -399,67 +411,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     } catch (e) {
       _setError('Error al guardar: $e');
       return false;
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // REINTENTO DE SINCRONIZACIÓN
-  // ═══════════════════════════════════════════════════════════════════
-
-  Future<Map<String, dynamic>> reintentarSincronizacion() async {
-    if (operacionExistente?.id == null) {
-      return {
-        'success': false,
-        'message': 'No hay operación para reintentar',
-      };
-    }
-
-    _setFormState(FormState.retrying);
-
-    try {
-      await _operacionRepository.marcarPendienteSincronizacion(operacionExistente!.id!);
-
-      // Reintentar sincronización
-      await _operacionRepository.sincronizarOperacionesPendientes();
-
-      await Future.delayed(const Duration(seconds: 2));
-      final operacionActualizada = await _operacionRepository.obtenerOperacionPorId(
-        operacionExistente!.id!,
-      );
-
-      _setFormState(FormState.idle);
-
-      if (operacionActualizada == null) {
-        return {
-          'success': false,
-          'message': 'No se pudo verificar el estado de la operación',
-        };
-      }
-
-      if (operacionActualizada.syncStatus == 'migrado') {
-        return {
-          'success': true,
-          'message': 'Operación sincronizada correctamente',
-          'operacion': operacionActualizada,
-        };
-      } else if (operacionActualizada.syncStatus == 'error') {
-        return {
-          'success': false,
-          'message': operacionActualizada.syncError ?? 'Error desconocido',
-        };
-      } else {
-        return {
-          'success': false,
-          'message': 'Sincronización en proceso...',
-        };
-      }
-
-    } catch (e) {
-      _setFormState(FormState.idle);
-      return {
-        'success': false,
-        'message': 'Error al reintentar: $e',
-      };
     }
   }
 

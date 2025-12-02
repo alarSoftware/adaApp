@@ -208,7 +208,7 @@ class SyncTablesConfig {
           final operacionCompleta = await repository.obtenerOperacionPorId(operacionId);
 
           if (operacionCompleta != null) {
-            await repository.sincronizarOperacionesPendientes();
+            // await repository.sincronizarOperacionesPendientes();
             final operacionActualizada = await repository.obtenerOperacionPorId(operacionId);
 
             if (operacionActualizada?.syncStatus == 'migrado') {

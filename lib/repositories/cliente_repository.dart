@@ -21,7 +21,14 @@ class ClienteRepository extends BaseRepository<Cliente> {
   @override
   List<dynamic> getBuscarArgs(String query) {
     final searchTerm = '%${query.toLowerCase()}%';
-    return [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm];
+    return [
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+    ];
   }
 
   @override
@@ -31,7 +38,8 @@ class ClienteRepository extends BaseRepository<Cliente> {
   @override
   Future<List<Cliente>> buscar(String query) async {
     try {
-      String sql = '''
+      String sql =
+          '''
         SELECT 
           c.*,
           CASE 
@@ -69,9 +77,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
       final List<Map<String, dynamic>> rows = await db.rawQuery(sql, params);
 
       return rows.map((row) => fromMap(row)).toList();
-
     } catch (e) {
-      logger.e('Error en ${getEntityName()}Repository.buscar: $e');
       throw Exception('Error al buscar ${getEntityName().toLowerCase()}s: $e');
     }
   }
@@ -84,7 +90,8 @@ class ClienteRepository extends BaseRepository<Cliente> {
   @override
   Future<Cliente?> obtenerPorId(dynamic id) async {
     try {
-      final sql = '''
+      final sql =
+          '''
         SELECT 
           c.*,
           CASE 
@@ -114,16 +121,15 @@ class ClienteRepository extends BaseRepository<Cliente> {
       if (result.isEmpty) return null;
 
       return fromMap(result.first);
-
     } catch (e) {
-      logger.e('Error en ${getEntityName()}Repository.obtenerPorId: $e');
       throw Exception('Error al obtener ${getEntityName().toLowerCase()}: $e');
     }
   }
 
   Future<List<Cliente>> obtenerConCensoPendiente() async {
     try {
-      final sql = '''
+      final sql =
+          '''
         SELECT 
           c.*,
           0 as tiene_censo_hoy,
@@ -147,16 +153,15 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
       final result = await consultarPersonalizada(sql);
       return result.map((row) => fromMap(row)).toList();
-
     } catch (e) {
-      logger.e('Error en obtenerConCensoPendiente: $e');
       throw Exception('Error al obtener clientes con censo pendiente: $e');
     }
   }
 
   Future<List<Cliente>> obtenerConFormularioPendiente() async {
     try {
-      final sql = '''
+      final sql =
+          '''
         SELECT 
           c.*,
           CASE 
@@ -181,16 +186,15 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
       final result = await consultarPersonalizada(sql);
       return result.map((row) => fromMap(row)).toList();
-
     } catch (e) {
-      logger.e('Error en obtenerConFormularioPendiente: $e');
       throw Exception('Error al obtener clientes con formulario pendiente: $e');
     }
   }
 
   Future<List<Cliente>> obtenerCompletados() async {
     try {
-      final sql = '''
+      final sql =
+          '''
         SELECT 
           c.*,
           1 as tiene_censo_hoy,
@@ -213,9 +217,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
       final result = await consultarPersonalizada(sql);
       return result.map((row) => fromMap(row)).toList();
-
     } catch (e) {
-      logger.e('Error en obtenerCompletados: $e');
       throw Exception('Error al obtener clientes completados: $e');
     }
   }
@@ -225,7 +227,8 @@ class ClienteRepository extends BaseRepository<Cliente> {
     try {
       final statsBase = await super.obtenerEstadisticas();
 
-      final sql = '''
+      final sql =
+          '''
         SELECT 
           COUNT(*) as total_clientes,
           
@@ -271,11 +274,10 @@ class ClienteRepository extends BaseRepository<Cliente> {
         'conCensoHoy': row['con_censo_hoy'] as int,
         'conFormularioHoy': row['con_formulario_hoy'] as int,
         'completadosHoy': row['completados_hoy'] as int,
-        'pendientesHoy': (row['total_clientes'] as int) - (row['completados_hoy'] as int),
+        'pendientesHoy':
+            (row['total_clientes'] as int) - (row['completados_hoy'] as int),
       };
-
     } catch (e) {
-      logger.e('Error en obtenerEstadisticas: $e');
       throw Exception('Error al obtener estadísticas: $e');
     }
   }
@@ -304,22 +306,18 @@ class ClienteRepository extends BaseRepository<Cliente> {
       final db = await dbHelper.database;
 
       final censoActivo = await db.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='censo_activo'"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='censo_activo'",
       );
 
       final dynamicFormResponse = await db.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='dynamic_form_response'"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='dynamic_form_response'",
       );
 
       final tieneCensoActivo = censoActivo.isNotEmpty;
       final tieneDynamicForm = dynamicFormResponse.isNotEmpty;
 
-      logger.i('Verificación de tablas - CensoActivo: $tieneCensoActivo, DynamicFormResponse: $tieneDynamicForm');
-
       return tieneCensoActivo && tieneDynamicForm;
-
     } catch (e) {
-      logger.e('Error verificando tablas de estado: $e');
       return false;
     }
   }
@@ -329,11 +327,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
     try {
       final tieneTablasEstado = await verificarTablasEstado();
-      if (!tieneTablasEstado) {
-        logger.w('⚠️  Las tablas de estado (censo_activo/dynamic_form_response) no existen aún');
-      }
-    } catch (e) {
-      logger.e('Error en verificación completa: $e');
-    }
+      if (!tieneTablasEstado) {}
+    } catch (e) {}
   }
 }

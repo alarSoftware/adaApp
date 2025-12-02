@@ -1,7 +1,6 @@
 import 'package:ada_app/models/producto.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
-import 'package:logger/logger.dart';
 
 abstract class ProductoRepository {
   /// Obtener todos los productos disponibles
@@ -14,13 +13,18 @@ abstract class ProductoRepository {
   Future<Producto?> obtenerProductoPorCodigo(String codigo);
 
   /// Obtener productos por categoría (para productos de reemplazo)
-  Future<List<Producto>> obtenerProductosPorCategoria(String categoria, {int? excluirId}); // 👈 CAMBIO: usar ID
+  Future<List<Producto>> obtenerProductosPorCategoria(
+    String categoria, {
+    int? excluirId,
+  }); // 👈 CAMBIO: usar ID
 
   /// Obtener total de productos
   Future<int> contarProductos();
 
   /// Guardar productos desde el servidor
-  Future<int> guardarProductosDesdeServidor(List<Map<String, dynamic>> productos);
+  Future<int> guardarProductosDesdeServidor(
+    List<Map<String, dynamic>> productos,
+  );
 
   /// Limpiar todos los productos locales
   Future<void> limpiarProductosLocales();
@@ -28,19 +32,14 @@ abstract class ProductoRepository {
 
 class ProductoRepositoryImpl implements ProductoRepository {
   final DatabaseHelper _dbHelper;
-  static final Logger _logger = Logger();
 
   ProductoRepositoryImpl({DatabaseHelper? dbHelper})
-      : _dbHelper = dbHelper ?? DatabaseHelper();
-
-  Logger get logger => _logger;
+    : _dbHelper = dbHelper ?? DatabaseHelper();
 
 
   @override
   Future<List<Producto>> obtenerProductosDisponibles() async {
     try {
-      _logger.d('🔍 Obteniendo productos disponibles...');
-
       final db = await _dbHelper.database;
 
       final List<Map<String, dynamic>> maps = await db.query(
@@ -49,12 +48,9 @@ class ProductoRepositoryImpl implements ProductoRepository {
       );
 
       final productos = maps.map((map) => Producto.fromMap(map)).toList();
-      _logger.d('✅ ${productos.length} productos disponibles obtenidos');
 
       return productos;
     } catch (e) {
-      _logger.e('❌ Error obteniendo productos disponibles: $e');
-
       await ErrorLogService.logDatabaseError(
         tableName: 'productos',
         operation: 'obtener_disponibles',
@@ -68,13 +64,10 @@ class ProductoRepositoryImpl implements ProductoRepository {
   @override
   Future<List<Producto>> buscarProductos(String searchTerm) async {
     if (searchTerm.isEmpty) {
-      _logger.d('⚠️ Término de búsqueda vacío');
       return [];
     }
 
     try {
-      _logger.d('🔍 Buscando productos con término: "$searchTerm"');
-
       final db = await _dbHelper.database;
       final searchLower = '%${searchTerm.toLowerCase()}%';
 
@@ -91,12 +84,9 @@ class ProductoRepositoryImpl implements ProductoRepository {
       );
 
       final productos = maps.map((map) => Producto.fromMap(map)).toList();
-      _logger.d('✅ ${productos.length} productos encontrados para "$searchTerm"');
 
       return productos;
     } catch (e) {
-      _logger.e('❌ Error buscando productos con término "$searchTerm": $e');
-
       await ErrorLogService.logDatabaseError(
         tableName: 'productos',
         operation: 'buscar_productos',
@@ -110,8 +100,6 @@ class ProductoRepositoryImpl implements ProductoRepository {
   @override
   Future<Producto?> obtenerProductoPorCodigo(String codigo) async {
     try {
-      _logger.d('🔍 Obteniendo producto por código: $codigo');
-
       final db = await _dbHelper.database;
 
       final List<Map<String, dynamic>> maps = await db.query(
@@ -122,17 +110,13 @@ class ProductoRepositoryImpl implements ProductoRepository {
       );
 
       if (maps.isEmpty) {
-        _logger.d('⚠️ Producto con código "$codigo" no encontrado');
         return null;
       }
 
       final producto = Producto.fromMap(maps.first);
-      _logger.d('✅ Producto encontrado: ${producto.displayName}');
 
       return producto;
     } catch (e) {
-      _logger.e('❌ Error obteniendo producto por código $codigo: $e');
-
       await ErrorLogService.logDatabaseError(
         tableName: 'productos',
         operation: 'obtener_por_codigo',
@@ -145,11 +129,9 @@ class ProductoRepositoryImpl implements ProductoRepository {
 
   @override
   Future<List<Producto>> obtenerProductosPorCategoria(
-      String categoria, {
-        int? excluirId, // 👈 CAMBIO: Usar ID en lugar de código
-      }) async {
-    _logger.d('🔍 Obteniendo productos de categoría: $categoria (excluyendo ID: ${excluirId ?? "ninguno"})');
-
+    String categoria, {
+    int? excluirId, // 👈 CAMBIO: Usar ID en lugar de código
+  }) async {
     try {
       final db = await _dbHelper.database;
 
@@ -170,16 +152,14 @@ class ProductoRepositoryImpl implements ProductoRepository {
       );
 
       final productos = maps.map((map) => Producto.fromMap(map)).toList();
-      _logger.d('✅ ${productos.length} productos encontrados en categoría "$categoria"');
 
       return productos;
     } catch (e) {
-      _logger.e('❌ Error obteniendo productos por categoría: $e');
-
       await ErrorLogService.logDatabaseError(
         tableName: 'productos',
         operation: 'obtener_por_categoria',
-        errorMessage: 'Error obteniendo productos de categoría "$categoria": $e',
+        errorMessage:
+            'Error obteniendo productos de categoría "$categoria": $e',
       );
 
       return [];
@@ -189,8 +169,6 @@ class ProductoRepositoryImpl implements ProductoRepository {
   @override
   Future<int> contarProductos() async {
     try {
-      _logger.d('🔍 Contando productos...');
-
       final db = await _dbHelper.database;
 
       final resultado = await db.rawQuery(
@@ -198,12 +176,9 @@ class ProductoRepositoryImpl implements ProductoRepository {
       );
 
       final total = resultado.first['total'] as int? ?? 0;
-      _logger.d('✅ Total de productos: $total');
 
       return total;
     } catch (e) {
-      _logger.e('❌ Error contando productos: $e');
-
       await ErrorLogService.logDatabaseError(
         tableName: 'productos',
         operation: 'contar_productos',
@@ -215,28 +190,24 @@ class ProductoRepositoryImpl implements ProductoRepository {
   }
 
   @override
-  Future<int> guardarProductosDesdeServidor(List<Map<String, dynamic>> productos) async {
+  Future<int> guardarProductosDesdeServidor(
+    List<Map<String, dynamic>> productos,
+  ) async {
     if (productos.isEmpty) {
-      _logger.d('⚠️ No hay productos para guardar');
       return 0;
     }
 
     try {
-      _logger.i('💾 Guardando ${productos.length} productos desde servidor...');
-
       // Usar vaciarEInsertar para reemplazar todos los datos
       await _dbHelper.vaciarEInsertar('productos', productos);
 
-      _logger.i('✅ ${productos.length} productos guardados correctamente');
       return productos.length;
-
     } catch (e) {
-      _logger.e('❌ Error guardando productos desde servidor: $e');
-
       await ErrorLogService.logDatabaseError(
         tableName: 'productos',
         operation: 'guardar_desde_servidor',
-        errorMessage: 'Error guardando ${productos.length} productos desde servidor: $e',
+        errorMessage:
+            'Error guardando ${productos.length} productos desde servidor: $e',
       );
 
       throw Exception('Error guardando productos: $e');
@@ -246,15 +217,9 @@ class ProductoRepositoryImpl implements ProductoRepository {
   @override
   Future<void> limpiarProductosLocales() async {
     try {
-      _logger.i('🗑️ Limpiando productos locales...');
-
       final db = await _dbHelper.database;
       await db.delete('productos');
-
-      _logger.i('✅ Productos locales eliminados');
     } catch (e) {
-      _logger.e('❌ Error limpiando productos locales: $e');
-
       await ErrorLogService.logDatabaseError(
         tableName: 'productos',
         operation: 'limpiar_locales',
@@ -273,7 +238,6 @@ class ProductoRepositoryImpl implements ProductoRepository {
       final producto = await obtenerProductoPorCodigo(codigo);
       return producto != null;
     } catch (e) {
-      _logger.e('❌ Error verificando existencia de producto $codigo: $e');
       return false;
     }
   }
@@ -281,8 +245,6 @@ class ProductoRepositoryImpl implements ProductoRepository {
   /// Obtener producto por código de barras
   Future<Producto?> obtenerProductoPorCodigoBarras(String codigoBarras) async {
     try {
-      _logger.d('🔍 Obteniendo producto por código de barras: $codigoBarras');
-
       final db = await _dbHelper.database;
 
       final List<Map<String, dynamic>> maps = await db.query(
@@ -293,21 +255,18 @@ class ProductoRepositoryImpl implements ProductoRepository {
       );
 
       if (maps.isEmpty) {
-        _logger.d('⚠️ Producto con código de barras "$codigoBarras" no encontrado');
         return null;
       }
 
       final producto = Producto.fromMap(maps.first);
-      _logger.d('✅ Producto encontrado por código de barras: ${producto.displayName}');
 
       return producto;
     } catch (e) {
-      _logger.e('❌ Error obteniendo producto por código de barras $codigoBarras: $e');
-
       await ErrorLogService.logDatabaseError(
         tableName: 'productos',
         operation: 'obtener_por_codigo_barras',
-        errorMessage: 'Error obteniendo producto por código de barras "$codigoBarras": $e',
+        errorMessage:
+            'Error obteniendo producto por código de barras "$codigoBarras": $e',
       );
 
       return null;
@@ -315,12 +274,12 @@ class ProductoRepositoryImpl implements ProductoRepository {
   }
 
   /// Obtener productos por lista de códigos
-  Future<List<Producto>> obtenerProductosPorCodigos(List<String> codigos) async {
+  Future<List<Producto>> obtenerProductosPorCodigos(
+    List<String> codigos,
+  ) async {
     if (codigos.isEmpty) return [];
 
     try {
-      _logger.d('🔍 Obteniendo productos por ${codigos.length} códigos...');
-
       final db = await _dbHelper.database;
       final placeholders = List.filled(codigos.length, '?').join(',');
 
@@ -332,11 +291,9 @@ class ProductoRepositoryImpl implements ProductoRepository {
       );
 
       final productos = maps.map((map) => Producto.fromMap(map)).toList();
-      _logger.d('✅ ${productos.length} productos encontrados');
 
       return productos;
     } catch (e) {
-      _logger.e('❌ Error obteniendo productos por códigos: $e');
       return [];
     }
   }
@@ -344,8 +301,6 @@ class ProductoRepositoryImpl implements ProductoRepository {
   /// Obtener categorías disponibles
   Future<List<String>> obtenerCategorias() async {
     try {
-      _logger.d('🔍 Obteniendo categorías...');
-
       final db = await _dbHelper.database;
 
       final List<Map<String, dynamic>> maps = await db.rawQuery(
@@ -357,11 +312,8 @@ class ProductoRepositoryImpl implements ProductoRepository {
           .where((categoria) => categoria.isNotEmpty)
           .toList();
 
-      _logger.d('✅ ${categorias.length} categorías encontradas');
-
       return categorias;
     } catch (e) {
-      _logger.e('❌ Error obteniendo categorías: $e');
       return [];
     }
   }
@@ -369,8 +321,6 @@ class ProductoRepositoryImpl implements ProductoRepository {
   /// 👈 NUEVO: Obtener producto por ID
   Future<Producto?> obtenerProductoPorId(int id) async {
     try {
-      _logger.d('🔍 Obteniendo producto por ID: $id');
-
       final db = await _dbHelper.database;
 
       final List<Map<String, dynamic>> maps = await db.query(
@@ -381,17 +331,13 @@ class ProductoRepositoryImpl implements ProductoRepository {
       );
 
       if (maps.isEmpty) {
-        _logger.d('⚠️ Producto con ID $id no encontrado');
         return null;
       }
 
       final producto = Producto.fromMap(maps.first);
-      _logger.d('✅ Producto encontrado: ${producto.displayName}');
 
       return producto;
     } catch (e) {
-      _logger.e('❌ Error obteniendo producto por ID $id: $e');
-
       await ErrorLogService.logDatabaseError(
         tableName: 'productos',
         operation: 'obtener_por_id',

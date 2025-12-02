@@ -1,4 +1,5 @@
 import 'package:ada_app/models/operaciones_comerciales/enums/estado_operacion.dart';
+import 'package:ada_app/services/post/operaciones_comerciales_post_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -518,8 +519,10 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
       final repository = OperacionComercialRepositoryImpl();
 
       // Marcar como pendiente y reintentar
-      await repository.marcarPendienteSincronizacion(operacion.id!);
-      await repository.sincronizarOperacionesPendientes();
+      // await repository.marcarPendienteSincronizacion(operacion.id!);
+      // await repository.sincronizarOperacionesPendientes();
+      //TODO ESTOY REINTENTANDO ENVIAR LA OPERACION COMERCIAL AL SERVIDOR
+      await OperacionesComercialesPostService.enviarOperacion(operacion);
 
       if (!mounted) return;
 

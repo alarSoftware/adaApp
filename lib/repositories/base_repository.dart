@@ -1,9 +1,6 @@
 // base_repository.dart - VERSIÓN SIMPLIFICADA SIN CAMPOS DE AUDITORÍA
 import 'package:sqflite/sqflite.dart';
 import '../services/database_helper.dart';
-import 'package:logger/logger.dart';
-
-var logger = Logger();
 
 abstract class BaseRepository<T> {
   final DatabaseHelper dbHelper = DatabaseHelper();
@@ -81,7 +78,12 @@ abstract class BaseRepository<T> {
   /// Actualizar elemento - SIMPLIFICADO
   Future<int> actualizar(T item, int id) async {
     final datos = toMap(item);
-    return await dbHelper.actualizar(tableName, datos, where: 'id = ?', whereArgs: [id]);
+    return await dbHelper.actualizar(
+      tableName,
+      datos,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   /// Consulta personalizada
@@ -99,8 +101,11 @@ abstract class BaseRepository<T> {
   Future<Map<String, dynamic>> obtenerEstadisticas() async {
     final db = await dbHelper.database;
 
-    final total = Sqflite.firstIntValue(await db.rawQuery(
-        'SELECT COUNT(*) FROM $tableName')) ?? 0;
+    final total =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM $tableName'),
+        ) ??
+        0;
 
     return {
       'total${getEntityName()}s': total,
@@ -116,12 +121,9 @@ abstract class BaseRepository<T> {
   Future<void> limpiarYSincronizar(List<dynamic> itemsAPI) async {
     final db = await dbHelper.database;
 
-    logger.i('Iniciando limpiarYSincronizar para $tableName con ${itemsAPI.length} items');
-
     await db.transaction((txn) async {
       // Limpiar tabla completamente
-      final deleted = await txn.delete(tableName);
-      logger.i('Items eliminados de $tableName: $deleted');
+      await txn.delete(tableName);
 
       // Insertar items de la API
       int exitosos = 0;
@@ -137,28 +139,28 @@ abstract class BaseRepository<T> {
             datos = toMap(itemData);
           }
 
-          await txn.insert(tableName, datos, conflictAlgorithm: ConflictAlgorithm.replace);
+          await txn.insert(
+            tableName,
+            datos,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
           exitosos++;
 
           // Log cada 500 inserciones exitosas
           if (exitosos % 500 == 0) {
             logger.i('Procesados: $exitosos de ${itemsAPI.length}');
           }
-
         } catch (e) {
           errores++;
           logger.e('Error insertando item en $tableName: $e');
 
-          if (errores <= 3) { // Solo mostrar los primeros 3 errores
+          if (errores <= 3) {
+            // Solo mostrar los primeros 3 errores
             logger.e('Datos del item con error: $itemData');
           }
         }
       }
-
-      logger.i('Sincronización completa en $tableName: $exitosos exitosos, $errores errores');
     });
-
-    logger.i('Sincronización completa: ${itemsAPI.length} items procesados en $tableName');
   }
 
   /// Método alternativo con nombre más simple
@@ -169,8 +171,6 @@ abstract class BaseRepository<T> {
   /// Método batch insert para mejor performance
   Future<void> insertarLote(List<dynamic> itemsAPI) async {
     final db = await dbHelper.database;
-
-    logger.i('Insertando lote en $tableName: ${itemsAPI.length} items');
 
     await db.transaction((txn) async {
       final batch = txn.batch();
@@ -185,28 +185,31 @@ abstract class BaseRepository<T> {
             datos = toMap(itemData);
           }
 
-          batch.insert(tableName, datos, conflictAlgorithm: ConflictAlgorithm.replace);
-        } catch (e) {
-          logger.e('Error preparando item para lote: $e');
-        }
+          batch.insert(
+            tableName,
+            datos,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        } catch (e) {}
       }
 
       await batch.commit(noResult: true);
-      logger.i('Lote insertado exitosamente en $tableName');
     });
   }
 
   /// Contar registros
   Future<int> contar() async {
     final db = await dbHelper.database;
-    return Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM $tableName')) ?? 0;
+    return Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM $tableName'),
+        ) ??
+        0;
   }
 
   /// Vaciar tabla
   Future<void> vaciar() async {
     final db = await dbHelper.database;
     await db.delete(tableName);
-    logger.i('Tabla $tableName vaciada');
   }
 
   // ════════════════════════════════════════════════════════════════

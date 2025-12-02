@@ -1,10 +1,8 @@
-import 'package:logger/logger.dart';
 import '../models/dynamic_form/dynamic_form_template.dart';
 import '../services/sync/dynamic_form_sync_service.dart';
 import '../services/database_helper.dart';
 
 class DynamicFormTemplateRepository {
-  final Logger _logger = Logger();
   final DatabaseHelper _dbHelper = DatabaseHelper();
 
   String get _tableName => 'dynamic_form';
@@ -29,10 +27,8 @@ class DynamicFormTemplateRepository {
         }
       }
 
-      _logger.i('✅ Templates cargados desde BD: ${templates.length}');
       return templates;
     } catch (e) {
-      _logger.e('❌ Error obteniendo formularios: $e');
       return [];
     }
   }
@@ -51,7 +47,6 @@ class DynamicFormTemplateRepository {
 
       return await _mapToTemplateWithDetails(maps.first);
     } catch (e) {
-      _logger.e('❌ Error obteniendo formulario por ID: $e');
       return null;
     }
   }
@@ -77,7 +72,6 @@ class DynamicFormTemplateRepository {
 
       return templates;
     } catch (e) {
-      _logger.e('❌ Error obteniendo formularios por estado: $e');
       return [];
     }
   }
@@ -85,39 +79,34 @@ class DynamicFormTemplateRepository {
   /// Descargar templates desde el servidor (limpia antes de descargar)
   Future<bool> downloadFromServer() async {
     try {
-      _logger.i('📋 Descargando formularios desde servidor...');
-
       // 1. Limpiar formularios locales primero
-      _logger.i('🗑️ Limpiando formularios locales...');
+
       await _dbHelper.eliminar(_detailTableName);
       await _dbHelper.eliminar(_tableName);
-      _logger.i('✅ Formularios locales eliminados');
 
       // 2. Descargar del servidor
-      final resultado = await DynamicFormSyncService.obtenerFormulariosDinamicos();
+      final resultado =
+          await DynamicFormSyncService.obtenerFormulariosDinamicos();
 
       if (!resultado.exito) {
-        _logger.e('❌ Error: ${resultado.mensaje}');
         return false;
       }
 
-      _logger.i('✅ Formularios descargados: ${resultado.itemsSincronizados}');
       return true;
     } catch (e) {
-      _logger.e('❌ Error: $e');
       return false;
     }
   }
 
   /// Guardar templates desde el servidor
-  Future<int> saveTemplatesFromServer(List<Map<String, dynamic>> templates) async {
+  Future<int> saveTemplatesFromServer(
+    List<Map<String, dynamic>> templates,
+  ) async {
     int saved = 0;
 
     try {
       for (final template in templates) {
         try {
-          _logger.i('📦 Procesando formulario: ${template['id']}');
-
           final formId = template['id'].toString();
           final existing = await _dbHelper.consultar(
             _tableName,
@@ -127,7 +116,6 @@ class DynamicFormTemplateRepository {
           );
 
           if (existing.isNotEmpty) {
-            _logger.i('⏭️ Formulario ya existe - Actualizando');
             await _dbHelper.actualizar(
               _tableName,
               _mapTemplateForDB(template),
@@ -140,21 +128,14 @@ class DynamicFormTemplateRepository {
 
           await _dbHelper.insertar(_tableName, _mapTemplateForDB(template));
           saved++;
-          _logger.i('✅ Formulario insertado: ${template['name']}');
-
-        } catch (e) {
-          _logger.w('⚠️ Error guardando formulario individual: $e');
-        }
+        } catch (e) {}
       }
 
-      _logger.i('✅ Formularios guardados: $saved de ${templates.length}');
       return saved;
     } catch (e) {
-      _logger.e('❌ Error guardando formularios: $e');
       return saved;
     }
   }
-
 
   /// Guardar detalles de templates desde el servidor
   Future<int> saveDetailsFromServer(List<Map<String, dynamic>> details) async {
@@ -175,7 +156,6 @@ class DynamicFormTemplateRepository {
           formId ??= detail['formId']?.toString();
 
           if (formId == null) {
-            _logger.w('⚠️ Detalle sin dynamicFormId: ${detail['id']}');
             continue;
           }
 
@@ -201,15 +181,11 @@ class DynamicFormTemplateRepository {
           }
 
           saved++;
-        } catch (e) {
-          _logger.w('⚠️ Error guardando detalle individual: $e');
-        }
+        } catch (e) {}
       }
 
-      _logger.i('✅ Detalles guardados: $saved de ${details.length}');
       return saved;
     } catch (e) {
-      _logger.e('❌ Error guardando detalles: $e');
       return saved;
     }
   }
@@ -223,16 +199,10 @@ class DynamicFormTemplateRepository {
         whereArgs: [id],
       );
 
-      await _dbHelper.eliminar(
-        _tableName,
-        where: 'id = ?',
-        whereArgs: [id],
-      );
+      await _dbHelper.eliminar(_tableName, where: 'id = ?', whereArgs: [id]);
 
-      _logger.i('✅ Formulario eliminado: $id');
       return true;
     } catch (e) {
-      _logger.e('❌ Error eliminando formulario: $e');
       return false;
     }
   }
@@ -243,7 +213,6 @@ class DynamicFormTemplateRepository {
       final maps = await _dbHelper.consultar(_tableName);
       return maps.length;
     } catch (e) {
-      _logger.e('❌ Error contando formularios: $e');
       return 0;
     }
   }
@@ -251,11 +220,12 @@ class DynamicFormTemplateRepository {
   // ==================== MÉTODOS PRIVADOS DE MAPEO ====================
 
   /// Mapear template de BD a modelo con sus detalles
-  Future<DynamicFormTemplate?> _mapToTemplateWithDetails(Map<String, dynamic> map) async {
+  Future<DynamicFormTemplate?> _mapToTemplateWithDetails(
+    Map<String, dynamic> map,
+  ) async {
     try {
       final formId = map['id']?.toString() ?? '';
       if (formId.isEmpty) {
-        _logger.e('❌ Formulario sin ID');
         return null;
       }
 
@@ -267,7 +237,6 @@ class DynamicFormTemplateRepository {
       );
 
       if (details.isEmpty) {
-        _logger.w('⚠️ Formulario sin detalles: $formId');
         return null;
       }
 
@@ -281,17 +250,19 @@ class DynamicFormTemplateRepository {
         return idA.compareTo(idB);
       });
 
-      _logger.d('✅ ${details.length} detalles ordenados por ID');
-
       // Preparar formJson
       final formJson = {
         'id': int.tryParse(formId) ?? formId,
         'name': map['name']?.toString() ?? 'Sin título',
         'estado': map['estado']?.toString() ?? 'BORRADOR',
         'totalPuntos': map['total_puntos'] ?? 0,
-        'creationDate': map['creation_date']?.toString() ?? DateTime.now().toIso8601String(),
+        'creationDate':
+            map['creation_date']?.toString() ??
+            DateTime.now().toIso8601String(),
         'lastUpdateDate': map['last_update_date']?.toString(),
-        'creationUser': map['creator_user_id'] != null ? {'id': map['creator_user_id']} : null,
+        'creationUser': map['creator_user_id'] != null
+            ? {'id': map['creator_user_id']}
+            : null,
         'lastUpdateUser': map['last_update_user_id'],
       };
 
@@ -307,10 +278,14 @@ class DynamicFormTemplateRepository {
           'id': detalle['id'],
           'type': detalle['type']?.toString() ?? 'text',
           'label': detalle['label']?.toString() ?? 'Sin etiqueta',
-          'parent': detalle['parent_id'] != null ? {'id': detalle['parent_id']} : null,
+          'parent': detalle['parent_id'] != null
+              ? {'id': detalle['parent_id']}
+              : null,
           'sequence': detalle['sequence'],
           'points': detalle['points'] ?? 0,
-          'respuestaCorrectaOpt': _parseBooleanFromDb(detalle['respuesta_correcta_opt']),
+          'respuestaCorrectaOpt': _parseBooleanFromDb(
+            detalle['respuesta_correcta_opt'],
+          ),
           'respuestaCorrectaText': detalle['respuesta_correcta']?.toString(),
           'percentage': detalle['percentage'],
           'dynamicForm': {'id': formId},
@@ -319,8 +294,6 @@ class DynamicFormTemplateRepository {
 
       return DynamicFormTemplate.fromApiJson(formJson, detailsJson);
     } catch (e, stackTrace) {
-      _logger.e('❌ Error mapeando template: $e');
-      _logger.e('Stack trace: $stackTrace');
       return null;
     }
   }
@@ -333,14 +306,18 @@ class DynamicFormTemplateRepository {
       'estado': apiData['estado'],
       'name': apiData['name'],
       'total_puntos': (apiData['totalPuntos'] ?? 0).toInt(),
-      'creation_date': apiData['creationDate'] ?? DateTime.now().toIso8601String(),
+      'creation_date':
+          apiData['creationDate'] ?? DateTime.now().toIso8601String(),
       'creator_user_id': apiData['creationUser']?['id'],
       'last_update_date': apiData['lastUpdateDate'],
     };
   }
 
   /// Mapear detalle para BD
-  Map<String, dynamic> _mapDetailForDB(Map<String, dynamic> apiData, String formId) {
+  Map<String, dynamic> _mapDetailForDB(
+    Map<String, dynamic> apiData,
+    String formId,
+  ) {
     String? parentId;
     if (apiData['parent'] != null) {
       if (apiData['parent'] is Map) {
@@ -353,7 +330,9 @@ class DynamicFormTemplateRepository {
     return {
       'id': apiData['id']?.toString() ?? '',
       'version': apiData['version'] ?? 1,
-      'respuesta_correcta': apiData['respuestaCorrectaText']?.toString() ?? apiData['respuestaCorrecta']?.toString(),
+      'respuesta_correcta':
+          apiData['respuestaCorrectaText']?.toString() ??
+          apiData['respuestaCorrecta']?.toString(),
       'dynamic_form_id': formId,
       'sequence': apiData['sequence'] ?? 0,
       'points': apiData['points'] ?? 0,
