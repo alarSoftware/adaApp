@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:ada_app/models/censo_activo.dart';
 import 'package:logger/logger.dart';
-import 'package:http/http.dart' as http;
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';

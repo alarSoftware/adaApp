@@ -8,7 +8,6 @@ import 'package:ada_app/repositories/cliente_repository.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
-import 'package:ada_app/models/operaciones_comerciales/enums/estado_operacion.dart';
 import 'package:intl/intl.dart';
 
 class OperacionesPendientesDetailScreen extends StatefulWidget {

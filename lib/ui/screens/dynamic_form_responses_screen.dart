@@ -396,31 +396,6 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     );
   }
 
-  Widget _buildErrorMessage(String message) {
-    return Container(
-      margin: EdgeInsets.only(top: 8),
-      padding: EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: AppColors.error.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, size: 12, color: AppColors.error),
-          SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(fontSize: 10, color: AppColors.error),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildStatusBadge(String status) {
     final config = _getStatusConfig(status);
 

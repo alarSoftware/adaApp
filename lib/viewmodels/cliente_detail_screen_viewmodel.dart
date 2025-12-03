@@ -3,11 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:logger/logger.dart';
 import '../models/cliente.dart';
-import '../models/equipos.dart';
 import '../repositories/equipo_repository.dart';
 import '../repositories/equipo_pendiente_repository.dart'; // AGREGAR: Repository para equipos pendientes
 import '../repositories/censo_activo_repository.dart';
-import 'package:ada_app/models/censo_activo.dart';
 
 // ========== EVENTOS PARA LA UI ==========
 abstract class ClienteDetailUIEvent {}

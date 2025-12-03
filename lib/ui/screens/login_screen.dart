@@ -151,8 +151,6 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
   }
 
   void _handleSyncCompleted(SyncCompletedEvent event) {
-    // La navegación al home se maneja con NavigateToHomeEvent
-    // Este método está disponible por si necesitas hacer algo adicional
   }
 
   // ========== ACCIONES DE UI ==========
@@ -255,30 +253,6 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontWeight: FontWeight.w500,
-            fontSize: 14,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildPendingItem(IconData icon, String label, int count) {
     return Padding(
