@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/ui/widgets/client_info_card.dart';
-import 'package:ada_app/models/operaciones_comerciales/enums/estado_operacion.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/ui/screens/operaciones_comerciales/operacion_comercial_form_screen.dart';
@@ -366,24 +365,24 @@ class _OperacionesComercialesMenuViewState
 
                 const SizedBox(width: 16),
 
-                // Info central (SIN EL ID RARO)
+                // Info central
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 1. Chip de Estado (Ahora es lo principal arriba)
+                      // 1. Chip de Estado de Sincronización
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: _getEstadoColor(operacion.estado).withOpacity(0.1),
+                          color: _getSyncStatusColor(operacion.syncStatus).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          operacion.estado.displayName,
+                          operacion.displaySyncStatus,
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: _getEstadoColor(operacion.estado),
+                            color: _getSyncStatusColor(operacion.syncStatus),
                           ),
                         ),
                       ),
@@ -477,12 +476,18 @@ class _OperacionesComercialesMenuViewState
     );
   }
 
-  // Helpers
-  Color _getEstadoColor(dynamic estado) {
-    // Define tus colores según estado aquí
-    if (estado.toString().contains('borrador')) return Colors.grey;
-    if (estado.toString().contains('sincronizado')) return AppColors.success;
-    return AppColors.warning;
+  // Helper para colores de syncStatus
+  Color _getSyncStatusColor(String syncStatus) {
+    switch (syncStatus) {
+      case 'creado':
+        return AppColors.warning; // Amarillo/Naranja para pendiente
+      case 'migrado':
+        return AppColors.success; // Verde para sincronizado
+      case 'error':
+        return AppColors.error; // Rojo para error
+      default:
+        return Colors.grey;
+    }
   }
 
   // Navegación

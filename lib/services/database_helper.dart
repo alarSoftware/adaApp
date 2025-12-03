@@ -84,10 +84,8 @@ class DatabaseHelper {
         limit: limit,
         offset: offset,
       );
-      logger.d('Consulta en $tableName: ${result.length} registros');
       return result;
     } catch (e) {
-      logger.e('Error consultando $tableName: $e');
       rethrow;
     }
   }
@@ -96,10 +94,8 @@ class DatabaseHelper {
     try {
       final db = await database;
       final result = await db.rawQuery(sql, arguments);
-      logger.d('Consulta personalizada: ${result.length} registros encontrados');
       return result;
     } catch (e) {
-      logger.e('Error en consulta personalizada: $e');
       rethrow;
     }
   }

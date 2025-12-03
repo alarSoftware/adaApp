@@ -17,9 +17,9 @@ class OperacionesComercialesPostService {
       '/operacionComercial/insertOperacionComercial';
 
   static Future<void> enviarOperacion(
-    OperacionComercial operacion, {
-    int timeoutSegundos = 60,
-  }) async {
+      OperacionComercial operacion, {
+        int timeoutSegundos = 60,
+      }) async {
     String? fullUrl;
     try {
       if (operacion.id == null || operacion.id!.isEmpty) {
@@ -28,36 +28,42 @@ class OperacionesComercialesPostService {
       if (operacion.detalles.isEmpty) {
         throw Exception('La operación debe tener al menos un detalle');
       }
+
       final payload = _construirPayload(operacion);
       final baseUrl = await ApiConfigService.getBaseUrl();
       final cleanBaseUrl = baseUrl.endsWith('/')
           ? baseUrl.substring(0, baseUrl.length - 1)
           : baseUrl;
       fullUrl = '$cleanBaseUrl$_endpoint';
+
       final response = await http
           .post(
-            Uri.parse(fullUrl),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'ngrok-skip-browser-warning': 'true',
-            },
-            body: jsonEncode(payload),
-          )
+        Uri.parse(fullUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: jsonEncode(payload),
+      )
           .timeout(Duration(seconds: timeoutSegundos));
+
       ServerResponse resultObject = ServerResponse.fromHttp(response);
+
       if (!resultObject.success) {
         if (!resultObject.isDuplicate && resultObject.message != '') {
           throw Exception(resultObject.message);
         }
       }
-      if (resultObject.success || resultObject.isDuplicate) {}
+
+      // Éxito
+      if (resultObject.success || resultObject.isDuplicate) {
+      }
     } catch (e) {
-      //TODO RONALDO ESCALAR ERROR
+      //TODO escalar error
       rethrow;
     }
   }
-
   static Map<String, dynamic> _construirPayload(OperacionComercial operacion) {
     final operacionComercialData = {
       'id': operacion.id,

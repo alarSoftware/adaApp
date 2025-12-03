@@ -24,11 +24,11 @@ class CensoUploadService {
   static const int maxIntentos = 10;
   static const Duration intervaloTimer = Duration(minutes: 1);
 
-  static Timer? _syncTimer;
-  static bool _syncActivo = false;
-  static bool _syncEnProgreso = false;
-  static int? _usuarioActual;
-  static final Set<String> _censosEnProceso = {};
+  // static Timer? _syncTimer;
+  // static bool _syncActivo = false;
+  // static bool _syncEnProgreso = false;
+  // static int? _usuarioActual;
+  // static final Set<String> _censosEnProceso = {};
 
   CensoUploadService({
     CensoActivoRepository? estadoEquipoRepository,
@@ -435,89 +435,82 @@ class CensoUploadService {
     }
   }
 
-  static void iniciarSincronizacionAutomatica(int usuarioId) {
-    if (_syncActivo && _usuarioActual == usuarioId) {
-      Logger().w('Sincronización ya activa para usuario $usuarioId');
-      return;
-    }
+  // static void iniciarSincronizacionAutomatica(int usuarioId) {
+  //   if (_syncActivo && _usuarioActual == usuarioId) {
+  //     Logger().w('Sincronización ya activa para usuario $usuarioId');
+  //     return;
+  //   }
+  //
+  //   detenerSincronizacionAutomatica();
+  //
+  //   _usuarioActual = usuarioId;
+  //   _syncActivo = true;
+  //
+  //   Logger().i(
+  //     'Iniciando sincronización automática cada ${intervaloTimer.inMinutes} min',
+  //   );
+  //
+  //   _syncTimer = Timer.periodic(intervaloTimer, (timer) async {
+  //     await _ejecutarSincronizacionAutomatica();
+  //   });
+  //
+  //   Timer(const Duration(seconds: 15), () async {
+  //     await _ejecutarSincronizacionAutomatica();
+  //   });
+  // }
 
-    detenerSincronizacionAutomatica();
+  // static void detenerSincronizacionAutomatica() {
+  //   if (_syncTimer != null) {
+  //     _syncTimer!.cancel();
+  //     _syncTimer = null;
+  //     _syncActivo = false;
+  //     _syncEnProgreso = false;
+  //     _usuarioActual = null;
+  //     _censosEnProceso.clear();
+  //     Logger().i('Sincronización automática detenida');
+  //   }
+  // }
 
-    _usuarioActual = usuarioId;
-    _syncActivo = true;
+  // static Future<void> _ejecutarSincronizacionAutomatica() async {
+  //   if (_syncEnProgreso || !_syncActivo || _usuarioActual == null) return;
+  //
+  //   _syncEnProgreso = true;
+  //
+  //   try {
+  //     final conexion = await BaseSyncService.testConnection();
+  //     if (!conexion.exito) {
+  //       Logger().w('Sin conexión al servidor: ${conexion.mensaje}');
+  //       return;
+  //     }
+  //
+  //     final service = CensoUploadService();
+  //     final resultado = await service.sincronizarCensosNoMigrados(
+  //       _usuarioActual!,
+  //     );
+  //
+  //     if (resultado['total']! > 0) {
+  //       Logger().i(
+  //         'Auto-sync: ${resultado['censos_exitosos']}/${resultado['total']}',
+  //       );
+  //     }
+  //   } catch (e, stackTrace) {
+  //     Logger().e('Error en auto-sync: $e', stackTrace: stackTrace);
+  //
+  //     await ErrorLogService.manejarExcepcion(
+  //       e,
+  //       null,
+  //       null,
+  //       _usuarioActual,
+  //       'censo_activo',
+  //     );
+  //   } finally {
+  //     _syncEnProgreso = false;
+  //   }
+  // }
 
-    Logger().i(
-      'Iniciando sincronización automática cada ${intervaloTimer.inMinutes} min',
-    );
 
-    _syncTimer = Timer.periodic(intervaloTimer, (timer) async {
-      await _ejecutarSincronizacionAutomatica();
-    });
-
-    Timer(const Duration(seconds: 15), () async {
-      await _ejecutarSincronizacionAutomatica();
-    });
-  }
-
-  static void detenerSincronizacionAutomatica() {
-    if (_syncTimer != null) {
-      _syncTimer!.cancel();
-      _syncTimer = null;
-      _syncActivo = false;
-      _syncEnProgreso = false;
-      _usuarioActual = null;
-      _censosEnProceso.clear();
-      Logger().i('Sincronización automática detenida');
-    }
-  }
-
-  static Future<void> _ejecutarSincronizacionAutomatica() async {
-    if (_syncEnProgreso || !_syncActivo || _usuarioActual == null) return;
-
-    _syncEnProgreso = true;
-
-    try {
-      final conexion = await BaseSyncService.testConnection();
-      if (!conexion.exito) {
-        Logger().w('Sin conexión al servidor: ${conexion.mensaje}');
-        return;
-      }
-
-      final service = CensoUploadService();
-      final resultado = await service.sincronizarCensosNoMigrados(
-        _usuarioActual!,
-      );
-
-      if (resultado['total']! > 0) {
-        Logger().i(
-          'Auto-sync: ${resultado['censos_exitosos']}/${resultado['total']}',
-        );
-      }
-    } catch (e, stackTrace) {
-      Logger().e('Error en auto-sync: $e', stackTrace: stackTrace);
-
-      await ErrorLogService.manejarExcepcion(
-        e,
-        null,
-        null,
-        _usuarioActual,
-        'censo_activo',
-      );
-    } finally {
-      _syncEnProgreso = false;
-    }
-  }
-
-  static Future<Map<String, int>?> forzarSincronizacion() async {
-    if (!_syncActivo || _usuarioActual == null) return null;
-
-    Logger().i('Forzando sincronización...');
-    final service = CensoUploadService();
-    return await service.sincronizarCensosNoMigrados(_usuarioActual!);
-  }
-
-  static bool get esSincronizacionActiva => _syncActivo;
-  static bool get estaEnProgreso => _syncEnProgreso;
+  // static bool get esSincronizacionActiva => _syncActivo;
+  // static bool get estaEnProgreso => _syncEnProgreso;
 
   Future<List<dynamic>> _filtrarRegistrosListosParaReintento(
     List<dynamic> registrosError, [

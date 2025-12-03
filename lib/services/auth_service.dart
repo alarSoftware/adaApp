@@ -348,10 +348,10 @@ class AuthService {
       }
 
       // Sincronización automática de censos
-      if (usuarioEncontrado.id != null) {
-        CensoUploadService.iniciarSincronizacionAutomatica(usuarioEncontrado.id!);
-        OperacionComercialSyncService.iniciarSincronizacionAutomatica(usuarioEncontrado.id!);
-      }
+      // if (usuarioEncontrado.id != null) {
+      //   CensoUploadService.iniciarSincronizacionAutomatica(usuarioEncontrado.id!);
+      //   OperacionComercialSyncService.iniciarSincronizacionAutomatica(usuarioEncontrado.id!);
+      // }
 
       return AuthResult(
         exitoso: true,
@@ -399,10 +399,10 @@ class AuthService {
         }
       }
 
-      if (currentUser.id != null) {
-        CensoUploadService.iniciarSincronizacionAutomatica(currentUser.id!);
-        OperacionComercialSyncService.iniciarSincronizacionAutomatica(currentUser.id!);
-      }
+      // if (currentUser.id != null) {
+      //   CensoUploadService.iniciarSincronizacionAutomatica(currentUser.id!);
+      //   OperacionComercialSyncService.iniciarSincronizacionAutomatica(currentUser.id!);
+      // }
 
       return AuthResult(
         exitoso: true,

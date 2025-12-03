@@ -77,14 +77,14 @@ class AppServices {
       _logger.i('🔄 Iniciando sincronizaciones automáticas (SIN device logging)...');
 
       // Sincronización de Censos (cada 1 minuto)
-      if (usuario.id != null) {
-        CensoUploadService.iniciarSincronizacionAutomatica(usuario.id!);
-        _logger.i('  ✅ Censos: cada 1 minuto');
-      }
+      // if (usuario.id != null) {
+      //   CensoUploadService.iniciarSincronizacionAutomatica(usuario.id!);
+      //   _logger.i('  ✅ Censos: cada 1 minuto');
+      // }
 
       // Sincronización de Formularios Dinámicos (cada 2 minutos)
       if (usuario.edfVendedorId != null && usuario.edfVendedorId!.isNotEmpty) {
-        DynamicFormUploadService.iniciarSincronizacionAutomatica(usuario.edfVendedorId!);
+        // DynamicFormUploadService.iniciarSincronizacionAutomatica(usuario.edfVendedorId!);
         _logger.i('  ✅ Formularios: cada 2 minutos');
       }
 
@@ -124,8 +124,8 @@ class AppServices {
   Future<void> _detenerSincronizacionesAutomaticas() async {
     try {
       // Detener Censos
-      CensoUploadService.detenerSincronizacionAutomatica();
-      OperacionComercialSyncService.detenerSincronizacionAutomatica();
+      // CensoUploadService.detenerSincronizacionAutomatica();
+      // OperacionComercialSyncService.detenerSincronizacionAutomatica();
 
       // Detener Formularios
       DynamicFormUploadService.detenerSincronizacionAutomatica();
@@ -187,7 +187,7 @@ class AppServices {
       return {
         'usuario_logueado': _isUserLoggedIn,
         'extension_activa': DeviceLogBackgroundExtension.estaActivo,
-        'censo_sync_activo': CensoUploadService.esSincronizacionActiva,
+        // 'censo_sync_activo': CensoUploadService.esSincronizacionActiva,
         'formularios_sync_activo': DynamicFormUploadService.esSincronizacionActiva,
         'device_logs_sync_activo': DeviceLogUploadService.esSincronizacionActiva,
         // ✅ Agregar campos del background state individualmente
@@ -241,7 +241,7 @@ class AppServices {
   Future<Map<String, int>?> forzarSincronizacionCensos() async {
     try {
       _logger.i('⚡ Forzando sincronización de censos...');
-      return await CensoUploadService.forzarSincronizacion();
+      // return await CensoUploadService.forzarSincronizacion();
     } catch (e) {
       _logger.e('Error forzando sync de censos: $e');
       return null;

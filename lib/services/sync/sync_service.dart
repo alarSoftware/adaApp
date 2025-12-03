@@ -12,9 +12,6 @@ import 'package:ada_app/services/database_validation_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:sqflite/sqflite.dart';
 import '../database_helper.dart';
-import 'package:logger/logger.dart';
-
-final logger = Logger();
 
 class SyncService {
   static final _clienteRepo = ClienteRepository();

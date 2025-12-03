@@ -1,4 +1,3 @@
-import 'package:ada_app/models/operaciones_comerciales/enums/estado_operacion.dart';
 import 'package:ada_app/services/post/operaciones_comerciales_post_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -65,8 +64,10 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
   Widget build(BuildContext context) {
     return Consumer<vm.OperacionComercialFormViewModel>(
       builder: (context, viewModel, child) {
-        // 👇 Verificar si tiene error para mostrar botón de reintentar
+        // ✅ CORREGIDO: Verificar si tiene error O está pendiente
         final tieneError = viewModel.operacionExistente?.tieneError ?? false;
+        final estaPendiente = viewModel.operacionExistente?.estaPendiente ?? false;
+        final necesitaReintento = tieneError || estaPendiente;
 
         return PopScope(
           canPop: viewModel.isViewOnly || !viewModel.isFormDirty,
@@ -166,8 +167,8 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                   ),
                 ),
 
-                // 👇 CAMBIO: Mostrar botón de reintentar si hay error, sino el botón normal
-                if (!viewModel.isViewOnly || tieneError)
+                // ✅ CORREGIDO: Mostrar botón de reintentar si necesita reintento O si no es viewOnly
+                if (!viewModel.isViewOnly || necesitaReintento)
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -179,7 +180,7 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                         ),
                       ],
                     ),
-                    child: tieneError
+                    child: necesitaReintento
                         ? _buildRetryButton(viewModel)
                         : BottomBarWidget(
                       totalProductos: viewModel.totalProductos,
@@ -518,47 +519,34 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     try {
       final repository = OperacionComercialRepositoryImpl();
 
-      // Marcar como pendiente y reintentar
-      // await repository.marcarPendienteSincronizacion(operacion.id!);
-      // await repository.sincronizarOperacionesPendientes();
-      //TODO ESTOY REINTENTANDO ENVIAR LA OPERACION COMERCIAL AL SERVIDOR
+      // Reintentar envío
       await OperacionesComercialesPostService.enviarOperacion(operacion);
 
-      if (!mounted) return;
-
-      // Esperar un momento para que se complete la sincronización
-      await Future.delayed(const Duration(seconds: 2));
-
-      // Verificar el resultado
-      final operacionActualizada = await repository.obtenerOperacionPorId(operacion.id!);
+      // Éxito - marcar como migrado
+      await repository.marcarComoMigrado(operacion.id!, null);
 
       if (!mounted) return;
 
-      if (operacionActualizada?.syncStatus == 'migrado') {
-        AppNotification.show(
-          context,
-          message: 'Operación sincronizada correctamente',
-          type: NotificationType.success,
-        );
-        Navigator.pop(context, true);
-      } else if (operacionActualizada?.syncStatus == 'error') {
-        AppNotification.show(
-          context,
-          message: 'Error al sincronizar: ${operacionActualizada?.syncError ?? "Error desconocido"}',
-          type: NotificationType.error,
-        );
-      } else {
-        AppNotification.show(
-          context,
-          message: 'Sincronización en proceso...',
-          type: NotificationType.info,
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
       AppNotification.show(
         context,
-        message: 'Error al reintentar: $e',
+        message: 'Operación sincronizada correctamente',
+        type: NotificationType.success,
+      );
+      Navigator.pop(context, true);
+
+    } catch (e) {
+      if (!mounted) return;
+
+      // Error - actualizar mensaje
+      final repository = OperacionComercialRepositoryImpl();
+      await repository.marcarComoError(
+        operacion.id!,
+        e.toString().replaceAll('Exception: ', ''),
+      );
+
+      AppNotification.show(
+        context,
+        message: 'Error al reintentar: ${e.toString().replaceAll('Exception: ', '')}',
         type: NotificationType.error,
       );
     } finally {

@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/models/producto.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
-import 'package:ada_app/models/operaciones_comerciales/enums/estado_operacion.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
 import 'package:ada_app/services/post/operaciones_comerciales_post_service.dart';
@@ -55,8 +54,8 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     OperacionComercialRepository? operacionRepository,
     ProductoRepository? productoRepository,
   }) : _operacionRepository =
-           operacionRepository ?? OperacionComercialRepositoryImpl(),
-       _productoRepository = productoRepository ?? ProductoRepositoryImpl() {
+      operacionRepository ?? OperacionComercialRepositoryImpl(),
+        _productoRepository = productoRepository ?? ProductoRepositoryImpl() {
     _initializeForm();
   }
 
@@ -168,7 +167,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   bool isProductoSeleccionado(String? codigoProducto) {
     if (codigoProducto == null) return false;
     return _productosSeleccionados.any(
-      (detalle) => detalle.productoCodigo == codigoProducto,
+          (detalle) => detalle.productoCodigo == codigoProducto,
     );
   }
 
@@ -230,8 +229,8 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   // ═══════════════════════════════════════════════════════════════════
 
   Future<List<Producto>> obtenerProductosReemplazo(
-    Producto productoOriginal,
-  ) async {
+      Producto productoOriginal,
+      ) async {
     if (productoOriginal.categoria == null) {
       return [];
     }
@@ -247,10 +246,10 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   }
 
   Future<List<Producto>> getProductosReemplazo(
-    String? categoriaOriginal,
-    String? codigoOriginal,
-    int? idProductoActual,
-  ) async {
+      String? categoriaOriginal,
+      String? codigoOriginal,
+      int? idProductoActual,
+      ) async {
     if (categoriaOriginal == null) return [];
 
     try {
@@ -336,9 +335,9 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       final categoriasDiferentes = _productosSeleccionados
           .where(
             (detalle) =>
-                detalle.productoReemplazoId != null &&
-                detalle.productoCategoria != detalle.productoReemplazoCategoria,
-          )
+        detalle.productoReemplazoId != null &&
+            detalle.productoCategoria != detalle.productoReemplazoCategoria,
+      )
           .toList();
 
       if (categoriasDiferentes.isNotEmpty) {
@@ -346,9 +345,9 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
             .take(2)
             .map(
               (d) =>
-                  '• ${d.productoDescripcion} (${d.productoCategoria}) \n'
-                  '   → Intenta reemplazar con (${d.productoReemplazoCategoria})',
-            )
+          '• ${d.productoDescripcion} (${d.productoCategoria}) \n'
+              '   → Intenta reemplazar con (${d.productoReemplazoCategoria})',
+        )
             .join('\n\n');
 
         return ValidationResult.error(
@@ -393,19 +392,13 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         tipoOperacion: tipoOperacion,
         fechaCreacion: operacionExistente?.fechaCreacion ?? DateTime.now(),
         fechaRetiro: _fechaRetiro,
-        estado: EstadoOperacion.borrador,
         observaciones: _observaciones.isEmpty ? null : _observaciones,
         totalProductos: _productosSeleccionados.length,
         usuarioId: 1,
         syncStatus: 'creado',
         detalles: _productosSeleccionados,
       );
-
-      if (operacionExistente != null) {
-      } else {
-        await _operacionRepository.crearOperacion(operacion);
-      }
-
+      await _operacionRepository.crearOperacion(operacion);
       _setFormState(FormState.idle);
       return true;
     } catch (e) {

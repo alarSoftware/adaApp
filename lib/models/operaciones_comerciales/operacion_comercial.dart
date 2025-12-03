@@ -1,7 +1,5 @@
-// lib/models/operaciones_comerciales/operacion_comercial.dart
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
-import 'package:ada_app/models/operaciones_comerciales/enums/estado_operacion.dart';
 
 class OperacionComercial {
   final String? id;
@@ -9,7 +7,6 @@ class OperacionComercial {
   final TipoOperacion tipoOperacion;
   final DateTime fechaCreacion;
   final DateTime? fechaRetiro;
-  final EstadoOperacion estado;
   final String? observaciones;
   final int totalProductos;
   final int? usuarioId;
@@ -17,9 +14,8 @@ class OperacionComercial {
   final String syncStatus;
   final String? syncError;
   final DateTime? syncedAt;
-  final int syncRetryCount; // 🆕 NUEVO CAMPO
+  final int syncRetryCount;
 
-  // ✅ CAMPO CALCULADO - NO VA A LA BASE DE DATOS
   final List<OperacionComercialDetalle> detalles;
 
   const OperacionComercial({
@@ -28,7 +24,6 @@ class OperacionComercial {
     required this.tipoOperacion,
     required this.fechaCreacion,
     this.fechaRetiro,
-    this.estado = EstadoOperacion.borrador,
     this.observaciones,
     this.totalProductos = 0,
     this.usuarioId,
@@ -36,7 +31,7 @@ class OperacionComercial {
     this.syncStatus = 'creado',
     this.syncError,
     this.syncedAt,
-    this.syncRetryCount = 0, // 🆕 NUEVO CAMPO
+    this.syncRetryCount = 0,
     this.detalles = const [],
   });
 
@@ -51,7 +46,6 @@ class OperacionComercial {
       fechaRetiro: map['fecha_retiro'] != null
           ? DateTime.parse(map['fecha_retiro'] as String)
           : null,
-      estado: EstadoOperacionExtension.fromString(map['estado'] as String?),
       observaciones: map['observaciones'] as String?,
       totalProductos: map['total_productos'] as int? ?? 0,
       usuarioId: map['usuario_id'] as int?,
@@ -61,7 +55,7 @@ class OperacionComercial {
       syncedAt: map['synced_at'] != null
           ? DateTime.parse(map['synced_at'] as String)
           : null,
-      syncRetryCount: map['sync_retry_count'] as int? ?? 0, // 🆕 NUEVO CAMPO
+      syncRetryCount: map['sync_retry_count'] as int? ?? 0,
     );
   }
 
@@ -72,7 +66,6 @@ class OperacionComercial {
       'tipo_operacion': tipoOperacion.valor,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_retiro': fechaRetiro?.toIso8601String(),
-      'estado': estado.valor,
       'observaciones': observaciones,
       'total_productos': totalProductos,
       'usuario_id': usuarioId,
@@ -80,7 +73,7 @@ class OperacionComercial {
       'sync_status': syncStatus,
       'sync_error': syncError,
       'synced_at': syncedAt?.toIso8601String(),
-      'sync_retry_count': syncRetryCount, // 🆕 NUEVO CAMPO
+      'sync_retry_count': syncRetryCount,
     };
   }
 
@@ -91,7 +84,6 @@ class OperacionComercial {
       'tipo_operacion': tipoOperacion.valor,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_retiro': fechaRetiro?.toIso8601String(),
-      'estado': estado.valor,
       'observaciones': observaciones,
       'detalles': detalles.map((d) => d.toJson()).toList(),
     };
@@ -103,7 +95,6 @@ class OperacionComercial {
     TipoOperacion? tipoOperacion,
     DateTime? fechaCreacion,
     DateTime? fechaRetiro,
-    EstadoOperacion? estado,
     String? observaciones,
     int? totalProductos,
     int? usuarioId,
@@ -111,7 +102,7 @@ class OperacionComercial {
     String? syncStatus,
     String? syncError,
     DateTime? syncedAt,
-    int? syncRetryCount, // 🆕 NUEVO CAMPO
+    int? syncRetryCount,
     List<OperacionComercialDetalle>? detalles,
   }) {
     return OperacionComercial(
@@ -120,7 +111,6 @@ class OperacionComercial {
       tipoOperacion: tipoOperacion ?? this.tipoOperacion,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       fechaRetiro: fechaRetiro ?? this.fechaRetiro,
-      estado: estado ?? this.estado,
       observaciones: observaciones ?? this.observaciones,
       totalProductos: totalProductos ?? this.totalProductos,
       usuarioId: usuarioId ?? this.usuarioId,
@@ -128,24 +118,21 @@ class OperacionComercial {
       syncStatus: syncStatus ?? this.syncStatus,
       syncError: syncError ?? this.syncError,
       syncedAt: syncedAt ?? this.syncedAt,
-      syncRetryCount: syncRetryCount ?? this.syncRetryCount, // 🆕 NUEVO CAMPO
+      syncRetryCount: syncRetryCount ?? this.syncRetryCount,
       detalles: detalles ?? this.detalles,
     );
   }
 
-  // Getters útiles
-  bool get esBorrador => estado == EstadoOperacion.borrador;
-  bool get estaPendiente => estado == EstadoOperacion.pendiente;
-  bool get fueEnviado => estado == EstadoOperacion.enviado;
+  // Getters útiles basados en syncStatus
   bool get estaSincronizado => syncStatus == 'migrado';
   bool get tieneError => syncStatus == 'error';
+  bool get estaPendiente => syncStatus == 'creado';
   bool get tieneDetalles => detalles.isNotEmpty;
   bool get necesitaFechaRetiro =>
       tipoOperacion == TipoOperacion.notaRetiro ||
           tipoOperacion == TipoOperacion.notaRetiroDiscontinuos;
 
   String get displayTipo => tipoOperacion.displayName;
-  String get displayEstado => estado.displayName;
   String get displaySyncStatus {
     switch (syncStatus) {
       case 'creado':
@@ -173,6 +160,6 @@ class OperacionComercial {
 
   @override
   String toString() {
-    return 'OperacionComercial{id: $id, tipo: ${tipoOperacion.valor}, cliente: $clienteId, estado: ${estado.valor}, detalles: ${detalles.length}, sync: $syncStatus, retries: $syncRetryCount}';
+    return 'OperacionComercial{id: $id, tipo: ${tipoOperacion.valor}, cliente: $clienteId, detalles: ${detalles.length}, sync: $syncStatus, retries: $syncRetryCount}';
   }
 }

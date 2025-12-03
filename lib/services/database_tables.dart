@@ -295,7 +295,6 @@ class DatabaseTables {
     tipo_operacion TEXT NOT NULL,
     fecha_creacion TEXT NOT NULL,
     fecha_retiro TEXT,
-    estado TEXT DEFAULT 'borrador',
     observaciones TEXT,
     total_productos INTEGER DEFAULT 0,
     usuario_id INTEGER,
@@ -493,7 +492,6 @@ class DatabaseTables {
       // Índices para operacion_comercial
       'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_cliente_id ON operacion_comercial (cliente_id)',
       'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_tipo ON operacion_comercial (tipo_operacion)',
-      'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_estado ON operacion_comercial (estado)',
       'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_sync_status ON operacion_comercial (sync_status)',
       'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_fecha_creacion ON operacion_comercial (fecha_creacion)',
       'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_usuario_id ON operacion_comercial (usuario_id)',

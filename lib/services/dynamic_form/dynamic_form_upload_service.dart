@@ -311,28 +311,28 @@ class DynamicFormUploadService {
 
   // ==================== SINCRONIZACIÓN AUTOMÁTICA ====================
 
-  static void iniciarSincronizacionAutomatica(String usuarioId) {
-    if (_syncActivo) {
-      Logger().i('⚠️ Sincronización de formularios ya está activa');
-      return;
-    }
-
-    _usuarioActual = usuarioId;
-    _syncActivo = true;
-
-    Logger().i(
-      '🚀 Iniciando sincronización automática de formularios cada 2 minutos...',
-    );
-
-    _syncTimer = Timer.periodic(Duration(minutes: 2), (timer) async {
-      await _ejecutarSincronizacionAutomatica();
-    });
-
-    // Primera ejecución después de 30 segundos
-    Timer(Duration(seconds: 30), () async {
-      await _ejecutarSincronizacionAutomatica();
-    });
-  }
+  // static void iniciarSincronizacionAutomatica(String usuarioId) {
+  //   if (_syncActivo) {
+  //     Logger().i('⚠️ Sincronización de formularios ya está activa');
+  //     return;
+  //   }
+  //
+  //   _usuarioActual = usuarioId;
+  //   _syncActivo = true;
+  //
+  //   Logger().i(
+  //     '🚀 Iniciando sincronización automática de formularios cada 2 minutos...',
+  //   );
+  //
+  //   _syncTimer = Timer.periodic(Duration(minutes: 2), (timer) async {
+  //     await _ejecutarSincronizacionAutomatica();
+  //   });
+  //
+  //   // Primera ejecución después de 30 segundos
+  //   Timer(Duration(seconds: 30), () async {
+  //     await _ejecutarSincronizacionAutomatica();
+  //   });
+  // }
 
   static void detenerSincronizacionAutomatica() {
     if (_syncTimer != null) {
@@ -344,36 +344,36 @@ class DynamicFormUploadService {
     }
   }
 
-  static Future<void> _ejecutarSincronizacionAutomatica() async {
-    if (!_syncActivo || _usuarioActual == null) return;
-
-    try {
-      final logger = Logger();
-      logger.i('🔄 Ejecutando sincronización automática de formularios...');
-
-      final service = DynamicFormUploadService();
-      final resultado = await service.sincronizarRespuestasPendientes(
-        _usuarioActual!,
-      );
-
-      if (resultado['total']! > 0) {
-        logger.i(
-          '✅ Auto-sync formularios: ${resultado['exitosos']}/${resultado['total']}',
-        );
-      }
-    } catch (e) {
-      Logger().e('❌ Error en auto-sync formularios: $e');
-
-      // 🚨 LOG: Error en auto-sync
-      // await ErrorLogService.logError(
-      //   tableName: 'dynamic_form_response',
-      //   operation: 'auto_sync',
-      //   errorMessage: 'Error en sincronización automática: $e',
-      //   errorType: 'auto_sync',
-      //   userId: _usuarioActual,
-      // );
-    }
-  }
+  // static Future<void> _ejecutarSincronizacionAutomatica() async {
+  //   if (!_syncActivo || _usuarioActual == null) return;
+  //
+  //   try {
+  //     final logger = Logger();
+  //     logger.i('🔄 Ejecutando sincronización automática de formularios...');
+  //
+  //     final service = DynamicFormUploadService();
+  //     final resultado = await service.sincronizarRespuestasPendientes(
+  //       _usuarioActual!,
+  //     );
+  //
+  //     if (resultado['total']! > 0) {
+  //       logger.i(
+  //         '✅ Auto-sync formularios: ${resultado['exitosos']}/${resultado['total']}',
+  //       );
+  //     }
+  //   } catch (e) {
+  //     Logger().e('❌ Error en auto-sync formularios: $e');
+  //
+  //     // 🚨 LOG: Error en auto-sync
+  //     // await ErrorLogService.logError(
+  //     //   tableName: 'dynamic_form_response',
+  //     //   operation: 'auto_sync',
+  //     //   errorMessage: 'Error en sincronización automática: $e',
+  //     //   errorType: 'auto_sync',
+  //     //   userId: _usuarioActual,
+  //     // );
+  //   }
+  // }
 
   static bool get esSincronizacionActiva => _syncActivo;
   static String? get usuarioActualSync => _usuarioActual;

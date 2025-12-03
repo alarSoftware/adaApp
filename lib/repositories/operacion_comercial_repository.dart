@@ -1,33 +1,29 @@
-// lib/repositories/operacion_comercial_repository.dart
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
-import 'package:ada_app/models/operaciones_comerciales/enums/estado_operacion.dart';
 import 'package:ada_app/services/post/operaciones_comerciales_post_service.dart';
 import 'base_repository.dart';
 
 import 'package:uuid/uuid.dart';
 
-/// Interface para el repository de operaciones comerciales
 abstract class OperacionComercialRepository {
   Future<String> crearOperacion(OperacionComercial operacion);
 
   Future<OperacionComercial?> obtenerOperacionPorId(String id);
   Future<List<OperacionComercial>> obtenerOperacionesPorCliente(int clienteId);
   Future<List<OperacionComercial>> obtenerOperacionesPorTipo(
-    TipoOperacion tipo,
-  );
+      TipoOperacion tipo,
+      );
   Future<List<OperacionComercial>> obtenerOperacionesPorClienteYTipo(
-    int clienteId,
-    TipoOperacion tipo,
-  );
+      int clienteId,
+      TipoOperacion tipo,
+      );
   Future<void> eliminarOperacion(String id);
 
   Future<void> marcarPendienteSincronizacion(String operacionId);
   Future<List<OperacionComercial>> obtenerOperacionesPendientes();
 }
 
-/// Implementación usando BaseRepository
 class OperacionComercialRepositoryImpl
     extends BaseRepository<OperacionComercial>
     implements OperacionComercialRepository {
@@ -61,21 +57,21 @@ class OperacionComercialRepositoryImpl
 
   @override
   Future<String> crearOperacion(OperacionComercial operacion) async {
+    String? operacionId;
     try {
-      final operacionId = operacion.id ?? _uuid.v4();
+      operacionId = operacion.id ?? _uuid.v4();
       final now = DateTime.now();
 
       final operacionConId = operacion.copyWith(
         id: operacionId,
         fechaCreacion: now,
-        estado: EstadoOperacion.borrador,
         syncStatus: 'creado',
         totalProductos: operacion.detalles.length,
       );
 
       final db = await dbHelper.database;
-
       await db.transaction((txn) async {
+
         await txn.insert(tableName, operacionConId.toMap());
 
         for (int i = 0; i < operacion.detalles.length; i++) {
@@ -89,10 +85,17 @@ class OperacionComercialRepositoryImpl
           await txn.insert('operacion_comercial_detalle', detalle.toMap());
         }
       });
-
       await marcarPendienteSincronizacion(operacionId);
-      //TODO ESTOY CREANDO INSERTANDO Y ENVIANDO AL SERVIDOR
-      await OperacionesComercialesPostService.enviarOperacion(operacion);
+
+      try {
+        await OperacionesComercialesPostService.enviarOperacion(operacionConId);
+        await marcarComoMigrado(operacionId, null);
+      } catch (syncError) {
+        await marcarComoError(
+          operacionId,
+          syncError.toString().replaceAll('Exception: ', ''),
+        );
+      }
 
       return operacionId;
     } catch (e) {
@@ -132,8 +135,8 @@ class OperacionComercialRepositoryImpl
 
   @override
   Future<List<OperacionComercial>> obtenerOperacionesPorCliente(
-    int clienteId,
-  ) async {
+      int clienteId,
+      ) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -170,8 +173,8 @@ class OperacionComercialRepositoryImpl
 
   @override
   Future<List<OperacionComercial>> obtenerOperacionesPorTipo(
-    TipoOperacion tipo,
-  ) async {
+      TipoOperacion tipo,
+      ) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -188,9 +191,9 @@ class OperacionComercialRepositoryImpl
 
   @override
   Future<List<OperacionComercial>> obtenerOperacionesPorClienteYTipo(
-    int clienteId,
-    TipoOperacion tipo,
-  ) async {
+      int clienteId,
+      TipoOperacion tipo,
+      ) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -255,7 +258,6 @@ class OperacionComercialRepositoryImpl
         tableName,
         {
           'sync_status': 'creado',
-          'estado': EstadoOperacion.pendiente.valor,
           'sync_error': null,
         },
         where: 'id = ?',
@@ -286,27 +288,6 @@ class OperacionComercialRepositoryImpl
   // MÉTODOS ESPECÍFICOS
   // ═══════════════════════════════════════════════════════════════════
 
-  Future<List<OperacionComercial>> obtenerOperacionesPorEstado(
-    EstadoOperacion estado,
-  ) async {
-    try {
-      final operacionesMaps = await dbHelper.consultar(
-        tableName,
-        where: 'estado = ?',
-        whereArgs: [estado.valor],
-        orderBy: getDefaultOrderBy(),
-      );
-
-      return operacionesMaps.map((map) => fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
-  Future<List<OperacionComercial>> obtenerBorradores() async {
-    return await obtenerOperacionesPorEstado(EstadoOperacion.borrador);
-  }
-
   Future<List<OperacionComercial>> obtenerOperacionesConError() async {
     try {
       final operacionesMaps = await dbHelper.consultar(
@@ -319,22 +300,6 @@ class OperacionComercialRepositoryImpl
       return operacionesMaps.map((map) => fromMap(map)).toList();
     } catch (e) {
       return [];
-    }
-  }
-
-  Future<void> actualizarEstado(
-    String operacionId,
-    EstadoOperacion nuevoEstado,
-  ) async {
-    try {
-      await dbHelper.actualizar(
-        tableName,
-        {'estado': nuevoEstado.valor},
-        where: 'id = ?',
-        whereArgs: [operacionId],
-      );
-    } catch (e) {
-      rethrow;
     }
   }
 
@@ -368,9 +333,9 @@ class OperacionComercialRepositoryImpl
 
   /// Actualiza el contador de intentos de sincronización
   Future<void> actualizarIntentoSync(
-    String operacionId,
-    int numeroIntento,
-  ) async {
+      String operacionId,
+      int numeroIntento,
+      ) async {
     try {
       await dbHelper.actualizar(
         tableName,
@@ -413,43 +378,6 @@ class OperacionComercialRepositoryImpl
       );
     } catch (e) {
       rethrow;
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // ESTADÍSTICAS
-  // ═══════════════════════════════════════════════════════════════════
-
-  Future<Map<String, dynamic>> obtenerEstadisticasCompletas() async {
-    try {
-      final stats = await obtenerEstadisticas();
-
-      final pendientes = await obtenerOperacionesPendientes();
-      final conError = await obtenerOperacionesConError();
-      final borradores = await obtenerBorradores();
-
-      final porTipo = <String, int>{};
-      for (final tipo in TipoOperacion.values) {
-        final operaciones = await obtenerOperacionesPorTipo(tipo);
-        porTipo[tipo.displayName] = operaciones.length;
-      }
-
-      final porEstado = <String, int>{};
-      for (final estado in EstadoOperacion.values) {
-        final operaciones = await obtenerOperacionesPorEstado(estado);
-        porEstado[estado.displayName] = operaciones.length;
-      }
-
-      return {
-        ...stats,
-        'operaciones_pendientes': pendientes.length,
-        'operaciones_error': conError.length,
-        'borradores': borradores.length,
-        'por_tipo': porTipo,
-        'por_estado': porEstado,
-      };
-    } catch (e) {
-      return {};
     }
   }
 }
