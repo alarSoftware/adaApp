@@ -34,12 +34,13 @@ class ClienteRepository extends BaseRepository<Cliente> {
   @override
   String getEntityName() => 'Cliente';
 
-  // ✅ VERSIÓN CORREGIDA - Aparece con CUALQUIER estado en censo_activo
-  @override
-  Future<List<Cliente>> buscar(String query) async {
+  // MÉTODO PRINCIPAL CON FILTROS COMBINADOS
+  Future<List<Cliente>> buscarConFiltros({
+    String? query,
+    String? rutaDia,
+  }) async {
     try {
-      String sql =
-          '''
+      String sql = '''
         SELECT 
           c.*,
           CASE 
@@ -50,7 +51,6 @@ class ClienteRepository extends BaseRepository<Cliente> {
             ) THEN 1 ELSE 0 
           END as tiene_censo_hoy,
           
-          -- ✅ Formulario completado HOY
           CASE 
             WHEN EXISTS(
               SELECT 1 FROM dynamic_form_response 
@@ -66,7 +66,14 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
       final List<dynamic> params = [];
 
-      if (query.trim().isNotEmpty) {
+      // Filtro por día de ruta
+      if (rutaDia != null && rutaDia.isNotEmpty) {
+        sql += ' AND c.ruta_dia = ?';
+        params.add(rutaDia);
+      }
+
+      // Filtro por búsqueda
+      if (query != null && query.trim().isNotEmpty) {
         sql += ' AND (${getBuscarWhere()})';
         params.addAll(getBuscarArgs(query));
       }
@@ -76,6 +83,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
       final db = await dbHelper.database;
       final List<Map<String, dynamic>> rows = await db.rawQuery(sql, params);
 
+
       return rows.map((row) => fromMap(row)).toList();
     } catch (e) {
       throw Exception('Error al buscar ${getEntityName().toLowerCase()}s: $e');
@@ -83,15 +91,19 @@ class ClienteRepository extends BaseRepository<Cliente> {
   }
 
   @override
+  Future<List<Cliente>> buscar(String query) async {
+    return await buscarConFiltros(query: query);
+  }
+
+  @override
   Future<List<Cliente>> obtenerTodos() async {
-    return await buscar('');
+    return await buscarConFiltros();
   }
 
   @override
   Future<Cliente?> obtenerPorId(dynamic id) async {
     try {
-      final sql =
-          '''
+      final sql = '''
         SELECT 
           c.*,
           CASE 
@@ -128,8 +140,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
   Future<List<Cliente>> obtenerConCensoPendiente() async {
     try {
-      final sql =
-          '''
+      final sql = '''
         SELECT 
           c.*,
           0 as tiene_censo_hoy,
@@ -160,8 +171,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
   Future<List<Cliente>> obtenerConFormularioPendiente() async {
     try {
-      final sql =
-          '''
+      final sql = '''
         SELECT 
           c.*,
           CASE 
@@ -193,8 +203,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
   Future<List<Cliente>> obtenerCompletados() async {
     try {
-      final sql =
-          '''
+      final sql = '''
         SELECT 
           c.*,
           1 as tiene_censo_hoy,
@@ -227,8 +236,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
     try {
       final statsBase = await super.obtenerEstadisticas();
 
-      final sql =
-          '''
+      final sql = '''
         SELECT 
           COUNT(*) as total_clientes,
           
@@ -275,7 +283,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
         'conFormularioHoy': row['con_formulario_hoy'] as int,
         'completadosHoy': row['completados_hoy'] as int,
         'pendientesHoy':
-            (row['total_clientes'] as int) - (row['completados_hoy'] as int),
+        (row['total_clientes'] as int) - (row['completados_hoy'] as int),
       };
     } catch (e) {
       throw Exception('Error al obtener estadísticas: $e');

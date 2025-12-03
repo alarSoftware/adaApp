@@ -78,7 +78,8 @@ class DatabaseTables {
       direccion TEXT,
       ruc_ci TEXT,
       propietario TEXT,
-      condicio_venta TEXT
+      condicio_venta TEXT,
+      ruta_dia TEXT
     )
   ''';
 
@@ -372,6 +373,7 @@ class DatabaseTables {
       'CREATE INDEX IF NOT EXISTS idx_clientes_direccion ON clientes (direccion)',
       'CREATE INDEX IF NOT EXISTS idx_clientes_codigo ON clientes (codigo)',
       'CREATE INDEX IF NOT EXISTS idx_clientes_propietario ON clientes (propietario)',
+      'CREATE INDEX IF NOT EXISTS idx_clientes_ruta_dia ON clientes (ruta_dia)',
     ];
 
     for (final indice in indices) {
