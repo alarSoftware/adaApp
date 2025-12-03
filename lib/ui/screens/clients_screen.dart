@@ -20,7 +20,7 @@ class ClienteListScreen extends StatefulWidget {
   const ClienteListScreen({super.key});
 
   @override
-  _ClienteListScreenState createState() => _ClienteListScreenState();
+  State<ClienteListScreen> createState() => _ClienteListScreenState();
 }
 
 class _ClienteListScreenState extends State<ClienteListScreen> {
@@ -114,7 +114,8 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
         final now = DateTime.now();
         final lastSync = _ultimaSincronizacion!;
 
-        _necesitaSincronizar = lastSync.year != now.year ||
+        _necesitaSincronizar =
+            lastSync.year != now.year ||
             lastSync.month != now.month ||
             lastSync.day != now.day;
       });
@@ -192,8 +193,11 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final fechaHoy = DateFormat("EEEE, d 'de' MMMM", 'es').format(DateTime.now());
-    final fechaFormateada = toBeginningOfSentenceCase(fechaHoy) ?? fechaHoy;
+    final fechaHoy = DateFormat(
+      "EEEE, d 'de' MMMM",
+      'es',
+    ).format(DateTime.now());
+    final fechaFormateada = toBeginningOfSentenceCase(fechaHoy);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -205,7 +209,10 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
             if (_necesitaSincronizar && !_isSyncing)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.orange.shade50,
                   border: Border(
@@ -214,7 +221,10 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800),
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.orange.shade800,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -231,8 +241,8 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                           Text(
                             "No has descargado los clientes de hoy.",
                             style: TextStyle(
-                                color: Colors.orange.shade800,
-                                fontSize: 12
+                              color: Colors.orange.shade800,
+                              fontSize: 12,
                             ),
                           ),
                         ],
@@ -249,7 +259,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                         visualDensity: VisualDensity.compact,
                       ),
                       child: const Text("Descargar"),
-                    )
+                    ),
                   ],
                 ),
               ),
@@ -288,9 +298,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.white,
-                border: Border(
-                  bottom: BorderSide(color: AppColors.border),
-                ),
+                border: Border(bottom: BorderSide(color: AppColors.border)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,24 +360,36 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                                 label: Text(dia),
                                 selected: isSelected,
                                 onSelected: (selected) {
-                                  _viewModel.updateSelectedDia(selected ? dia : null);
+                                  _viewModel.updateSelectedDia(
+                                    selected ? dia : null,
+                                  );
                                 },
                                 backgroundColor: Colors.grey[100],
-                                selectedColor: AppColors.buttonPrimary.withOpacity(0.2),
+                                selectedColor: AppColors.buttonPrimary
+                                    .withValues(alpha: 0.2),
                                 checkmarkColor: AppColors.buttonPrimary,
                                 labelStyle: TextStyle(
                                   fontSize: 13,
-                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                                  color: isSelected ? AppColors.buttonPrimary : AppColors.textSecondary,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                  color: isSelected
+                                      ? AppColors.buttonPrimary
+                                      : AppColors.textSecondary,
                                 ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(20),
                                   side: BorderSide(
-                                    color: isSelected ? AppColors.buttonPrimary : AppColors.border,
+                                    color: isSelected
+                                        ? AppColors.buttonPrimary
+                                        : AppColors.border,
                                     width: isSelected ? 1.5 : 1,
                                   ),
                                 ),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
                               ),
                             );
                           }).toList(),
@@ -415,7 +435,8 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                           horizontal: 16,
                           vertical: 8,
                         ),
-                        itemCount: _viewModel.displayedClientes.length +
+                        itemCount:
+                            _viewModel.displayedClientes.length +
                             (_viewModel.hasMoreData ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (index == _viewModel.displayedClientes.length) {
@@ -450,14 +471,14 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                 Text(
                   'Lista de Clientes (${_viewModel.displayedClientes.length})',
                   style: TextStyle(
-                      color: AppColors.appBarForeground,
-                      fontSize: 18
+                    color: AppColors.appBarForeground,
+                    fontSize: 18,
                   ),
                 ),
                 Text(
                   fechaString,
                   style: TextStyle(
-                    color: AppColors.appBarForeground.withOpacity(0.8),
+                    color: AppColors.appBarForeground.withValues(alpha: 0.8),
                     fontSize: 12,
                     fontWeight: FontWeight.normal,
                   ),
@@ -473,25 +494,28 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                 onPressed: _isSyncing ? null : _sincronizarClientes,
                 icon: _isSyncing
                     ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
                     : Icon(
-                  _necesitaSincronizar ? Icons.notification_important : Icons.sync,
-                  color: _necesitaSincronizar ? Colors.orangeAccent : AppColors.appBarForeground,
-                ),
+                        _necesitaSincronizar
+                            ? Icons.notification_important
+                            : Icons.sync,
+                        color: _necesitaSincronizar
+                            ? Colors.orangeAccent
+                            : AppColors.appBarForeground,
+                      ),
                 tooltip: 'Sincronizar clientes',
               ),
               IconButton(
                 onPressed: _onRefresh,
-                icon: Icon(
-                  Icons.refresh,
-                  color: AppColors.appBarForeground,
-                ),
+                icon: Icon(Icons.refresh, color: AppColors.appBarForeground),
                 tooltip: 'Actualizar lista',
               ),
             ],
@@ -509,10 +533,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
       shadowColor: AppColors.shadowLight,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: AppColors.border,
-          width: 0.5,
-        ),
+        side: BorderSide(color: AppColors.border, width: 0.5),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(

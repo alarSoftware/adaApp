@@ -14,13 +14,13 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
   final Function(int, dynamic)? onSeleccionarReemplazo;
 
   const ProductosSeleccionadosWidget({
-    Key? key,
+    super.key,
     required this.productosSeleccionados,
     required this.tipoOperacion,
     required this.onEliminarProducto,
     required this.onActualizarCantidad,
     this.onSeleccionarReemplazo,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -69,10 +69,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             'Busca productos arriba para agregarlos',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppColors.textTertiary,
-            ),
+            style: TextStyle(fontSize: 13, color: AppColors.textTertiary),
             textAlign: TextAlign.center,
           ),
         ],
@@ -94,7 +91,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(8),
                 topRight: Radius.circular(8),
@@ -137,7 +134,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
             itemCount: productosSeleccionados.length,
             separatorBuilder: (context, index) => Divider(
               height: 1,
-              color: AppColors.border.withOpacity(0.5),
+              color: AppColors.border.withValues(alpha: 0.5),
             ),
             itemBuilder: (context, index) {
               return _buildProductRow(context, index);
@@ -150,7 +147,8 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
 
   Widget _buildProductRow(BuildContext context, int index) {
     final detalle = productosSeleccionados[index];
-    final esDiscontinuos = tipoOperacion == TipoOperacion.notaRetiroDiscontinuos;
+    final esDiscontinuos =
+        tipoOperacion == TipoOperacion.notaRetiroDiscontinuos;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -186,7 +184,10 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildProductInfo(OperacionComercialDetalle detalle, bool esDiscontinuos) {
+  Widget _buildProductInfo(
+    OperacionComercialDetalle detalle,
+    bool esDiscontinuos,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -196,9 +197,11 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.error.withOpacity(0.1),
+                  color: AppColors.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                  border: Border.all(
+                    color: AppColors.error.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Text(
                   'RETIRAR',
@@ -227,10 +230,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           detalle.productoCodigo,
-          style: TextStyle(
-            fontSize: 11,
-            color: AppColors.textSecondary,
-          ),
+          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
         ),
         if (detalle.productoCategoria != null) ...[
           const SizedBox(height: 2),
@@ -303,18 +303,18 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildExchangeSection(BuildContext context, int index, OperacionComercialDetalle detalle) {
+  Widget _buildExchangeSection(
+    BuildContext context,
+    int index,
+    OperacionComercialDetalle detalle,
+  ) {
     return Column(
       children: [
         // Icono de intercambio
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.swap_vert,
-              color: AppColors.warning,
-              size: 24,
-            ),
+            Icon(Icons.swap_vert, color: AppColors.warning, size: 24),
             const SizedBox(width: 8),
             Text(
               'INTERCAMBIO',
@@ -338,16 +338,19 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildSelectReplacementButton(int index, OperacionComercialDetalle detalle) {
+  Widget _buildSelectReplacementButton(
+    int index,
+    OperacionComercialDetalle detalle,
+  ) {
     return InkWell(
       onTap: () => onSeleccionarReemplazo?.call(index, detalle),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.success.withOpacity(0.1),
+          color: AppColors.success.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: AppColors.success.withOpacity(0.3),
+            color: AppColors.success.withValues(alpha: 0.3),
             style: BorderStyle.solid,
             width: 1.5,
           ),

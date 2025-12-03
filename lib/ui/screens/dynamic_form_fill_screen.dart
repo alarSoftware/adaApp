@@ -30,12 +30,16 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        // 🔒 Bloquear el botón de atrás si está guardando
-        if (_isSaving) return false;
-        if (widget.isReadOnly) return true;
-        return await _showExitConfirmation();
+    return PopScope(
+      canPop: widget.isReadOnly && !_isSaving,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        if (_isSaving) return;
+
+        final shouldExit = await _showExitConfirmation();
+        if (shouldExit && context.mounted) {
+          Navigator.of(context).pop();
+        }
       },
       child: Stack(
         children: [
@@ -73,7 +77,9 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
                   height: 60,
                   child: CircularProgressIndicator(
                     strokeWidth: 4,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -114,12 +120,12 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
       automaticallyImplyLeading: !_isSaving,
       leading: _isSaving
           ? Container(
-        margin: const EdgeInsets.all(12),
-        child: CircularProgressIndicator(
-          color: AppColors.onPrimary,
-          strokeWidth: 2,
-        ),
-      )
+              margin: const EdgeInsets.all(12),
+              child: CircularProgressIndicator(
+                color: AppColors.onPrimary,
+                strokeWidth: 2,
+              ),
+            )
           : null,
     );
   }
@@ -198,7 +204,7 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
   Widget _buildReadOnlyBanner() {
     return Container(
       padding: EdgeInsets.all(16),
-      color: AppColors.info.withOpacity(0.1),
+      color: AppColors.info.withValues(alpha: 0.1),
       child: Row(
         children: [
           Icon(Icons.lock_outline, color: AppColors.info, size: 20),
@@ -244,13 +250,15 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
                 value: widget.viewModel.getFieldValue(field.id),
                 onChanged: widget.isReadOnly || _isSaving
                     ? (_) {}
-                    : (value) => widget.viewModel.updateFieldValue(field.id, value),
+                    : (value) =>
+                          widget.viewModel.updateFieldValue(field.id, value),
                 errorText: widget.viewModel.getFieldError(field.id),
                 allValues: currentAnswers,
                 isReadOnly: widget.isReadOnly || _isSaving,
                 onNestedFieldChanged: widget.isReadOnly || _isSaving
                     ? (_, __) {}
-                    : (fieldId, value) => widget.viewModel.updateFieldValue(fieldId, value),
+                    : (fieldId, value) =>
+                          widget.viewModel.updateFieldValue(fieldId, value),
               );
             }),
             SizedBox(height: 80),
@@ -289,8 +297,8 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               // 🔒 Estilo deshabilitado
-              disabledBackgroundColor: AppColors.success.withOpacity(0.5),
-              disabledForegroundColor: Colors.white.withOpacity(0.7),
+              disabledBackgroundColor: AppColors.success.withValues(alpha: 0.5),
+              disabledForegroundColor: Colors.white.withValues(alpha: 0.7),
             ),
             label: Text(_isSaving ? 'Guardando...' : 'Confirmar formulario'),
           ),
@@ -337,7 +345,8 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
   Future<void> _completeForm() async {
     final confirm = await _showConfirmDialog(
       title: '¿Completar formulario?',
-      content: 'Una vez completado, el formulario será marcado como terminado. ¿Deseas continuar?',
+      content:
+          'Una vez completado, el formulario será marcado como terminado. ¿Deseas continuar?',
       confirmText: 'Completar',
       confirmColor: AppColors.success,
     );
@@ -361,7 +370,8 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
         );
         Navigator.pop(context);
       } else {
-        final errorMessage = widget.viewModel.errorMessage ?? 'Error al completar formulario';
+        final errorMessage =
+            widget.viewModel.errorMessage ?? 'Error al completar formulario';
         _showSnackBar(
           message: '❌ $errorMessage',
           backgroundColor: AppColors.error,
@@ -406,16 +416,24 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
             Icon(Icons.check_circle, color: confirmColor),
             SizedBox(width: 8),
             Expanded(
-              child: Text(title, style: TextStyle(color: AppColors.textPrimary)),
+              child: Text(
+                title,
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
             ),
           ],
         ),
-        content: Text(content, style: TextStyle(color: AppColors.textSecondary)),
+        content: Text(
+          content,
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
-
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),

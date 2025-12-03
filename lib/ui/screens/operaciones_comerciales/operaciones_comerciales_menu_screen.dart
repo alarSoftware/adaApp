@@ -12,17 +12,13 @@ import 'package:ada_app/viewmodels/operaciones_comerciales/operaciones_comercial
 class OperacionesComercialesMenuScreen extends StatelessWidget {
   final Cliente cliente;
 
-  const OperacionesComercialesMenuScreen({
-    Key? key,
-    required this.cliente,
-  }) : super(key: key);
+  const OperacionesComercialesMenuScreen({super.key, required this.cliente});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => OperacionesComercialesMenuViewModel(
-        clienteId: cliente.id!,
-      ),
+      create: (_) =>
+          OperacionesComercialesMenuViewModel(clienteId: cliente.id!),
       child: _OperacionesComercialesMenuView(cliente: cliente),
     );
   }
@@ -40,7 +36,8 @@ class _OperacionesComercialesMenuView extends StatefulWidget {
 
 class _OperacionesComercialesMenuViewState
     extends State<_OperacionesComercialesMenuView>
-/* with TickerProviderStateMixin */ { // 👈 COMENTADO PARA FUTURO
+/* with TickerProviderStateMixin */ {
+  // 👈 COMENTADO PARA FUTURO
 
   /* // 🔮 CÓDIGO COMENTADO PARA FUTURO USO DE TABS
   late TabController _tabController;
@@ -85,7 +82,8 @@ class _OperacionesComercialesMenuViewState
                 icon: Icons.inventory_2_outlined,
                 color: AppColors.error, // Rojo
                 title: 'Retiro de Discontinuos',
-                description: 'Retira productos discontinuados (misma categoría)',
+                description:
+                    'Retira productos discontinuados (misma categoría)',
               ),
             ),
           ],
@@ -106,7 +104,9 @@ class _OperacionesComercialesMenuViewState
           builder: (context, viewModel, _) {
             return IconButton(
               icon: const Icon(Icons.refresh_rounded),
-              onPressed: viewModel.isLoading ? null : viewModel.cargarOperaciones,
+              onPressed: viewModel.isLoading
+                  ? null
+                  : viewModel.cargarOperaciones,
             );
           },
         ),
@@ -194,12 +194,12 @@ class _OperacionesComercialesMenuViewState
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: color.withOpacity(0.1),
+                      color: color.withValues(alpha: 0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
                   ],
-                  border: Border.all(color: color.withOpacity(0.2)),
+                  border: Border.all(color: color.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   children: [
@@ -207,7 +207,7 @@ class _OperacionesComercialesMenuViewState
                       width: 50,
                       height: 50,
                       decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
+                        color: color.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(icon, color: color, size: 28),
@@ -246,17 +246,21 @@ class _OperacionesComercialesMenuViewState
               SizedBox(
                 height: 54,
                 child: ElevatedButton.icon(
-                  onPressed: () => _navigateToCreateOperacion(tipoOperacion, viewModel),
+                  onPressed: () =>
+                      _navigateToCreateOperacion(tipoOperacion, viewModel),
                   icon: const Icon(Icons.add_circle_outline_rounded),
                   label: Text(
                     'Nueva Solicitud',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: color,
                     foregroundColor: Colors.white,
                     elevation: 4,
-                    shadowColor: color.withOpacity(0.4),
+                    shadowColor: color.withValues(alpha: 0.4),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -295,14 +299,12 @@ class _OperacionesComercialesMenuViewState
   }
 
   Widget _buildOperacionesList(
-      OperacionesComercialesMenuViewModel viewModel,
-      TipoOperacion tipoOperacion,
-      Color color,
-      ) {
+    OperacionesComercialesMenuViewModel viewModel,
+    TipoOperacion tipoOperacion,
+    Color color,
+  ) {
     if (viewModel.isLoading) {
-      return Center(
-        child: CircularProgressIndicator(color: color),
-      );
+      return Center(child: CircularProgressIndicator(color: color));
     }
 
     final operaciones = viewModel.getOperacionesPorTipo(tipoOperacion);
@@ -323,12 +325,14 @@ class _OperacionesComercialesMenuViewState
   }
 
   Widget _buildOperacionCard(
-      OperacionComercial operacion,
-      Color color,
-      OperacionesComercialesMenuViewModel viewModel,
-      ) {
+    OperacionComercial operacion,
+    Color color,
+    OperacionesComercialesMenuViewModel viewModel,
+  ) {
     // Formateador de fecha
-    final fechaStr = DateFormat('dd/MM/yyyy HH:mm').format(operacion.fechaCreacion);
+    final fechaStr = DateFormat(
+      'dd/MM/yyyy HH:mm',
+    ).format(operacion.fechaCreacion);
 
     return Container(
       decoration: BoxDecoration(
@@ -336,7 +340,7 @@ class _OperacionesComercialesMenuViewState
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -357,10 +361,14 @@ class _OperacionesComercialesMenuViewState
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.description_outlined, color: color, size: 20),
+                  child: Icon(
+                    Icons.description_outlined,
+                    color: color,
+                    size: 20,
+                  ),
                 ),
 
                 const SizedBox(width: 16),
@@ -372,9 +380,14 @@ class _OperacionesComercialesMenuViewState
                     children: [
                       // 1. Chip de Estado de Sincronización
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: _getSyncStatusColor(operacion.syncStatus).withOpacity(0.1),
+                          color: _getSyncStatusColor(
+                            operacion.syncStatus,
+                          ).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -409,14 +422,17 @@ class _OperacionesComercialesMenuViewState
                     Text(
                       '${operacion.totalProductos}',
                       style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     Text(
                       'items',
-                      style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -443,7 +459,7 @@ class _OperacionesComercialesMenuViewState
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                 ),
               ],
@@ -466,10 +482,7 @@ class _OperacionesComercialesMenuViewState
           const SizedBox(height: 8),
           Text(
             'Crea una nueva solicitud arriba',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -492,9 +505,9 @@ class _OperacionesComercialesMenuViewState
 
   // Navegación
   Future<void> _navigateToCreateOperacion(
-      TipoOperacion tipoOperacion,
-      OperacionesComercialesMenuViewModel viewModel,
-      ) async {
+    TipoOperacion tipoOperacion,
+    OperacionesComercialesMenuViewModel viewModel,
+  ) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -507,21 +520,24 @@ class _OperacionesComercialesMenuViewState
 
     if (result == true && mounted) {
       await viewModel.cargarOperaciones();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Operación creada exitosamente'),
           backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     }
   }
 
   Future<void> _navigateToEditOperacion(
-      OperacionComercial operacion,
-      OperacionesComercialesMenuViewModel viewModel,
-      ) async {
+    OperacionComercial operacion,
+    OperacionesComercialesMenuViewModel viewModel,
+  ) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(

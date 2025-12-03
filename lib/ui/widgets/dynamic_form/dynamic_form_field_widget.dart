@@ -16,7 +16,8 @@ class DynamicFormFieldWidget extends StatelessWidget {
   final bool isReadOnly;
 
   // 🆕 NUEVO: Callbacks para guardar imágenes
-  final Future<bool> Function(String fieldId, String imagePath)? onImageSelected;
+  final Future<bool> Function(String fieldId, String imagePath)?
+  onImageSelected;
   final Future<bool> Function(String fieldId)? onImageDeleted;
 
   const DynamicFormFieldWidget({
@@ -59,10 +60,10 @@ class DynamicFormFieldWidget extends StatelessWidget {
   Widget _buildHeader() {
     return Card(
       elevation: 0,
-      color: AppColors.primary.withOpacity(0.1),
+      color: AppColors.primary.withValues(alpha: 0.1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
       ),
       child: Padding(
         padding: EdgeInsets.all(12),
@@ -73,7 +74,11 @@ class DynamicFormFieldWidget extends StatelessWidget {
             Expanded(
               child: Text(
                 field.label,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
               ),
             ),
           ],
@@ -82,7 +87,10 @@ class DynamicFormFieldWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildSelectionGroup(BuildContext context, {required bool isMultiple}) {
+  Widget _buildSelectionGroup(
+    BuildContext context, {
+    required bool isMultiple,
+  }) {
     final selectedIds = _parseSelectedIds(value);
     final options = field.children.where((c) => c.type == 'opt').toList();
 
@@ -98,13 +106,21 @@ class DynamicFormFieldWidget extends StatelessWidget {
           if (options.isEmpty)
             _buildEmptyMessage()
           else
-            ...options.map((opt) => _buildOptionWithNested(context, opt, selectedIds, isMultiple)),
+            ...options.map(
+              (opt) =>
+                  _buildOptionWithNested(context, opt, selectedIds, isMultiple),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildOptionWithNested(BuildContext context, DynamicFormField option, List<String> selectedIds, bool isMultiple) {
+  Widget _buildOptionWithNested(
+    BuildContext context,
+    DynamicFormField option,
+    List<String> selectedIds,
+    bool isMultiple,
+  ) {
     final isSelected = selectedIds.contains(option.id);
     final hasNested = option.children.any((c) => c.type != 'opt');
 
@@ -115,7 +131,9 @@ class DynamicFormFieldWidget extends StatelessWidget {
           option: option,
           isSelected: isSelected,
           isRadio: !isMultiple,
-          onTap: isReadOnly ? null : () => _handleSelection(option.id, isMultiple, selectedIds),
+          onTap: isReadOnly
+              ? null
+              : () => _handleSelection(option.id, isMultiple, selectedIds),
         ),
         if (isSelected && hasNested)
           _buildNestedFields(context, option.children),
@@ -138,7 +156,9 @@ class DynamicFormFieldWidget extends StatelessWidget {
           margin: EdgeInsets.only(bottom: 8),
           padding: EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
+            color: isSelected
+                ? AppColors.primary.withValues(alpha: 0.1)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: isSelected ? AppColors.primary : AppColors.border,
@@ -149,8 +169,12 @@ class DynamicFormFieldWidget extends StatelessWidget {
             children: [
               Icon(
                 isRadio
-                    ? (isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked)
-                    : (isSelected ? Icons.check_box : Icons.check_box_outline_blank),
+                    ? (isSelected
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked)
+                    : (isSelected
+                          ? Icons.check_box
+                          : Icons.check_box_outline_blank),
                 color: isSelected ? AppColors.primary : AppColors.textSecondary,
                 size: 22,
               ),
@@ -160,13 +184,21 @@ class DynamicFormFieldWidget extends StatelessWidget {
                   option.label,
                   style: TextStyle(
                     fontSize: 14,
-                    color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.textPrimary,
+                    fontWeight: isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
                   ),
                 ),
               ),
               if (isReadOnly)
-                Icon(Icons.lock_outline, size: 16, color: AppColors.textSecondary),
+                Icon(
+                  Icons.lock_outline,
+                  size: 16,
+                  color: AppColors.textSecondary,
+                ),
             ],
           ),
         ),
@@ -174,7 +206,11 @@ class DynamicFormFieldWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildNestedFields(BuildContext context, List<DynamicFormField> nestedFields, {int depth = 0}) {
+  Widget _buildNestedFields(
+    BuildContext context,
+    List<DynamicFormField> nestedFields, {
+    int depth = 0,
+  }) {
     final fields = nestedFields.where((f) => f.type != 'opt').toList();
     if (fields.isEmpty) return SizedBox.shrink();
 
@@ -195,7 +231,11 @@ class DynamicFormFieldWidget extends StatelessWidget {
                     if (hasSubChildren)
                       Padding(
                         padding: EdgeInsets.only(left: 10, top: 8),
-                        child: _buildNestedFields(context, f.children, depth: depth + 1),
+                        child: _buildNestedFields(
+                          context,
+                          f.children,
+                          depth: depth + 1,
+                        ),
                       ),
                   ],
                 ),
@@ -212,11 +252,24 @@ class DynamicFormFieldWidget extends StatelessWidget {
       width: 16,
       child: Column(
         children: [
-          Container(width: 2, height: 14, color: AppColors.primary.withOpacity(0.3)),
+          Container(
+            width: 2,
+            height: 14,
+            color: AppColors.primary.withValues(alpha: 0.3),
+          ),
           Row(
             children: [
-              Container(width: 2, height: 2, color: AppColors.primary.withOpacity(0.3)),
-              Expanded(child: Container(height: 2, color: AppColors.primary.withOpacity(0.3))),
+              Container(
+                width: 2,
+                height: 2,
+                color: AppColors.primary.withValues(alpha: 0.3),
+              ),
+              Expanded(
+                child: Container(
+                  height: 2,
+                  color: AppColors.primary.withValues(alpha: 0.3),
+                ),
+              ),
             ],
           ),
         ],
@@ -224,14 +277,21 @@ class DynamicFormFieldWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildNestedFieldCard(BuildContext context, DynamicFormField nestedField, int depth) {
+  Widget _buildNestedFieldCard(
+    BuildContext context,
+    DynamicFormField nestedField,
+    int depth,
+  ) {
     return Card(
       elevation: 0.5,
       color: AppColors.surface,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(6),
-        side: BorderSide(color: AppColors.border.withOpacity(0.5), width: 1),
+        side: BorderSide(
+          color: AppColors.border.withValues(alpha: 0.5),
+          width: 1,
+        ),
       ),
       child: Padding(
         padding: EdgeInsets.all(depth >= 2 ? 14.0 : 12.0),
@@ -240,46 +300,74 @@ class DynamicFormFieldWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildNestedFieldContent(BuildContext context, DynamicFormField field) {
+  Widget _buildNestedFieldContent(
+    BuildContext context,
+    DynamicFormField field,
+  ) {
     return switch (field.type) {
       'image' => _buildNestedImagePicker(context, field),
       'checkbox' => _buildNestedSelectionField(context, field, isRadio: false),
-      'radio_button' => _buildNestedSelectionField(context, field, isRadio: true),
+      'radio_button' => _buildNestedSelectionField(
+        context,
+        field,
+        isRadio: true,
+      ),
       'resp_abierta' => _buildNestedTextField(field, maxLines: 2),
       'resp_abierta_larga' => _buildNestedTextField(field, maxLines: 4),
       _ => _buildNestedTextField(field),
     };
   }
 
-  Widget _buildNestedSelectionField(BuildContext context, DynamicFormField field, {required bool isRadio}) {
+  Widget _buildNestedSelectionField(
+    BuildContext context,
+    DynamicFormField field, {
+    required bool isRadio,
+  }) {
     final nestedValue = allValues[field.id];
-    final selectedIds = isRadio ? (nestedValue != null ? [nestedValue.toString()] : <String>[]) : _parseSelectedIds(nestedValue);
+    final selectedIds = isRadio
+        ? (nestedValue != null ? [nestedValue.toString()] : <String>[])
+        : _parseSelectedIds(nestedValue);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           field.label,
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
         ),
         SizedBox(height: 6),
         ...field.children.where((c) => c.type == 'opt').map((opt) {
-          final isSelected = isRadio ? selectedIds.firstOrNull == opt.id : selectedIds.contains(opt.id);
+          final isSelected = isRadio
+              ? selectedIds.firstOrNull == opt.id
+              : selectedIds.contains(opt.id);
           final hasNested = opt.children.any((c) => c.type != 'opt');
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildNestedOption(opt, isSelected, isRadio, isReadOnly ? null : () {
-                if (onNestedFieldChanged == null) return;
-                if (isRadio) {
-                  onNestedFieldChanged!(field.id, opt.id);
-                } else {
-                  final newIds = List<String>.from(selectedIds);
-                  isSelected ? newIds.remove(opt.id) : newIds.add(opt.id);
-                  onNestedFieldChanged!(field.id, newIds);
-                }
-              }),
+              _buildNestedOption(
+                opt,
+                isSelected,
+                isRadio,
+                isReadOnly
+                    ? null
+                    : () {
+                        if (onNestedFieldChanged == null) return;
+                        if (isRadio) {
+                          onNestedFieldChanged!(field.id, opt.id);
+                        } else {
+                          final newIds = List<String>.from(selectedIds);
+                          isSelected
+                              ? newIds.remove(opt.id)
+                              : newIds.add(opt.id);
+                          onNestedFieldChanged!(field.id, newIds);
+                        }
+                      },
+              ),
               if (isSelected && hasNested)
                 _buildNestedFields(context, opt.children, depth: 1),
             ],
@@ -289,7 +377,12 @@ class DynamicFormFieldWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildNestedOption(DynamicFormField opt, bool isSelected, bool isRadio, VoidCallback? onTap) {
+  Widget _buildNestedOption(
+    DynamicFormField opt,
+    bool isSelected,
+    bool isRadio,
+    VoidCallback? onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       child: Opacity(
@@ -298,7 +391,9 @@ class DynamicFormFieldWidget extends StatelessWidget {
           margin: EdgeInsets.only(bottom: 6),
           padding: EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.background,
+            color: isSelected
+                ? AppColors.primary.withValues(alpha: 0.1)
+                : AppColors.background,
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
               color: isSelected ? AppColors.primary : AppColors.border,
@@ -309,8 +404,12 @@ class DynamicFormFieldWidget extends StatelessWidget {
             children: [
               Icon(
                 isRadio
-                    ? (isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked)
-                    : (isSelected ? Icons.check_box : Icons.check_box_outline_blank),
+                    ? (isSelected
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked)
+                    : (isSelected
+                          ? Icons.check_box
+                          : Icons.check_box_outline_blank),
                 color: isSelected ? AppColors.primary : AppColors.textSecondary,
                 size: 18,
               ),
@@ -320,13 +419,21 @@ class DynamicFormFieldWidget extends StatelessWidget {
                   opt.label,
                   style: TextStyle(
                     fontSize: 12,
-                    color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.textPrimary,
+                    fontWeight: isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
                   ),
                 ),
               ),
               if (isReadOnly)
-                Icon(Icons.lock_outline, size: 14, color: AppColors.textSecondary),
+                Icon(
+                  Icons.lock_outline,
+                  size: 14,
+                  color: AppColors.textSecondary,
+                ),
             ],
           ),
         ),
@@ -338,7 +445,14 @@ class DynamicFormFieldWidget extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(field.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+        Text(
+          field.label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
         SizedBox(height: 6),
         TextFormField(
           initialValue: allValues[field.id]?.toString(),
@@ -355,7 +469,9 @@ class DynamicFormFieldWidget extends StatelessWidget {
           ),
           style: TextStyle(fontSize: 12),
           maxLines: maxLines,
-          onChanged: isReadOnly ? null : (v) => onNestedFieldChanged?.call(field.id, v),
+          onChanged: isReadOnly
+              ? null
+              : (v) => onNestedFieldChanged?.call(field.id, v),
         ),
       ],
     );
@@ -373,10 +489,21 @@ class DynamicFormFieldWidget extends StatelessWidget {
             Icon(Icons.photo_camera, color: AppColors.primary, size: 16),
             SizedBox(width: 6),
             Expanded(
-              child: Text(field.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+              child: Text(
+                field.label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ),
             if (isReadOnly)
-              Icon(Icons.lock_outline, size: 14, color: AppColors.textSecondary),
+              Icon(
+                Icons.lock_outline,
+                size: 14,
+                color: AppColors.textSecondary,
+              ),
           ],
         ),
         SizedBox(height: 8),
@@ -395,9 +522,19 @@ class DynamicFormFieldWidget extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.image_not_supported, color: AppColors.textSecondary, size: 32),
+                  Icon(
+                    Icons.image_not_supported,
+                    color: AppColors.textSecondary,
+                    size: 32,
+                  ),
                   SizedBox(height: 4),
-                  Text('Sin imagen', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                  Text(
+                    'Sin imagen',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -428,17 +565,40 @@ class DynamicFormFieldWidget extends StatelessWidget {
             initialValue: value?.toString(),
             enabled: !isReadOnly,
             decoration: InputDecoration(
-              hintText: isReadOnly ? '' : (field.placeholder ?? 'Escribe tu respuesta aquí...'),
+              hintText: isReadOnly
+                  ? ''
+                  : (field.placeholder ?? 'Escribe tu respuesta aquí...'),
               errorText: errorText,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.primary, width: 2)),
-              errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.error, width: 2)),
-              disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: AppColors.primary, width: 2),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: AppColors.error, width: 2),
+              ),
+              disabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
               filled: true,
-              fillColor: isReadOnly ? AppColors.neutral200 : AppColors.background,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              suffixIcon: isReadOnly ? Icon(Icons.lock_outline, size: 20) : null,
+              fillColor: isReadOnly
+                  ? AppColors.neutral200
+                  : AppColors.background,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+              suffixIcon: isReadOnly
+                  ? Icon(Icons.lock_outline, size: 20)
+                  : null,
             ),
             maxLines: maxLines,
             maxLength: isReadOnly ? null : field.maxLength,
@@ -460,10 +620,23 @@ class DynamicFormFieldWidget extends StatelessWidget {
             children: [
               Icon(Icons.photo_camera, color: AppColors.primary, size: 20),
               SizedBox(width: 8),
-              Expanded(child: Text(field.label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+              Expanded(
+                child: Text(
+                  field.label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
               if (field.required && !isReadOnly) _buildRequiredBadge(),
               if (isReadOnly)
-                Icon(Icons.lock_outline, size: 18, color: AppColors.textSecondary),
+                Icon(
+                  Icons.lock_outline,
+                  size: 18,
+                  color: AppColors.textSecondary,
+                ),
             ],
           ),
           if (errorText != null) _buildErrorText(),
@@ -483,9 +656,19 @@ class DynamicFormFieldWidget extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.image_not_supported, color: AppColors.textSecondary, size: 48),
+                    Icon(
+                      Icons.image_not_supported,
+                      color: AppColors.textSecondary,
+                      size: 48,
+                    ),
                     SizedBox(height: 8),
-                    Text('Sin imagen', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                    Text(
+                      'Sin imagen',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -494,7 +677,11 @@ class DynamicFormFieldWidget extends StatelessWidget {
           ],
           if (!isReadOnly) ...[
             _buildImageButtons(context),
-            if (hasImage) _buildDeleteButton(fieldId: field.id, onLocalDelete: () => onChanged(null)),
+            if (hasImage)
+              _buildDeleteButton(
+                fieldId: field.id,
+                onLocalDelete: () => onChanged(null),
+              ),
           ],
         ],
       ),
@@ -512,14 +699,26 @@ class DynamicFormFieldWidget extends StatelessWidget {
         errorBuilder: (_, __, ___) => Container(
           height: height,
           color: AppColors.neutral200,
-          child: Center(child: Icon(Icons.broken_image, size: height > 100 ? 48 : 28, color: AppColors.textSecondary)),
+          child: Center(
+            child: Icon(
+              Icons.broken_image,
+              size: height > 100 ? 48 : 28,
+              color: AppColors.textSecondary,
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildImageButtons(BuildContext context, {bool isNested = false, String? fieldId}) {
-    final buttonPadding = isNested ? EdgeInsets.symmetric(vertical: 6) : EdgeInsets.symmetric(vertical: 12);
+  Widget _buildImageButtons(
+    BuildContext context, {
+    bool isNested = false,
+    String? fieldId,
+  }) {
+    final buttonPadding = isNested
+        ? EdgeInsets.symmetric(vertical: 6)
+        : EdgeInsets.symmetric(vertical: 12);
     final iconSize = isNested ? 14.0 : 20.0;
     final fontSize = isNested ? 10.0 : 14.0;
 
@@ -527,7 +726,12 @@ class DynamicFormFieldWidget extends StatelessWidget {
       children: [
         Expanded(
           child: ElevatedButton.icon(
-            onPressed: () => _pickImage(context, ImageSource.camera, isNested: isNested, fieldId: fieldId),
+            onPressed: () => _pickImage(
+              context,
+              ImageSource.camera,
+              isNested: isNested,
+              fieldId: fieldId,
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: AppColors.onPrimary,
@@ -541,21 +745,30 @@ class DynamicFormFieldWidget extends StatelessWidget {
         Expanded(
           child: isNested
               ? OutlinedButton.icon(
-            onPressed: () => _pickImage(context, ImageSource.gallery, isNested: true, fieldId: fieldId),
-            style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary, padding: buttonPadding, side: BorderSide(color: AppColors.primary)),
-            icon: Icon(Icons.photo_library, size: iconSize),
-            label: Text('Galería', style: TextStyle(fontSize: fontSize)),
-          )
+                  onPressed: () => _pickImage(
+                    context,
+                    ImageSource.gallery,
+                    isNested: true,
+                    fieldId: fieldId,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    padding: buttonPadding,
+                    side: BorderSide(color: AppColors.primary),
+                  ),
+                  icon: Icon(Icons.photo_library, size: iconSize),
+                  label: Text('Galería', style: TextStyle(fontSize: fontSize)),
+                )
               : ElevatedButton.icon(
-            onPressed: () => _pickImage(context, ImageSource.gallery),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary.withOpacity(0.1),
-              foregroundColor: AppColors.primary,
-              padding: buttonPadding,
-            ),
-            icon: Icon(Icons.photo_library, size: iconSize),
-            label: Text('Galería', style: TextStyle(fontSize: fontSize)),
-          ),
+                  onPressed: () => _pickImage(context, ImageSource.gallery),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                    foregroundColor: AppColors.primary,
+                    padding: buttonPadding,
+                  ),
+                  icon: Icon(Icons.photo_library, size: iconSize),
+                  label: Text('Galería', style: TextStyle(fontSize: fontSize)),
+                ),
         ),
       ],
     );
@@ -586,18 +799,26 @@ class DynamicFormFieldWidget extends StatelessWidget {
           padding: EdgeInsets.symmetric(vertical: isCompact ? 4 : 8),
         ),
         icon: Icon(Icons.delete_outline, size: isCompact ? 14 : 20),
-        label: Text('Eliminar', style: TextStyle(fontSize: isCompact ? 10 : 14)),
+        label: Text(
+          'Eliminar',
+          style: TextStyle(fontSize: isCompact ? 10 : 14),
+        ),
       ),
     );
   }
 
-  Future<void> _pickImage(BuildContext context, ImageSource source, {bool isNested = false, String? fieldId}) async {
+  Future<void> _pickImage(
+    BuildContext context,
+    ImageSource source, {
+    bool isNested = false,
+    String? fieldId,
+  }) async {
     try {
       final image = await ImagePicker().pickImage(
-          source: source,
-          maxWidth: 1920,
-          maxHeight: 1920,
-          imageQuality: 85
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
       );
 
       if (image == null) return;
@@ -665,8 +886,8 @@ class DynamicFormFieldWidget extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Error al seleccionar imagen: $e'),
-              backgroundColor: AppColors.error
+            content: Text('Error al seleccionar imagen: $e'),
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -679,7 +900,10 @@ class DynamicFormFieldWidget extends StatelessWidget {
       color: AppColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: errorText != null ? AppColors.error : AppColors.border, width: errorText != null ? 2 : 0.5),
+        side: BorderSide(
+          color: errorText != null ? AppColors.error : AppColors.border,
+          width: errorText != null ? 2 : 0.5,
+        ),
       ),
       child: Padding(padding: EdgeInsets.all(12), child: child),
     );
@@ -688,12 +912,25 @@ class DynamicFormFieldWidget extends StatelessWidget {
   Widget _buildFieldHeader() {
     return Row(
       children: [
-        Expanded(child: Text(field.label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+        Expanded(
+          child: Text(
+            field.label,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
         if (field.required && !isReadOnly) _buildRequiredBadge(),
         if (isReadOnly)
           Padding(
             padding: EdgeInsets.only(left: 8),
-            child: Icon(Icons.lock_outline, size: 18, color: AppColors.textSecondary),
+            child: Icon(
+              Icons.lock_outline,
+              size: 18,
+              color: AppColors.textSecondary,
+            ),
           ),
       ],
     );
@@ -702,22 +939,42 @@ class DynamicFormFieldWidget extends StatelessWidget {
   Widget _buildRequiredBadge() {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: AppColors.error.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
-      child: Text('*', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.error)),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        '*',
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: AppColors.error,
+        ),
+      ),
     );
   }
 
   Widget _buildErrorText() {
     return Padding(
       padding: EdgeInsets.only(top: 4),
-      child: Text(errorText!, style: TextStyle(fontSize: 11, color: AppColors.error)),
+      child: Text(
+        errorText!,
+        style: TextStyle(fontSize: 11, color: AppColors.error),
+      ),
     );
   }
 
   Widget _buildEmptyMessage() {
     return Padding(
       padding: EdgeInsets.all(8),
-      child: Text('No hay opciones disponibles', style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontStyle: FontStyle.italic)),
+      child: Text(
+        'No hay opciones disponibles',
+        style: TextStyle(
+          fontSize: 12,
+          color: AppColors.textSecondary,
+          fontStyle: FontStyle.italic,
+        ),
+      ),
     );
   }
 
@@ -729,7 +986,10 @@ class DynamicFormFieldWidget extends StatelessWidget {
           width: 3,
           height: 60,
           margin: EdgeInsets.only(right: 12, top: 8),
-          decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.3), borderRadius: BorderRadius.circular(2)),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(2),
+          ),
         ),
         Expanded(
           child: Column(
@@ -739,16 +999,25 @@ class DynamicFormFieldWidget extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 margin: EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
-                  color: AppColors.info.withOpacity(0.1),
+                  color: AppColors.info.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                  border: Border.all(
+                    color: AppColors.info.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.arrow_forward, size: 12, color: AppColors.info),
                     SizedBox(width: 4),
-                    Text('Campo condicional', style: TextStyle(fontSize: 10, color: AppColors.info, fontWeight: FontWeight.w600)),
+                    Text(
+                      'Campo condicional',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppColors.info,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -791,10 +1060,16 @@ class DynamicFormFieldWidget extends StatelessWidget {
     return [];
   }
 
-  void _handleSelection(String optionId, bool isMultiple, List<String> current) {
+  void _handleSelection(
+    String optionId,
+    bool isMultiple,
+    List<String> current,
+  ) {
     if (isMultiple) {
       final newSelected = List<String>.from(current);
-      newSelected.contains(optionId) ? newSelected.remove(optionId) : newSelected.add(optionId);
+      newSelected.contains(optionId)
+          ? newSelected.remove(optionId)
+          : newSelected.add(optionId);
       onChanged(newSelected);
     } else {
       onChanged(optionId);

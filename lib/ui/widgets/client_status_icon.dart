@@ -60,28 +60,18 @@ class ClientStatusIcons extends StatelessWidget {
     Widget iconWidget = Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: color.withOpacity(0.3),
-          width: 0.5,
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 0.5),
       ),
-      child: Icon(
-        icon,
-        size: iconSize,
-        color: color,
-      ),
+      child: Icon(icon, size: iconSize, color: color),
     );
 
     if (!showTooltips) {
       return iconWidget;
     }
 
-    return Tooltip(
-      message: tooltip,
-      child: iconWidget,
-    );
+    return Tooltip(message: tooltip, child: iconWidget);
   }
 }
 
@@ -128,9 +118,11 @@ class ClientListTile extends StatelessWidget {
               // Avatar del cliente
               CircleAvatar(
                 radius: 24,
-                backgroundColor: AppColors.primary.withOpacity(0.1),
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                 child: Text(
-                  clienteNombre.isNotEmpty ? clienteNombre[0].toUpperCase() : '?',
+                  clienteNombre.isNotEmpty
+                      ? clienteNombre[0].toUpperCase()
+                      : '?',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -159,7 +151,11 @@ class ClientListTile extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.badge, size: 14, color: AppColors.textTertiary),
+                          Icon(
+                            Icons.badge,
+                            size: 14,
+                            color: AppColors.textTertiary,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'CI: $clienteCI',
@@ -171,11 +167,16 @@ class ClientListTile extends StatelessWidget {
                         ],
                       ),
                     ],
-                    if (clienteDireccion != null && clienteDireccion!.isNotEmpty) ...[
+                    if (clienteDireccion != null &&
+                        clienteDireccion!.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          Icon(Icons.location_on, size: 14, color: AppColors.textTertiary),
+                          Icon(
+                            Icons.location_on,
+                            size: 14,
+                            color: AppColors.textTertiary,
+                          ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(

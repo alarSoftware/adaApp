@@ -19,7 +19,7 @@ class SelectScreen extends StatefulWidget {
   const SelectScreen({super.key});
 
   @override
-  _SelectScreenState createState() => _SelectScreenState();
+  State<SelectScreen> createState() => _SelectScreenState();
 }
 
 class _SelectScreenState extends State<SelectScreen> {
@@ -60,11 +60,11 @@ class _SelectScreenState extends State<SelectScreen> {
     //   Duration(minutes: 2),
     //       (_) => _checkPendingData(),
     // );
-    // _checkPendingData();
+    _checkPendingData();
   }
 
   // 🆕 NUEVO: Verificar datos pendientes
-// 🆕 NUEVO: Verificar datos pendientes (CORREGIDO)
+  // 🆕 NUEVO: Verificar datos pendientes (CORREGIDO)
   Future<void> _checkPendingData() async {
     try {
       final dbHelper = DatabaseHelper();
@@ -82,7 +82,8 @@ class _SelectScreenState extends State<SelectScreen> {
       // 🔥 CONTAR OTROS DATOS PENDIENTES (excluyendo tablas relacionadas con censos)
       final validationService = DatabaseValidationService(db);
       final summary = await validationService.getPendingSyncSummary();
-      final pendingByTable = summary['pending_by_table'] as List<dynamic>? ?? [];
+      final pendingByTable =
+          summary['pending_by_table'] as List<dynamic>? ?? [];
 
       // Tablas que se excluyen del conteo (ya están incluidas en censos)
       final tablasExcluidas = {
@@ -108,10 +109,11 @@ class _SelectScreenState extends State<SelectScreen> {
         });
       }
 
-      print('📊 Datos pendientes: $totalPendientes (Censos: $cantidadCensos, Otros: $otrosDatos)');
-
+      debugPrint(
+        '📊 Datos pendientes: $totalPendientes (Censos: $cantidadCensos, Otros: $otrosDatos)',
+      );
     } catch (e) {
-      print('❌ Error verificando datos pendientes: $e');
+      debugPrint('❌ Error verificando datos pendientes: $e');
       // Silently ignore errors for background check
     }
   }
@@ -123,11 +125,15 @@ class _SelectScreenState extends State<SelectScreen> {
     _batteryOptimizationChecked = true;
 
     try {
-      print('🔋 INICIANDO verificación de batería en SelectScreen...');
-      await BatteryOptimizationDialog.checkAndRequestBatteryOptimization(context);
-      print('🔋 ✅ COMPLETADO verificación de batería en SelectScreen');
+      debugPrint('🔋 INICIANDO verificación de batería en SelectScreen...');
+      await BatteryOptimizationDialog.checkAndRequestBatteryOptimization(
+        context,
+      );
+      debugPrint('🔋 ✅ COMPLETADO verificación de batería en SelectScreen');
     } catch (e) {
-      print('🔋 ❌ ERROR verificando optimización de batería en SelectScreen: $e');
+      debugPrint(
+        '🔋 ❌ ERROR verificando optimización de batería en SelectScreen: $e',
+      );
     }
   }
 
@@ -170,7 +176,7 @@ class _SelectScreenState extends State<SelectScreen> {
         Navigator.pushNamedAndRemoveUntil(
           context,
           '/login',
-              (route) => false, // Elimina TODAS las pantallas anteriores
+          (route) => false, // Elimina TODAS las pantallas anteriores
         );
       }
     } catch (e) {
@@ -190,9 +196,7 @@ class _SelectScreenState extends State<SelectScreen> {
             // Navegar a la pantalla de datos pendientes
             await Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (context) => PendingDataScreen(),
-              ),
+              MaterialPageRoute(builder: (context) => PendingDataScreen()),
             );
             // Refrescar contador después de volver
             // _checkPendingData();
@@ -218,10 +222,7 @@ class _SelectScreenState extends State<SelectScreen> {
                   ),
                 ],
               ),
-              constraints: BoxConstraints(
-                minWidth: 16,
-                minHeight: 16,
-              ),
+              constraints: BoxConstraints(minWidth: 16, minHeight: 16),
               child: Text(
                 _pendingDataCount > 99 ? '99+' : _pendingDataCount.toString(),
                 style: TextStyle(
@@ -236,8 +237,6 @@ class _SelectScreenState extends State<SelectScreen> {
       ],
     );
   }
-
-
 
   void _setupEventListener() {
     _eventSubscription = _viewModel.uiEvents.listen((event) {
@@ -303,16 +302,20 @@ class _SelectScreenState extends State<SelectScreen> {
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.1),
+                    color: AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                    border: Border.all(
+                      color: AppColors.error.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.warning_amber_rounded,
-                          color: AppColors.error,
-                          size: 20),
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: AppColors.error,
+                        size: 20,
+                      ),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -363,18 +366,22 @@ class _SelectScreenState extends State<SelectScreen> {
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.info.withOpacity(0.1),
+                    color: AppColors.info.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                    border: Border.all(
+                      color: AppColors.info.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.lightbulb_outline,
-                              color: AppColors.info,
-                              size: 18),
+                          Icon(
+                            Icons.lightbulb_outline,
+                            color: AppColors.info,
+                            size: 18,
+                          ),
                           SizedBox(width: 8),
                           Text(
                             'Recomendaciones:',
@@ -388,8 +395,12 @@ class _SelectScreenState extends State<SelectScreen> {
                       ),
                       SizedBox(height: 8),
                       _buildRecommendation('Verifica tu conexión a internet'),
-                      _buildRecommendation('Intenta nuevamente en unos momentos'),
-                      _buildRecommendation('Si el problema persiste, contacta a soporte'),
+                      _buildRecommendation(
+                        'Intenta nuevamente en unos momentos',
+                      ),
+                      _buildRecommendation(
+                        'Si el problema persiste, contacta a soporte',
+                      ),
                     ],
                   ),
                 ),
@@ -429,20 +440,11 @@ class _SelectScreenState extends State<SelectScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '•  ',
-            style: TextStyle(
-              color: AppColors.info,
-              fontSize: 13,
-            ),
-          ),
+          Text('•  ', style: TextStyle(color: AppColors.info, fontSize: 13)),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
             ),
           ),
         ],
@@ -450,7 +452,9 @@ class _SelectScreenState extends State<SelectScreen> {
     );
   }
 
-  Future<void> _handleDeleteValidationFailed(DatabaseValidationResult validation) async {
+  Future<void> _handleDeleteValidationFailed(
+    DatabaseValidationResult validation,
+  ) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -459,7 +463,11 @@ class _SelectScreenState extends State<SelectScreen> {
           backgroundColor: AppColors.surface,
           title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 28),
+              Icon(
+                Icons.warning_amber_rounded,
+                color: AppColors.warning,
+                size: 28,
+              ),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -490,9 +498,11 @@ class _SelectScreenState extends State<SelectScreen> {
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.warning.withOpacity(0.1),
+                    color: AppColors.warning.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                    border: Border.all(
+                      color: AppColors.warning.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -501,7 +511,11 @@ class _SelectScreenState extends State<SelectScreen> {
                         padding: EdgeInsets.symmetric(vertical: 4),
                         child: Row(
                           children: [
-                            Icon(Icons.circle, size: 8, color: AppColors.warning),
+                            Icon(
+                              Icons.circle,
+                              size: 8,
+                              color: AppColors.warning,
+                            ),
                             SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -522,9 +536,11 @@ class _SelectScreenState extends State<SelectScreen> {
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.info.withOpacity(0.1),
+                    color: AppColors.info.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                    border: Border.all(
+                      color: AppColors.info.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -533,10 +549,7 @@ class _SelectScreenState extends State<SelectScreen> {
                       Expanded(
                         child: Text(
                           'Por favor, sincroniza estos datos antes de eliminar la base de datos.',
-                          style: TextStyle(
-                            color: AppColors.info,
-                            fontSize: 13,
-                          ),
+                          style: TextStyle(color: AppColors.info, fontSize: 13),
                         ),
                       ),
                     ],
@@ -559,7 +572,7 @@ class _SelectScreenState extends State<SelectScreen> {
                 Navigator.of(context).pop();
                 await Navigator.push(
                   context,
-                   MaterialPageRoute(builder: (context) => PendingDataScreen()),
+                  MaterialPageRoute(builder: (context) => PendingDataScreen()),
                 );
                 // _checkPendingData();
               },
@@ -610,7 +623,10 @@ class _SelectScreenState extends State<SelectScreen> {
             children: [
               Icon(Icons.sync, color: AppColors.neutral700),
               SizedBox(width: 8),
-              Text('Sincronizar Datos', style: TextStyle(color: AppColors.textPrimary)),
+              Text(
+                'Sincronizar Datos',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
             ],
           ),
           content: Column(
@@ -632,23 +648,38 @@ class _SelectScreenState extends State<SelectScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('• Clientes', style: TextStyle(color: AppColors.textSecondary)),
-                    Text('• Equipos', style: TextStyle(color: AppColors.textSecondary)),
-                    Text('• Formularios', style: TextStyle(color: AppColors.textSecondary)),
+                    Text(
+                      '• Clientes',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                    Text(
+                      '• Equipos',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                    Text(
+                      '• Formularios',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
                   ],
                 ),
               ),
               SizedBox(height: 12),
               Text(
                 'Los datos locales serán actualizados.',
-                style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+              child: Text(
+                'Cancelar',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
@@ -674,29 +705,63 @@ class _SelectScreenState extends State<SelectScreen> {
             children: [
               Icon(Icons.delete_forever, color: AppColors.error),
               SizedBox(width: 8),
-              Text('Borrar Base de Datos', style: TextStyle(fontSize: 20, color: AppColors.textPrimary)),
+              Text(
+                'Borrar Base de Datos',
+                style: TextStyle(fontSize: 20, color: AppColors.textPrimary),
+              ),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('¡ATENCIÓN!', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.error, fontSize: 16)),
+              Text(
+                '¡ATENCIÓN!',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.error,
+                  fontSize: 16,
+                ),
+              ),
               SizedBox(height: 12),
-              Text('Esta acción borrará TODOS los datos locales:', style: TextStyle(color: AppColors.textPrimary)),
+              Text(
+                'Esta acción borrará TODOS los datos locales:',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
               SizedBox(height: 8),
-              Text('• Todos los clientes', style: TextStyle(color: AppColors.textSecondary)),
-              Text('• Todos los equipos', style: TextStyle(color: AppColors.textSecondary)),
-              Text('• Configuraciones locales', style: TextStyle(color: AppColors.textSecondary)),
-              Text('• Datos de sincronización', style: TextStyle(color: AppColors.textSecondary)),
+              Text(
+                '• Todos los clientes',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              Text(
+                '• Todos los equipos',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              Text(
+                '• Configuraciones locales',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              Text(
+                '• Datos de sincronización',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
               SizedBox(height: 16),
-              Text('¿Estás seguro?', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+              Text(
+                '¿Estás seguro?',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+              child: Text(
+                'Cancelar',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
@@ -755,16 +820,18 @@ class _SelectScreenState extends State<SelectScreen> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: onTap ?? () {
-          if (routeName != null) {
-            Navigator.pushNamed(context, routeName);
-          } else if (page != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => page),
-            );
-          }
-        },
+        onTap:
+            onTap ??
+            () {
+              if (routeName != null) {
+                Navigator.pushNamed(context, routeName);
+              } else if (page != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => page),
+                );
+              }
+            },
         child: Padding(
           padding: EdgeInsets.all(16),
           child: Row(
@@ -773,9 +840,9 @@ class _SelectScreenState extends State<SelectScreen> {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: color.withOpacity(0.2)),
+                  border: Border.all(color: color.withValues(alpha: 0.2)),
                 ),
                 child: Icon(icon, color: color, size: 28),
               ),
@@ -821,18 +888,16 @@ class _SelectScreenState extends State<SelectScreen> {
       child: Center(
         child: Card(
           color: AppColors.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           margin: EdgeInsets.symmetric(horizontal: 24),
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.sync,
-                  size: 48,
-                  color: AppColors.primary,
-                ),
+                Icon(Icons.sync, size: 48, color: AppColors.primary),
                 SizedBox(height: 16),
                 Text(
                   'Sincronizando Datos',
@@ -883,7 +948,10 @@ class _SelectScreenState extends State<SelectScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Panel Principal', style: TextStyle(color: AppColors.onPrimary)),
+        title: Text(
+          'Panel Principal',
+          style: TextStyle(color: AppColors.onPrimary),
+        ),
         backgroundColor: AppColors.appBarBackground,
         foregroundColor: AppColors.appBarForeground,
         actions: [
@@ -895,15 +963,19 @@ class _SelectScreenState extends State<SelectScreen> {
                 onPressed: _viewModel.isSyncing ? null : _viewModel.requestSync,
                 icon: _viewModel.isSyncing
                     ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.onPrimary),
-                  ),
-                )
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.onPrimary,
+                          ),
+                        ),
+                      )
                     : Icon(Icons.sync, color: AppColors.onPrimary),
-                tooltip: _viewModel.isSyncing ? 'Sincronizando...' : 'Sincronizar datos',
+                tooltip: _viewModel.isSyncing
+                    ? 'Sincronizando...'
+                    : 'Sincronizar datos',
               );
             },
           ),
@@ -930,22 +1002,28 @@ class _SelectScreenState extends State<SelectScreen> {
                 itemBuilder: (BuildContext context) => [
                   PopupMenuItem<String>(
                     value: 'probar_conexion',
-                    enabled: !_viewModel.isTestingConnection && !_viewModel.isSyncing,
+                    enabled:
+                        !_viewModel.isTestingConnection &&
+                        !_viewModel.isSyncing,
                     child: Row(
                       children: [
                         _viewModel.isTestingConnection
                             ? SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.success),
-                          ),
-                        )
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.success,
+                                  ),
+                                ),
+                              )
                             : Icon(Icons.wifi_find, color: AppColors.success),
                         SizedBox(width: 8),
                         Text(
-                          _viewModel.isTestingConnection ? 'Probando...' : 'Probar Conexión',
+                          _viewModel.isTestingConnection
+                              ? 'Probando...'
+                              : 'Probar Conexión',
                           style: TextStyle(color: AppColors.textPrimary),
                         ),
                       ],
@@ -953,12 +1031,17 @@ class _SelectScreenState extends State<SelectScreen> {
                   ),
                   PopupMenuItem<String>(
                     value: 'borrar_bd',
-                    enabled: !_viewModel.isSyncing && !_viewModel.isTestingConnection,
+                    enabled:
+                        !_viewModel.isSyncing &&
+                        !_viewModel.isTestingConnection,
                     child: Row(
                       children: [
                         Icon(Icons.delete_forever, color: AppColors.error),
                         SizedBox(width: 8),
-                        Text('Borrar Base de Datos', style: TextStyle(color: AppColors.textPrimary)),
+                        Text(
+                          'Borrar Base de Datos',
+                          style: TextStyle(color: AppColors.textPrimary),
+                        ),
                       ],
                     ),
                   ),
@@ -1005,7 +1088,9 @@ class _SelectScreenState extends State<SelectScreen> {
                                     height: 16,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        AppColors.primary,
+                                      ),
                                     ),
                                   ),
                                   SizedBox(width: 8),
@@ -1098,7 +1183,10 @@ class _SelectScreenState extends State<SelectScreen> {
                       icon: Icon(Icons.logout, color: AppColors.textSecondary),
                       label: Text(
                         'Cerrar Sesión',
-                        style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -1128,7 +1216,9 @@ class _SelectScreenState extends State<SelectScreen> {
     Navigator.pushReplacementNamed(context, '/login');
   }
 
-  Future<void> _mostrarDialogoSincronizacionObligatoria(RequiredSyncEvent event) async {
+  Future<void> _mostrarDialogoSincronizacionObligatoria(
+    RequiredSyncEvent event,
+  ) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -1141,8 +1231,8 @@ class _SelectScreenState extends State<SelectScreen> {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                    'Sincronización Requerida',
-                    style: TextStyle(color: AppColors.textPrimary)
+                  'Sincronización Requerida',
+                  style: TextStyle(color: AppColors.textPrimary),
                 ),
               ),
             ],
@@ -1165,7 +1255,10 @@ class _SelectScreenState extends State<SelectScreen> {
                 Navigator.of(context).pop();
                 _viewModel.cancelAndLogout();
               },
-              child: Text('Login', style: TextStyle(color: AppColors.textSecondary)),
+              child: Text(
+                'Login',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
             ),
             ElevatedButton(
               onPressed: () {

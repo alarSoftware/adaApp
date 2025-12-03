@@ -15,10 +15,10 @@ class OperacionesPendientesDetailScreen extends StatefulWidget {
   final PendingDataGroup group;
 
   const OperacionesPendientesDetailScreen({
-    Key? key,
+    super.key,
     required this.viewModel,
     required this.group,
-  }) : super(key: key);
+  });
 
   @override
   State<OperacionesPendientesDetailScreen> createState() =>
@@ -59,19 +59,21 @@ class _OperacionesPendientesDetailScreenState
   }
 
   // 🆕 MÉTODO PARA NAVEGAR AL HISTORIAL DE LA OPERACIÓN
-  Future<void> _navegarAHistorialOperacion(Map<String, dynamic> operacion) async {
+  Future<void> _navegarAHistorialOperacion(
+    Map<String, dynamic> operacion,
+  ) async {
     try {
       // Mostrar indicador de carga
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
       // Obtener datos completos de la operación
-      final operacionCompleta = await _obtenerOperacionCompleta(operacion['id']);
+      final operacionCompleta = await _obtenerOperacionCompleta(
+        operacion['id'],
+      );
 
       // Cerrar indicador de carga
       if (mounted && Navigator.canPop(context)) {
@@ -90,6 +92,8 @@ class _OperacionesPendientesDetailScreenState
         return;
       }
 
+      if (!mounted) return;
+
       // 🔥 NAVEGAR A OperacionComercialFormScreen en modo historial
       final resultado = await Navigator.push(
         context,
@@ -107,7 +111,6 @@ class _OperacionesPendientesDetailScreenState
       if (resultado == true && mounted) {
         await _loadOperacionesFallidas();
       }
-
     } catch (e) {
       // Cerrar indicador de carga si está abierto
       if (mounted && Navigator.canPop(context)) {
@@ -117,26 +120,28 @@ class _OperacionesPendientesDetailScreenState
       debugPrint('Error navegando al historial: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
   }
 
   // 🆕 MÉTODO AUXILIAR - Obtener OperacionComercial completa
-  Future<Map<String, dynamic>?> _obtenerOperacionCompleta(dynamic operacionId) async {
+  Future<Map<String, dynamic>?> _obtenerOperacionCompleta(
+    dynamic operacionId,
+  ) async {
     try {
       final db = await _dbHelper.database;
 
       // Obtener operación base (SIN JOIN a clientes)
-      final operaciones = await db.rawQuery('''
+      final operaciones = await db.rawQuery(
+        '''
         SELECT oc.*
         FROM operacion_comercial oc
         WHERE oc.id = ?
-      ''', [operacionId]);
+      ''',
+        [operacionId],
+      );
 
       if (operaciones.isEmpty) return null;
 
@@ -151,7 +156,7 @@ class _OperacionesPendientesDetailScreenState
       }
 
       final cliente = await clienteRepository.obtenerPorId(
-          clienteId is int ? clienteId : int.parse(clienteId.toString())
+        clienteId is int ? clienteId : int.parse(clienteId.toString()),
       );
 
       if (cliente == null) {
@@ -159,7 +164,8 @@ class _OperacionesPendientesDetailScreenState
       }
 
       // Obtener productos/detalles de la operación
-      final productosRaw = await db.rawQuery('''
+      final productosRaw = await db.rawQuery(
+        '''
         SELECT 
           ocd.*,
           p.nombre as producto_nombre,
@@ -169,12 +175,14 @@ class _OperacionesPendientesDetailScreenState
         LEFT JOIN productos p ON ocd.producto_id = p.id
         WHERE ocd.operacion_comercial_id = ?
         ORDER BY ocd.orden
-      ''', [operacionId]);
+      ''',
+        [operacionId],
+      );
 
       // Parsear tipo de operación
       final tipoOperacionStr = operacionData['tipo_operacion'] as String;
       final tipoOperacion = TipoOperacion.values.firstWhere(
-            (t) => t.name == tipoOperacionStr,
+        (t) => t.name == tipoOperacionStr,
         orElse: () => TipoOperacion.notaRetiroDiscontinuos,
       );
 
@@ -196,7 +204,8 @@ class _OperacionesPendientesDetailScreenState
           'orden': prod['orden'],
           'producto_reemplazo_id': prod['producto_reemplazo_id'],
           'producto_reemplazo_codigo': prod['producto_reemplazo_codigo'],
-          'producto_reemplazo_descripcion': prod['producto_reemplazo_descripcion'],
+          'producto_reemplazo_descripcion':
+              prod['producto_reemplazo_descripcion'],
         };
         return OperacionComercialDetalle.fromMap(detalleMap);
       }).toList();
@@ -209,7 +218,6 @@ class _OperacionesPendientesDetailScreenState
         'tipo_operacion': tipoOperacion,
         'operacion': operacionConDetalles,
       };
-
     } catch (e, stackTrace) {
       debugPrint('Error obteniendo operación completa: $e');
       debugPrint('StackTrace: $stackTrace');
@@ -277,8 +285,11 @@ class _OperacionesPendientesDetailScreenState
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.check_circle_outline,
-                size: 64, color: Colors.green[300]),
+            Icon(
+              Icons.check_circle_outline,
+              size: 64,
+              color: Colors.green[300],
+            ),
             const SizedBox(height: 16),
             Text(
               'Todas las operaciones sincronizadas',
@@ -309,7 +320,8 @@ class _OperacionesPendientesDetailScreenState
 
   Widget _buildOperacionCard(Map<String, dynamic> operacion) {
     final tipoOperacion = operacion['tipo_operacion']?.toString() ?? 'Sin tipo';
-    final clienteNombre = operacion['cliente_nombre']?.toString() ?? 'Sin cliente';
+    final clienteNombre =
+        operacion['cliente_nombre']?.toString() ?? 'Sin cliente';
     final fechaCreacion = operacion['fecha_creacion'] != null
         ? DateTime.parse(operacion['fecha_creacion'])
         : null;
@@ -319,7 +331,8 @@ class _OperacionesPendientesDetailScreenState
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       child: InkWell(
-        onTap: () => _navegarAHistorialOperacion(operacion), // 🆕 NAVEGAR AL HISTORIAL
+        onTap: () =>
+            _navegarAHistorialOperacion(operacion), // 🆕 NAVEGAR AL HISTORIAL
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -332,7 +345,7 @@ class _OperacionesPendientesDetailScreenState
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -406,9 +419,11 @@ class _OperacionesPendientesDetailScreenState
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    border: Border.all(
+                      color: Colors.red.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -457,8 +472,12 @@ class _OperacionesPendientesDetailScreenState
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value,
-      {Color? valueColor}) {
+  Widget _buildInfoRow(
+    IconData icon,
+    String label,
+    String value, {
+    Color? valueColor,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -467,10 +486,7 @@ class _OperacionesPendientesDetailScreenState
           const SizedBox(width: 8),
           Text(
             '$label:',
-            style: TextStyle(
-              fontSize: 13,
-              color: Theme.of(context).hintColor,
-            ),
+            style: TextStyle(fontSize: 13, color: Theme.of(context).hintColor),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -479,8 +495,8 @@ class _OperacionesPendientesDetailScreenState
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: valueColor ??
-                    Theme.of(context).textTheme.bodyLarge?.color,
+                color:
+                    valueColor ?? Theme.of(context).textTheme.bodyLarge?.color,
               ),
             ),
           ),

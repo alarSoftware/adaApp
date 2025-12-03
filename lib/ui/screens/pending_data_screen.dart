@@ -8,7 +8,7 @@ import 'package:ada_app/ui/screens/pantallaPendientesMigrado/operaciones_pendien
 class PendingDataScreen extends StatefulWidget {
   static const String routeName = '/pending-data';
 
-  const PendingDataScreen({Key? key}) : super(key: key);
+  const PendingDataScreen({super.key});
 
   @override
   State<PendingDataScreen> createState() => _PendingDataScreenState();
@@ -28,26 +28,25 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
     _viewModel.uiEvents.listen((event) {
       if (!mounted) return;
 
-      switch (event.runtimeType) {
-        case ShowErrorEvent _:
-          final errorEvent = event as ShowErrorEvent;
+      switch (event) {
+        case ShowErrorEvent errorEvent:
           _showErrorSnackBar(errorEvent.message);
           break;
 
-        case ShowSuccessEvent _:
-          final successEvent = event as ShowSuccessEvent;
+        case ShowSuccessEvent successEvent:
           _showSuccessSnackBar(successEvent.message);
           break;
 
-        case RequestBulkSendConfirmationEvent:
-          final confirmEvent = event as RequestBulkSendConfirmationEvent;
-          _showBulkSendConfirmation(confirmEvent.groups, confirmEvent.totalItems);
+        case RequestBulkSendConfirmationEvent confirmEvent:
+          _showBulkSendConfirmation(
+            confirmEvent.groups,
+            confirmEvent.totalItems,
+          );
           break;
 
-        case SendProgressEvent:
-        // El progreso se maneja automáticamente via notifyListeners
+        case SendProgressEvent _:
+          // El progreso se maneja automáticamente via notifyListeners
           break;
-
       }
     });
   }
@@ -115,12 +114,9 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
               children: [
                 _buildHeader(viewModel),
                 // 🆕 Barra de estado de auto-sync
-                if (viewModel.autoSyncEnabled)
-                  _buildAutoSyncBanner(viewModel),
+                if (viewModel.autoSyncEnabled) _buildAutoSyncBanner(viewModel),
                 if (viewModel.isSending) _buildSendingProgress(viewModel),
-                Expanded(
-                  child: _buildContent(viewModel),
-                ),
+                Expanded(child: _buildContent(viewModel)),
                 if (viewModel.hasPendingData) _buildActionButtons(viewModel),
               ],
             );
@@ -136,29 +132,19 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.1),
+        color: Colors.blue.withValues(alpha: 0.1),
         border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).dividerColor,
-            width: 1,
-          ),
+          bottom: BorderSide(color: Theme.of(context).dividerColor, width: 1),
         ),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.sync,
-            size: 16,
-            color: Colors.blue,
-          ),
+          const Icon(Icons.sync, size: 16, color: Colors.blue),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               'Sincronización automática activa (cada ${viewModel.autoSyncInterval.inMinutes} min)',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.blue,
-              ),
+              style: const TextStyle(fontSize: 12, color: Colors.blue),
             ),
           ),
         ],
@@ -171,12 +157,9 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor.withOpacity(0.1),
+        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
         border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).dividerColor,
-            width: 1,
-          ),
+          bottom: BorderSide(color: Theme.of(context).dividerColor, width: 1),
         ),
       ),
       child: Column(
@@ -185,7 +168,9 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
           Row(
             children: [
               Icon(
-                viewModel.hasPendingData ? Icons.pending_actions : Icons.check_circle,
+                viewModel.hasPendingData
+                    ? Icons.pending_actions
+                    : Icons.check_circle,
                 color: viewModel.hasPendingData ? Colors.orange : Colors.green,
                 size: 28,
               ),
@@ -224,7 +209,7 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.1),
+        color: Colors.blue.withValues(alpha: 0.1),
         border: Border(
           bottom: BorderSide(color: Theme.of(context).dividerColor),
         ),
@@ -400,7 +385,7 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
+                      color: Colors.orange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
@@ -429,21 +414,20 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
     );
   }
 
-// Agregar este método al final de la clase _PendingDataScreenState
+  // Agregar este método al final de la clase _PendingDataScreenState
   void _navigateToCensosDetail(PendingDataGroup group) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CensosPendientesDetailScreen(
-          viewModel: _viewModel,
-          group: group,
-        ),
+        builder: (context) =>
+            CensosPendientesDetailScreen(viewModel: _viewModel, group: group),
       ),
     ).then((_) {
       // Recargar cuando regrese de la pantalla de detalle
       _viewModel.refresh();
     });
   }
+
   void _navigateToOperacionesDetail(PendingDataGroup group) {
     Navigator.push(
       context,
@@ -489,14 +473,10 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(
-        iconData,
-        color: color,
-        size: 24,
-      ),
+      child: Icon(iconData, color: color, size: 24),
     );
   }
 
@@ -505,12 +485,10 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(
-          top: BorderSide(color: Theme.of(context).dividerColor),
-        ),
+        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             offset: const Offset(0, -2),
             blurRadius: 4,
           ),
@@ -525,9 +503,9 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
                 padding: const EdgeInsets.all(12),
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -551,7 +529,10 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
 
   // ========== DIÁLOGOS ==========
 
-  void _showBulkSendConfirmation(List<PendingDataGroup> groups, int totalItems) {
+  void _showBulkSendConfirmation(
+    List<PendingDataGroup> groups,
+    int totalItems,
+  ) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -567,7 +548,9 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Se enviarán $totalItems elementos en ${groups.length} categorías:'),
+            Text(
+              'Se enviarán $totalItems elementos en ${groups.length} categorías:',
+            ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
@@ -576,43 +559,50 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
-                children: groups.map((group) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    children: [
-                      _buildTypeIcon(group.type),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          group.displayName,
-                          style: const TextStyle(fontSize: 14),
+                children: groups
+                    .map(
+                      (group) => Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          children: [
+                            _buildTypeIcon(group.type),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                group.displayName,
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '${group.count}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: Colors.orange,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '${group.count}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: Colors.orange,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                )).toList(),
+                    )
+                    .toList(),
               ),
             ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: Colors.blue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -622,10 +612,7 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
                   Expanded(
                     child: Text(
                       'Este proceso puede tardar varios minutos dependiendo de la cantidad de datos.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.blue[700],
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.blue[700]),
                     ),
                   ),
                 ],
@@ -636,7 +623,6 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
       ),
     );
   }
-
 
   // ========== HELPERS ==========
 

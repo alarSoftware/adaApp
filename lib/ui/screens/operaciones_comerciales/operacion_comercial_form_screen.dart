@@ -9,7 +9,8 @@ import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart'
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/ui/widgets/client_info_card.dart';
 import 'package:ada_app/ui/widgets/app_notification.dart';
-import 'package:ada_app/viewmodels/operaciones_comerciales/operacion_comercial_viewmodel.dart' as vm;
+import 'package:ada_app/viewmodels/operaciones_comerciales/operacion_comercial_viewmodel.dart'
+    as vm;
 import 'package:ada_app/ui/widgets/operaciones_comerciales/buscador_productos_widget.dart';
 import 'package:ada_app/ui/widgets/operaciones_comerciales/productos_seleccionados_widget.dart';
 import 'package:ada_app/ui/widgets/bottom_bar_widget.dart';
@@ -23,19 +24,21 @@ class OperacionComercialFormScreen extends StatelessWidget {
   final bool isViewOnly;
 
   const OperacionComercialFormScreen({
-    Key? key,
+    super.key,
     required this.cliente,
     required this.tipoOperacion,
     this.operacionExistente,
     this.isViewOnly = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     // 👇 CAMBIO: Incluir operaciones con error o sincronizadas como solo lectura
-    final esVisualizacion = isViewOnly ||
+    final esVisualizacion =
+        isViewOnly ||
         (operacionExistente != null &&
-            (operacionExistente!.estaSincronizado || operacionExistente!.tieneError));
+            (operacionExistente!.estaSincronizado ||
+                operacionExistente!.tieneError));
 
     return ChangeNotifierProvider(
       create: (context) => vm.OperacionComercialFormViewModel(
@@ -53,10 +56,12 @@ class _OperacionComercialFormView extends StatefulWidget {
   const _OperacionComercialFormView();
 
   @override
-  State<_OperacionComercialFormView> createState() => _OperacionComercialFormViewState();
+  State<_OperacionComercialFormView> createState() =>
+      _OperacionComercialFormViewState();
 }
 
-class _OperacionComercialFormViewState extends State<_OperacionComercialFormView> {
+class _OperacionComercialFormViewState
+    extends State<_OperacionComercialFormView> {
   final _formKey = GlobalKey<FormState>();
   bool _isRetrying = false;
 
@@ -66,16 +71,17 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
       builder: (context, viewModel, child) {
         // ✅ CORREGIDO: Verificar si tiene error O está pendiente
         final tieneError = viewModel.operacionExistente?.tieneError ?? false;
-        final estaPendiente = viewModel.operacionExistente?.estaPendiente ?? false;
+        final estaPendiente =
+            viewModel.operacionExistente?.estaPendiente ?? false;
         final necesitaReintento = tieneError || estaPendiente;
 
         return PopScope(
           canPop: viewModel.isViewOnly || !viewModel.isFormDirty,
-          onPopInvoked: (didPop) async {
+          onPopInvokedWithResult: (didPop, result) async {
             if (!didPop && !viewModel.isViewOnly && viewModel.isFormDirty) {
               final shouldPop = await _handleBackNavigation(viewModel);
               if (shouldPop && mounted) {
-                Navigator.of(context).pop();
+                Navigator.of(this.context).pop();
               }
             }
           },
@@ -95,7 +101,12 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                           if (viewModel.isViewOnly)
                             SliverToBoxAdapter(
                               child: Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  16,
+                                  16,
+                                  8,
+                                ),
                                 child: _buildModernStatusBanner(viewModel),
                               ),
                             ),
@@ -113,11 +124,14 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                                   const SizedBox(height: 12),
                                   BuscadorProductosWidget(
                                     searchQuery: viewModel.searchQuery,
-                                    productosFiltrados: viewModel.productosFiltrados,
-                                    productosSeleccionados: viewModel.productosSeleccionados,
+                                    productosFiltrados:
+                                        viewModel.productosFiltrados,
+                                    productosSeleccionados:
+                                        viewModel.productosSeleccionados,
                                     onSearchChanged: viewModel.setSearchQuery,
                                     onClearSearch: viewModel.clearSearch,
-                                    onProductoSelected: viewModel.agregarProducto,
+                                    onProductoSelected:
+                                        viewModel.agregarProducto,
                                   ),
                                   const SizedBox(height: 24),
                                 ],
@@ -126,19 +140,32 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                                   'Detalle del Pedido',
                                   trailing: Text(
                                     '${viewModel.productosSeleccionados.length} items',
-                                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 13,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 12),
 
                                 ProductosSeleccionadosWidget(
-                                  productosSeleccionados: viewModel.productosSeleccionados,
+                                  productosSeleccionados:
+                                      viewModel.productosSeleccionados,
                                   tipoOperacion: viewModel.tipoOperacion,
-                                  onEliminarProducto: viewModel.isViewOnly ? (_) {} : viewModel.eliminarProducto,
-                                  onActualizarCantidad: viewModel.isViewOnly ? (_, __) {} : viewModel.actualizarCantidadProducto,
+                                  onEliminarProducto: viewModel.isViewOnly
+                                      ? (_) {}
+                                      : viewModel.eliminarProducto,
+                                  onActualizarCantidad: viewModel.isViewOnly
+                                      ? (_, __) {}
+                                      : viewModel.actualizarCantidadProducto,
                                   onSeleccionarReemplazo: viewModel.isViewOnly
                                       ? (_, __) {}
-                                      : (index, detalle) => _seleccionarProductoReemplazo(viewModel, index, detalle),
+                                      : (index, detalle) =>
+                                            _seleccionarProductoReemplazo(
+                                              viewModel,
+                                              index,
+                                              detalle,
+                                            ),
                                   isReadOnly: viewModel.isViewOnly,
                                 ),
                                 const SizedBox(height: 24),
@@ -146,13 +173,15 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                                 IgnorePointer(
                                   ignoring: viewModel.isViewOnly,
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       _buildSectionTitle('Notas Adicionales'),
                                       const SizedBox(height: 8),
                                       ObservacionesWidget(
                                         observaciones: viewModel.observaciones,
-                                        onObservacionesChanged: viewModel.setObservaciones,
+                                        onObservacionesChanged:
+                                            viewModel.setObservaciones,
                                       ),
                                     ],
                                   ),
@@ -174,7 +203,7 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                       color: Colors.white,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           offset: const Offset(0, -4),
                           blurRadius: 16,
                         ),
@@ -183,11 +212,11 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                     child: necesitaReintento
                         ? _buildRetryButton(viewModel)
                         : BottomBarWidget(
-                      totalProductos: viewModel.totalProductos,
-                      isSaving: viewModel.isSaving,
-                      isEditing: false,
-                      onGuardar: () => _guardarOperacion(viewModel),
-                    ),
+                            totalProductos: viewModel.totalProductos,
+                            isSaving: viewModel.isSaving,
+                            isEditing: false,
+                            onGuardar: () => _guardarOperacion(viewModel),
+                          ),
                   ),
               ],
             ),
@@ -211,7 +240,7 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: AppColors.error.withOpacity(0.1),
+                color: AppColors.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -220,11 +249,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      viewModel.operacionExistente?.syncError ?? 'Error de sincronización',
-                      style: TextStyle(
-                        color: AppColors.error,
-                        fontSize: 12,
-                      ),
+                      viewModel.operacionExistente?.syncError ??
+                          'Error de sincronización',
+                      style: TextStyle(color: AppColors.error, fontSize: 12),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -239,11 +266,15 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: _isRetrying ? null : () => _reintentarSincronizacion(viewModel),
+                onPressed: _isRetrying
+                    ? null
+                    : () => _reintentarSincronizacion(viewModel),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.warning,
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: AppColors.warning.withOpacity(0.5),
+                  disabledBackgroundColor: AppColors.warning.withValues(
+                    alpha: 0.5,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -251,40 +282,42 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                 ),
                 child: _isRetrying
                     ? Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Reintentando...',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                )
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Reintentando...',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      )
                     : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.refresh, size: 20),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Reintentar Envio',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.refresh, size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Reintentar Envio',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ],
@@ -293,7 +326,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     );
   }
 
-  PreferredSizeWidget _buildFixedAppBar(vm.OperacionComercialFormViewModel viewModel) {
+  PreferredSizeWidget _buildFixedAppBar(
+    vm.OperacionComercialFormViewModel viewModel,
+  ) {
     return AppBar(
       title: Text(
         viewModel.isViewOnly
@@ -305,9 +340,7 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
       foregroundColor: AppColors.appBarForeground,
       elevation: 0,
       centerTitle: true,
-      actions: viewModel.isViewOnly ? [
-        _buildSyncStatusBadge(viewModel),
-      ] : null,
+      actions: viewModel.isViewOnly ? [_buildSyncStatusBadge(viewModel)] : null,
     );
   }
 
@@ -345,7 +378,7 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, size: 20, color: color),
@@ -354,7 +387,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     );
   }
 
-  Widget _buildModernStatusBanner(vm.OperacionComercialFormViewModel viewModel) {
+  Widget _buildModernStatusBanner(
+    vm.OperacionComercialFormViewModel viewModel,
+  ) {
     final operacion = viewModel.operacionExistente;
     final tieneError = operacion?.syncStatus == 'error';
     final colorBase = tieneError ? Colors.red : Colors.blue;
@@ -362,16 +397,16 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: colorBase.withOpacity(0.08),
+        color: colorBase.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorBase.withOpacity(0.2)),
+        border: Border.all(color: colorBase.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: colorBase.withOpacity(0.2),
+              color: colorBase.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -423,7 +458,7 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.06),
+                  color: Colors.grey.withValues(alpha: 0.06),
                   blurRadius: 20,
                   offset: const Offset(0, 4),
                 ),
@@ -440,7 +475,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     final isError = !viewModel.isViewOnly && viewModel.fechaRetiro == null;
 
     return InkWell(
-      onTap: viewModel.isViewOnly ? null : () => _seleccionarFechaRetiro(viewModel),
+      onTap: viewModel.isViewOnly
+          ? null
+          : () => _seleccionarFechaRetiro(viewModel),
       borderRadius: BorderRadius.circular(12),
       child: Row(
         children: [
@@ -448,8 +485,8 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: isError
-                  ? AppColors.error.withOpacity(0.1)
-                  : AppColors.primary.withOpacity(0.08),
+                  ? AppColors.error.withValues(alpha: 0.1)
+                  : AppColors.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
@@ -464,10 +501,7 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
             children: [
               Text(
                 'Fecha de Retiro',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
               ),
               const SizedBox(height: 2),
               Text(
@@ -510,7 +544,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
 
   // --- LÓGICA DE NEGOCIO ---
 
-  Future<void> _reintentarSincronizacion(vm.OperacionComercialFormViewModel viewModel) async {
+  Future<void> _reintentarSincronizacion(
+    vm.OperacionComercialFormViewModel viewModel,
+  ) async {
     final operacion = viewModel.operacionExistente;
     if (operacion == null) return;
 
@@ -533,7 +569,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
         type: NotificationType.success,
       );
       Navigator.pop(context, true);
-
     } catch (e) {
       if (!mounted) return;
 
@@ -544,9 +579,12 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
         e.toString().replaceAll('Exception: ', ''),
       );
 
+      if (!mounted) return;
+
       AppNotification.show(
         context,
-        message: 'Error al reintentar: ${e.toString().replaceAll('Exception: ', '')}',
+        message:
+            'Error al reintentar: ${e.toString().replaceAll('Exception: ', '')}',
         type: NotificationType.error,
       );
     } finally {
@@ -554,7 +592,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     }
   }
 
-  Future<void> _seleccionarFechaRetiro(vm.OperacionComercialFormViewModel viewModel) async {
+  Future<void> _seleccionarFechaRetiro(
+    vm.OperacionComercialFormViewModel viewModel,
+  ) async {
     if (viewModel.isViewOnly) return;
 
     final ahora = DateTime.now();
@@ -589,7 +629,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     }
   }
 
-  Future<void> _guardarOperacion(vm.OperacionComercialFormViewModel viewModel) async {
+  Future<void> _guardarOperacion(
+    vm.OperacionComercialFormViewModel viewModel,
+  ) async {
     if (!_formKey.currentState!.validate()) {
       AppNotification.show(
         context,
@@ -612,7 +654,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     }
   }
 
-  Future<bool> _handleBackNavigation(vm.OperacionComercialFormViewModel viewModel) async {
+  Future<bool> _handleBackNavigation(
+    vm.OperacionComercialFormViewModel viewModel,
+  ) async {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -625,11 +669,15 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
           ],
         ),
         content: const Text(
-            'Tienes cambios que no se han guardado. ¿Estás seguro que quieres salir?'),
+          'Tienes cambios que no se han guardado. ¿Estás seguro que quieres salir?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -646,10 +694,10 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
   }
 
   Future<void> _seleccionarProductoReemplazo(
-      vm.OperacionComercialFormViewModel viewModel,
-      int index,
-      dynamic detalle,
-      ) async {
+    vm.OperacionComercialFormViewModel viewModel,
+    int index,
+    dynamic detalle,
+  ) async {
     if (viewModel.isViewOnly) return;
 
     final productoOriginal = Producto(
@@ -659,7 +707,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
       categoria: detalle.productoCategoria,
     );
 
-    final productosReemplazo = await viewModel.obtenerProductosReemplazo(productoOriginal);
+    final productosReemplazo = await viewModel.obtenerProductosReemplazo(
+      productoOriginal,
+    );
 
     if (!mounted) return;
 
@@ -697,7 +747,10 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 8,
+                ),
                 child: Column(
                   children: [
                     Text(
@@ -725,7 +778,8 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                   controller: scrollController,
                   padding: const EdgeInsets.all(16),
                   itemCount: productosReemplazo.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final producto = productosReemplazo[index];
                     return InkWell(
@@ -744,7 +798,7 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                               width: 48,
                               height: 48,
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
+                                color: AppColors.primary.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Icon(
