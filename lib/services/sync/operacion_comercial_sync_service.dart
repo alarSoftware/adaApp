@@ -55,16 +55,7 @@ class OperacionComercialSyncService {
           operacionesExitosas++;
         } catch (e) {
           totalFallidas++;
-
-          if (operacion.id != null) {
-            await ErrorLogService.manejarExcepcion(
-              e,
-              operacion.id!,
-              null,
-              usuarioId,
-              _tableName,
-            );
-          }
+          // El error ya fue logueado en OperacionesComercialesPostService
         }
 
         await Future.delayed(Duration(milliseconds: 500));

@@ -17,9 +17,9 @@ class OperacionesComercialesPostService {
       '/operacionComercial/insertOperacionComercial';
 
   static Future<void> enviarOperacion(
-      OperacionComercial operacion, {
-        int timeoutSegundos = 60,
-      }) async {
+    OperacionComercial operacion, {
+    int timeoutSegundos = 60,
+  }) async {
     String? fullUrl;
     try {
       if (operacion.id == null || operacion.id!.isEmpty) {
@@ -38,14 +38,14 @@ class OperacionesComercialesPostService {
 
       final response = await http
           .post(
-        Uri.parse(fullUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-        },
-        body: jsonEncode(payload),
-      )
+            Uri.parse(fullUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'ngrok-skip-browser-warning': 'true',
+            },
+            body: jsonEncode(payload),
+          )
           .timeout(Duration(seconds: timeoutSegundos));
 
       ServerResponse resultObject = ServerResponse.fromHttp(response);
@@ -57,13 +57,19 @@ class OperacionesComercialesPostService {
       }
 
       // Éxito
-      if (resultObject.success || resultObject.isDuplicate) {
-      }
+      if (resultObject.success || resultObject.isDuplicate) {}
     } catch (e) {
-      //TODO escalar error
+      await ErrorLogService.manejarExcepcion(
+        e,
+        operacion.id,
+        fullUrl,
+        operacion.usuarioId,
+        'operacion_comercial',
+      );
       rethrow;
     }
   }
+
   static Map<String, dynamic> _construirPayload(OperacionComercial operacion) {
     final operacionComercialData = {
       'id': operacion.id,

@@ -2,6 +2,7 @@ import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart'
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 import 'package:ada_app/services/post/operaciones_comerciales_post_service.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'base_repository.dart';
 
 import 'package:uuid/uuid.dart';
@@ -12,12 +13,12 @@ abstract class OperacionComercialRepository {
   Future<OperacionComercial?> obtenerOperacionPorId(String id);
   Future<List<OperacionComercial>> obtenerOperacionesPorCliente(int clienteId);
   Future<List<OperacionComercial>> obtenerOperacionesPorTipo(
-      TipoOperacion tipo,
-      );
+    TipoOperacion tipo,
+  );
   Future<List<OperacionComercial>> obtenerOperacionesPorClienteYTipo(
-      int clienteId,
-      TipoOperacion tipo,
-      );
+    int clienteId,
+    TipoOperacion tipo,
+  );
   Future<void> eliminarOperacion(String id);
 
   Future<void> marcarPendienteSincronizacion(String operacionId);
@@ -71,7 +72,6 @@ class OperacionComercialRepositoryImpl
 
       final db = await dbHelper.database;
       await db.transaction((txn) async {
-
         await txn.insert(tableName, operacionConId.toMap());
 
         for (int i = 0; i < operacion.detalles.length; i++) {
@@ -135,8 +135,8 @@ class OperacionComercialRepositoryImpl
 
   @override
   Future<List<OperacionComercial>> obtenerOperacionesPorCliente(
-      int clienteId,
-      ) async {
+    int clienteId,
+  ) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -173,8 +173,8 @@ class OperacionComercialRepositoryImpl
 
   @override
   Future<List<OperacionComercial>> obtenerOperacionesPorTipo(
-      TipoOperacion tipo,
-      ) async {
+    TipoOperacion tipo,
+  ) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -191,9 +191,9 @@ class OperacionComercialRepositoryImpl
 
   @override
   Future<List<OperacionComercial>> obtenerOperacionesPorClienteYTipo(
-      int clienteId,
-      TipoOperacion tipo,
-      ) async {
+    int clienteId,
+    TipoOperacion tipo,
+  ) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -256,10 +256,7 @@ class OperacionComercialRepositoryImpl
     try {
       await dbHelper.actualizar(
         tableName,
-        {
-          'sync_status': 'creado',
-          'sync_error': null,
-        },
+        {'sync_status': 'creado', 'sync_error': null},
         where: 'id = ?',
         whereArgs: [operacionId],
       );
@@ -322,6 +319,11 @@ class OperacionComercialRepositoryImpl
         where: 'id = ?',
         whereArgs: [operacionId],
       );
+
+      await ErrorLogService.marcarErroresComoResueltos(
+        registroFailId: operacionId,
+        tableName: tableName,
+      );
     } catch (e) {
       rethrow;
     }
@@ -333,9 +335,9 @@ class OperacionComercialRepositoryImpl
 
   /// Actualiza el contador de intentos de sincronización
   Future<void> actualizarIntentoSync(
-      String operacionId,
-      int numeroIntento,
-      ) async {
+    String operacionId,
+    int numeroIntento,
+  ) async {
     try {
       await dbHelper.actualizar(
         tableName,
