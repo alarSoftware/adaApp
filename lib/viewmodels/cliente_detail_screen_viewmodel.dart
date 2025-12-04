@@ -1,13 +1,10 @@
-// viewmodels/cliente_detail_screen_viewmodel.dart
 import 'package:flutter/foundation.dart';
 import 'dart:async';
-import 'package:logger/logger.dart';
 import '../models/cliente.dart';
 import '../repositories/equipo_repository.dart';
-import '../repositories/equipo_pendiente_repository.dart'; // AGREGAR: Repository para equipos pendientes
+import '../repositories/equipo_pendiente_repository.dart';
 import '../repositories/censo_activo_repository.dart';
 
-// ========== EVENTOS PARA LA UI ==========
 abstract class ClienteDetailUIEvent {}
 
 class ShowErrorEvent extends ClienteDetailUIEvent {
@@ -27,7 +24,6 @@ class NavigateToEquipoDetailEvent extends ClienteDetailUIEvent {
 
 class RefreshCompletedEvent extends ClienteDetailUIEvent {}
 
-// ========== ESTADO PURO - CORREGIDO ==========
 class ClienteDetailState {
   final bool isLoading;
   final List<Map<String, dynamic>> equiposAsignadosList;
@@ -65,27 +61,21 @@ class ClienteDetailState {
   bool get tieneEquiposAsignados => equiposAsignadosList.isNotEmpty;
   bool get tieneEquiposPendientes => equiposPendientesList.isNotEmpty;
 
-  // Lista combinada para compatibilidad con código existente
   List<Map<String, dynamic>> get equiposCompletos => [...equiposAsignadosList, ...equiposPendientesList];
 }
 
-// ========== VIEWMODEL CORREGIDO ==========
 class ClienteDetailScreenViewModel extends ChangeNotifier {
-  final Logger _logger = Logger();
   final EquipoRepository _equipoRepository = EquipoRepository();
   final EquipoPendienteRepository _equipoPendienteRepository = EquipoPendienteRepository();
   final CensoActivoRepository _estadoEquipoRepository = CensoActivoRepository();
 
-  // ========== ESTADO INTERNO ==========
   ClienteDetailState _state = ClienteDetailState();
   Cliente? _cliente;
 
-  // ========== STREAMS PARA EVENTOS ==========
   final StreamController<ClienteDetailUIEvent> _eventController =
   StreamController<ClienteDetailUIEvent>.broadcast();
   Stream<ClienteDetailUIEvent> get uiEvents => _eventController.stream;
 
-  // ========== GETTERS PÚBLICOS ==========
   ClienteDetailState get state => _state;
   bool get isLoading => _state.isLoading;
   List<Map<String, dynamic>> get equiposAsignadosList => _state.equiposAsignadosList;
@@ -112,13 +102,11 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
     super.dispose();
   }
 
-  // ========== INICIALIZACIÓN ==========
   Future<void> initialize(Cliente cliente) async {
     _cliente = cliente;
     await cargarEquipos();
   }
 
-  // ========== CARGA DE DATOS - CORREGIDO ==========
   Future<void> cargarEquipos() async {
     _updateState(_state.copyWith(
       isLoading: true,
@@ -131,17 +119,8 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      _logger.i('Cargando equipos para cliente: ${_cliente!.id}');
-
       final equiposAsignadosList = await _equipoRepository.obtenerEquiposAsignados(_cliente!.id!);
       final equiposPendientesList = await _equipoPendienteRepository.obtenerEquiposPendientesPorCliente(_cliente!.id!);
-
-      _logger.i('=== DEBUG SEPARACIÓN ===');
-      _logger.i('Equipos ASIGNADOS obtenidos: ${equiposAsignadosList.length}');
-      equiposAsignadosList.forEach((eq) => _logger.i('  - Asignado: ${eq['cod_barras']} | Estado: ${eq['estado']}'));
-
-      _logger.i('Equipos PENDIENTES obtenidos: ${equiposPendientesList.length}');
-      equiposPendientesList.forEach((eq) => _logger.i('  - Pendiente: ${eq['cod_barras']} | Estado: ${eq['estado']}'));
 
       _updateState(_state.copyWith(
         isLoading: false,
@@ -149,12 +128,7 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
         equiposPendientesList: equiposPendientesList,
       ));
 
-      _logger.i('✅ Equipos cargados exitosamente');
-      _logger.i('Total: $totalEquiposCount, Asignados: $equiposAsignadosCount, Pendientes: $equiposPendientesCount');
-
     } catch (e, stackTrace) {
-      _logger.e('❌ Error cargando equipos del cliente', error: e, stackTrace: stackTrace);
-
       _updateState(_state.copyWith(
         isLoading: false,
         errorMessage: 'Error cargando equipos: ${e.toString()}',
@@ -172,7 +146,6 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
     ));
   }
 
-  // ========== MÉTODOS DE NAVEGACIÓN ==========
   Future<void> refresh() async {
     await cargarEquipos();
     _eventController.add(RefreshCompletedEvent());
@@ -185,10 +158,8 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   void navegarADetalleEquipo(Map<String, dynamic> equipoData) {
-    // CORRECCIÓN: Determinar si es asignado basándose en la lista de origen
     bool isAsignado = _state.equiposAsignadosList.any((e) => e['id'] == equipoData['id']);
 
-    // Agregar el tipo_estado al equipoData
     final equipoDataWithType = {
       ...equipoData,
       'tipo_estado': isAsignado ? 'asignado' : 'pendiente',
@@ -203,7 +174,6 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== UTILIDADES PARA LA UI ==========
   String getNombreCliente() {
     return _cliente?.nombre ?? 'Cliente no especificado';
   }
@@ -215,6 +185,7 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
         '${fecha.hour.toString().padLeft(2, '0')}:'
         '${fecha.minute.toString().padLeft(2, '0')}';
   }
+
   String getEquipoTitle(Map<String, dynamic> equipoData) {
     final marca = equipoData['marca_nombre'] ?? 'Sin marca';
     final modelo = equipoData['modelo_nombre'] ?? 'Sin modelo';
@@ -246,11 +217,11 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
         final fecha = DateTime.parse(fechaStr).toLocal();
         return 'Censado: ${formatearFecha(fecha)}';
       } catch (e) {
-        _logger.w('Error parseando fecha: $fechaStr');
       }
     }
     return 'Fecha no disponible';
   }
+
   String getEquipoEstado(Map<String, dynamic> equipoData) {
     return equipoData['estado']?.toString() ?? 'Sin estado';
   }
@@ -264,13 +235,13 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
     final estado = equipoData['estado']?.toString().toLowerCase();
     switch (estado) {
       case 'asignado':
-        return '#4CAF50'; // Verde
+        return '#4CAF50';
       case 'pendiente':
-        return '#FF9800'; // Naranja
+        return '#FF9800';
       case 'disponible':
-        return '#2196F3'; // Azul
+        return '#2196F3';
       default:
-        return '#9E9E9E'; // Gris
+        return '#9E9E9E';
     }
   }
 
@@ -288,38 +259,31 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== MÉTODOS PARA OBTENER ESTADO DE CENSO ==========
   Future<Map<String, dynamic>?> getEstadoCensoInfo(Map<String, dynamic> equipoData) async {
     try {
       final clienteId = int.tryParse(_cliente?.id?.toString() ?? '');
       if (clienteId == null) {
-        _logger.w('Cliente ID nulo');
         return null;
       }
 
-      // IMPORTANTE: Determinar si es asignado o pendiente desde equipoData
       final tipoEstado = equipoData['tipo_estado']?.toString() ??
           equipoData['estado']?.toString();
-
-      _logger.i('Buscando estado_censo para equipo ${equipoData['cod_barras']}, tipo: $tipoEstado');
 
       Map<String, dynamic>? resultado;
 
       if (tipoEstado == 'pendiente') {
-// Para equipos pendientes, buscar por equipo_id y cliente_id también
         final equipoId = equipoData['equipo_id']?.toString() ??
             equipoData['id']?.toString();
 
         if (equipoId != null && equipoId.isNotEmpty) {
           final ultimoEstado = await _estadoEquipoRepository.obtenerUltimoEstado(
-            equipoId,  // usar directamente como String
+            equipoId,
             clienteId,
           );
           resultado = ultimoEstado?.toMap();
         }
 
       } else if (tipoEstado == 'asignado') {
-        // Para equipos asignados, buscar en Estado_Equipo por equipo_id y cliente_id
         final equipoId = equipoData['equipo_id']?.toString() ??
             equipoData['id']?.toString();
         if (equipoId != null) {
@@ -330,61 +294,44 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
         }
       }
 
-      if (resultado != null) {
-        _logger.i('Estado_censo encontrado: ${resultado['estado_censo']}, sincronizado: ${resultado['sincronizado']}');
-      } else {
-        _logger.w('No se encontró registro en censo_activo para ${equipoData['cod_barras']}');
-      }
-
       return resultado;
 
     } catch (e) {
-      _logger.e('Error obteniendo estado censo: $e');
       return null;
     }
   }
 
-  // ========== MÉTODOS DE INFORMACIÓN DEL CLIENTE ==========
   bool shouldShowCliente() => _cliente?.nombre.isNotEmpty == true;
   bool shouldShowPhone() => _cliente?.telefono?.isNotEmpty == true;
   bool shouldShowAddress() => _cliente?.direccion?.isNotEmpty == true;
   String getClientePhone() => _cliente?.telefono ?? '';
   String getClienteAddress() => _cliente?.direccion ?? '';
 
-  // ========== MÉTODOS PARA EMPTY STATES ==========
   String getEmptyStateTitle() => 'Sin equipos censados';
   String getEmptyStateSubtitle() => 'Este cliente no tiene equipos censados actualmente';
   String getErrorStateTitle() => 'Error al cargar equipos';
   String getLoadingMessage() => 'Cargando equipos...';
 
-  // ========== HELPER PRIVADO ==========
   void _updateState(ClienteDetailState newState) {
     _state = newState;
     notifyListeners();
   }
 
-  // ========== MÉTODOS ESPECÍFICOS PARA TABS ==========
-
-  /// Obtener título del tab de equipos asignados
   String getTabAsignadosTitle() {
     return tieneEquiposAsignados
         ? 'Asignados ($equiposAsignadosCount)'
         : 'Asignados';
   }
 
-  /// Obtener título del tab de equipos pendientes
   String getTabPendientesTitle() {
     return tieneEquiposPendientes
         ? 'Pendientes ($equiposPendientesCount)'
         : 'Pendientes';
   }
 
-  /// Verificar si se debe mostrar el indicador de carga en el tab
   bool shouldShowTabLoading() => isLoading;
 
-  /// Verificar si se debe mostrar el empty state para asignados
   bool shouldShowEmptyAsignados() => !isLoading && !hasError && equiposAsignadosCount == 0;
 
-  /// Verificar si se debe mostrar el empty state para pendientes
   bool shouldShowEmptyPendientes() => !isLoading && !hasError && equiposPendientesCount == 0;
 }
