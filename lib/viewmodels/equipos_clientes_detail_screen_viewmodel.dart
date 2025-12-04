@@ -40,7 +40,7 @@ class EquiposClienteDetailState {
     this.historialCambios = const [],
     this.historialUltimos5 = const [],
   }) : equipoEnLocal =
-      equipoEnLocal ?? (equipoCliente['tipo_estado'] == 'asignado');
+           equipoEnLocal ?? (equipoCliente['tipo_estado'] == 'asignado');
 
   EquiposClienteDetailState copyWith({
     dynamic equipoCliente,
@@ -76,16 +76,16 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
   // ========== STREAMS PARA EVENTOS ==========
   final StreamController<EquiposClienteDetailUIEvent> _eventController =
-  StreamController<EquiposClienteDetailUIEvent>.broadcast();
+      StreamController<EquiposClienteDetailUIEvent>.broadcast();
   Stream<EquiposClienteDetailUIEvent> get uiEvents => _eventController.stream;
 
   // ========== CONSTRUCTOR ==========
   EquiposClienteDetailScreenViewModel(
-      dynamic equipoCliente,
-      this._estadoEquipoRepository,
-      this._equipoRepository,
-      ) : _state = EquiposClienteDetailState(equipoCliente: equipoCliente),
-        _estadoLocalActual = _determinarEstadoInicial(equipoCliente) {
+    dynamic equipoCliente,
+    this._estadoEquipoRepository,
+    this._equipoRepository,
+  ) : _state = EquiposClienteDetailState(equipoCliente: equipoCliente),
+      _estadoLocalActual = _determinarEstadoInicial(equipoCliente) {
     _initializeState();
     _loadInitialState();
     _logDebugInfo();
@@ -118,11 +118,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       final codigoBarras = equipoCliente['cod_barras']?.toString();
       final clienteId = equipoCliente['cliente_id'];
 
-      print('🔍 BUSCANDO HISTORIAL PARA:');
-      print('   cod_barras: $codigoBarras (tipo: ${codigoBarras.runtimeType})');
-      print('   clienteId: $clienteId (tipo: ${clienteId.runtimeType})');
-      print('   tipo_estado: ${equipoCliente['tipo_estado']}');
-
       if (codigoBarras == null || codigoBarras.isEmpty || clienteId == null) {
         _logger.w('No se encontró código de barras o cliente');
         return;
@@ -139,9 +134,9 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       try {
         historialCompleto = await _estadoEquipoRepository
             .obtenerHistorialDirectoPorEquipoCliente(
-          codigoBarras, // ← Ya es String no-nullable
-          int.parse(clienteId.toString()),
-        );
+              codigoBarras, // ← Ya es String no-nullable
+              int.parse(clienteId.toString()),
+            );
 
         _logger.i(
           '📈 Historial directo obtenido: ${historialCompleto.length} registros',
@@ -154,9 +149,9 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         try {
           historialCompleto = await _estadoEquipoRepository
               .obtenerHistorialCompleto(
-            codigoBarras, // ← Ya es String no-nullable
-            int.parse(clienteId.toString()),
-          );
+                codigoBarras, // ← Ya es String no-nullable
+                int.parse(clienteId.toString()),
+              );
           _logger.i(
             '📈 Historial alternativo obtenido: ${historialCompleto.length} registros',
           );
@@ -297,9 +292,9 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
       historialCompleto = await _estadoEquipoRepository
           .obtenerHistorialCompleto(
-        equipoId.toString(),
-        int.parse(clienteId.toString()),
-      );
+            equipoId.toString(),
+            int.parse(clienteId.toString()),
+          );
 
       final ultimos5 = historialCompleto.take(5).toList();
 
@@ -380,8 +375,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
             enLocal: _estadoUbicacionEquipo!,
             position: position,
             observaciones: nuevoEstado.observaciones,
-            equipoId:
-            equipoCliente['equipo_id']?.toString() ?? codigoBarras,
+            equipoId: equipoCliente['equipo_id']?.toString() ?? codigoBarras,
             clienteNombre: equipoCliente['cliente_nombre']?.toString() ?? '',
             numeroSerie: equipoCliente['numero_serie']?.toString() ?? '',
             modelo: equipoCliente['modelo_nombre']?.toString() ?? '',
@@ -560,7 +554,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       'equipoNombre': getNombreCompletoEquipo(),
       'equipoCodigo': equipoCliente['cod_barras'] ?? 'Sin código',
       'clienteNombre':
-      'Cliente ID: ${equipoCliente['cliente_id'] ?? "No asignado"}',
+          'Cliente ID: ${equipoCliente['cliente_id'] ?? "No asignado"}',
     };
   }
 

@@ -19,9 +19,6 @@ var logger = Logger();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  debugPrint('🚀 ==================== APP INICIADA ====================');
-  debugPrint('🚀 Timestamp: ${DateTime.now()}');
-
   // RESET TEMPORAL - COMENTADO PARA PRODUCCIÓN
   // await _resetCompleteApp();
 
@@ -31,21 +28,7 @@ void main() async {
 //  FUNCIÓN DE RESET TEMPORAL - COMENTADA PARA PRODUCCIÓN
 /*
 Future<void> _resetCompleteApp() async {
-  try {
-    print(' === RESET TOTAL DE ADA APP ===');
 
-    //  Usar el método específico del DatabaseHelper
-    await DatabaseHelper.resetCompleteDatabase();
-
-    //  Verificar estado después del reset (opcional)
-    final estado = await DatabaseHelper.verificarEstadoPostReset();
-    print('Estado después del reset: $estado');
-
-    print(' RESET COMPLETO EXITOSO');
-
-  } catch (e) {
-    print(' Error durante reset total: $e');
-  }
 }
 */
 
@@ -117,7 +100,6 @@ class _InitializationScreenState extends State<InitializationScreen> {
       });
 
       await AppServices().inicializar();
-      debugPrint('✅ AppServices inicializado correctamente');
 
       setState(() {
         _loadingMessage = 'Verificando autenticación...';
@@ -126,29 +108,15 @@ class _InitializationScreenState extends State<InitializationScreen> {
       final authService = AuthService();
       final estaAutenticado = await authService.hasUserLoggedInBefore();
 
-      debugPrint('🔐 ¿Está autenticado? $estaAutenticado');
-
       if (estaAutenticado) {
         setState(() {
           _loadingMessage = 'Preparando acceso...';
         });
-
-        debugPrint(
-          '🔐 Sesión activa detectada - NO iniciando servicios automáticamente',
-        );
-        debugPrint(
-          '📝 Los servicios se iniciarán después de la primera sincronización',
-        );
       }
 
       await Future.delayed(const Duration(milliseconds: 500));
 
       if (mounted && estaAutenticado) {
-        debugPrint('🔋 INICIANDO verificación de batería...');
-        debugPrint(
-          '🔋 Usuario autenticado: $estaAutenticado, mounted: $mounted',
-        );
-
         try {
           setState(() {
             _loadingMessage = 'Verificando optimización de batería...';
@@ -157,16 +125,8 @@ class _InitializationScreenState extends State<InitializationScreen> {
           await BatteryOptimizationDialog.checkAndRequestBatteryOptimization(
             context,
           );
-          debugPrint('🔋 ✅ COMPLETADO verificación de batería');
-        } catch (e, stackTrace) {
-          debugPrint('🔋 ❌ ERROR en batería: $e');
-          debugPrint('🔋 ❌ StackTrace: $stackTrace');
-        }
-      } else {
-        debugPrint(
-          '🔋 ⏭️ SALTANDO verificación de batería. Autenticado: $estaAutenticado, Mounted: $mounted',
-        );
-      }
+        } catch (e) {}
+      } else {}
 
       if (mounted) {
         Navigator.pushReplacementNamed(
@@ -174,10 +134,7 @@ class _InitializationScreenState extends State<InitializationScreen> {
           estaAutenticado ? '/home' : '/login',
         );
       }
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error inicializando la aplicación: $e');
-      debugPrint('❌ Stack trace: $stackTrace');
-
+    } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;

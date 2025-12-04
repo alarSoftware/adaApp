@@ -6,13 +6,11 @@ import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/repositories/logo_repository.dart';
 import 'package:ada_app/repositories/models_repository.dart';
 import 'package:ada_app/repositories/marca_repository.dart';
-import 'package:logger/logger.dart';
 import 'package:barcode_scan2/barcode_scan2.dart';
 import 'package:ada_app/services/image_service.dart';
 import 'package:ada_app/services/location_service.dart';
 import 'dart:io';
 
-// Eventos UI
 abstract class FormsUIEvent {}
 
 class ShowSnackBarEvent extends FormsUIEvent {
@@ -55,19 +53,16 @@ class DialogAction {
 }
 
 class FormsScreenViewModel extends ChangeNotifier {
-  final Logger _logger = Logger();
   final EquipoRepository _equipoRepository = EquipoRepository();
   final ImageService _imageService = ImageService();
   final LocationService _locationService = LocationService();
 
-  // Controladores de texto
   final TextEditingController codigoBarrasController = TextEditingController();
   final TextEditingController numeroSerieController = TextEditingController();
   final TextEditingController observacionesController = TextEditingController();
 
   String _ultimoCodigoBuscado = '';
 
-  // Estado privado
   bool _isCensoMode = true;
   bool _isLoading = false;
   bool _isScanning = false;
@@ -88,7 +83,6 @@ class FormsScreenViewModel extends ChangeNotifier {
   Map<String, dynamic>? _equipoCompleto;
   bool _equipoYaAsignado = false;
 
-  // Getters públicos
   bool get isCensoMode => _isCensoMode;
   bool get isLoading => _isLoading;
   bool get isScanning => _isScanning;
@@ -142,23 +136,18 @@ class FormsScreenViewModel extends ChangeNotifier {
 
   late final StreamController<FormsUIEvent> _eventController;
 
-  // Constructor
   FormsScreenViewModel() {
     _eventController = StreamController<FormsUIEvent>.broadcast();
   }
 
-  // Inicialización
   Future<void> initialize(Cliente cliente) async {
     _cliente = cliente;
-    _logger.i('Inicializando FormsScreenViewModel para cliente: ${cliente.nombre}');
 
     await Future.wait([
       _cargarMarcas(),
       _cargarLogos(),
       _cargarModelos(),
     ]);
-
-    _logger.i('Inicialización completa. Marcas: ${_marcas.length}, Logos: ${_logos.length}, Modelos: ${_modelos.length}');
   }
 
   @override
@@ -169,10 +158,6 @@ class FormsScreenViewModel extends ChangeNotifier {
     _eventController.close();
     super.dispose();
   }
-
-  // ===============================
-  // MÉTODOS AUXILIARES PARA EVENTOS UI
-  // ===============================
 
   void _showError(String message) {
     _eventController.add(ShowSnackBarEvent(message, Colors.red));
@@ -190,13 +175,8 @@ class FormsScreenViewModel extends ChangeNotifier {
     _eventController.add(ShowSnackBarEvent(message, Colors.orange));
   }
 
-  // ===============================
-  // LÓGICA DE NEGOCIO - MARCAS
-  // ===============================
-
   Future<void> _cargarMarcas() async {
     try {
-      _logger.i('Iniciando carga de marcas...');
       final marcaRepo = MarcaRepository();
       final marcas = await marcaRepo.obtenerTodos();
 
@@ -205,27 +185,19 @@ class FormsScreenViewModel extends ChangeNotifier {
         'nombre': marca.nombre,
       }).toList();
 
-      _logger.i('Marcas cargadas exitosamente: ${_marcas.length}');
       notifyListeners();
     } catch (e) {
-      _logger.e('Error cargando marcas: $e');
       _showError('No se pudieron cargar las marcas disponibles');
     }
   }
 
   void setMarcaSeleccionada(int? marcaId) {
     _marcaSeleccionada = marcaId;
-    _logger.i('Marca seleccionada: $marcaId');
     notifyListeners();
   }
 
-  // ===============================
-  // LÓGICA DE NEGOCIO - LOGOS
-  // ===============================
-
   Future<void> _cargarLogos() async {
     try {
-      _logger.i('Iniciando carga de logos...');
       final logoRepo = LogoRepository();
       final logos = await logoRepo.obtenerTodos();
 
@@ -233,11 +205,8 @@ class FormsScreenViewModel extends ChangeNotifier {
         'id': logo.id,
         'nombre': logo.nombre,
       }).toList();
-
-      _logger.i('Logos cargados exitosamente: ${_logos.length}');
       notifyListeners();
     } catch (e) {
-      _logger.e('Error cargando logos: $e');
       _showError('No se pudieron cargar los logos disponibles');
     }
   }
@@ -247,13 +216,8 @@ class FormsScreenViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ===============================
-  // LÓGICA DE NEGOCIO - MODELOS
-  // ===============================
-
   Future<void> _cargarModelos() async {
     try {
-      _logger.i('Iniciando carga de modelos...');
       final modeloRepo = ModeloRepository();
       final modelos = await modeloRepo.obtenerTodos();
 
@@ -262,23 +226,16 @@ class FormsScreenViewModel extends ChangeNotifier {
         'nombre': modelo.nombre,
       }).toList();
 
-      _logger.i('Modelos cargados exitosamente: ${_modelos.length}');
       notifyListeners();
     } catch (e) {
-      _logger.e('Error cargando modelos: $e');
       _showError('No se pudieron cargar los modelos disponibles');
     }
   }
 
   void setModeloSeleccionado(int? modeloId) {
     _modeloSeleccionado = modeloId;
-    _logger.i('Modelo seleccionado: $modeloId');
     notifyListeners();
   }
-
-  // ===============================
-  // LÓGICA DE NEGOCIO - SCANNING
-  // ===============================
 
   Future<void> escanearCodigoBarras() async {
     _setScanning(true);
@@ -306,7 +263,6 @@ class FormsScreenViewModel extends ChangeNotifier {
         _showError('Error al escanear: ${e.message}');
       }
     } catch (e) {
-      _logger.e('Error escaneando código: $e');
       _showError('No se pudo escanear el código de barras');
     } finally {
       _setScanning(false);
@@ -318,25 +274,18 @@ class FormsScreenViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ===============================
-  // LÓGICA DE NEGOCIO - BÚSQUEDA EQUIPOS
-  // ===============================
-
   Future<void> buscarEquipoSiHuboCambios() async {
     if (!_isCensoMode) {
-      _logger.i('Modo nuevo equipo activo - búsqueda deshabilitada');
       return;
     }
 
     final codigoActual = codigoBarrasController.text.trim();
 
     if (codigoActual.length < 3) {
-      _logger.i('Código muy corto para buscar: ${codigoActual.length} caracteres');
       return;
     }
 
     if (codigoActual == _ultimoCodigoBuscado) {
-      _logger.i('No hay cambios en el código de barras, búsqueda omitida');
       return;
     }
 
@@ -345,15 +294,12 @@ class FormsScreenViewModel extends ChangeNotifier {
 
   Future<void> buscarEquipoPorCodigo(String codigo) async {
     if (!_isCensoMode) {
-      _logger.i('Modo nuevo equipo activo - búsqueda deshabilitada');
       return;
     }
 
     _ultimoCodigoBuscado = codigo.trim();
 
     try {
-      _logger.i('Buscando visicooler con código: $codigo');
-
       final equipoRepo = EquipoRepository();
       final equiposCompletos = await equipoRepo.buscarPorCodigoExacto(
         codigoBarras: codigo.trim(),
@@ -366,27 +312,21 @@ class FormsScreenViewModel extends ChangeNotifier {
       }
 
     } catch (e, stackTrace) {
-      _logger.e('Error buscando visicooler: $e', stackTrace: stackTrace);
       _limpiarDatosAutocompletados();
       _showError('No se pudo buscar el equipo. Verifique su conexión');
     }
   }
 
   Future<void> _procesarEquipoEncontrado(Map<String, dynamic> equipoCompleto) async {
-    _logger.i('=== PROCESANDO EQUIPO ENCONTRADO ===');
-    _logger.i('Equipo: ${equipoCompleto['marca_nombre']} ${equipoCompleto['modelo_nombre']}');
-
     try {
       await _verificarAsignacionEquipo(equipoCompleto);
       _llenarCamposFormulario(equipoCompleto);
       _prepararDatosPreview(equipoCompleto);
       _mostrarEstadoEquipo(equipoCompleto);
 
-      // ✅ NUEVO: Notificar cambios inmediatamente
       notifyListeners();
 
     } catch (e) {
-      _logger.e('Error procesando equipo: $e');
       _showError('Error procesando equipo: $e');
     }
   }
@@ -398,8 +338,6 @@ class FormsScreenViewModel extends ChangeNotifier {
           ? _cliente!.id!
           : int.parse(_cliente!.id!.toString());
 
-      _logger.i('Verificando asignación - EquipoID: "$equipoId" (String), ClienteID: $clienteId (int)');
-
       final yaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(
         equipoId,
         clienteId,
@@ -407,14 +345,7 @@ class FormsScreenViewModel extends ChangeNotifier {
 
       _equipoYaAsignado = yaAsignado;
 
-      if (yaAsignado) {
-        _logger.i('✅ Equipo YA ESTÁ asignado al cliente ${_cliente!.nombre}');
-      } else {
-        _logger.w('⚠️ Equipo NO está asignado al cliente ${_cliente!.nombre}');
-      }
-
     } catch (e) {
-      _logger.e('Error verificando asignación: $e');
       _equipoYaAsignado = false;
       throw 'Error verificando asignación del equipo';
     }
@@ -422,41 +353,26 @@ class FormsScreenViewModel extends ChangeNotifier {
 
   void _llenarCamposFormulario(Map<String, dynamic> equipoCompleto) {
     _marcaSeleccionada = equipoCompleto['marca_id'];
-    _logger.i('Marca seleccionada del equipo: $_marcaSeleccionada');
-
     _modeloSeleccionado = equipoCompleto['modelo_id'];
-    _logger.i('Modelo seleccionado del equipo: $_modeloSeleccionado');
-
     numeroSerieController.text = equipoCompleto['numero_serie'] ?? '';
     _logoSeleccionado = equipoCompleto['logo_id'];
 
-    _logger.i('Campos autocompletados: Marca ID=$_marcaSeleccionada, Modelo ID=$_modeloSeleccionado, Serie=${numeroSerieController.text}, Logo ID=$_logoSeleccionado');
-
-    // ✅ NUEVO: Notificar cambios inmediatamente
     notifyListeners();
   }
 
   void _prepararDatosPreview(Map<String, dynamic> equipoCompleto) {
     _equipoCompleto = equipoCompleto;
-    _logger.i('Datos del equipo preparados para preview');
   }
 
   void _mostrarEstadoEquipo(Map<String, dynamic> equipoCompleto) {
-
     if (_equipoYaAsignado) {
-      _showSuccess(
-        '¡Equipo encontrado!',
-      );
+      _showSuccess('¡Equipo encontrado!');
     } else {
-      _showWarning(
-        'Equipo encontrado pero no asignado al cliente, se censara como pendiente',
-      );
+      _showWarning('Equipo encontrado pero no asignado al cliente, se censara como pendiente');
     }
   }
 
   void _procesarEquipoNoEncontrado(String codigo) {
-    _logger.w('Equipo no encontrado con código: $codigo');
-
     final actions = [
       DialogAction(
         text: 'Cancelar',
@@ -480,10 +396,6 @@ class FormsScreenViewModel extends ChangeNotifier {
     ));
   }
 
-  // ===============================
-  // LÓGICA DE NEGOCIO - IMÁGENES
-  // ===============================
-
   Future<void> tomarFoto({required bool esPrimeraFoto}) async {
     if (_isTakingPhoto) {
       _showWarning('Espere a que termine la captura actual');
@@ -494,17 +406,12 @@ class FormsScreenViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _logger.i('Iniciando captura de foto ${esPrimeraFoto ? "1" : "2"}...');
-
       final File? foto = await _imageService.tomarFoto();
 
       if (foto != null) {
         await _procesarImagenSeleccionada(foto, esPrimeraFoto: esPrimeraFoto);
-      } else {
-        _logger.i('Usuario canceló la captura de foto');
       }
     } catch (e) {
-      _logger.e('Error tomando foto: $e');
       _showError('No se pudo capturar la foto');
     } finally {
       _isTakingPhoto = false;
@@ -547,12 +454,10 @@ class FormsScreenViewModel extends ChangeNotifier {
         _imagenSeleccionada2 = imagenGuardada;
       }
 
-      _logger.i('Imagen ${esPrimeraFoto ? "1" : "2"} procesada: ${imagenGuardada.path}');
       _showSuccess('Foto ${esPrimeraFoto ? "1" : "2"} capturada correctamente (${tamanoMB.toStringAsFixed(1)}MB)');
       notifyListeners();
 
     } catch (e) {
-      _logger.e('Error procesando imagen: $e');
       _showError('No se pudo procesar la foto capturada');
     }
   }
@@ -560,10 +465,8 @@ class FormsScreenViewModel extends ChangeNotifier {
   void eliminarImagen({required bool esPrimeraFoto}) {
     if (esPrimeraFoto) {
       _imagenSeleccionada = null;
-      _logger.i('Imagen 1 eliminada');
     } else {
       _imagenSeleccionada2 = null;
-      _logger.i('Imagen 2 eliminada');
     }
     notifyListeners();
   }
@@ -573,10 +476,6 @@ class FormsScreenViewModel extends ChangeNotifier {
     _imagenSeleccionada2 = null;
     notifyListeners();
   }
-
-  // ===============================
-  // LÓGICA DE NEGOCIO - FORMULARIO
-  // ===============================
 
   void onCodigoChanged(String codigo) {
     if (_isCensoMode && codigo.length >= 3) {
@@ -590,7 +489,6 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   void onCodigoSubmitted(String codigo) {
-    _logger.i('Código submitted: "$codigo"');
     if (codigo.length >= 3) {
       buscarEquipoPorCodigo(codigo);
     } else if (codigo.isNotEmpty) {
@@ -636,10 +534,6 @@ class FormsScreenViewModel extends ChangeNotifier {
     _equipoYaAsignado = false;
     notifyListeners();
   }
-
-  // ===============================
-  // VALIDACIONES
-  // ===============================
 
   String? _validarCampo(String? value, String nombreCampo, {int minLength = 1}) {
     if (value == null || value.trim().isEmpty) {
@@ -688,12 +582,7 @@ class FormsScreenViewModel extends ChangeNotifier {
     return null;
   }
 
-  // ===============================0
-  // LÓGICA DE NEGOCIO - NAVEGACIÓN
-  // ===============================
-
   Future<void> continuarAPreview(GlobalKey<FormState> formKey) async {
-    // ✅ NUEVO: Esperar un momento para que la UI se actualice después del autocompletado
     await Future.delayed(const Duration(milliseconds: 150));
 
     if (!formKey.currentState!.validate()) {
@@ -709,16 +598,12 @@ class FormsScreenViewModel extends ChangeNotifier {
     _setLoading(true);
 
     try {
-      _logger.i('Obteniendo ubicación GPS del visicooler...');
-
       final ubicacion = await _obtenerUbicacion();
-      _logger.i('Ubicación obtenida: ${ubicacion['latitud']}, ${ubicacion['longitud']}');
 
       final datosCompletos = _construirDatosCompletos(ubicacion);
       _eventController.add(NavigateToPreviewEvent(datosCompletos));
 
     } catch (e) {
-      _logger.e('Error obteniendo ubicación: $e');
       _mostrarDialogoErrorGPS(e.toString());
     } finally {
       _setLoading(false);
@@ -783,10 +668,6 @@ class FormsScreenViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ===============================
-  // LÓGICA DE NEGOCIO - GPS
-  // ===============================
-
   Future<Map<String, double>> _obtenerUbicacion() async {
     try {
       return await _locationService.getCurrentLocationAsMap(
@@ -816,10 +697,6 @@ class FormsScreenViewModel extends ChangeNotifier {
       actions,
     ));
   }
-
-  // ===============================
-  // GETTERS PARA LA UI
-  // ===============================
 
   String get titleText => _isCensoMode ? 'Censo de Equipos' : 'Agregar Nuevo Equipo';
 
