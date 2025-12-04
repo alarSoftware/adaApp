@@ -4,7 +4,7 @@ import 'package:ada_app/viewmodels/login_screen_viewmodel.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 
 class LoginAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final VoidCallback onSync;  // ✅ CAMBIO: Ya no recibe LoginScreenViewModel
+  final VoidCallback onSync; // ✅ CAMBIO: Ya no recibe LoginScreenViewModel
   final VoidCallback onDeleteUsers;
 
   const LoginAppBar({
@@ -25,18 +25,25 @@ class LoginAppBar extends StatelessWidget implements PreferredSizeWidget {
         Consumer<LoginScreenViewModel>(
           builder: (context, viewModel, child) {
             return PopupMenuButton<String>(
-              icon: Icon(Icons.more_vert, color: AppColors.textSecondary, size: 24),
+              icon: Icon(
+                Icons.more_vert,
+                color: AppColors.textSecondary,
+                size: 24,
+              ),
               tooltip: 'Más opciones',
               offset: const Offset(0, 40),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               color: AppColors.cardBackground,
               elevation: 8,
               shadowColor: AppColors.shadowLight,
               onSelected: (String value) {
                 switch (value) {
                   case 'sync':
-                    if (!viewModel.isSyncing) {  // ✅ CAMBIO: isSyncing en lugar de isSyncingUsers
-                      onSync();  // ✅ CAMBIO: Sin parámetro
+                    if (!viewModel.isSyncing) {
+                      // ✅ CAMBIO: isSyncing en lugar de isSyncingUsers
+                      onSync(); // ✅ CAMBIO: Sin parámetro
                     }
                     break;
                   case 'delete_users':
@@ -50,27 +57,34 @@ class LoginAppBar extends StatelessWidget implements PreferredSizeWidget {
               itemBuilder: (BuildContext context) => [
                 PopupMenuItem<String>(
                   value: 'sync',
-                  enabled: !viewModel.isSyncing,  // ✅ CAMBIO: isSyncing
+                  enabled: !viewModel.isSyncing, // ✅ CAMBIO: isSyncing
                   child: Row(
                     children: [
-                      viewModel.isSyncing  // ✅ CAMBIO: isSyncing
+                      viewModel
+                              .isSyncing // ✅ CAMBIO: isSyncing
                           ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.textSecondary,
-                          ),
-                        ),
-                      )
-                          : Icon(Icons.sync, color: AppColors.textSecondary, size: 20),
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.textSecondary,
+                                ),
+                              ),
+                            )
+                          : Icon(
+                              Icons.sync,
+                              color: AppColors.textSecondary,
+                              size: 20,
+                            ),
                       const SizedBox(width: 12),
                       Text(
                         'Sincronizar usuarios',
                         style: TextStyle(
-                          color: viewModel.isSyncing  // ✅ CAMBIO: isSyncing
-                              ? AppColors.textSecondary.withOpacity(0.5)
+                          color:
+                              viewModel
+                                  .isSyncing // ✅ CAMBIO: isSyncing
+                              ? AppColors.textSecondary.withValues(alpha: 0.5)
                               : AppColors.textPrimary,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -84,7 +98,11 @@ class LoginAppBar extends StatelessWidget implements PreferredSizeWidget {
                   value: 'delete_users',
                   child: Row(
                     children: [
-                      Icon(Icons.person_remove, color: AppColors.error, size: 20),
+                      Icon(
+                        Icons.person_remove,
+                        color: AppColors.error,
+                        size: 20,
+                      ),
                       const SizedBox(width: 12),
                       Text(
                         'Eliminar usuarios',

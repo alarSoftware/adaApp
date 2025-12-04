@@ -19,8 +19,8 @@ var logger = Logger();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  print('🚀 ==================== APP INICIADA ====================');
-  print('🚀 Timestamp: ${DateTime.now()}');
+  debugPrint('🚀 ==================== APP INICIADA ====================');
+  debugPrint('🚀 Timestamp: ${DateTime.now()}');
 
   // RESET TEMPORAL - COMENTADO PARA PRODUCCIÓN
   // await _resetCompleteApp();
@@ -52,7 +52,8 @@ Future<void> _resetCompleteApp() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  static final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
+  static final RouteObserver<PageRoute> routeObserver =
+      RouteObserver<PageRoute>();
 
   @override
   Widget build(BuildContext context) {
@@ -63,10 +64,7 @@ class MyApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('es'),
-        Locale('en'),
-      ],
+      supportedLocales: const [Locale('es'), Locale('en')],
       locale: const Locale('es'),
       theme: ThemeData(
         primarySwatch: Colors.grey,
@@ -119,7 +117,7 @@ class _InitializationScreenState extends State<InitializationScreen> {
       });
 
       await AppServices().inicializar();
-      print('✅ AppServices inicializado correctamente');
+      debugPrint('✅ AppServices inicializado correctamente');
 
       setState(() {
         _loadingMessage = 'Verificando autenticación...';
@@ -128,48 +126,57 @@ class _InitializationScreenState extends State<InitializationScreen> {
       final authService = AuthService();
       final estaAutenticado = await authService.hasUserLoggedInBefore();
 
-      print('🔐 ¿Está autenticado? $estaAutenticado');
+      debugPrint('🔐 ¿Está autenticado? $estaAutenticado');
 
       if (estaAutenticado) {
         setState(() {
           _loadingMessage = 'Preparando acceso...';
         });
 
-        print('🔐 Sesión activa detectada - NO iniciando servicios automáticamente');
-        print('📝 Los servicios se iniciarán después de la primera sincronización');
+        debugPrint(
+          '🔐 Sesión activa detectada - NO iniciando servicios automáticamente',
+        );
+        debugPrint(
+          '📝 Los servicios se iniciarán después de la primera sincronización',
+        );
       }
 
       await Future.delayed(const Duration(milliseconds: 500));
 
       if (mounted && estaAutenticado) {
-        print('🔋 INICIANDO verificación de batería...');
-        print('🔋 Usuario autenticado: $estaAutenticado, mounted: $mounted');
+        debugPrint('🔋 INICIANDO verificación de batería...');
+        debugPrint(
+          '🔋 Usuario autenticado: $estaAutenticado, mounted: $mounted',
+        );
 
         try {
           setState(() {
             _loadingMessage = 'Verificando optimización de batería...';
           });
 
-          await BatteryOptimizationDialog.checkAndRequestBatteryOptimization(context);
-          print('🔋 ✅ COMPLETADO verificación de batería');
+          await BatteryOptimizationDialog.checkAndRequestBatteryOptimization(
+            context,
+          );
+          debugPrint('🔋 ✅ COMPLETADO verificación de batería');
         } catch (e, stackTrace) {
-          print('🔋 ❌ ERROR en batería: $e');
-          print('🔋 ❌ StackTrace: $stackTrace');
+          debugPrint('🔋 ❌ ERROR en batería: $e');
+          debugPrint('🔋 ❌ StackTrace: $stackTrace');
         }
       } else {
-        print('🔋 ⏭️ SALTANDO verificación de batería. Autenticado: $estaAutenticado, Mounted: $mounted');
+        debugPrint(
+          '🔋 ⏭️ SALTANDO verificación de batería. Autenticado: $estaAutenticado, Mounted: $mounted',
+        );
       }
 
       if (mounted) {
         Navigator.pushReplacementNamed(
-            context,
-            estaAutenticado ? '/home' : '/login'
+          context,
+          estaAutenticado ? '/home' : '/login',
         );
       }
-
     } catch (e, stackTrace) {
-      print('❌ Error inicializando la aplicación: $e');
-      print('❌ Stack trace: $stackTrace');
+      debugPrint('❌ Error inicializando la aplicación: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
 
       if (mounted) {
         setState(() {
@@ -264,18 +271,11 @@ class _InitializationScreenState extends State<InitializationScreen> {
               const SizedBox(height: 24),
               Text(
                 _loadingMessage,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
             ] else ...[
-              Icon(
-                Icons.refresh,
-                size: 48,
-                color: Colors.grey[400],
-              ),
+              Icon(Icons.refresh, size: 48, color: Colors.grey[400]),
               const SizedBox(height: 16),
               GestureDetector(
                 onTap: _retryInitialization,
@@ -295,10 +295,7 @@ class _InitializationScreenState extends State<InitializationScreen> {
 
             Text(
               'Versión 1.0.0',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[400],
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey[400]),
             ),
           ],
         ),

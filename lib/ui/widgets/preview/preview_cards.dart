@@ -9,10 +9,7 @@ import 'package:ada_app/ui/widgets/gps_navigation_widget.dart';
 class PreviewClienteCard extends StatelessWidget {
   final Cliente cliente;
 
-  const PreviewClienteCard({
-    super.key,
-    required this.cliente,
-  });
+  const PreviewClienteCard({super.key, required this.cliente});
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +56,7 @@ class PreviewClienteCard extends StatelessWidget {
             ),
             InfoRow(
               label: 'Telefono',
-              value: cliente.telefono ?? 'No especificado',
+              value: cliente.telefono,
               icon: Icons.phone,
             ),
           ],
@@ -73,10 +70,7 @@ class PreviewClienteCard extends StatelessWidget {
 class PreviewEquipoCard extends StatelessWidget {
   final Map<String, dynamic> datos;
 
-  const PreviewEquipoCard({
-    super.key,
-    required this.datos,
-  });
+  const PreviewEquipoCard({super.key, required this.datos});
 
   @override
   Widget build(BuildContext context) {
@@ -165,10 +159,7 @@ class PreviewUbicacionCard extends StatelessWidget {
       shadowColor: AppColors.shadowLight,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: AppColors.border,
-          width: 0.5,
-        ),
+        side: BorderSide(color: AppColors.border, width: 0.5),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -200,7 +191,11 @@ class PreviewUbicacionCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.gps_fixed, size: 18, color: AppColors.textTertiary),
+                  Icon(
+                    Icons.gps_fixed,
+                    size: 18,
+                    color: AppColors.textTertiary,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -226,17 +221,21 @@ class PreviewUbicacionCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           OutlinedButton.icon(
-                            onPressed: () => GPSNavigationWidget.abrirUbicacionEnMapa(
-                              context,
-                              latitud.toDouble(),
-                              longitud.toDouble(),
-                            ),
+                            onPressed: () =>
+                                GPSNavigationWidget.abrirUbicacionEnMapa(
+                                  context,
+                                  latitud.toDouble(),
+                                  longitud.toDouble(),
+                                ),
                             icon: Icon(Icons.map, size: 18),
                             label: Text('Ver en Google Maps'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.primary,
                               side: BorderSide(color: AppColors.primary),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -347,7 +346,7 @@ class SyncStatusIndicator extends StatelessWidget {
       margin: const EdgeInsets.only(top: 16, bottom: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color),
       ),
@@ -376,9 +375,9 @@ class SyncStatusIndicator extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.05),
+                color: color.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: color.withOpacity(0.2)),
+                border: Border.all(color: color.withValues(alpha: 0.2)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,7 +388,7 @@ class SyncStatusIndicator extends StatelessWidget {
                     child: Text(
                       errorDetalle!,
                       style: TextStyle(
-                        color: color.withOpacity(0.95),
+                        color: color.withValues(alpha: 0.95),
                         fontSize: 12,
                         height: 1.4,
                       ),
