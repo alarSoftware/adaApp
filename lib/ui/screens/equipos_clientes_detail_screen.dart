@@ -3,7 +3,6 @@ import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/equipos_clientes_detail_screen_viewmodel.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
-
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:ada_app/ui/screens/preview_screen.dart';
@@ -31,13 +30,12 @@ class _EquiposClientesDetailScreenState
     _viewModel = EquiposClienteDetailScreenViewModel(
       widget.equipoCliente,
       CensoActivoRepository(),
-      EquipoRepository(), // Agregar esta línea
+      EquipoRepository(),
     );
     _setupEventListener();
   }
 
   void _checkDatabase() async {
-    // Verificación de tablas eliminada por limpieza de logs
   }
 
   @override
@@ -90,7 +88,6 @@ class _EquiposClientesDetailScreenState
         backgroundColor: AppColors.appBarBackground,
         foregroundColor: AppColors.appBarForeground,
         actions: [
-          // SOLO MOSTRAR BOTÓN DE GUARDAR PARA EQUIPOS ACTIVOS/ASIGNADOS
           if (_viewModel.isEquipoActivo)
             ListenableBuilder(
               listenable: _viewModel,
@@ -196,7 +193,6 @@ class _EquiposClientesDetailScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header del equipo
             Row(
               children: [
                 Container(
@@ -232,15 +228,15 @@ class _EquiposClientesDetailScreenState
                       Container(
                         decoration: BoxDecoration(
                           color:
-                              _viewModel.equipoCliente['tipo_estado'] ==
-                                  'asignado'
+                          _viewModel.equipoCliente['tipo_estado'] ==
+                              'asignado'
                               ? AppColors.success.withValues(alpha: 0.1)
                               : AppColors.warning.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color:
-                                _viewModel.equipoCliente['tipo_estado'] ==
-                                    'asignado'
+                            _viewModel.equipoCliente['tipo_estado'] ==
+                                'asignado'
                                 ? AppColors.success.withValues(alpha: 0.3)
                                 : AppColors.warning.withValues(alpha: 0.3),
                           ),
@@ -251,8 +247,8 @@ class _EquiposClientesDetailScreenState
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color:
-                                _viewModel.equipoCliente['tipo_estado'] ==
-                                    'asignado'
+                            _viewModel.equipoCliente['tipo_estado'] ==
+                                'asignado'
                                 ? AppColors.success
                                 : AppColors.warning,
                           ),
@@ -265,8 +261,6 @@ class _EquiposClientesDetailScreenState
             ),
 
             SizedBox(height: 20),
-
-            // Información del equipo en grid
             _buildInfoGrid(),
           ],
         ),
@@ -277,7 +271,6 @@ class _EquiposClientesDetailScreenState
   Widget _buildInfoGrid() {
     final infoItems = <Map<String, String>>[];
 
-    // Agregar campos solo si tienen datos
     if (_viewModel.shouldShowMarca()) {
       infoItems.add({'label': 'Marca', 'value': _viewModel.getMarcaText()});
     }
@@ -299,7 +292,6 @@ class _EquiposClientesDetailScreenState
 
     return Column(
       children: [
-        // Construir filas de 2 elementos cada una
         for (int i = 0; i < infoItems.length; i += 2)
           Padding(
             padding: EdgeInsets.only(bottom: 12),
@@ -321,7 +313,7 @@ class _EquiposClientesDetailScreenState
                       ),
                     ),
                   ] else
-                    Expanded(child: SizedBox()), // Espacio vacío si es impar
+                    Expanded(child: SizedBox()),
                 ],
               ),
             ),
@@ -375,13 +367,10 @@ class _EquiposClientesDetailScreenState
       builder: (context, child) {
         return Column(
           children: [
-            // Mostrar control de ubicación solo para equipos activos
             if (_viewModel.isEquipoActivo) ...[
               _buildLocationControlCard(),
               SizedBox(height: 20),
             ],
-
-            // Mostrar historial para TODOS los equipos (activos e inactivos)
             _buildHistorialCard(),
           ],
         );
@@ -394,8 +383,8 @@ class _EquiposClientesDetailScreenState
       listenable: _viewModel,
       builder: (context, child) {
         final estadoUbicacion = _viewModel.estadoUbicacionEquipo;
+        final dropdownHabilitado = _viewModel.dropdownHabilitado;
 
-        // CAMBIO: Color basado en si hay selección o no
         Color statusColor = estadoUbicacion == null
             ? AppColors.neutral400
             : (estadoUbicacion ? AppColors.success : AppColors.warning);
@@ -432,7 +421,6 @@ class _EquiposClientesDetailScreenState
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    // CAMBIO: Mostrar badge solo si hay selección
                     if (estadoUbicacion != null) ...[
                       SizedBox(width: 8),
                       Container(
@@ -462,7 +450,7 @@ class _EquiposClientesDetailScreenState
                 ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: double.infinity),
                   child: DropdownButtonFormField<bool?>(
-                    initialValue: estadoUbicacion, // Será null inicialmente
+                    value: estadoUbicacion,
                     isExpanded: true,
                     decoration: InputDecoration(
                       contentPadding: EdgeInsets.symmetric(
@@ -473,27 +461,36 @@ class _EquiposClientesDetailScreenState
                         borderRadius: BorderRadius.circular(8),
                       ),
                       filled: true,
-                      fillColor: AppColors.surface,
+                      fillColor: dropdownHabilitado
+                          ? AppColors.surface
+                          : AppColors.neutral200,
                     ),
                     hint: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          Icons.help_outline,
+                          dropdownHabilitado ? Icons.help_outline : Icons.lock,
                           size: 20,
                           color: AppColors.textSecondary,
                         ),
                         SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            '-- Seleccionar ubicación --',
+                            dropdownHabilitado
+                                ? '-- Seleccionar ubicación --'
+                                : 'Bloqueado - día no corresponde',
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: AppColors.textSecondary),
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontStyle: dropdownHabilitado
+                                  ? FontStyle.normal
+                                  : FontStyle.italic,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    items: [
+                    items: dropdownHabilitado ? [
                       DropdownMenuItem<bool?>(
                         value: false,
                         child: Row(
@@ -514,9 +511,10 @@ class _EquiposClientesDetailScreenState
                           ],
                         ),
                       ),
-                    ],
-                    onChanged: (value) =>
-                        _viewModel.cambiarUbicacionEquipo(value),
+                    ] : null,
+                    onChanged: dropdownHabilitado
+                        ? (value) => _viewModel.cambiarUbicacionEquipo(value)
+                        : null,
                   ),
                 ),
               ],
@@ -527,7 +525,6 @@ class _EquiposClientesDetailScreenState
     );
   }
 
-  // NUEVA SECCIÓN DEL HISTORIAL
   Widget _buildHistorialCard() {
     return ListenableBuilder(
       listenable: _viewModel,
@@ -562,7 +559,6 @@ class _EquiposClientesDetailScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header del historial
                 Row(
                   children: [
                     Container(
@@ -625,7 +621,6 @@ class _EquiposClientesDetailScreenState
 
                 SizedBox(height: 16),
 
-                // Lista del historial
                 if (historial.isEmpty)
                   _buildEmptyHistorial()
                 else
@@ -695,7 +690,7 @@ class _EquiposClientesDetailScreenState
           final isFirst = index == 0;
 
           return InkWell(
-            onTap: () => _navegarAPreview(cambio), // ← CAMBIO AQUÍ
+            onTap: () => _navegarAPreview(cambio),
             borderRadius: BorderRadius.circular(12),
             child: _buildHistorialItem(cambio, isFirst),
           );
@@ -706,21 +701,16 @@ class _EquiposClientesDetailScreenState
 
   void _navegarAPreview(dynamic historialItem) async {
     try {
-      // Debug: Log de los datos antes de procesarlos
-
-      // Mostrar indicador de carga mientras se consulta la BD
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
-      // Preparar datos para PreviewScreen consultando la base de datos
       final datosParaPreview = await _prepararDatosHistorialParaPreview(
         historialItem,
       );
 
-      // Cerrar indicador de carga
       if (Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
@@ -732,14 +722,10 @@ class _EquiposClientesDetailScreenState
         ),
       );
     } catch (e) {
-      // Cerrar indicador de carga si está abierto
       if (Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
 
-      // Log detallado del error
-
-      // Mostrar error más específico al usuario
       String errorMessage = 'Error al cargar detalles del historial';
       if (e.toString().contains('Cliente no encontrado')) {
         errorMessage = 'Cliente no encontrado en la base de datos';
@@ -778,8 +764,8 @@ class _EquiposClientesDetailScreenState
   }
 
   Future<Map<String, dynamic>> _prepararDatosHistorialParaPreview(
-    dynamic historialItem,
-  ) async {
+      dynamic historialItem,
+      ) async {
     try {
       final clienteIdRaw = widget.equipoCliente['cliente_id'];
 
@@ -819,7 +805,7 @@ class _EquiposClientesDetailScreenState
         'cod_barras': widget.equipoCliente['cod_barras']?.toString() ?? '',
         'numero_serie': widget.equipoCliente['numero_serie']?.toString() ?? '',
         'modelo_nombre':
-            widget.equipoCliente['modelo_nombre']?.toString() ?? '',
+        widget.equipoCliente['modelo_nombre']?.toString() ?? '',
         'logo_nombre': widget.equipoCliente['logo_nombre']?.toString() ?? '',
         'marca_nombre': widget.equipoCliente['marca_nombre']?.toString() ?? '',
       };
@@ -835,7 +821,6 @@ class _EquiposClientesDetailScreenState
         fechaRevisionSafe = null;
       }
 
-      // ✅ NUEVA LÓGICA: Obtener fotos desde el repositorio
       String? imagenPath;
       String? imagenBase64;
       bool tieneImagen = false;
@@ -853,7 +838,6 @@ class _EquiposClientesDetailScreenState
             historialItem.id,
           );
 
-          // Primera foto
           if (fotos.isNotEmpty) {
             final primeraFoto = fotos.first;
             imagenPath = primeraFoto.imagenPath;
@@ -862,7 +846,6 @@ class _EquiposClientesDetailScreenState
             imagenTamano = primeraFoto.imagenTamano;
           }
 
-          // Segunda foto
           if (fotos.length > 1) {
             final segundaFoto = fotos[1];
             imagenPath2 = segundaFoto.imagenPath;
@@ -871,7 +854,6 @@ class _EquiposClientesDetailScreenState
             imagenTamano2 = segundaFoto.imagenTamano;
           }
         } catch (e) {
-          // Las variables ya están inicializadas en null/false
         }
       }
 
@@ -885,20 +867,19 @@ class _EquiposClientesDetailScreenState
         'timestamp_gps': fechaRevisionSafe?.toString(),
 
         'codigo_barras':
-            widget.equipoCliente['cod_barras']?.toString() ?? 'No especificado',
+        widget.equipoCliente['cod_barras']?.toString() ?? 'No especificado',
         'modelo':
-            widget.equipoCliente['modelo_nombre']?.toString() ??
+        widget.equipoCliente['modelo_nombre']?.toString() ??
             'No especificado',
         'logo':
-            widget.equipoCliente['logo_nombre']?.toString() ??
+        widget.equipoCliente['logo_nombre']?.toString() ??
             'No especificado',
         'numero_serie':
-            widget.equipoCliente['numero_serie']?.toString() ??
+        widget.equipoCliente['numero_serie']?.toString() ??
             'No especificado',
 
         'observaciones': historialItem?.observaciones ?? 'Sin observaciones',
 
-        // ✅ Usar las fotos obtenidas del repositorio
         'imagen_path': imagenPath,
         'imagen_base64': imagenBase64,
         'tiene_imagen': tieneImagen,
@@ -927,7 +908,6 @@ class _EquiposClientesDetailScreenState
     final statusIcon = enLocal ? Icons.store : Icons.location_off;
     final statusText = enLocal ? 'EN LOCAL' : 'FUERA DEL LOCAL';
 
-    // Información de ubicación GPS (solo para mostrar información)
     final tieneUbicacion =
         censoActivo.latitud != null && censoActivo.longitud != null;
 
@@ -940,7 +920,6 @@ class _EquiposClientesDetailScreenState
       ),
       child: Row(
         children: [
-          // Indicador visual
           Container(
             width: 40,
             height: 40,
@@ -954,7 +933,6 @@ class _EquiposClientesDetailScreenState
 
           SizedBox(width: 12),
 
-          // Información del cambio
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1017,10 +995,8 @@ class _EquiposClientesDetailScreenState
             ),
           ),
 
-          // Indicadores en columna
           Column(
             children: [
-              // Indicador de sincronización
               if (censoActivo.estadoCenso != 'migrado')
                 Container(
                   width: 8,
@@ -1030,7 +1006,6 @@ class _EquiposClientesDetailScreenState
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-              // Indicador GPS (solo visual)
               if (tieneUbicacion) ...[
                 SizedBox(height: 4),
                 Container(
@@ -1052,7 +1027,6 @@ class _EquiposClientesDetailScreenState
             ],
           ),
 
-          // Flecha indicando que es clickeable para preview
           SizedBox(width: 8),
           Icon(
             Icons.arrow_forward_ios,

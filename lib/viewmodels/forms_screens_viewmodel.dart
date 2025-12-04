@@ -136,6 +136,43 @@ class FormsScreenViewModel extends ChangeNotifier {
 
   late final StreamController<FormsUIEvent> _eventController;
 
+  // ========== MÉTODOS PARA VALIDACIÓN DE DÍA DE RUTA ==========
+
+  String _getDiaActual() {
+    final diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    final now = DateTime.now();
+    return diasSemana[now.weekday - 1];
+  }
+
+  bool _validarDiaRuta() {
+    if (_cliente == null) return false;
+
+    final rutaDia = _cliente!.rutaDia;
+
+    // Si el cliente no tiene día de ruta asignado, permitir acceso
+    if (rutaDia == null || rutaDia.isEmpty) return true;
+
+    final diaActual = _getDiaActual();
+
+    // Validar que el día actual coincida con el día de ruta
+    return rutaDia == diaActual;
+  }
+
+  bool get puedeRealizarCenso => _validarDiaRuta();
+
+  String get mensajeRestriccionDia {
+    if (_cliente == null) return '';
+
+    final diaActual = _getDiaActual();
+    final rutaDia = _cliente!.rutaDia ?? 'sin asignar';
+
+    return 'No puedes realizar censos hoy.\n'
+        'Este cliente corresponde al día: $rutaDia\n'
+        'Hoy es: $diaActual';
+  }
+
+  // ============================================================
+
   FormsScreenViewModel() {
     _eventController = StreamController<FormsUIEvent>.broadcast();
   }
@@ -192,6 +229,12 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   void setMarcaSeleccionada(int? marcaId) {
+    // VALIDAR DÍA DE RUTA antes de permitir cambios
+    if (!_validarDiaRuta()) {
+      _showError(mensajeRestriccionDia);
+      return;
+    }
+
     _marcaSeleccionada = marcaId;
     notifyListeners();
   }
@@ -212,6 +255,12 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   void setLogoSeleccionado(int? logoId) {
+    // VALIDAR DÍA DE RUTA antes de permitir cambios
+    if (!_validarDiaRuta()) {
+      _showError(mensajeRestriccionDia);
+      return;
+    }
+
     _logoSeleccionado = logoId;
     notifyListeners();
   }
@@ -233,11 +282,23 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   void setModeloSeleccionado(int? modeloId) {
+    // VALIDAR DÍA DE RUTA antes de permitir cambios
+    if (!_validarDiaRuta()) {
+      _showError(mensajeRestriccionDia);
+      return;
+    }
+
     _modeloSeleccionado = modeloId;
     notifyListeners();
   }
 
   Future<void> escanearCodigoBarras() async {
+    // VALIDAR DÍA DE RUTA antes de escanear
+    if (!_validarDiaRuta()) {
+      _showError(mensajeRestriccionDia);
+      return;
+    }
+
     _setScanning(true);
 
     try {
@@ -397,6 +458,12 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   Future<void> tomarFoto({required bool esPrimeraFoto}) async {
+    // VALIDAR DÍA DE RUTA antes de tomar foto
+    if (!_validarDiaRuta()) {
+      _showError(mensajeRestriccionDia);
+      return;
+    }
+
     if (_isTakingPhoto) {
       _showWarning('Espere a que termine la captura actual');
       return;
@@ -583,6 +650,12 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   Future<void> continuarAPreview(GlobalKey<FormState> formKey) async {
+    // VALIDAR DÍA DE RUTA antes de continuar
+    if (!_validarDiaRuta()) {
+      _showError(mensajeRestriccionDia);
+      return;
+    }
+
     await Future.delayed(const Duration(milliseconds: 150));
 
     if (!formKey.currentState!.validate()) {
