@@ -7,6 +7,7 @@ import '../repositories/equipo_repository.dart';
 import '../models/censo_activo.dart';
 import '../services/location_service.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:ada_app/services/auth_service.dart';
 
 // ========== EVENTOS PARA LA UI ==========
 abstract class EquiposClienteDetailUIEvent {}
@@ -38,7 +39,8 @@ class EquiposClienteDetailState {
     bool? equipoEnLocal,
     this.historialCambios = const [],
     this.historialUltimos5 = const [],
-  }): equipoEnLocal = equipoEnLocal ?? (equipoCliente['tipo_estado'] == 'asignado');
+  }) : equipoEnLocal =
+      equipoEnLocal ?? (equipoCliente['tipo_estado'] == 'asignado');
 
   EquiposClienteDetailState copyWith({
     dynamic equipoCliente,
@@ -104,14 +106,16 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     _estadoUbicacionEquipo = null;
     _hasUnsavedChanges = false;
     _logger.i('Estado inicial - _estadoLocalActual: $_estadoLocalActual');
-    _logger.i('Estado inicial - _estadoUbicacionEquipo: null (placeholder activo)');
+    _logger.i(
+      'Estado inicial - _estadoUbicacionEquipo: null (placeholder activo)',
+    );
   }
 
   // CARGAR ESTADO INICIAL Y HISTORIAL
   Future<void> _loadInitialState() async {
     try {
       // ✅ USAR CÓDIGO DE BARRAS para buscar historial
-      final codigoBarras = equipoCliente['cod_barras'];
+      final codigoBarras = equipoCliente['cod_barras']?.toString();
       final clienteId = equipoCliente['cliente_id'];
 
       print('🔍 BUSCANDO HISTORIAL PARA:');
@@ -119,7 +123,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       print('   clienteId: $clienteId (tipo: ${clienteId.runtimeType})');
       print('   tipo_estado: ${equipoCliente['tipo_estado']}');
 
-      if (codigoBarras == null || clienteId == null) {
+      if (codigoBarras == null || codigoBarras.isEmpty || clienteId == null) {
         _logger.w('No se encontró código de barras o cliente');
         return;
       }
@@ -129,39 +133,48 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       List<CensoActivo> historialCompleto = [];
 
       _logger.i(
-          '📋 Cargando historial para equipo: $codigoBarras, cliente: $clienteId, tipo: $tipoEstado');
+        '📋 Cargando historial para equipo: $codigoBarras, cliente: $clienteId, tipo: $tipoEstado',
+      );
 
       try {
-        historialCompleto =
-        await _estadoEquipoRepository.obtenerHistorialDirectoPorEquipoCliente(
-            codigoBarras.toString(),  // ← Usar código de barras
-            int.parse(clienteId.toString())
+        historialCompleto = await _estadoEquipoRepository
+            .obtenerHistorialDirectoPorEquipoCliente(
+          codigoBarras, // ← Ya es String no-nullable
+          int.parse(clienteId.toString()),
         );
 
-        _logger.i('📈 Historial directo obtenido: ${historialCompleto.length} registros');
+        _logger.i(
+          '📈 Historial directo obtenido: ${historialCompleto.length} registros',
+        );
       } catch (e) {
-        _logger.w('⚠️ Error con historial directo, intentando método alternativo: $e');
+        _logger.w(
+          '⚠️ Error con historial directo, intentando método alternativo: $e',
+        );
 
         try {
-          historialCompleto =
-          await _estadoEquipoRepository.obtenerHistorialCompleto(
-              codigoBarras.toString(),  // ← Usar código de barras
-              int.parse(clienteId.toString())
+          historialCompleto = await _estadoEquipoRepository
+              .obtenerHistorialCompleto(
+            codigoBarras, // ← Ya es String no-nullable
+            int.parse(clienteId.toString()),
           );
-          _logger.i('📈 Historial alternativo obtenido: ${historialCompleto.length} registros');
+          _logger.i(
+            '📈 Historial alternativo obtenido: ${historialCompleto.length} registros',
+          );
         } catch (e2) {
           _logger.e('❌ Error con ambos métodos de historial: $e2');
           historialCompleto = [];
         }
       }
 
-      estadoActual = historialCompleto.isNotEmpty ? historialCompleto.first : null;
+      estadoActual = historialCompleto.isNotEmpty
+          ? historialCompleto.first
+          : null;
 
       if (estadoActual == null && tipoEstado == 'asignado') {
         try {
           estadoActual = await _estadoEquipoRepository.obtenerUltimoEstado(
-              codigoBarras.toString(),  // ← Usar código de barras
-              int.parse(clienteId.toString())
+            codigoBarras, // ← Ya es String no-nullable
+            int.parse(clienteId.toString()),
           );
           _logger.i('📍 Estado individual obtenido para equipo asignado');
 
@@ -173,11 +186,11 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         }
       }
 
-
       if (estadoActual != null) {
         _estadoLocalActual = estadoActual.enLocal ? 1 : 0;
         _logger.i(
-            '🏠 Estado local determinado por historial: $_estadoLocalActual (${estadoActual.enLocal ? "En local" : "Fuera del local"})');
+          '🏠 Estado local determinado por historial: $_estadoLocalActual (${estadoActual.enLocal ? "En local" : "Fuera del local"})',
+        );
       } else {
         _estadoLocalActual = tipoEstado == 'asignado' ? 1 : 0;
         _logger.i('🏠 Estado local por defecto: $_estadoLocalActual');
@@ -194,15 +207,21 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       notifyListeners();
 
       _logger.i('✅ Estado inicial cargado:');
-      _logger.i('   - Historial completo: ${historialCompleto.length} registros');
+      _logger.i(
+        '   - Historial completo: ${historialCompleto.length} registros',
+      );
       _logger.i('   - Últimos 5: ${ultimos5.length} registros');
-      _logger.i('   - Estado actual: ${estadoActual != null ? "Encontrado" : "No encontrado"}');
+      _logger.i(
+        '   - Estado actual: ${estadoActual != null ? "Encontrado" : "No encontrado"}',
+      );
       _logger.i('   - Estado local actual: $_estadoLocalActual');
       _logger.i('   - Estado dropdown: $_estadoUbicacionEquipo');
 
       for (int i = 0; i < ultimos5.length; i++) {
         final registro = ultimos5[i];
-        _logger.i('   Registro $i: ${registro.enLocal ? "En local" : "Fuera"} - ${registro.fechaRevision}');
+        _logger.i(
+          '   Registro $i: ${registro.enLocal ? "En local" : "Fuera"} - ${registro.fechaRevision}',
+        );
       }
     } catch (e) {
       _logger.e('❌ Error crítico cargando estado inicial: $e');
@@ -227,6 +246,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     final tipoEstado = equipoCliente['tipo_estado']?.toString();
     return tipoEstado == 'asignado';
   }
+
   bool? get estadoUbicacionEquipo => _estadoUbicacionEquipo;
   bool get hasUnsavedChanges => _hasUnsavedChanges;
   bool get saveButtonEnabled => _estadoUbicacionEquipo != null;
@@ -262,27 +282,24 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     try {
       _logger.i('🔄 Recargando historial completo...');
 
-      if (equipoCliente['id'] == null) {
-        _logger.w('⚠️ equipoCliente id es null, no se puede recargar historial');
+      final equipoId = equipoCliente['id'];
+      final clienteId = equipoCliente['cliente_id'];
+
+      if (equipoId == null || clienteId == null) {
+        _logger.w(
+          '⚠️ equipoCliente id o cliente_id es null, no se puede recargar historial',
+        );
         return;
       }
 
       final tipoEstado = equipoCliente['tipo_estado']?.toString();
       List<CensoActivo> historialCompleto = [];
 
-      if (tipoEstado == 'asignado') {
-        final clienteId = equipoCliente['cliente_id'];
-        if (clienteId != null) {
-          historialCompleto = await _estadoEquipoRepository.obtenerHistorialCompleto(
-              equipoCliente['id'], clienteId
-          );
-        }
-      } else {
-        historialCompleto = await _estadoEquipoRepository.obtenerHistorialCompleto(
-          equipoCliente['id'].toString(),
-          int.parse(equipoCliente['cliente_id'].toString()),
-        );
-      }
+      historialCompleto = await _estadoEquipoRepository
+          .obtenerHistorialCompleto(
+        equipoId.toString(),
+        int.parse(clienteId.toString()),
+      );
 
       final ultimos5 = historialCompleto.take(5).toList();
 
@@ -293,19 +310,20 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
       notifyListeners();
       _logger.i('✅ Historial recargado: ${historialCompleto.length} registros');
-
     } catch (e) {
       _logger.e('❌ Error recargando historial: $e');
     }
   }
 
-// ========== GUARDAR CAMBIOS ==========
+  // ========== GUARDAR CAMBIOS ==========
   Future<void> saveAllChanges() async {
     if (_estadoUbicacionEquipo == null) {
-      _eventController.add(ShowMessageEvent(
-        'Debe seleccionar una ubicación para el equipo antes de guardar',
-        MessageType.error,
-      ));
+      _eventController.add(
+        ShowMessageEvent(
+          'Debe seleccionar una ubicación para el equipo antes de guardar',
+          MessageType.error,
+        ),
+      );
       return;
     }
 
@@ -320,19 +338,20 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         position = await _locationService.getCurrentLocationRequired(
           timeout: Duration(seconds: 30),
         );
-        _logger.i('Ubicación GPS obtenida: ${_locationService.formatCoordinates(position)}');
+        _logger.i(
+          'Ubicación GPS obtenida: ${_locationService.formatCoordinates(position)}',
+        );
       } on LocationException catch (e) {
         _state = _state.copyWith(isProcessing: false);
         notifyListeners();
-        _eventController.add(ShowMessageEvent(
-          'GPS requerido: ${e.message}',
-          MessageType.error,
-        ));
+        _eventController.add(
+          ShowMessageEvent('GPS requerido: ${e.message}', MessageType.error),
+        );
         return;
       }
 
       final clienteId = equipoCliente['cliente_id'];
-      final codigoBarras = equipoCliente['cod_barras'];
+      final codigoBarras = equipoCliente['cod_barras']?.toString();
 
       if (clienteId == null || codigoBarras == null || codigoBarras.isEmpty) {
         throw Exception('Código de barras o cliente no disponible');
@@ -341,7 +360,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       _logger.i('Usando codigoBarras: $codigoBarras, clienteId: $clienteId');
 
       final nuevoEstado = await _estadoEquipoRepository.crearCensoActivo(
-        equipoId: codigoBarras.toString(),
+        equipoId: codigoBarras,
         clienteId: int.parse(clienteId.toString()),
         enLocal: _estadoUbicacionEquipo!,
         fechaRevision: DateTime.now(),
@@ -350,30 +369,51 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       );
 
       // 2. Sincronizar con el servidor - AGREGAR TODOS LOS CAMPOS
-      // try {
-      //   final resultadoSync = await CensoActivoPostService.enviarCambioEstado(
-      //     codigoBarras: codigoBarras.toString(),
-      //     clienteId: int.parse(clienteId.toString()),
-      //     enLocal: _estadoUbicacionEquipo!,
-      //     position: position,
-      //     observaciones: nuevoEstado.observaciones,
-      //     equipoId: equipoCliente['equipo_id']?.toString() ?? codigoBarras.toString(),
-      //     clienteNombre: equipoCliente['cliente_nombre']?.toString() ?? '',
-      //     numeroSerie: equipoCliente['numero_serie']?.toString() ?? '',
-      //     modelo: equipoCliente['modelo_nombre']?.toString() ?? '',
-      //     marca: equipoCliente['marca_nombre']?.toString() ?? '',
-      //     logo: equipoCliente['logo_nombre']?.toString() ?? '',
-      //   );
-      //
-      //   if (resultadoSync['exito']) {
-      //     _logger.i('✅ Sincronizado con servidor: ${resultadoSync['mensaje']}');
-      //   } else {
-      //     _logger.w('⚠️ Error al sincronizar: ${resultadoSync['mensaje']}');
-      //   }
-      // } catch (syncError) {
-      //   _logger.w('⚠️ Excepción al sincronizar: $syncError');
-      //   // El guardado local ya se hizo, así que continuamos
-      // }
+      try {
+        final currentUser = await AuthService().getCurrentUser();
+        if (currentUser != null &&
+            currentUser.id != null &&
+            currentUser.edfVendedorId != null) {
+          final resultadoSync = await CensoActivoPostService.enviarCambioEstado(
+            codigoBarras: codigoBarras,
+            clienteId: int.parse(clienteId.toString()),
+            enLocal: _estadoUbicacionEquipo!,
+            position: position,
+            observaciones: nuevoEstado.observaciones,
+            equipoId:
+            equipoCliente['equipo_id']?.toString() ?? codigoBarras,
+            clienteNombre: equipoCliente['cliente_nombre']?.toString() ?? '',
+            numeroSerie: equipoCliente['numero_serie']?.toString() ?? '',
+            modelo: equipoCliente['modelo_nombre']?.toString() ?? '',
+            marca: equipoCliente['marca_nombre']?.toString() ?? '',
+            logo: equipoCliente['logo_nombre']?.toString() ?? '',
+            usuarioId: currentUser.id!,
+            edfVendedorId: currentUser.edfVendedorId!,
+          );
+
+          if (resultadoSync['exito']) {
+            _logger.i(
+              '✅ Sincronizado con servidor: ${resultadoSync['mensaje']}',
+            );
+            // MARCAR COMO MIGRADO EN LOCAL
+            if (nuevoEstado.id != null) {
+              await _estadoEquipoRepository.marcarComoMigrado(nuevoEstado.id!);
+              _logger.i('✅ Estado local actualizado a MIGRADO');
+            } else {
+              _logger.w('⚠️ No se pudo marcar como migrado: ID nulo');
+            }
+          } else {
+            _logger.w('⚠️ Error al sincronizar: ${resultadoSync['mensaje']}');
+          }
+        } else {
+          _logger.w(
+            '⚠️ No se pudo sincronizar: Usuario no autenticado o datos incompletos',
+          );
+        }
+      } catch (syncError) {
+        _logger.w('⚠️ Excepción al sincronizar: $syncError');
+        // El guardado local ya se hizo, así que continuamos
+      }
 
       _estadoLocalActual = _estadoUbicacionEquipo! ? 1 : 0;
       _estadoUbicacionEquipo = null;
@@ -391,19 +431,19 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
       notifyListeners();
 
-      _eventController.add(ShowMessageEvent(
-        'Cambios guardados con ubicación GPS',
-        MessageType.success,
-      ));
-
+      _eventController.add(
+        ShowMessageEvent(
+          'Cambios guardados con ubicación GPS',
+          MessageType.success,
+        ),
+      );
     } catch (e) {
       _logger.e('Error al guardar cambios: $e');
       _state = _state.copyWith(isProcessing: false);
       notifyListeners();
-      _eventController.add(ShowMessageEvent(
-        'Error al guardar los cambios: $e',
-        MessageType.error,
-      ));
+      _eventController.add(
+        ShowMessageEvent('Error al guardar los cambios: $e', MessageType.error),
+      );
     }
   }
 
@@ -451,7 +491,8 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   String getNombreCompletoEquipo() {
-    return '${equipoCliente['marca_nombre'] ?? ''} ${equipoCliente['modelo_nombre'] ?? ''}'.trim();
+    return '${equipoCliente['marca_nombre'] ?? ''} ${equipoCliente['modelo_nombre'] ?? ''}'
+        .trim();
   }
 
   bool shouldShowMarca() {
@@ -518,14 +559,17 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     return {
       'equipoNombre': getNombreCompletoEquipo(),
       'equipoCodigo': equipoCliente['cod_barras'] ?? 'Sin código',
-      'clienteNombre': 'Cliente ID: ${equipoCliente['cliente_id'] ?? "No asignado"}',
+      'clienteNombre':
+      'Cliente ID: ${equipoCliente['cliente_id'] ?? "No asignado"}',
     };
   }
 
   void _logDebugInfo() {
     _logger.i('DEBUG - Equipo Marca: ${equipoCliente['marca_nombre']}');
     _logger.i('DEBUG - Equipo Modelo: ${equipoCliente['modelo_nombre']}');
-    _logger.i('DEBUG - Nombre completo calculado: ${getNombreCompletoEquipo()}');
+    _logger.i(
+      'DEBUG - Nombre completo calculado: ${getNombreCompletoEquipo()}',
+    );
     _logger.i('DEBUG - En local: ${_state.equipoEnLocal}');
     _logger.i('DEBUG - Estado dropdown: $_estadoUbicacionEquipo');
     _logger.i('DEBUG - Estado local actual: $_estadoLocalActual');
@@ -552,6 +596,8 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   void logDebugInfo() {
-    _logger.d('EquiposClienteDetailScreenViewModel Debug Info: ${getDebugInfo()}');
+    _logger.d(
+      'EquiposClienteDetailScreenViewModel Debug Info: ${getDebugInfo()}',
+    );
   }
 }

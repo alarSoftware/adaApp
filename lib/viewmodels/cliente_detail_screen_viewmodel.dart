@@ -150,7 +150,7 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
       ));
 
       _logger.i('✅ Equipos cargados exitosamente');
-      _logger.i('Total: ${totalEquiposCount}, Asignados: ${equiposAsignadosCount}, Pendientes: ${equiposPendientesCount}');
+      _logger.i('Total: $totalEquiposCount, Asignados: $equiposAsignadosCount, Pendientes: $equiposPendientesCount');
 
     } catch (e, stackTrace) {
       _logger.e('❌ Error cargando equipos del cliente', error: e, stackTrace: stackTrace);

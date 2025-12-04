@@ -579,4 +579,51 @@ class CensoActivoPostService {
 
     return censo;
   }
+
+  static Future<Map<String, dynamic>> enviarCambioEstado({
+    required String codigoBarras,
+    required int clienteId,
+    required bool enLocal,
+    required dynamic position, // Geolocator Position
+    String? observaciones,
+    required String equipoId,
+    required String clienteNombre,
+    required String numeroSerie,
+    required String modelo,
+    required String marca,
+    required String logo,
+    required int usuarioId,
+    required String edfVendedorId,
+  }) async {
+    try {
+      await enviarCensoActivo(
+        censoId: DateTime.now().millisecondsSinceEpoch.toString(),
+        equipoId: equipoId,
+        codigoBarras: codigoBarras,
+        clienteId: clienteId,
+        usuarioId: usuarioId,
+        edfVendedorId: edfVendedorId,
+        latitud: position.latitude,
+        longitud: position.longitude,
+        observaciones: observaciones,
+        enLocal: enLocal,
+        estadoCenso: 'migrado', // Se asume migrado si se envía directo
+        esNuevoEquipo: false,
+        crearPendiente: false,
+        clienteNombre: clienteNombre,
+        numeroSerie: numeroSerie,
+        modelo: modelo,
+        marca: marca,
+        logo: logo,
+        guardarLog: true,
+      );
+
+      return {'exito': true, 'mensaje': 'Estado actualizado correctamente'};
+    } catch (e) {
+      return {
+        'exito': false,
+        'mensaje': e.toString().replaceAll('Exception: ', ''),
+      };
+    }
+  }
 }

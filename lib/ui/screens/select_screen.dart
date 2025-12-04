@@ -26,11 +26,9 @@ class _SelectScreenState extends State<SelectScreen> {
   late SelectScreenViewModel _viewModel;
   late StreamSubscription<UIEvent> _eventSubscription;
 
-  // 🆕 NUEVO: Estado para datos pendientes
   int _pendingDataCount = 0;
   Timer? _pendingDataTimer;
 
-  // ✅ NUEVO: Variable para evitar múltiples verificaciones de batería
   bool _batteryOptimizationChecked = false;
 
   @override
@@ -38,9 +36,8 @@ class _SelectScreenState extends State<SelectScreen> {
     super.initState();
     _viewModel = SelectScreenViewModel();
     _setupEventListener();
-    _startPendingDataMonitoring(); // 🆕 NUEVO
+    _startPendingDataMonitoring();
 
-    // ✅ NUEVO: Verificar optimización de batería cuando se carga la pantalla
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkBatteryOptimizationOnFirstLoad();
     });
@@ -49,28 +46,20 @@ class _SelectScreenState extends State<SelectScreen> {
   @override
   void dispose() {
     _eventSubscription.cancel();
-    _pendingDataTimer?.cancel(); // 🆕 NUEVO
+    _pendingDataTimer?.cancel();
     _viewModel.dispose();
     super.dispose();
   }
 
-  // 🆕 NUEVO: Monitoreo de datos pendientes
   void _startPendingDataMonitoring() {
-    // _pendingDataTimer = Timer.periodic(
-    //   Duration(minutes: 2),
-    //       (_) => _checkPendingData(),
-    // );
     _checkPendingData();
   }
 
-  // 🆕 NUEVO: Verificar datos pendientes
-  // 🆕 NUEVO: Verificar datos pendientes (CORREGIDO)
   Future<void> _checkPendingData() async {
     try {
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
 
-      // 🔥 CONTAR SOLO CENSOS ACTIVOS NO SINCRONIZADOS
       final censosPendientes = await db.query(
         'censo_activo',
         where: 'sincronizado = ?',
@@ -79,13 +68,11 @@ class _SelectScreenState extends State<SelectScreen> {
 
       final cantidadCensos = censosPendientes.length;
 
-      // 🔥 CONTAR OTROS DATOS PENDIENTES (excluyendo tablas relacionadas con censos)
       final validationService = DatabaseValidationService(db);
       final summary = await validationService.getPendingSyncSummary();
       final pendingByTable =
           summary['pending_by_table'] as List<dynamic>? ?? [];
 
-      // Tablas que se excluyen del conteo (ya están incluidas en censos)
       final tablasExcluidas = {
         'censo_activo',
         'equipos_pendientes',
@@ -100,7 +87,6 @@ class _SelectScreenState extends State<SelectScreen> {
         }
       }
 
-      // Total: censos + otros datos
       final totalPendientes = cantidadCensos + otrosDatos;
 
       if (mounted) {
@@ -108,39 +94,24 @@ class _SelectScreenState extends State<SelectScreen> {
           _pendingDataCount = totalPendientes;
         });
       }
-
-      debugPrint(
-        '📊 Datos pendientes: $totalPendientes (Censos: $cantidadCensos, Otros: $otrosDatos)',
-      );
     } catch (e) {
-      debugPrint('❌ Error verificando datos pendientes: $e');
-      // Silently ignore errors for background check
     }
   }
 
-  // ✅ NUEVO: Verificar optimización de batería en el primer acceso
   Future<void> _checkBatteryOptimizationOnFirstLoad() async {
-    // Evitar múltiples verificaciones
     if (_batteryOptimizationChecked) return;
     _batteryOptimizationChecked = true;
 
     try {
-      debugPrint('🔋 INICIANDO verificación de batería en SelectScreen...');
       await BatteryOptimizationDialog.checkAndRequestBatteryOptimization(
         context,
       );
-      debugPrint('🔋 ✅ COMPLETADO verificación de batería en SelectScreen');
     } catch (e) {
-      debugPrint(
-        '🔋 ❌ ERROR verificando optimización de batería en SelectScreen: $e',
-      );
     }
   }
 
-  // ✅ NUEVO: Método para manejar logout correctamente
   Future<void> _handleLogout() async {
     try {
-      // Mostrar indicador de carga
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -165,46 +136,37 @@ class _SelectScreenState extends State<SelectScreen> {
         ),
       );
 
-      // Hacer logout
       await AuthService().logout();
 
-      // Cerrar diálogo de carga
       if (mounted) Navigator.of(context).pop();
 
-      // Navegar a login y limpiar stack completo
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(
           context,
           '/login',
-          (route) => false, // Elimina TODAS las pantallas anteriores
+              (route) => false,
         );
       }
     } catch (e) {
-      // Cerrar diálogo si está abierto
       if (mounted) Navigator.of(context).pop();
 
       _mostrarError('Error al cerrar sesión: $e');
     }
   }
 
-  // 🆕 NUEVO: Botón de campanita con badge
   Widget _buildPendingDataButton() {
     return Stack(
       children: [
         IconButton(
           onPressed: () async {
-            // Navegar a la pantalla de datos pendientes
             await Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => PendingDataScreen()),
             );
-            // Refrescar contador después de volver
-            // _checkPendingData();
           },
           icon: Icon(Icons.notifications, color: AppColors.onPrimary),
           tooltip: 'Datos pendientes de envío',
         ),
-        // Badge con contador
         if (_pendingDataCount > 0)
           Positioned(
             right: 6,
@@ -246,8 +208,6 @@ class _SelectScreenState extends State<SelectScreen> {
         _mostrarError(event.message);
       } else if (event is ShowSuccessEvent) {
         _mostrarExito(event.message);
-        // 🆕 NUEVO: Refrescar contador después de sync exitoso
-        // _checkPendingData();
       } else if (event is RequestSyncConfirmationEvent) {
         _handleSyncConfirmation();
       } else if (event is RequiredSyncEvent) {
@@ -260,16 +220,12 @@ class _SelectScreenState extends State<SelectScreen> {
         _handleDeleteValidationFailed(event.validationResult);
       } else if (event is SyncCompletedEvent) {
         _mostrarExito(event.result.message);
-        // 🆕 NUEVO: Refrescar contador después de sync
-        // _checkPendingData();
       } else if (event is SyncErrorEvent) {
-        // 🆕 NUEVO: Mostrar diálogo de error de sincronización
         _mostrarDialogoErrorSync(event);
       }
     });
   }
 
-  // 🆕 NUEVO: Diálogo para mostrar errores de sincronización
   Future<void> _mostrarDialogoErrorSync(SyncErrorEvent event) async {
     return showDialog<void>(
       context: context,
@@ -283,7 +239,7 @@ class _SelectScreenState extends State<SelectScreen> {
               SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '❌ Error de Sincronización',
+                  'Error de Sincronización',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -298,7 +254,6 @@ class _SelectScreenState extends State<SelectScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Mensaje principal
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -330,7 +285,6 @@ class _SelectScreenState extends State<SelectScreen> {
                   ),
                 ),
 
-                // Detalles técnicos si existen
                 if (event.details != null && event.details!.isNotEmpty) ...[
                   SizedBox(height: 16),
                   Text(
@@ -362,7 +316,6 @@ class _SelectScreenState extends State<SelectScreen> {
 
                 SizedBox(height: 16),
 
-                // Recomendaciones
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -418,7 +371,7 @@ class _SelectScreenState extends State<SelectScreen> {
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.of(context).pop();
-                _viewModel.requestSync(); // Reintentar sincronización
+                _viewModel.requestSync();
               },
               icon: Icon(Icons.refresh),
               style: ElevatedButton.styleFrom(
@@ -433,7 +386,6 @@ class _SelectScreenState extends State<SelectScreen> {
     );
   }
 
-  // 🆕 NUEVO: Widget helper para recomendaciones
   Widget _buildRecommendation(String text) {
     return Padding(
       padding: EdgeInsets.only(bottom: 4, left: 4),
@@ -453,8 +405,8 @@ class _SelectScreenState extends State<SelectScreen> {
   }
 
   Future<void> _handleDeleteValidationFailed(
-    DatabaseValidationResult validation,
-  ) async {
+      DatabaseValidationResult validation,
+      ) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -471,7 +423,7 @@ class _SelectScreenState extends State<SelectScreen> {
               SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '⚠️ No se puede eliminar',
+                  'No se puede eliminar',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -566,7 +518,6 @@ class _SelectScreenState extends State<SelectScreen> {
                 style: TextStyle(color: AppColors.textSecondary),
               ),
             ),
-            // NUEVO: Botón para ir a datos pendientes
             TextButton(
               onPressed: () async {
                 Navigator.of(context).pop();
@@ -574,7 +525,6 @@ class _SelectScreenState extends State<SelectScreen> {
                   context,
                   MaterialPageRoute(builder: (context) => PendingDataScreen()),
                 );
-                // _checkPendingData();
               },
               child: Text(
                 'Ver Detalles',
@@ -780,7 +730,7 @@ class _SelectScreenState extends State<SelectScreen> {
   void _mostrarError(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('❌ $mensaje'),
+        content: Text('$mensaje'),
         backgroundColor: AppColors.error,
         duration: Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
@@ -792,7 +742,7 @@ class _SelectScreenState extends State<SelectScreen> {
   void _mostrarExito(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('✅ $mensaje'),
+        content: Text('$mensaje'),
         backgroundColor: AppColors.success,
         duration: Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
@@ -821,8 +771,8 @@ class _SelectScreenState extends State<SelectScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap:
-            onTap ??
-            () {
+        onTap ??
+                () {
               if (routeName != null) {
                 Navigator.pushNamed(context, routeName);
               } else if (page != null) {
@@ -955,7 +905,6 @@ class _SelectScreenState extends State<SelectScreen> {
         backgroundColor: AppColors.appBarBackground,
         foregroundColor: AppColors.appBarForeground,
         actions: [
-          // Botón de sincronización
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {
@@ -963,15 +912,15 @@ class _SelectScreenState extends State<SelectScreen> {
                 onPressed: _viewModel.isSyncing ? null : _viewModel.requestSync,
                 icon: _viewModel.isSyncing
                     ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.onPrimary,
-                          ),
-                        ),
-                      )
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.onPrimary,
+                    ),
+                  ),
+                )
                     : Icon(Icons.sync, color: AppColors.onPrimary),
                 tooltip: _viewModel.isSyncing
                     ? 'Sincronizando...'
@@ -979,11 +928,8 @@ class _SelectScreenState extends State<SelectScreen> {
               );
             },
           ),
-          // 🆕 NUEVO: Botón de campanita para datos pendientes
           _buildPendingDataButton(),
-          // Indicador de conexión
           _buildConnectionStatus(),
-          // Menú de opciones
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {
@@ -998,26 +944,25 @@ class _SelectScreenState extends State<SelectScreen> {
                       break;
                   }
                 },
-
                 itemBuilder: (BuildContext context) => [
                   PopupMenuItem<String>(
                     value: 'probar_conexion',
                     enabled:
-                        !_viewModel.isTestingConnection &&
+                    !_viewModel.isTestingConnection &&
                         !_viewModel.isSyncing,
                     child: Row(
                       children: [
                         _viewModel.isTestingConnection
                             ? SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    AppColors.success,
-                                  ),
-                                ),
-                              )
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.success,
+                            ),
+                          ),
+                        )
                             : Icon(Icons.wifi_find, color: AppColors.success),
                         SizedBox(width: 8),
                         Text(
@@ -1032,7 +977,7 @@ class _SelectScreenState extends State<SelectScreen> {
                   PopupMenuItem<String>(
                     value: 'borrar_bd',
                     enabled:
-                        !_viewModel.isSyncing &&
+                    !_viewModel.isSyncing &&
                         !_viewModel.isTestingConnection,
                     child: Row(
                       children: [
@@ -1065,7 +1010,6 @@ class _SelectScreenState extends State<SelectScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Header con nombre de usuario
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Card(
@@ -1119,7 +1063,6 @@ class _SelectScreenState extends State<SelectScreen> {
                     ),
                   ),
 
-                  // Lista de opciones
                   Expanded(
                     child: ListView(
                       padding: EdgeInsets.symmetric(horizontal: 16),
@@ -1163,6 +1106,7 @@ class _SelectScreenState extends State<SelectScreen> {
                           color: AppColors.primary,
                           page: const MarcaScreen(),
                         ),
+                        SizedBox(height: 12),
                         _buildMenuCard(
                           label: 'Productos',
                           description: 'Catálogo completo de productos',
@@ -1175,11 +1119,10 @@ class _SelectScreenState extends State<SelectScreen> {
                     ),
                   ),
 
-                  // ✅ BOTÓN DE CERRAR SESIÓN CORREGIDO
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: TextButton.icon(
-                      onPressed: _handleLogout, // ✅ Usar el método correcto
+                      onPressed: _handleLogout,
                       icon: Icon(Icons.logout, color: AppColors.textSecondary),
                       label: Text(
                         'Cerrar Sesión',
@@ -1195,7 +1138,6 @@ class _SelectScreenState extends State<SelectScreen> {
             ),
           ),
 
-          // Overlay de sincronización mejorado con progreso
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {
@@ -1217,8 +1159,8 @@ class _SelectScreenState extends State<SelectScreen> {
   }
 
   Future<void> _mostrarDialogoSincronizacionObligatoria(
-    RequiredSyncEvent event,
-  ) async {
+      RequiredSyncEvent event,
+      ) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,

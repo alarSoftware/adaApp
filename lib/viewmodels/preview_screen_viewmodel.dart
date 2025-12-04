@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'dart:async';
 import 'package:uuid/uuid.dart';
-import '../../models/cliente.dart';
 import '../../models/usuario.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
-import 'package:ada_app/services/post/censo_activo_post_service.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
