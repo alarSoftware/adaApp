@@ -80,7 +80,7 @@ class ClientOptionsScreen extends StatelessWidget {
                     _buildOptionCard(
                       context: context,
                       title: 'Operaciones Comerciales',
-                      description: 'Pedidos, reposiciones y retiros',
+                      description: 'Reposiciones y retiros',
                       icon: Icons.receipt_long,
                       color: AppColors.success,
                       onTap: () => _navigateToOperacionesComerciales(context),

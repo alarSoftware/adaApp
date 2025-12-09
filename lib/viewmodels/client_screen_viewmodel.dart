@@ -20,7 +20,6 @@ class ClienteListState {
   final bool isLoadingMore;
   final List<Cliente> displayedClientes;
   final String searchQuery;
-  final String? selectedDia;
   final bool hasMoreData;
   final int currentPage;
   final int totalCount;
@@ -31,7 +30,6 @@ class ClienteListState {
     this.isLoadingMore = false,
     this.displayedClientes = const [],
     this.searchQuery = '',
-    this.selectedDia,
     this.hasMoreData = true,
     this.currentPage = 0,
     this.totalCount = 0,
@@ -55,7 +53,6 @@ class ClienteListState {
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       displayedClientes: displayedClientes ?? this.displayedClientes,
       searchQuery: searchQuery ?? this.searchQuery,
-      selectedDia: clearSelectedDia ? null : (selectedDia ?? this.selectedDia),
       hasMoreData: hasMoreData ?? this.hasMoreData,
       currentPage: currentPage ?? this.currentPage,
       totalCount: totalCount ?? this.totalCount,
@@ -84,7 +81,6 @@ class ClienteListScreenViewModel extends ChangeNotifier {
   bool get isLoadingMore => _state.isLoadingMore;
   List<Cliente> get displayedClientes => _state.displayedClientes;
   String get searchQuery => _state.searchQuery;
-  String? get selectedDia => _state.selectedDia;
   bool get hasMoreData => _state.hasMoreData;
   int get totalCount => _state.totalCount;
   bool get isEmpty => _state.displayedClientes.isEmpty && !_state.isLoading;
@@ -94,18 +90,6 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     _searchTimer?.cancel();
     _eventController.close();
     super.dispose();
-  }
-
-  String _getDiaActual() {
-    final diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-    final now = DateTime.now();
-    return diasSemana[now.weekday - 1];
-  }
-
-  Future<void> initialize() async {
-    final diaActual = _getDiaActual();
-    _updateState(_state.copyWith(selectedDia: diaActual));
-    await loadClientes();
   }
 
   void updateSelectedDia(String? dia) {
@@ -122,7 +106,6 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     try {
       final resultados = await _repository.buscarConFiltros(
         query: _state.searchQuery,
-        rutaDia: _state.selectedDia,
       );
 
       _filteredClientes = resultados;
@@ -150,7 +133,6 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     try {
       final clientesDB = await _repository.buscarConFiltros(
         query: _state.searchQuery,
-        rutaDia: _state.selectedDia,
       );
 
       _allClientes = clientesDB;
@@ -174,7 +156,7 @@ class ClienteListScreenViewModel extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    if (_state.searchQuery.isNotEmpty || _state.selectedDia != null) {
+    if (_state.searchQuery.isNotEmpty) {
       await _applyFilters();
     } else {
       await loadClientes();
@@ -267,22 +249,19 @@ class ClienteListScreenViewModel extends ChangeNotifier {
   }
 
   String getEmptyStateTitle() {
-    return _state.searchQuery.isEmpty && _state.selectedDia == null
+    return _state.searchQuery.isEmpty
         ? 'No hay clientes'
         : 'No se encontraron clientes';
   }
 
   String getEmptyStateSubtitle() {
-    if (_state.searchQuery.isEmpty && _state.selectedDia == null) {
+    if (_state.searchQuery.isEmpty) {
       return 'No hay clientes registrados en el sistema';
     }
 
     List<String> filtros = [];
     if (_state.searchQuery.isNotEmpty) {
       filtros.add('búsqueda: "${_state.searchQuery}"');
-    }
-    if (_state.selectedDia != null) {
-      filtros.add('día: ${_state.selectedDia}');
     }
 
     return 'con ${filtros.join(' y ')}';
@@ -301,7 +280,6 @@ class ClienteListScreenViewModel extends ChangeNotifier {
       'pagina_actual': _state.currentPage,
       'tiene_mas_datos': _state.hasMoreData,
       'query_busqueda': _state.searchQuery,
-      'dia_seleccionado': _state.selectedDia,
       'esta_cargando': _state.isLoading,
       'esta_cargando_mas': _state.isLoadingMore,
     };

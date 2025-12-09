@@ -6,10 +6,7 @@ import 'package:ada_app/ui/widgets/client_info_card.dart';
 import 'forms_screen.dart';
 import 'dart:async';
 import 'package:ada_app/ui/theme/colors.dart';
-import 'package:logger/logger.dart';
 import 'package:ada_app/main.dart';
-
-var logger = Logger();
 
 class ClienteDetailScreen extends StatefulWidget {
   final Cliente cliente;
@@ -43,7 +40,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
 
   @override
   void didPopNext() {
-    logger.i('🔄 Pantalla visible nuevamente - Refrescando datos');
     if (mounted) {
       _viewModel.refresh();
     }
@@ -102,13 +98,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   }
 
   void _navigateToEquipoDetail(dynamic equipoData) {
-    final isAsignado = equipoData['tipo_estado'] == 'asignado';
-
-    logger.i('Navegando a detalle de equipo:');
-    logger.i('- Código: ${equipoData['cod_barras']}');
-    logger.i('- Tipo estado: ${equipoData['tipo_estado']}');
-    logger.i('- Es asignado: $isAsignado');
-
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -266,7 +255,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
               isAsignado: true,
               emptyTitle: 'Sin equipos asignados',
               emptySubtitle:
-                  'Este cliente no tiene equipos asignados actualmente',
+              'Este cliente no tiene equipos asignados actualmente',
               emptyIcon: Icons.check_circle_outline,
             ),
             _buildEquiposTab(
@@ -370,9 +359,9 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   }
 
   Widget _buildEquipoCard(
-    Map<String, dynamic> equipoData, {
-    required bool isAsignado,
-  }) {
+      Map<String, dynamic> equipoData, {
+        required bool isAsignado,
+      }) {
     final equipoColor = isAsignado ? AppColors.success : AppColors.warning;
     final borderColor = isAsignado
         ? AppColors.borderSuccess
@@ -533,12 +522,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
       return FutureBuilder<Map<String, dynamic>?>(
         future: _viewModel.getEstadoCensoInfo(equipoData),
         builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data != null) {
-            logger.i(
-              'Estado info para ${equipoData['cod_barras']}: ${snapshot.data}',
-            );
-          }
-
           if (!snapshot.hasData || snapshot.data == null) {
             return SizedBox.shrink();
           }
@@ -554,11 +537,9 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
 
           final sincronizado =
               estadoInfo['sincronizado']?.toString() == '1' ||
-              estadoInfo['sincronizado'] == 1 ||
-              estadoInfo['sincronizado'] == true ||
-              estadoInfo['esta_sincronizado'] == true;
-
-          logger.i('Estado censo: $estadoCenso, Sincronizado: $sincronizado');
+                  estadoInfo['sincronizado'] == 1 ||
+                  estadoInfo['sincronizado'] == true ||
+                  estadoInfo['esta_sincronizado'] == true;
 
           if (estadoCenso == 'migrado' || sincronizado) {
             iconColor = AppColors.success;
@@ -573,7 +554,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
             icon = Icons.cloud_off;
             tooltip = 'Error en sincronización';
           } else {
-            logger.w('No se encontró estado_censo válido: $estadoCenso');
             return SizedBox.shrink();
           }
 

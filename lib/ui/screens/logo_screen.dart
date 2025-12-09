@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../repositories/logo_repository.dart';
 import '../../services/sync/equipment_sync_service.dart';
-import 'package:logger/logger.dart';
-
-final _logger = Logger();
 
 class LogosScreen extends StatefulWidget {
   const LogosScreen({super.key});
@@ -19,15 +16,12 @@ class _LogosScreenState extends State<LogosScreen> {
   bool _isSyncing = false;
   String? _errorMessage;
 
-  // Controlador para el campo de búsqueda
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _cargarLogosLocales();
-
-    // Listener para el campo de búsqueda
     _searchController.addListener(_filtrarLogos);
   }
 
@@ -77,10 +71,7 @@ class _LogosScreenState extends State<LogosScreen> {
           _isLoading = false;
         });
       }
-
-      _logger.i('Logos locales cargados: ${_logos.length}');
     } catch (e) {
-      _logger.e('Error cargando logos locales: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -99,15 +90,11 @@ class _LogosScreenState extends State<LogosScreen> {
     });
 
     try {
-      _logger.i('Iniciando sincronización de logos desde el servidor...');
-
-      // Usar EquipmentSyncService en lugar de LogoRepository
       final resultado = await EquipmentSyncService.sincronizarLogos();
 
       if (!mounted) return;
 
       if (resultado.exito) {
-        // Recargar logos locales después de la sincronización
         final logoRepo = LogoRepository();
         final logosActualizados = await logoRepo.obtenerTodos();
 
@@ -122,15 +109,12 @@ class _LogosScreenState extends State<LogosScreen> {
           _isSyncing = false;
         });
 
-        // Aplicar filtro si hay búsqueda activa
         if (_searchController.text.isNotEmpty) {
           _filtrarLogos();
         }
 
         final cantidadSincronizada = resultado.itemsSincronizados;
-        _logger.i('Logos sincronizados exitosamente: $cantidadSincronizada');
 
-        // Mostrar mensaje de éxito con la cantidad
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -143,15 +127,12 @@ class _LogosScreenState extends State<LogosScreen> {
           ),
         );
       } else {
-        // Error en la sincronización
         final mensaje = resultado.mensaje;
 
         setState(() {
           _isSyncing = false;
           _errorMessage = mensaje;
         });
-
-        _logger.e('Error sincronizando logos: $mensaje');
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -162,7 +143,6 @@ class _LogosScreenState extends State<LogosScreen> {
         );
       }
     } catch (e) {
-      _logger.e('Error sincronizando logos: $e');
       if (mounted) {
         setState(() {
           _isSyncing = false;
@@ -207,10 +187,7 @@ class _LogosScreenState extends State<LogosScreen> {
       ),
       body: Column(
         children: [
-          // Barra de búsqueda fija
           _buildSearchSection(),
-
-          // Contenido principal
           Expanded(
             child: _buildContent(),
           ),
@@ -385,7 +362,6 @@ class _LogosScreenState extends State<LogosScreen> {
   }
 
   Widget _buildLogosList() {
-    // Mostrar mensaje si no hay resultados de búsqueda
     if (_logosFiltrados.isEmpty && _searchController.text.isNotEmpty) {
       return Center(
         child: Padding(
@@ -422,7 +398,6 @@ class _LogosScreenState extends State<LogosScreen> {
 
     return Column(
       children: [
-        // Banner de estado de sincronización
         if (_isSyncing)
           Container(
             width: double.infinity,
@@ -449,8 +424,6 @@ class _LogosScreenState extends State<LogosScreen> {
               ],
             ),
           ),
-
-        // Contador de resultados si hay búsqueda activa
         if (_searchController.text.isNotEmpty)
           Container(
             width: double.infinity,
@@ -465,8 +438,6 @@ class _LogosScreenState extends State<LogosScreen> {
               ),
             ),
           ),
-
-        // Grid de logos
         Expanded(
           child: GridView.builder(
             padding: EdgeInsets.only(

@@ -33,25 +33,14 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
   DateTime? _ultimaSincronizacion;
   bool _necesitaSincronizar = true;
 
-  // Lista de días de la semana
-  final List<String> _diasSemana = [
-    'Lunes',
-    'Martes',
-    'Miércoles',
-    'Jueves',
-    'Viernes',
-    'Sábado',
-    'Domingo',
-  ];
-
   @override
   void initState() {
     super.initState();
     _viewModel = ClienteListScreenViewModel();
     _setupEventListener();
     _setupSearchListener();
-    _viewModel.initialize();
     _verificarEstadoSincronizacion();
+    _viewModel.loadClientes();
   }
 
   @override
@@ -75,7 +64,6 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
             builder: (context) => ClientOptionsScreen(cliente: event.cliente),
           ),
         ).then((_) {
-          // Opcional: refrescar lista de clientes si es necesario
         });
       }
     });
@@ -291,124 +279,11 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                   ],
                 ),
               ),
-
-            // C. Selector de Día de Ruta (Chips Horizontales)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(bottom: BorderSide(color: AppColors.border)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today,
-                        size: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Filtrar por día de ruta',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const Spacer(),
-                      ListenableBuilder(
-                        listenable: _viewModel,
-                        builder: (context, child) {
-                          if (_viewModel.selectedDia != null) {
-                            return TextButton(
-                              onPressed: () => _viewModel.clearDiaFilter(),
-                              style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                minimumSize: const Size(50, 30),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              child: Text(
-                                'Ver todos',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.buttonPrimary,
-                                ),
-                              ),
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: ListenableBuilder(
-                      listenable: _viewModel,
-                      builder: (context, child) {
-                        return Row(
-                          children: _diasSemana.map((dia) {
-                            final isSelected = _viewModel.selectedDia == dia;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: FilterChip(
-                                label: Text(dia),
-                                selected: isSelected,
-                                onSelected: (selected) {
-                                  _viewModel.updateSelectedDia(
-                                    selected ? dia : null,
-                                  );
-                                },
-                                backgroundColor: Colors.grey[100],
-                                selectedColor: AppColors.buttonPrimary
-                                    .withValues(alpha: 0.2),
-                                checkmarkColor: AppColors.buttonPrimary,
-                                labelStyle: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                  color: isSelected
-                                      ? AppColors.buttonPrimary
-                                      : AppColors.textSecondary,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                  side: BorderSide(
-                                    color: isSelected
-                                        ? AppColors.buttonPrimary
-                                        : AppColors.border,
-                                    width: isSelected ? 1.5 : 1,
-                                  ),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // D. Buscador
             AppSearchBar(
               controller: _searchController,
               hintText: 'Buscar por nombre, codigo o documento...',
               onClear: _onClearSearch,
             ),
-
-            // E. Lista
             Expanded(
               child: ListenableBuilder(
                 listenable: _viewModel,

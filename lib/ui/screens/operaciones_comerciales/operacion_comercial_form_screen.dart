@@ -10,7 +10,7 @@ import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/ui/widgets/client_info_card.dart';
 import 'package:ada_app/ui/widgets/app_notification.dart';
 import 'package:ada_app/viewmodels/operaciones_comerciales/operacion_comercial_viewmodel.dart'
-    as vm;
+as vm;
 import 'package:ada_app/ui/widgets/operaciones_comerciales/buscador_productos_widget.dart';
 import 'package:ada_app/ui/widgets/operaciones_comerciales/productos_seleccionados_widget.dart';
 import 'package:ada_app/ui/widgets/bottom_bar_widget.dart';
@@ -33,12 +33,11 @@ class OperacionComercialFormScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 👇 CAMBIO: Incluir operaciones con error o sincronizadas como solo lectura
     final esVisualizacion =
         isViewOnly ||
-        (operacionExistente != null &&
-            (operacionExistente!.estaSincronizado ||
-                operacionExistente!.tieneError));
+            (operacionExistente != null &&
+                (operacionExistente!.estaSincronizado ||
+                    operacionExistente!.tieneError));
 
     return ChangeNotifierProvider(
       create: (context) => vm.OperacionComercialFormViewModel(
@@ -69,7 +68,18 @@ class _OperacionComercialFormViewState
   Widget build(BuildContext context) {
     return Consumer<vm.OperacionComercialFormViewModel>(
       builder: (context, viewModel, child) {
-        // ✅ CORREGIDO: Verificar si tiene error O está pendiente
+        // 👇 LISTENER PARA MOSTRAR ERRORES AUTOMÁTICAMENTE
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (viewModel.hasError && viewModel.errorMessage != null) {
+            AppNotification.show(
+              context,
+              message: viewModel.errorMessage!,
+              type: NotificationType.error,
+            );
+            viewModel.clearError();
+          }
+        });
+
         final tieneError = viewModel.operacionExistente?.tieneError ?? false;
         final estaPendiente =
             viewModel.operacionExistente?.estaPendiente ?? false;
@@ -124,14 +134,13 @@ class _OperacionComercialFormViewState
                                   const SizedBox(height: 12),
                                   BuscadorProductosWidget(
                                     searchQuery: viewModel.searchQuery,
-                                    productosFiltrados:
-                                        viewModel.productosFiltrados,
-                                    productosSeleccionados:
-                                        viewModel.productosSeleccionados,
+                                    productosFiltrados: viewModel.productosFiltrados,
+                                    productosSeleccionados: viewModel.productosSeleccionados,
                                     onSearchChanged: viewModel.setSearchQuery,
                                     onClearSearch: viewModel.clearSearch,
-                                    onProductoSelected:
-                                        viewModel.agregarProducto,
+                                    onProductoSelected: (producto) {
+                                      viewModel.agregarProducto(producto);
+                                    },
                                   ),
                                   const SizedBox(height: 24),
                                 ],
@@ -150,7 +159,7 @@ class _OperacionComercialFormViewState
 
                                 ProductosSeleccionadosWidget(
                                   productosSeleccionados:
-                                      viewModel.productosSeleccionados,
+                                  viewModel.productosSeleccionados,
                                   tipoOperacion: viewModel.tipoOperacion,
                                   onEliminarProducto: viewModel.isViewOnly
                                       ? (_) {}
@@ -161,11 +170,11 @@ class _OperacionComercialFormViewState
                                   onSeleccionarReemplazo: viewModel.isViewOnly
                                       ? (_, __) {}
                                       : (index, detalle) =>
-                                            _seleccionarProductoReemplazo(
-                                              viewModel,
-                                              index,
-                                              detalle,
-                                            ),
+                                      _seleccionarProductoReemplazo(
+                                        viewModel,
+                                        index,
+                                        detalle,
+                                      ),
                                   isReadOnly: viewModel.isViewOnly,
                                 ),
                                 const SizedBox(height: 24),
@@ -174,14 +183,14 @@ class _OperacionComercialFormViewState
                                   ignoring: viewModel.isViewOnly,
                                   child: Column(
                                     crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                    CrossAxisAlignment.start,
                                     children: [
                                       _buildSectionTitle('Notas Adicionales'),
                                       const SizedBox(height: 8),
                                       ObservacionesWidget(
                                         observaciones: viewModel.observaciones,
                                         onObservacionesChanged:
-                                            viewModel.setObservaciones,
+                                        viewModel.setObservaciones,
                                       ),
                                     ],
                                   ),
@@ -196,7 +205,6 @@ class _OperacionComercialFormViewState
                   ),
                 ),
 
-                // ✅ CORREGIDO: Mostrar botón de reintentar si necesita reintento O si no es viewOnly
                 if (!viewModel.isViewOnly || necesitaReintento)
                   Container(
                     decoration: BoxDecoration(
@@ -212,11 +220,11 @@ class _OperacionComercialFormViewState
                     child: necesitaReintento
                         ? _buildRetryButton(viewModel)
                         : BottomBarWidget(
-                            totalProductos: viewModel.totalProductos,
-                            isSaving: viewModel.isSaving,
-                            isEditing: false,
-                            onGuardar: () => _guardarOperacion(viewModel),
-                          ),
+                      totalProductos: viewModel.totalProductos,
+                      isSaving: viewModel.isSaving,
+                      isEditing: false,
+                      onGuardar: () => _guardarOperacion(viewModel),
+                    ),
                   ),
               ],
             ),
@@ -228,7 +236,6 @@ class _OperacionComercialFormViewState
 
   // --- WIDGETS ---
 
-  // 👇 NUEVO: Widget para el botón de reintentar
   Widget _buildRetryButton(vm.OperacionComercialFormViewModel viewModel) {
     return SafeArea(
       child: Padding(
@@ -236,7 +243,6 @@ class _OperacionComercialFormViewState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Mensaje de error resumido
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
@@ -261,7 +267,6 @@ class _OperacionComercialFormViewState
             ),
             const SizedBox(height: 12),
 
-            // Botón de reintentar
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -282,42 +287,42 @@ class _OperacionComercialFormViewState
                 ),
                 child: _isRetrying
                     ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'Reintentando...',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.refresh, size: 20),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Reintentar Envio',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.white,
+                        ),
                       ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Reintentando...',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                )
+                    : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.refresh, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Reintentar Envio',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -327,8 +332,8 @@ class _OperacionComercialFormViewState
   }
 
   PreferredSizeWidget _buildFixedAppBar(
-    vm.OperacionComercialFormViewModel viewModel,
-  ) {
+      vm.OperacionComercialFormViewModel viewModel,
+      ) {
     return AppBar(
       title: Text(
         viewModel.isViewOnly
@@ -388,8 +393,8 @@ class _OperacionComercialFormViewState
   }
 
   Widget _buildModernStatusBanner(
-    vm.OperacionComercialFormViewModel viewModel,
-  ) {
+      vm.OperacionComercialFormViewModel viewModel,
+      ) {
     final operacion = viewModel.operacionExistente;
     final tieneError = operacion?.syncStatus == 'error';
     final colorBase = tieneError ? Colors.red : Colors.blue;
@@ -545,8 +550,8 @@ class _OperacionComercialFormViewState
   // --- LÓGICA DE NEGOCIO ---
 
   Future<void> _reintentarSincronizacion(
-    vm.OperacionComercialFormViewModel viewModel,
-  ) async {
+      vm.OperacionComercialFormViewModel viewModel,
+      ) async {
     final operacion = viewModel.operacionExistente;
     if (operacion == null) return;
 
@@ -554,11 +559,7 @@ class _OperacionComercialFormViewState
 
     try {
       final repository = OperacionComercialRepositoryImpl();
-
-      // Reintentar envío
       await OperacionesComercialesPostService.enviarOperacion(operacion);
-
-      // Éxito - marcar como migrado
       await repository.marcarComoMigrado(operacion.id!, null);
 
       if (!mounted) return;
@@ -572,7 +573,6 @@ class _OperacionComercialFormViewState
     } catch (e) {
       if (!mounted) return;
 
-      // Error - actualizar mensaje
       final repository = OperacionComercialRepositoryImpl();
       await repository.marcarComoError(
         operacion.id!,
@@ -584,7 +584,7 @@ class _OperacionComercialFormViewState
       AppNotification.show(
         context,
         message:
-            'Error al reintentar: ${e.toString().replaceAll('Exception: ', '')}',
+        'Error al reintentar: ${e.toString().replaceAll('Exception: ', '')}',
         type: NotificationType.error,
       );
     } finally {
@@ -593,8 +593,8 @@ class _OperacionComercialFormViewState
   }
 
   Future<void> _seleccionarFechaRetiro(
-    vm.OperacionComercialFormViewModel viewModel,
-  ) async {
+      vm.OperacionComercialFormViewModel viewModel,
+      ) async {
     if (viewModel.isViewOnly) return;
 
     final ahora = DateTime.now();
@@ -630,8 +630,8 @@ class _OperacionComercialFormViewState
   }
 
   Future<void> _guardarOperacion(
-    vm.OperacionComercialFormViewModel viewModel,
-  ) async {
+      vm.OperacionComercialFormViewModel viewModel,
+      ) async {
     if (!_formKey.currentState!.validate()) {
       AppNotification.show(
         context,
@@ -655,8 +655,8 @@ class _OperacionComercialFormViewState
   }
 
   Future<bool> _handleBackNavigation(
-    vm.OperacionComercialFormViewModel viewModel,
-  ) async {
+      vm.OperacionComercialFormViewModel viewModel,
+      ) async {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -694,10 +694,10 @@ class _OperacionComercialFormViewState
   }
 
   Future<void> _seleccionarProductoReemplazo(
-    vm.OperacionComercialFormViewModel viewModel,
-    int index,
-    dynamic detalle,
-  ) async {
+      vm.OperacionComercialFormViewModel viewModel,
+      int index,
+      dynamic detalle,
+      ) async {
     if (viewModel.isViewOnly) return;
 
     final productoOriginal = Producto(
@@ -705,6 +705,7 @@ class _OperacionComercialFormViewState
       codigo: detalle.productoCodigo,
       nombre: detalle.productoDescripcion,
       categoria: detalle.productoCategoria,
+      unidadMedida: detalle.unidadMedida ?? 'UN',
     );
 
     final productosReemplazo = await viewModel.obtenerProductosReemplazo(
@@ -779,7 +780,7 @@ class _OperacionComercialFormViewState
                   padding: const EdgeInsets.all(16),
                   itemCount: productosReemplazo.length,
                   separatorBuilder: (context, index) =>
-                      const SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final producto = productosReemplazo[index];
                     return InkWell(

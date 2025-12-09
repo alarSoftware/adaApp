@@ -41,9 +41,7 @@ class DatabaseTables {
     await db.execute(_sqlDynamicFormResponse());
     await db.execute(_sqlDynamicFormResponseDetail());
     await db.execute(_sqlDynamicFormResponseImage());
-
     await db.execute(_sqlProductos());
-    await db.execute(_sqlUnidadesMedida());
     await db.execute(_sqlOperacionComercial());
     await db.execute(_sqlOperacionComercialDetalle());
   }
@@ -78,8 +76,7 @@ class DatabaseTables {
       direccion TEXT,
       ruc_ci TEXT,
       propietario TEXT,
-      condicio_venta TEXT,
-      ruta_dia TEXT
+      condicion_venta TEXT
     )
   ''';
 
@@ -332,14 +329,6 @@ class DatabaseTables {
   )
 ''';
 
-  String _sqlUnidadesMedida() => '''
-  CREATE TABLE unidades_medida (
-    id INTEGER PRIMARY KEY,
-    codigo TEXT NOT NULL,
-    descripcion TEXT NOT NULL,
-    activo INTEGER DEFAULT 1
-  )
-''';
 
   String _sqlProductos() => '''
   CREATE TABLE productos (
@@ -347,7 +336,8 @@ class DatabaseTables {
     codigo TEXT,
     codigo_barras TEXT,
     nombre TEXT,
-    categoria TEXT
+    categoria TEXT,
+    unidad_medida TEXT
   )
 ''';
 
@@ -373,7 +363,6 @@ class DatabaseTables {
       'CREATE INDEX IF NOT EXISTS idx_clientes_direccion ON clientes (direccion)',
       'CREATE INDEX IF NOT EXISTS idx_clientes_codigo ON clientes (codigo)',
       'CREATE INDEX IF NOT EXISTS idx_clientes_propietario ON clientes (propietario)',
-      'CREATE INDEX IF NOT EXISTS idx_clientes_ruta_dia ON clientes (ruta_dia)',
     ];
 
     for (final indice in indices) {

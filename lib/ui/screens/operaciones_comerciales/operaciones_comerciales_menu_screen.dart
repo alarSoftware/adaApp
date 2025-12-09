@@ -36,16 +36,15 @@ class _OperacionesComercialesMenuView extends StatefulWidget {
 
 class _OperacionesComercialesMenuViewState
     extends State<_OperacionesComercialesMenuView>
-/* with TickerProviderStateMixin */ {
-  // 👈 COMENTADO PARA FUTURO
-
-  /* // 🔮 CÓDIGO COMENTADO PARA FUTURO USO DE TABS
+    with TickerProviderStateMixin {
   late TabController _tabController;
+  late List<_TabConfig> _availableTabs;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _availableTabs = _getAvailableTabs();
+    _tabController = TabController(length: _availableTabs.length, vsync: this);
   }
 
   @override
@@ -53,38 +52,65 @@ class _OperacionesComercialesMenuViewState
     _tabController.dispose();
     super.dispose();
   }
-  */
+
+  // 👇 MÉTODO QUE DETERMINA QUÉ TABS MOSTRAR
+  List<_TabConfig> _getAvailableTabs() {
+    final List<_TabConfig> tabs = [];
+
+    // Reposición: TODOS los clientes
+    tabs.add(_TabConfig(
+      tipo: TipoOperacion.notaReposicion,
+      label: 'Reposición',
+      icon: Icons.add_shopping_cart,
+      color: AppColors.success,
+      title: 'Nota de Reposición',
+      description: 'Solicita productos para reponer en el cliente',
+    ));
+
+    // NDR (Retiro): SOLO CRÉDITO
+    if (widget.cliente.esCredito) {
+      tabs.add(_TabConfig(
+        tipo: TipoOperacion.notaRetiro,
+        label: 'Retiro',
+        icon: Icons.remove_shopping_cart,
+        color: AppColors.warning,
+        title: 'Nota de Retiro',
+        description: 'Retira productos del cliente',
+      ));
+    }
+
+    // NDR Discontinuo: SOLO CONTADO
+    if (widget.cliente.esContado) {
+      tabs.add(_TabConfig(
+        tipo: TipoOperacion.notaRetiroDiscontinuos,
+        label: 'Discontinuos',
+        icon: Icons.inventory_2_outlined,
+        color: AppColors.error,
+        title: 'Retiro de Discontinuos',
+        description: 'Retira productos discontinuados (misma categoría)',
+      ));
+    }
+
+    return tabs;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FC), // Fondo suave
+      backgroundColor: const Color(0xFFF8F9FC),
       appBar: _buildAppBar(),
       body: SafeArea(
         child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: _buildClienteInfoCard(),
+              child: ClientInfoCard(cliente: widget.cliente),
             ),
-
-            /* // 🔮 AQUÍ IBAN LOS TABS (COMENTADO)
-            _buildTabBar(),
+            if (_availableTabs.length > 1) _buildTabBar(),
             Expanded(
-              child: _buildTabBarView(),
-            ),
-            */
-
-            // 👇 MODO ACTUAL: Solo mostramos Discontinuos directamente
-            Expanded(
-              child: _buildOperacionTab(
-                tipoOperacion: TipoOperacion.notaRetiroDiscontinuos,
-                icon: Icons.inventory_2_outlined,
-                color: AppColors.error, // Rojo
-                title: 'Retiro de Discontinuos',
-                description:
-                    'Retira productos discontinuados (misma categoría)',
-              ),
+              child: _availableTabs.length > 1
+                  ? _buildTabBarView()
+                  : _buildSingleTab(_availableTabs.first),
             ),
           ],
         ),
@@ -114,12 +140,6 @@ class _OperacionesComercialesMenuViewState
     );
   }
 
-  Widget _buildClienteInfoCard() {
-    return ClientInfoCard(cliente: widget.cliente);
-  }
-
-  /*
-  // 🔮 WIDGETS DE TABS COMENTADOS PARA FUTURO
   Widget _buildTabBar() {
     return Container(
       color: AppColors.surface,
@@ -131,12 +151,20 @@ class _OperacionesComercialesMenuViewState
         indicatorWeight: 3,
         isScrollable: true,
         tabAlignment: TabAlignment.start,
-        // ... estilos ...
-        tabs: const [
-          Tab(text: 'Reposición', icon: Icon(Icons.add_shopping_cart)),
-          Tab(text: 'Retiro', icon: Icon(Icons.remove_shopping_cart)),
-          Tab(text: 'Discontinuos', icon: Icon(Icons.inventory_2_outlined)),
-        ],
+        labelStyle: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.normal,
+        ),
+        tabs: _availableTabs
+            .map((tab) => Tab(
+          text: tab.label,
+          icon: Icon(tab.icon, size: 20),
+        ))
+            .toList(),
       ),
     );
   }
@@ -144,34 +172,28 @@ class _OperacionesComercialesMenuViewState
   Widget _buildTabBarView() {
     return TabBarView(
       controller: _tabController,
-      children: [
-        _buildOperacionTab(
-          tipoOperacion: TipoOperacion.notaReposicion,
-          icon: Icons.add_shopping_cart,
-          color: AppColors.success,
-          title: 'Nota de Reposición',
-          description: 'Solicita productos para reponer en el cliente',
-        ),
-        _buildOperacionTab(
-          tipoOperacion: TipoOperacion.notaRetiro,
-          icon: Icons.remove_shopping_cart,
-          color: AppColors.warning,
-          title: 'Nota de Retiro',
-          description: 'Retira productos del cliente',
-        ),
-        _buildOperacionTab(
-          tipoOperacion: TipoOperacion.notaRetiroDiscontinuos,
-          icon: Icons.inventory_2_outlined,
-          color: AppColors.error,
-          title: 'Retiro de Discontinuos',
-          description: 'Retira productos discontinuados (misma categoría)',
-        ),
-      ],
+      children: _availableTabs
+          .map((tab) => _buildOperacionTab(
+        tipoOperacion: tab.tipo,
+        icon: tab.icon,
+        color: tab.color,
+        title: tab.title,
+        description: tab.description,
+      ))
+          .toList(),
     );
   }
-  */
 
-  // ESTE WIDGET SÍ LO USAMOS (GENÉRICO)
+  Widget _buildSingleTab(_TabConfig tab) {
+    return _buildOperacionTab(
+      tipoOperacion: tab.tipo,
+      icon: tab.icon,
+      color: tab.color,
+      title: tab.title,
+      description: tab.description,
+    );
+  }
+
   Widget _buildOperacionTab({
     required TipoOperacion tipoOperacion,
     required IconData icon,
@@ -186,6 +208,8 @@ class _OperacionesComercialesMenuViewState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: 16),
+
               // Encabezado (Banner de color)
               Container(
                 padding: const EdgeInsets.all(16),
@@ -242,16 +266,16 @@ class _OperacionesComercialesMenuViewState
 
               const SizedBox(height: 20),
 
-              // Botón Principal (Acción)
+              // Botón Principal
               SizedBox(
                 height: 54,
                 child: ElevatedButton.icon(
                   onPressed: () =>
                       _navigateToCreateOperacion(tipoOperacion, viewModel),
                   icon: const Icon(Icons.add_circle_outline_rounded),
-                  label: Text(
+                  label: const Text(
                     'Nueva Solicitud',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -299,10 +323,10 @@ class _OperacionesComercialesMenuViewState
   }
 
   Widget _buildOperacionesList(
-    OperacionesComercialesMenuViewModel viewModel,
-    TipoOperacion tipoOperacion,
-    Color color,
-  ) {
+      OperacionesComercialesMenuViewModel viewModel,
+      TipoOperacion tipoOperacion,
+      Color color,
+      ) {
     if (viewModel.isLoading) {
       return Center(child: CircularProgressIndicator(color: color));
     }
@@ -325,14 +349,12 @@ class _OperacionesComercialesMenuViewState
   }
 
   Widget _buildOperacionCard(
-    OperacionComercial operacion,
-    Color color,
-    OperacionesComercialesMenuViewModel viewModel,
-  ) {
-    // Formateador de fecha
-    final fechaStr = DateFormat(
-      'dd/MM/yyyy HH:mm',
-    ).format(operacion.fechaCreacion);
+      OperacionComercial operacion,
+      Color color,
+      OperacionesComercialesMenuViewModel viewModel,
+      ) {
+    final fechaStr =
+    DateFormat('dd/MM/yyyy HH:mm').format(operacion.fechaCreacion);
 
     return Container(
       decoration: BoxDecoration(
@@ -356,7 +378,6 @@ class _OperacionesComercialesMenuViewState
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                // Icono circular
                 Container(
                   width: 40,
                   height: 40,
@@ -370,24 +391,19 @@ class _OperacionesComercialesMenuViewState
                     size: 20,
                   ),
                 ),
-
                 const SizedBox(width: 16),
-
-                // Info central
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 1. Chip de Estado de Sincronización
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: _getSyncStatusColor(
-                            operacion.syncStatus,
-                          ).withValues(alpha: 0.1),
+                          color: _getSyncStatusColor(operacion.syncStatus)
+                              .withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -399,10 +415,7 @@ class _OperacionesComercialesMenuViewState
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 6),
-
-                      // 2. La fecha
                       Text(
                         fechaStr,
                         style: TextStyle(
@@ -414,8 +427,6 @@ class _OperacionesComercialesMenuViewState
                     ],
                   ),
                 ),
-
-                // Info derecha (Total items)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -436,7 +447,6 @@ class _OperacionesComercialesMenuViewState
                     ),
                   ],
                 ),
-
                 const SizedBox(width: 8),
                 Icon(Icons.chevron_right, color: Colors.grey.shade300),
               ],
@@ -489,25 +499,23 @@ class _OperacionesComercialesMenuViewState
     );
   }
 
-  // Helper para colores de syncStatus
   Color _getSyncStatusColor(String syncStatus) {
     switch (syncStatus) {
       case 'creado':
-        return AppColors.warning; // Amarillo/Naranja para pendiente
+        return AppColors.warning;
       case 'migrado':
-        return AppColors.success; // Verde para sincronizado
+        return AppColors.success;
       case 'error':
-        return AppColors.error; // Rojo para error
+        return AppColors.error;
       default:
         return Colors.grey;
     }
   }
 
-  // Navegación
   Future<void> _navigateToCreateOperacion(
-    TipoOperacion tipoOperacion,
-    OperacionesComercialesMenuViewModel viewModel,
-  ) async {
+      TipoOperacion tipoOperacion,
+      OperacionesComercialesMenuViewModel viewModel,
+      ) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -535,9 +543,9 @@ class _OperacionesComercialesMenuViewState
   }
 
   Future<void> _navigateToEditOperacion(
-    OperacionComercial operacion,
-    OperacionesComercialesMenuViewModel viewModel,
-  ) async {
+      OperacionComercial operacion,
+      OperacionesComercialesMenuViewModel viewModel,
+      ) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -545,7 +553,7 @@ class _OperacionesComercialesMenuViewState
           cliente: widget.cliente,
           tipoOperacion: operacion.tipoOperacion,
           operacionExistente: operacion,
-          isViewOnly: true, //SIEMPRE solo lectura para operaciones existentes
+          isViewOnly: true,
         ),
       ),
     );
@@ -554,4 +562,23 @@ class _OperacionesComercialesMenuViewState
       await viewModel.cargarOperaciones();
     }
   }
+}
+
+// 👇 CLASE HELPER PARA CONFIGURACIÓN DE TABS
+class _TabConfig {
+  final TipoOperacion tipo;
+  final String label;
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String description;
+
+  _TabConfig({
+    required this.tipo,
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.description,
+  });
 }

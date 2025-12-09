@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/repositories/models_repository.dart';
 import 'package:ada_app/services/sync/equipment_sync_service.dart';
-import 'package:logger/logger.dart';
-
-final _logger = Logger();
 
 class ModelosScreen extends StatefulWidget {
   const ModelosScreen({super.key});
@@ -19,15 +16,12 @@ class _ModelosScreenState extends State<ModelosScreen> {
   bool _isSyncing = false;
   String? _errorMessage;
 
-  // Controlador para el campo de búsqueda
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _cargarModelosLocales();
-
-    // Listener para el campo de búsqueda
     _searchController.addListener(_filtrarModelos);
   }
 
@@ -77,10 +71,7 @@ class _ModelosScreenState extends State<ModelosScreen> {
           _isLoading = false;
         });
       }
-
-      _logger.i('Modelos locales cargados: ${_modelos.length}');
     } catch (e) {
-      _logger.e('Error cargando modelos locales: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -99,15 +90,11 @@ class _ModelosScreenState extends State<ModelosScreen> {
     });
 
     try {
-      _logger.i('Iniciando sincronización de modelos desde el servidor...');
-
-      // Usar EquipmentSyncService en lugar de ModeloRepository
       final resultado = await EquipmentSyncService.sincronizarModelos();
 
       if (!mounted) return;
 
       if (resultado.exito) {
-        // Recargar los modelos locales después de sincronizar
         final modeloRepo = ModeloRepository();
         final modelosActualizados = await modeloRepo.obtenerTodos();
 
@@ -122,15 +109,12 @@ class _ModelosScreenState extends State<ModelosScreen> {
           _isSyncing = false;
         });
 
-        // Aplicar filtro si hay búsqueda activa
         if (_searchController.text.isNotEmpty) {
           _filtrarModelos();
         }
 
         final cantidadSincronizada = resultado.itemsSincronizados;
-        _logger.i('Modelos sincronizados exitosamente: $cantidadSincronizada');
 
-        // Mostrar mensaje de éxito
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -150,9 +134,6 @@ class _ModelosScreenState extends State<ModelosScreen> {
           _errorMessage = mensaje;
         });
 
-        _logger.e('Error sincronizando modelos: $mensaje');
-
-        // Mostrar mensaje de error
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(mensaje),
@@ -162,14 +143,12 @@ class _ModelosScreenState extends State<ModelosScreen> {
         );
       }
     } catch (e) {
-      _logger.e('Error sincronizando modelos: $e');
       if (mounted) {
         setState(() {
           _isSyncing = false;
           _errorMessage = 'Error sincronizando modelos: $e';
         });
 
-        // Mostrar mensaje de error
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al sincronizar modelos: ${e.toString()}'),
@@ -208,10 +187,7 @@ class _ModelosScreenState extends State<ModelosScreen> {
       ),
       body: Column(
         children: [
-          // Barra de búsqueda fija
           _buildSearchSection(),
-
-          // Contenido principal
           Expanded(
             child: _buildContent(),
           ),
@@ -386,7 +362,6 @@ class _ModelosScreenState extends State<ModelosScreen> {
   }
 
   Widget _buildModelosList() {
-    // Mostrar mensaje si no hay resultados de búsqueda
     if (_modelosFiltrados.isEmpty && _searchController.text.isNotEmpty) {
       return Center(
         child: Padding(
@@ -423,7 +398,6 @@ class _ModelosScreenState extends State<ModelosScreen> {
 
     return Column(
       children: [
-        // Banner de estado de sincronización
         if (_isSyncing)
           Container(
             width: double.infinity,
@@ -450,8 +424,6 @@ class _ModelosScreenState extends State<ModelosScreen> {
               ],
             ),
           ),
-
-        // Contador de resultados si hay búsqueda activa
         if (_searchController.text.isNotEmpty)
           Container(
             width: double.infinity,
@@ -466,8 +438,6 @@ class _ModelosScreenState extends State<ModelosScreen> {
               ),
             ),
           ),
-
-        // Lista de modelos
         Expanded(
           child: ListView.builder(
             padding: EdgeInsets.only(

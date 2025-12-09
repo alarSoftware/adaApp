@@ -8,6 +8,8 @@ import 'package:ada_app/services/post/operaciones_comerciales_post_service.dart'
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 import 'package:ada_app/repositories/producto_repository.dart';
 
+import '../../utils/unidad_medida_helper.dart';
+
 /// Estados del formulario
 enum FormState { idle, loading, saving, error, retrying }
 
@@ -57,39 +59,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       operacionRepository ?? OperacionComercialRepositoryImpl(),
         _productoRepository = productoRepository ?? ProductoRepositoryImpl() {
     _initializeForm();
-  }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // VALIDACIÓN DE DÍA DE RUTA
-  // ═══════════════════════════════════════════════════════════════════
-
-  String _getDiaActual() {
-    final diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-    final now = DateTime.now();
-    return diasSemana[now.weekday - 1];
-  }
-
-  bool _validarDiaRuta() {
-    final rutaDia = cliente.rutaDia;
-
-    // Si el cliente no tiene día de ruta asignado, permitir acceso
-    if (rutaDia == null || rutaDia.isEmpty) return true;
-
-    final diaActual = _getDiaActual();
-
-    // Validar que el día actual coincida con el día de ruta
-    return rutaDia == diaActual;
-  }
-
-  bool get puedeRealizarOperacion => _validarDiaRuta();
-
-  String get mensajeRestriccionDia {
-    final diaActual = _getDiaActual();
-    final rutaDia = cliente.rutaDia ?? 'sin asignar';
-
-    return 'No puedes realizar operaciones hoy.\n'
-        'Este cliente corresponde al día: $rutaDia\n'
-        'Hoy es: $diaActual';
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -146,13 +115,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
   void setFechaRetiro(DateTime? fecha) {
     if (isViewOnly) return;
-
-    // VALIDAR DÍA DE RUTA antes de permitir cambios
-    if (!_validarDiaRuta()) {
-      _setError(mensajeRestriccionDia);
-      return;
-    }
-
     _fechaRetiro = fecha;
     notifyListeners();
   }
@@ -163,13 +125,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
   void setObservaciones(String observaciones) {
     if (isViewOnly) return;
-
-    // VALIDAR DÍA DE RUTA antes de permitir cambios
-    if (!_validarDiaRuta()) {
-      _setError(mensajeRestriccionDia);
-      return;
-    }
-
     _observaciones = observaciones;
     notifyListeners();
   }
@@ -180,13 +135,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
   void setSearchQuery(String query) {
     if (isViewOnly) return;
-
-    // VALIDAR DÍA DE RUTA antes de permitir búsqueda
-    if (!_validarDiaRuta()) {
-      _setError(mensajeRestriccionDia);
-      return;
-    }
-
     _searchQuery = query;
     _filtrarProductos();
     notifyListeners();
@@ -205,11 +153,16 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       return;
     }
 
-    try {
-      _productosFiltrados = await _productoRepository.buscarProductos(
+    try{
+      final todosLosProductos = await _productoRepository.buscarProductos(
         _searchQuery,
       );
-    } catch (e) {
+      _productosFiltrados = todosLosProductos.where((producto){
+        final errorUnidad = tipoOperacion.validarUnidadMedida(producto.unidadMedida);
+        return errorUnidad == null;
+      }).toList();
+
+    } catch (e){
       _productosFiltrados = [];
     }
   }
@@ -225,45 +178,77 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     );
   }
 
-  void agregarProducto(Producto producto) {
-    if (isViewOnly) return;
+  bool agregarProducto(Producto producto) {
+    if (isViewOnly) return false;
 
-    // VALIDAR DÍA DE RUTA antes de agregar producto
-    if (!_validarDiaRuta()) {
-      _setError(mensajeRestriccionDia);
-      return;
+    // Usar código si existe, sino usar ID como fallback
+    final identificador = producto.codigo ?? producto.id?.toString();
+
+    print('🔍 DEBUG - Intentando agregar producto:');
+    print('   - ID: ${producto.id}');
+    print('   - Código: ${producto.codigo}');
+    print('   - Identificador final: $identificador');
+    print('   - Nombre: ${producto.nombre}');
+    print('   - Unidad: ${producto.unidadMedida}');
+
+    if (identificador == null || identificador.isEmpty) {
+      print('❌ Producto sin identificador válido');
+      _setError('El producto no tiene un identificador válido');
+      return false;
     }
 
-    if (producto.codigo == null || isProductoSeleccionado(producto.codigo)) {
-      return;
+    if (isProductoSeleccionado(identificador)) {
+      print('⚠️ Producto ya seleccionado');
+      return false;
     }
 
-    final cantidadInicial = 0.0;
+    // Validar que el producto tenga la unidad correcta según tipo de operación
+    final errorUnidad = tipoOperacion.validarUnidadMedida(producto.unidadMedida);
+    if (errorUnidad != null) {
+      print('❌ Error de unidad: $errorUnidad');
+      String mensajeEspecifico;
+
+      if (tipoOperacion.esNotaRetiro) {
+        mensajeEspecifico = 'Este producto viene en "${UnidadMedidaHelper.obtenerNombreDisplay(producto.unidadMedida)}".\n\nPara notas de retiro solo puedes usar productos en "Unidades".';
+      } else if (tipoOperacion.esNotaReposicion) {
+        mensajeEspecifico = 'Este producto viene en "${UnidadMedidaHelper.obtenerNombreDisplay(producto.unidadMedida)}".\n\nPara notas de reposición solo puedes usar productos en packs/cajas (X 6, X 12, X 24, etc.).';
+      } else {
+        mensajeEspecifico = errorUnidad;
+      }
+
+      _setError(mensajeEspecifico);
+      return false;
+    }
+
+    print('✅ Producto válido, agregando...');
 
     final detalle = OperacionComercialDetalle(
       operacionComercialId: '',
-      productoCodigo: producto.codigo!,
+      productoCodigo: identificador, // 👈 Usar identificador en lugar de producto.codigo!
       productoDescripcion: producto.nombre ?? 'Sin nombre',
       productoCategoria: producto.categoria,
       productoId: producto.id,
-      cantidad: cantidadInicial,
-      unidadMedida: 'UN',
+      cantidad: 0.0,
+      unidadMedida: producto.unidadMedida,
       orden: _productosSeleccionados.length + 1,
       fechaCreacion: DateTime.now(),
     );
 
     _productosSeleccionados.add(detalle);
+
+    print('✅ Producto agregado a la lista: ${_productosSeleccionados.length} productos');
+    print('   - Limpiando búsqueda...');
+
+    clearSearch();
     notifyListeners();
+
+    print('✅ notifyListeners() llamado');
+
+    return true;
   }
 
   void eliminarProducto(int index) {
     if (isViewOnly) return;
-
-    // VALIDAR DÍA DE RUTA antes de eliminar producto
-    if (!_validarDiaRuta()) {
-      _setError(mensajeRestriccionDia);
-      return;
-    }
 
     if (index >= 0 && index < _productosSeleccionados.length) {
       _productosSeleccionados.removeAt(index);
@@ -279,12 +264,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
   void actualizarCantidadProducto(int index, double cantidad) {
     if (isViewOnly) return;
-
-    // VALIDAR DÍA DE RUTA antes de actualizar cantidad
-    if (!_validarDiaRuta()) {
-      _setError(mensajeRestriccionDia);
-      return;
-    }
 
     if (index >= 0 && index < _productosSeleccionados.length) {
       if (cantidad < 0) cantidad = 0;
@@ -336,13 +315,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
   void seleccionarProductoReemplazo(int index, Producto productoReemplazo) {
     if (isViewOnly) return;
-
-    // VALIDAR DÍA DE RUTA antes de seleccionar reemplazo
-    if (!_validarDiaRuta()) {
-      _setError(mensajeRestriccionDia);
-      return;
-    }
-
     setProductoReemplazo(index, productoReemplazo);
   }
 
@@ -366,11 +338,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
   ValidationResult validateForm() {
     if (isViewOnly) return ValidationResult.valid();
-
-    // VALIDAR DÍA DE RUTA PRIMERO
-    if (!_validarDiaRuta()) {
-      return ValidationResult.error(mensajeRestriccionDia);
-    }
 
     // 1. Fecha de retiro
     if (tipoOperacion.necesitaFechaRetiro && _fechaRetiro == null) {
@@ -460,12 +427,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
   Future<bool> guardarOperacion() async {
     if (isViewOnly) return false;
-
-    // VALIDAR DÍA DE RUTA antes de guardar
-    if (!_validarDiaRuta()) {
-      _setError(mensajeRestriccionDia);
-      return false;
-    }
 
     final validation = validateForm();
     if (!validation.isValid) {
