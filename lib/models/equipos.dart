@@ -38,7 +38,6 @@ class Equipo {
     this.logoNombre,
   });
 
-
   /// Constructor desde Map (base de datos local)
   factory Equipo.fromMap(Map<String, dynamic> map) {
     return Equipo(
@@ -111,7 +110,6 @@ class Equipo {
     };
   }
 
-
   /// Convertir a JSON para API externa
   Map<String, dynamic> toJson() {
     return {
@@ -142,7 +140,6 @@ class Equipo {
       // Nuevo equipo (múltiples formatos para compatibilidad)
       'app_insert': ParsingHelpers.boolToInt(nuevoEquipo), // int para BD
       'appInsert': nuevoEquipo, // bool para API
-
       // Fechas (snake_case y camelCase)
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fechaCreacion': fechaCreacion.toIso8601String(),
@@ -253,7 +250,6 @@ List<Equipo> parseEquiposFromApiResponse(String jsonResponse) {
 
     // 2. Verificar campo "data"
     if (!mainJson.containsKey('data') || mainJson['data'] == null) {
-      print('⚠️ No se encontró campo "data" en la respuesta');
       return [];
     }
 
@@ -266,10 +262,7 @@ List<Equipo> parseEquiposFromApiResponse(String jsonResponse) {
         .whereType<Map<String, dynamic>>()
         .map((item) => Equipo.fromJson(item))
         .toList();
-
-  } catch (e, stackTrace) {
-    print('❌ Error parseando respuesta de API: $e');
-    print('StackTrace: $stackTrace');
+  } catch (e) {
     return [];
   }
 }
@@ -279,7 +272,6 @@ List<Equipo> parseEquiposFromMap(Map<String, dynamic> responseMap) {
   try {
     // 1. Verificar campo "data"
     if (!responseMap.containsKey('data') || responseMap['data'] == null) {
-      print('⚠️ No se encontró campo "data" en el Map');
       return [];
     }
 
@@ -292,10 +284,7 @@ List<Equipo> parseEquiposFromMap(Map<String, dynamic> responseMap) {
         .whereType<Map<String, dynamic>>()
         .map((item) => Equipo.fromJson(item))
         .toList();
-
-  } catch (e, stackTrace) {
-    print('❌ Error parseando Map: $e');
-    print('StackTrace: $stackTrace');
+  } catch (e) {
     return [];
   }
 }
@@ -307,10 +296,7 @@ List<Equipo> parseEquiposFromDirectArray(List<dynamic> equiposJson) {
         .whereType<Map<String, dynamic>>()
         .map((item) => Equipo.fromJson(item))
         .toList();
-
-  } catch (e, stackTrace) {
-    print('❌ Error parseando array directo: $e');
-    print('StackTrace: $stackTrace');
+  } catch (e) {
     return [];
   }
 }
@@ -323,10 +309,7 @@ class Marca {
   final int? id;
   final String nombre;
 
-  const Marca({
-    this.id,
-    required this.nombre,
-  });
+  const Marca({this.id, required this.nombre});
 
   factory Marca.fromMap(Map<String, dynamic> map) {
     return Marca(
@@ -338,10 +321,7 @@ class Marca {
   factory Marca.fromJson(Map<String, dynamic> json) => Marca.fromMap(json);
 
   Map<String, dynamic> toMap() {
-    return {
-      if (id != null) 'id': id,
-      'nombre': nombre.trim(),
-    };
+    return {if (id != null) 'id': id, 'nombre': nombre.trim()};
   }
 
   Map<String, dynamic> toJson() => toMap();
@@ -352,10 +332,10 @@ class Marca {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-          other is Marca &&
-              runtimeType == other.runtimeType &&
-              id == other.id &&
-              nombre == other.nombre;
+      other is Marca &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          nombre == other.nombre;
 
   @override
   int get hashCode => id.hashCode ^ nombre.hashCode;
@@ -365,10 +345,7 @@ class Modelo {
   final int? id;
   final String nombre;
 
-  const Modelo({
-    this.id,
-    required this.nombre,
-  });
+  const Modelo({this.id, required this.nombre});
 
   factory Modelo.fromMap(Map<String, dynamic> map) {
     return Modelo(
@@ -380,10 +357,7 @@ class Modelo {
   factory Modelo.fromJson(Map<String, dynamic> json) => Modelo.fromMap(json);
 
   Map<String, dynamic> toMap() {
-    return {
-      if (id != null) 'id': id,
-      'nombre': nombre.trim(),
-    };
+    return {if (id != null) 'id': id, 'nombre': nombre.trim()};
   }
 
   Map<String, dynamic> toJson() => toMap();
@@ -394,10 +368,10 @@ class Modelo {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-          other is Modelo &&
-              runtimeType == other.runtimeType &&
-              id == other.id &&
-              nombre == other.nombre;
+      other is Modelo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          nombre == other.nombre;
 
   @override
   int get hashCode => id.hashCode ^ nombre.hashCode;
@@ -407,10 +381,7 @@ class Logo {
   final int? id;
   final String nombre;
 
-  const Logo({
-    this.id,
-    required this.nombre,
-  });
+  const Logo({this.id, required this.nombre});
 
   factory Logo.fromMap(Map<String, dynamic> map) {
     return Logo(
@@ -422,10 +393,7 @@ class Logo {
   factory Logo.fromJson(Map<String, dynamic> json) => Logo.fromMap(json);
 
   Map<String, dynamic> toMap() {
-    return {
-      if (id != null) 'id': id,
-      'nombre': nombre.trim(),
-    };
+    return {if (id != null) 'id': id, 'nombre': nombre.trim()};
   }
 
   Map<String, dynamic> toJson() => toMap();
@@ -436,10 +404,10 @@ class Logo {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-          other is Logo &&
-              runtimeType == other.runtimeType &&
-              id == other.id &&
-              nombre == other.nombre;
+      other is Logo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          nombre == other.nombre;
 
   @override
   int get hashCode => id.hashCode ^ nombre.hashCode;

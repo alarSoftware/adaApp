@@ -41,7 +41,9 @@ class LoginForm extends StatelessWidget {
         labelText: 'Usuario',
         labelStyle: TextStyle(color: AppColors.textSecondary),
         hintText: 'Ingresa tu usuario',
-        hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+        hintStyle: TextStyle(
+          color: AppColors.textSecondary.withValues(alpha: 0.5),
+        ),
         prefixIcon: Icon(Icons.person_outline, color: AppColors.textSecondary),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -61,7 +63,10 @@ class LoginForm extends StatelessWidget {
         ),
         filled: true,
         fillColor: AppColors.inputBackground,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
       ),
       style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
       validator: viewModel.validateUsername,
@@ -80,7 +85,9 @@ class LoginForm extends StatelessWidget {
         labelText: 'Contraseña',
         labelStyle: TextStyle(color: AppColors.textSecondary),
         hintText: 'Ingresa tu contraseña',
-        hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+        hintStyle: TextStyle(
+          color: AppColors.textSecondary.withValues(alpha: 0.5),
+        ),
         prefixIcon: Icon(Icons.lock_outline, color: AppColors.textSecondary),
         suffixIcon: IconButton(
           icon: Icon(
@@ -107,7 +114,10 @@ class LoginForm extends StatelessWidget {
         ),
         filled: true,
         fillColor: AppColors.inputBackground,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
       ),
       style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
       validator: viewModel.validatePassword,
@@ -121,34 +131,40 @@ class LoginForm extends StatelessWidget {
       duration: const Duration(milliseconds: 300),
       child: viewModel.errorMessage != null
           ? Container(
-        key: ValueKey(viewModel.errorMessage),
-        padding: const EdgeInsets.all(16),
-        margin: const EdgeInsets.only(top: 8), // ✅ CAMBIO: top en lugar de bottom
-        decoration: BoxDecoration(
-          color: AppColors.errorContainer,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.borderError, width: 1),
-        ),
-        child: Semantics(
-          liveRegion: true,
-          child: Row(
-            children: [
-              Icon(Icons.error_outline_rounded, color: AppColors.error, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  viewModel.errorMessage!,
-                  style: TextStyle(
-                    color: AppColors.error,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+              key: ValueKey(viewModel.errorMessage),
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.only(
+                top: 8,
+              ), // ✅ CAMBIO: top en lugar de bottom
+              decoration: BoxDecoration(
+                color: AppColors.errorContainer,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.borderError, width: 1),
+              ),
+              child: Semantics(
+                liveRegion: true,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline_rounded,
+                      color: AppColors.error,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        viewModel.errorMessage!,
+                        style: TextStyle(
+                          color: AppColors.error,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
-      )
+            )
           : const SizedBox.shrink(),
     );
   }
@@ -165,27 +181,31 @@ class LoginForm extends StatelessWidget {
             backgroundColor: AppColors.buttonPrimary,
             foregroundColor: AppColors.buttonTextPrimary,
             disabledBackgroundColor: AppColors.buttonDisabled,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             elevation: 2,
             shadowColor: AppColors.shadowLight,
           ),
           child: viewModel.isLoading
               ? SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.buttonTextPrimary),
-            ),
-          )
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.buttonTextPrimary,
+                    ),
+                  ),
+                )
               : const Text(
-            'Iniciar Sesión',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-            ),
-          ),
+                  'Iniciar Sesión',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
         ),
       ),
     );

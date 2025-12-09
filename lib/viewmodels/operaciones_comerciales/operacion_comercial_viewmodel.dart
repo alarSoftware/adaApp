@@ -2,15 +2,16 @@ import 'package:flutter/foundation.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/models/producto.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
-import 'package:ada_app/models/operaciones_comerciales/enums/estado_operacion.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
 import 'package:ada_app/services/post/operaciones_comerciales_post_service.dart';
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 import 'package:ada_app/repositories/producto_repository.dart';
 
+import '../../utils/unidad_medida_helper.dart';
+
 /// Estados del formulario
-enum FormState { idle, loading, saving, error }
+enum FormState { idle, loading, saving, error, retrying }
 
 /// Resultado de validación
 class ValidationResult {
@@ -45,7 +46,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   // Búsqueda de productos
   String _searchQuery = '';
   List<Producto> _productosFiltrados = [];
-  List<Producto> _productosDisponibles = []; // Cache de productos si es necesario
+  List<Producto> _productosDisponibles = [];
 
   OperacionComercialFormViewModel({
     required this.cliente,
@@ -54,7 +55,8 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     this.isViewOnly = false,
     OperacionComercialRepository? operacionRepository,
     ProductoRepository? productoRepository,
-  })  : _operacionRepository = operacionRepository ?? OperacionComercialRepositoryImpl(),
+  }) : _operacionRepository =
+      operacionRepository ?? OperacionComercialRepositoryImpl(),
         _productoRepository = productoRepository ?? ProductoRepositoryImpl() {
     _initializeForm();
   }
@@ -70,10 +72,12 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       List.unmodifiable(_productosSeleccionados);
   String get observaciones => _observaciones;
   String get searchQuery => _searchQuery;
-  List<Producto> get productosFiltrados => List.unmodifiable(_productosFiltrados);
+  List<Producto> get productosFiltrados =>
+      List.unmodifiable(_productosFiltrados);
 
   bool get isLoading => _formState == FormState.loading;
   bool get isSaving => _formState == FormState.saving;
+  bool get isRetrying => _formState == FormState.retrying;
   bool get hasError => _formState == FormState.error;
   bool get isFormDirty => _hasChanges();
 
@@ -88,7 +92,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     if (operacionExistente != null) {
       _cargarOperacionExistente();
     }
-    // Precargar productos si es necesario, o dejarlo bajo demanda en búsqueda
     _cargarProductosIniciales();
   }
 
@@ -96,18 +99,14 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     final operacion = operacionExistente!;
     _observaciones = operacion.observaciones ?? '';
     _fechaRetiro = operacion.fechaRetiro;
-    // Crear una copia de la lista para no mutar el objeto original directamente
     _productosSeleccionados = List.from(operacion.detalles);
     notifyListeners();
   }
 
   Future<void> _cargarProductosIniciales() async {
-    // Opcional: Cargar productos disponibles al inicio si no son demasiados
     try {
-      // _productosDisponibles = await _productoRepository.obtenerProductosDisponibles();
-    } catch (e) {
-      print('Error carga inicial productos: $e');
-    }
+      // Opcional: Cargar productos disponibles
+    } catch (e) {}
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -115,7 +114,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   // ═══════════════════════════════════════════════════════════════════
 
   void setFechaRetiro(DateTime? fecha) {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
+    if (isViewOnly) return;
     _fechaRetiro = fecha;
     notifyListeners();
   }
@@ -125,7 +124,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   // ═══════════════════════════════════════════════════════════════════
 
   void setObservaciones(String observaciones) {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
+    if (isViewOnly) return;
     _observaciones = observaciones;
     notifyListeners();
   }
@@ -135,14 +134,14 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   // ═══════════════════════════════════════════════════════════════════
 
   void setSearchQuery(String query) {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
+    if (isViewOnly) return;
     _searchQuery = query;
     _filtrarProductos();
     notifyListeners();
   }
 
   void clearSearch() {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
+    if (isViewOnly) return;
     _searchQuery = '';
     _productosFiltrados = [];
     notifyListeners();
@@ -154,10 +153,16 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       return;
     }
 
-    try {
-      _productosFiltrados = await _productoRepository.buscarProductos(_searchQuery);
-    } catch (e) {
-      print('Error filtrando productos: $e');
+    try{
+      final todosLosProductos = await _productoRepository.buscarProductos(
+        _searchQuery,
+      );
+      _productosFiltrados = todosLosProductos.where((producto){
+        final errorUnidad = tipoOperacion.validarUnidadMedida(producto.unidadMedida);
+        return errorUnidad == null;
+      }).toList();
+
+    } catch (e){
       _productosFiltrados = [];
     }
   }
@@ -168,51 +173,97 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
   bool isProductoSeleccionado(String? codigoProducto) {
     if (codigoProducto == null) return false;
-    return _productosSeleccionados.any((detalle) => detalle.productoCodigo == codigoProducto);
+    return _productosSeleccionados.any(
+          (detalle) => detalle.productoCodigo == codigoProducto,
+    );
   }
 
-  void agregarProducto(Producto producto) {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
+  bool agregarProducto(Producto producto) {
+    if (isViewOnly) return false;
 
-    // Validación básica para no duplicar por código
-    if (producto.codigo == null || isProductoSeleccionado(producto.codigo)) {
-      return;
+    // Usar código si existe, sino usar ID como fallback
+    final identificador = producto.codigo ?? producto.id?.toString();
+
+    print('🔍 DEBUG - Intentando agregar producto:');
+    print('   - ID: ${producto.id}');
+    print('   - Código: ${producto.codigo}');
+    print('   - Identificador final: $identificador');
+    print('   - Nombre: ${producto.nombre}');
+    print('   - Unidad: ${producto.unidadMedida}');
+
+    if (identificador == null || identificador.isEmpty) {
+      print('❌ Producto sin identificador válido');
+      _setError('El producto no tiene un identificador válido');
+      return false;
     }
 
-    final cantidadInicial = 0.0;
+    if (isProductoSeleccionado(identificador)) {
+      print('⚠️ Producto ya seleccionado');
+      return false;
+    }
+
+    // Validar que el producto tenga la unidad correcta según tipo de operación
+    final errorUnidad = tipoOperacion.validarUnidadMedida(producto.unidadMedida);
+    if (errorUnidad != null) {
+      print('❌ Error de unidad: $errorUnidad');
+      String mensajeEspecifico;
+
+      if (tipoOperacion.esNotaRetiro) {
+        mensajeEspecifico = 'Este producto viene en "${UnidadMedidaHelper.obtenerNombreDisplay(producto.unidadMedida)}".\n\nPara notas de retiro solo puedes usar productos en "Unidades".';
+      } else if (tipoOperacion.esNotaReposicion) {
+        mensajeEspecifico = 'Este producto viene en "${UnidadMedidaHelper.obtenerNombreDisplay(producto.unidadMedida)}".\n\nPara notas de reposición solo puedes usar productos en packs/cajas (X 6, X 12, X 24, etc.).';
+      } else {
+        mensajeEspecifico = errorUnidad;
+      }
+
+      _setError(mensajeEspecifico);
+      return false;
+    }
+
+    print('✅ Producto válido, agregando...');
 
     final detalle = OperacionComercialDetalle(
-      operacionComercialId: '', // Se asignará al guardar o por backend
-      productoCodigo: producto.codigo!,
+      operacionComercialId: '',
+      productoCodigo: identificador, // 👈 Usar identificador en lugar de producto.codigo!
       productoDescripcion: producto.nombre ?? 'Sin nombre',
       productoCategoria: producto.categoria,
       productoId: producto.id,
-      cantidad: cantidadInicial,
-      unidadMedida: 'UN', // O obtener del producto si existe
+      cantidad: 0.0,
+      unidadMedida: producto.unidadMedida,
       orden: _productosSeleccionados.length + 1,
       fechaCreacion: DateTime.now(),
-      estaSincronizado: false,
     );
 
     _productosSeleccionados.add(detalle);
+
+    print('✅ Producto agregado a la lista: ${_productosSeleccionados.length} productos');
+    print('   - Limpiando búsqueda...');
+
+    clearSearch();
     notifyListeners();
+
+    print('✅ notifyListeners() llamado');
+
+    return true;
   }
 
   void eliminarProducto(int index) {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
+    if (isViewOnly) return;
 
     if (index >= 0 && index < _productosSeleccionados.length) {
       _productosSeleccionados.removeAt(index);
-      // Reordenar secuencialmente
+      // Reordenar
       for (int i = 0; i < _productosSeleccionados.length; i++) {
-        _productosSeleccionados[i] = _productosSeleccionados[i].copyWith(orden: i + 1);
+        _productosSeleccionados[i] = _productosSeleccionados[i].copyWith(
+          orden: i + 1,
+        );
       }
       notifyListeners();
     }
   }
 
   void actualizarCantidadProducto(int index, double cantidad) {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
+    if (isViewOnly) return;
 
     if (index >= 0 && index < _productosSeleccionados.length) {
       if (cantidad < 0) cantidad = 0;
@@ -225,29 +276,26 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  // MANEJO DE PRODUCTOS DE REEMPLAZO (CORREGIDO ✅)
+  // MANEJO DE PRODUCTOS DE REEMPLAZO
   // ═══════════════════════════════════════════════════════════════════
 
-  // 👈 NUEVO: Método que espera el FormScreen (obtenerProductosReemplazo)
-  Future<List<Producto>> obtenerProductosReemplazo(Producto productoOriginal) async {
-    // Verificamos que tenga categoría
+  Future<List<Producto>> obtenerProductosReemplazo(
+      Producto productoOriginal,
+      ) async {
     if (productoOriginal.categoria == null) {
-      print('Producto sin categoría: ${productoOriginal.nombre}');
       return [];
     }
 
     try {
       return await _productoRepository.obtenerProductosPorCategoria(
-        productoOriginal.categoria!, // 👈 Usamos ! porque ya verificamos que no es null
+        productoOriginal.categoria!,
         excluirId: productoOriginal.id,
       );
     } catch (e) {
-      print('Error obteniendo productos de reemplazo: $e');
       return [];
     }
   }
 
-  // Método original renombrado para claridad
   Future<List<Producto>> getProductosReemplazo(
       String? categoriaOriginal,
       String? codigoOriginal,
@@ -257,38 +305,27 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
     try {
       return await _productoRepository.obtenerProductosPorCategoria(
-        categoriaOriginal!, // 👈 Usamos ! porque ya verificamos que no es null arriba
+        categoriaOriginal,
         excluirId: idProductoActual,
       );
     } catch (e) {
-      print('Error obteniendo productos de reemplazo: $e');
       return [];
     }
   }
 
-  // 👈 NUEVO: Método que espera el FormScreen (seleccionarProductoReemplazo)
   void seleccionarProductoReemplazo(int index, Producto productoReemplazo) {
-    if (isViewOnly) return; // Bloqueo en modo lectura
+    if (isViewOnly) return;
     setProductoReemplazo(index, productoReemplazo);
   }
 
   void setProductoReemplazo(int index, Producto productoReemplazo) {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
+    if (isViewOnly) return;
 
     if (index >= 0 && index < _productosSeleccionados.length) {
-      // ✅ SOLUCIÓN APLICADA: Guardamos el ID y la categoría explícitamente
-      // Si el código viene vacío, ponemos un placeholder o lo dejamos vacío,
-      // pero la validación dependerá del ID.
-
       _productosSeleccionados[index] = _productosSeleccionados[index].copyWith(
-        // 1. Guardamos el ID para validación de existencia
         productoReemplazoId: productoReemplazo.id,
-
-        // 2. Guardamos datos descriptivos
         productoReemplazoCodigo: productoReemplazo.codigo ?? 'S/C',
         productoReemplazoDescripcion: productoReemplazo.nombre ?? 'Sin nombre',
-
-        // 3. Guardamos categoría para validación de negocio
         productoReemplazoCategoria: productoReemplazo.categoria,
       );
       notifyListeners();
@@ -296,11 +333,10 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   }
 
   // ═══════════════════════════════════════════════════════════════════
-  // VALIDACIONES (CORREGIDAS ✅)
+  // VALIDACIONES
   // ═══════════════════════════════════════════════════════════════════
 
   ValidationResult validateForm() {
-    // En modo solo lectura no validamos
     if (isViewOnly) return ValidationResult.valid();
 
     // 1. Fecha de retiro
@@ -310,7 +346,9 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
     // 2. Mínimo un producto
     if (_productosSeleccionados.isEmpty) {
-      return ValidationResult.error('⚠️ Debes agregar al menos un producto a la operación');
+      return ValidationResult.error(
+        '⚠️ Debes agregar al menos un producto a la operación',
+      );
     }
 
     // 3. Cantidades válidas
@@ -324,14 +362,13 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
           .map((d) => '• ${d.productoDescripcion}')
           .join('\n');
       return ValidationResult.error(
-          '⚠️ Productos con cantidad 0:\n$nombres' +
-              (productosSinCantidad.length > 3 ? '\n...y más.' : ''));
+        '⚠️ Productos con cantidad 0:\n$nombres' +
+            (productosSinCantidad.length > 3 ? '\n...y más.' : ''),
+      );
     }
 
     // 4. Validación específica para DISCONTINUOS
     if (tipoOperacion == TipoOperacion.notaRetiroDiscontinuos) {
-
-      // A) ¿Se seleccionó un reemplazo? (Usamos ID, no código)
       final sinReemplazo = _productosSeleccionados
           .where((detalle) => detalle.productoReemplazoId == null)
           .toList();
@@ -342,33 +379,37 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
             .map((d) => '• ${d.productoDescripcion}')
             .join('\n');
         return ValidationResult.error(
-            '⚠️ Debes seleccionar un reemplazo para:\n$nombres');
+          '⚠️ Debes seleccionar un reemplazo para:\n$nombres',
+        );
       }
 
-      // B) ¿El reemplazo es de la misma categoría?
       final categoriasDiferentes = _productosSeleccionados
-          .where((detalle) =>
-      detalle.productoReemplazoId != null && // Ya sabemos que existe
-          detalle.productoCategoria != detalle.productoReemplazoCategoria)
+          .where(
+            (detalle) =>
+        detalle.productoReemplazoId != null &&
+            detalle.productoCategoria != detalle.productoReemplazoCategoria,
+      )
           .toList();
 
       if (categoriasDiferentes.isNotEmpty) {
         final detalles = categoriasDiferentes
             .take(2)
-            .map((d) =>
-        '• ${d.productoDescripcion} (${d.productoCategoria}) \n'
-            '   → Intenta reemplazar con (${d.productoReemplazoCategoria})')
+            .map(
+              (d) =>
+          '• ${d.productoDescripcion} (${d.productoCategoria}) \n'
+              '   → Intenta reemplazar con (${d.productoReemplazoCategoria})',
+        )
             .join('\n\n');
 
         return ValidationResult.error(
-            '⚠️ Los reemplazos deben ser de la misma categoría:\n\n$detalles');
+          '⚠️ Los reemplazos deben ser de la misma categoría:\n\n$detalles',
+        );
       }
     }
 
     return ValidationResult.valid();
   }
 
-  // Helper para validación individual de campos de texto (si usas TextFormField)
   ValidationResult validateCantidad(String? value) {
     if (value == null || value.trim().isEmpty) {
       return ValidationResult.error('Requerido');
@@ -396,56 +437,23 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     _setFormState(FormState.saving);
 
     try {
-      // 1. Preparar el objeto (igual que antes)
-      var operacion = OperacionComercial( // Cambié final por var para poder actualizarla
+      final operacion = OperacionComercial(
         id: operacionExistente?.id,
         clienteId: cliente.id!,
         tipoOperacion: tipoOperacion,
         fechaCreacion: operacionExistente?.fechaCreacion ?? DateTime.now(),
         fechaRetiro: _fechaRetiro,
-        estado: EstadoOperacion.borrador,
         observaciones: _observaciones.isEmpty ? null : _observaciones,
         totalProductos: _productosSeleccionados.length,
-        usuarioId: 1, // Ajustar según auth
-        estaSincronizado: false,
-        syncStatus: 'pending',
-        intentosSync: 0,
+        usuarioId: 1,
+        syncStatus: 'creado',
         detalles: _productosSeleccionados,
       );
-
-      // 2. Guardar en BD Local (igual que antes)
-      if (operacionExistente != null) {
-        await _operacionRepository.actualizarOperacion(operacion);
-      } else {
-        await _operacionRepository.crearOperacion(operacion);
-      }
-
-      // 3. INTENTAR ENVIAR AL SERVIDOR (NUEVO) <---
-      try {
-        final resultado = await OperacionesComercialesPostService.enviarOperacion(operacion);
-
-        if (resultado['exito'] == true) {
-          // Si se envió bien, actualizamos el estado local a 'sincronizado' o 'enviado'
-          operacion = operacion.copyWith(
-            estaSincronizado: true,
-            syncStatus: 'synced',
-            estado: EstadoOperacion.sincronizado, // O el estado que prefieras
-            serverId: resultado['id'], // Si el server devuelve ID
-            fechaSincronizacion: DateTime.now(),
-          );
-
-          // Actualizamos en local el nuevo estado
-          await _operacionRepository.actualizarOperacion(operacion);
-        }
-      } catch (e) {
-        print('Error al intentar enviar online: $e');
-        // No fallamos el guardado general, solo queda pendiente de sync
-      }
-
+      await _operacionRepository.crearOperacion(operacion);
       _setFormState(FormState.idle);
       return true;
     } catch (e) {
-      _setError('❌ Error al guardar: $e');
+      _setError('Error al guardar: $e');
       return false;
     }
   }
@@ -475,7 +483,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   }
 
   bool _hasChanges() {
-    // En modo solo lectura nunca hay cambios
     if (isViewOnly) return false;
 
     if (operacionExistente == null) {

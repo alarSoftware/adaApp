@@ -1,10 +1,9 @@
 import '../models/censo_activo.dart';
 import 'base_repository.dart';
-import 'package:logger/logger.dart';
+
 import 'package:uuid/uuid.dart';
 
 class CensoActivoRepository extends BaseRepository<CensoActivo> {
-  final Logger _logger = Logger();
   final Uuid _uuid = Uuid();
 
   @override
@@ -44,7 +43,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
     double? longitud,
     String? estadoCenso,
     String? observaciones,
-    String? edfVendedorId
+    String? edfVendedorId,
   }) async {
     try {
       final now = DateTime.now();
@@ -62,7 +61,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'fecha_actualizacion': now.toIso8601String(),
         'estado_censo': EstadoEquipoCenso.creado.valor,
         'observaciones': observaciones,
-        'edf_vendedor_id': edfVendedorId
+        'edf_vendedor_id': edfVendedorId,
       };
 
       // 1. Usar await y no castear el resultado
@@ -73,14 +72,13 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
 
       // 3. Validar que no sea null para cumplir con el retorno Future<CensoActivo>
       if (censoRecuperado == null) {
-        throw Exception("Error crítico: No se pudo recuperar el censo recién creado ($uuidId)");
+        throw Exception(
+          "Error crítico: No se pudo recuperar el censo recién creado ($uuidId)",
+        );
       }
-
-      _logger.i('✅ Estado insertado en BD con UUID: $uuidId');
 
       return censoRecuperado;
     } catch (e) {
-      _logger.e('❌ Error creando nuevo estado: $e');
       rethrow;
     }
   }
@@ -151,7 +149,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return maps.isNotEmpty ? fromMap(maps.first) : null;
     } catch (e) {
-      _logger.e('Error al obtenerCensoActivoById: $e');
       return null;
     }
   }
@@ -171,7 +168,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return maps.isNotEmpty ? fromMap(maps.first) : null;
     } catch (e) {
-      _logger.e('Error al obtener último estado: $e');
       return null;
     }
   }
@@ -192,7 +188,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
-      _logger.e('Error al obtener historial completo: $e');
       return [];
     }
   }
@@ -208,7 +203,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
-      _logger.e('Error al obtener estados por usuario: $e');
       return [];
     }
   }
@@ -224,7 +218,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
-      _logger.e('Error al obtener estados creados: $e');
       return [];
     }
   }
@@ -240,7 +233,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
-      _logger.e('Error al obtener estados migrados: $e');
       return [];
     }
   }
@@ -256,7 +248,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
-      _logger.e('Error al obtener estados con error: $e');
       return [];
     }
   }
@@ -265,15 +256,17 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
     try {
       final maps = await dbHelper.consultar(
         tableName,
-        where: 'estado_censo IN (?, ?)', // <--- CAMBIO CLAVE: Buscar CREADO y ERROR
-        whereArgs: [EstadoEquipoCenso.creado.valor, EstadoEquipoCenso.error.valor],
+        where:
+            'estado_censo IN (?, ?)', // <--- CAMBIO CLAVE: Buscar CREADO y ERROR
+        whereArgs: [
+          EstadoEquipoCenso.creado.valor,
+          EstadoEquipoCenso.error.valor,
+        ],
         orderBy: getDefaultOrderBy(),
       );
 
-      _logger.i('📊 Censos pendientes de sync encontrados: ${maps.length}');
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
-      _logger.e('Error al obtener no migrados: $e');
       return [];
     }
   }
@@ -295,9 +288,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         where: 'id = ?',
         whereArgs: [estadoId],
       );
-      _logger.i('Estado $estadoId actualizado a ${nuevoEstado.valor}');
     } catch (e) {
-      _logger.e('Error al actualizar estado del censo: $e');
       rethrow;
     }
   }
@@ -314,9 +305,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         where: 'id = ?',
         whereArgs: [estadoId],
       );
-      _logger.i('Usuario actualizado en estado $estadoId: $usuarioId');
     } catch (e) {
-      _logger.e('Error al actualizar usuario del estado: $e');
       rethrow;
     }
   }
@@ -335,7 +324,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         whereArgs: estadoIds,
       );
     } catch (e) {
-      _logger.e('Error al marcar múltiples como sincronizados: $e');
       rethrow;
     }
   }
@@ -356,7 +344,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'total': creados.length + migrados.length + conError.length,
       };
     } catch (e) {
-      _logger.e('Error contando por estado: $e');
       return {'creados': 0, 'migrados': 0, 'error': 0, 'total': 0};
     }
   }
@@ -382,7 +369,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'total': estados.length,
       };
     } catch (e) {
-      _logger.e('Error contando por usuario: $e');
       return {'creados': 0, 'migrados': 0, 'error': 0, 'total': 0};
     }
   }
@@ -419,7 +405,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'porcentaje_error': (errores / total * 100).toDouble(),
       };
     } catch (e) {
-      _logger.e('Error obteniendo estadísticas de migración: $e');
       return {};
     }
   }
@@ -434,7 +419,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return result.length;
     } catch (e) {
-      _logger.e('Error al contar cambios: $e');
       return 0;
     }
   }
@@ -462,7 +446,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'estado_actual': historial.first.enLocal,
       };
     } catch (e) {
-      _logger.e('Error al obtener estadísticas: $e');
       return {
         'total_cambios': 0,
         'ultimo_cambio': null,
@@ -480,7 +463,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       final noSincronizados = await obtenerNoSincronizados();
       return noSincronizados.map((estado) => estado.toJson()).toList();
     } catch (e) {
-      _logger.e('Error al preparar datos para sincronización: $e');
       return [];
     }
   }
@@ -492,15 +474,12 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         Duration(days: diasAntiguedad),
       );
 
-      final registrosEliminados = await dbHelper.eliminar(
+      await dbHelper.eliminar(
         tableName,
         where: 'fecha_creacion < ? AND estado_censo = ?',
         whereArgs: [fechaLimite.toIso8601String(), 'migrado'],
       );
-
-      _logger.i('🗑️ Registros antiguos eliminados: $registrosEliminados');
     } catch (e) {
-      _logger.e('Error al limpiar historial antiguo: $e');
       rethrow;
     }
   }
@@ -532,7 +511,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       final estado = await obtenerUltimoEstado(equipoId, clienteId);
       return estado?.toMap();
     } catch (e) {
-      _logger.e('Error obteniendo último estado para icono: $e');
       return null;
     }
   }
@@ -552,7 +530,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         where: 'id = ?',
         whereArgs: [censoActivoId],
       );
-      _logger.i('Estado $censoActivoId marcado como migrado exitosamente');
     } catch (e) {
       throw Exception('Error en Marcar como Migrado: $e');
     }
@@ -571,7 +548,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         where: 'id = ?',
         whereArgs: [estadoId],
       );
-      _logger.i('Estado $estadoId marcado con error: $mensajeError');
     } catch (e) {
       rethrow;
     }

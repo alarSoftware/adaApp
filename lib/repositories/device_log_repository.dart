@@ -3,12 +3,10 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'package:ada_app/models/device_log.dart';
-import 'package:logger/logger.dart';
 
 class DeviceLogRepository {
   final Database db;
   final _uuid = const Uuid();
-  final _logger = Logger();
 
   DeviceLogRepository(this.db);
 
@@ -32,7 +30,7 @@ class DeviceLogRepository {
     );
 
     await db.insert('device_log', log.toMapLocal());
-    _logger.i('✅ Device log guardado: ${log.id}');
+
     return log.id;
   }
 
@@ -68,31 +66,30 @@ class DeviceLogRepository {
       if (maps.isEmpty) return null;
       return DeviceLog.fromMap(maps.first);
     } catch (e) {
-      _logger.e('❌ Error obteniendo último log: $e');
       return null;
     }
   }
 
   /// 🆕 Verificar si existe un log muy reciente (prevenir duplicados)
-  Future<bool> existeLogReciente(String? edfVendedorId, {int minutos = 8}) async {
+  Future<bool> existeLogReciente(
+    String? edfVendedorId, {
+    int minutos = 8,
+  }) async {
     try {
       final ultimoLog = await obtenerUltimoLog(edfVendedorId);
 
       if (ultimoLog == null) return false;
 
       final tiempoDesdeUltimo = DateTime.now().difference(
-          DateTime.parse(ultimoLog.fechaRegistro)
+        DateTime.parse(ultimoLog.fechaRegistro),
       );
 
       final esReciente = tiempoDesdeUltimo.inMinutes < minutos;
 
-      if (esReciente) {
-        _logger.i('⏭️ Log reciente encontrado (hace ${tiempoDesdeUltimo.inMinutes} min)');
-      }
+      if (esReciente) {}
 
       return esReciente;
     } catch (e) {
-      _logger.e('❌ Error verificando log reciente: $e');
       return false; // En caso de error, permitir crear log
     }
   }
@@ -110,10 +107,9 @@ class DeviceLogRepository {
       );
 
       final logs = maps.map((map) => DeviceLog.fromMap(map)).toList();
-      _logger.i('📋 Logs no sincronizados encontrados: ${logs.length}');
+
       return logs;
     } catch (e) {
-      _logger.e('❌ Error obteniendo logs no sincronizados: $e');
       return [];
     }
   }
@@ -129,12 +125,8 @@ class DeviceLogRepository {
       );
 
       if (count > 0) {
-        _logger.i('✅ Log marcado como sincronizado: $logId');
-      } else {
-        _logger.w('⚠️ No se encontró el log: $logId');
-      }
+      } else {}
     } catch (e) {
-      _logger.e('❌ Error marcando log como sincronizado: $e');
       rethrow;
     }
   }
@@ -150,13 +142,11 @@ class DeviceLogRepository {
       );
 
       if (maps.isEmpty) {
-        _logger.w('⚠️ Log no encontrado: $logId');
         return null;
       }
 
       return DeviceLog.fromMap(maps.first);
     } catch (e) {
-      _logger.e('❌ Error obteniendo log por ID: $e');
       return null;
     }
   }
@@ -173,7 +163,6 @@ class DeviceLogRepository {
 
       return maps.map((map) => DeviceLog.fromMap(map)).toList();
     } catch (e) {
-      _logger.e('❌ Error obteniendo logs sincronizados: $e');
       return [];
     }
   }
@@ -190,7 +179,6 @@ class DeviceLogRepository {
 
       return maps.map((map) => DeviceLog.fromMap(map)).toList();
     } catch (e) {
-      _logger.e('❌ Error obteniendo logs por vendedor: $e');
       return [];
     }
   }
@@ -204,16 +192,12 @@ class DeviceLogRepository {
       final maps = await db.query(
         'device_log',
         where: 'fecha_registro BETWEEN ? AND ?',
-        whereArgs: [
-          fechaInicio.toIso8601String(),
-          fechaFin.toIso8601String(),
-        ],
+        whereArgs: [fechaInicio.toIso8601String(), fechaFin.toIso8601String()],
         orderBy: 'fecha_registro DESC',
       );
 
       return maps.map((map) => DeviceLog.fromMap(map)).toList();
     } catch (e) {
-      _logger.e('❌ Error obteniendo logs por rango de fechas: $e');
       return [];
     }
   }
@@ -227,7 +211,6 @@ class DeviceLogRepository {
 
       return (result.first['count'] as int?) ?? 0;
     } catch (e) {
-      _logger.e('❌ Error contando pendientes: $e');
       return 0;
     }
   }
@@ -241,7 +224,6 @@ class DeviceLogRepository {
 
       return (result.first['count'] as int?) ?? 0;
     } catch (e) {
-      _logger.e('❌ Error contando sincronizados: $e');
       return 0;
     }
   }
@@ -259,10 +241,8 @@ class DeviceLogRepository {
         whereArgs: [1, fechaLimite],
       );
 
-      _logger.i('🧹 Logs antiguos eliminados: $count');
       return count;
     } catch (e) {
-      _logger.e('❌ Error eliminando logs antiguos: $e');
       return 0;
     }
   }
@@ -277,14 +257,11 @@ class DeviceLogRepository {
       );
 
       if (count > 0) {
-        _logger.i('✅ Log eliminado: $logId');
         return true;
       } else {
-        _logger.w('⚠️ No se encontró el log para eliminar: $logId');
         return false;
       }
     } catch (e) {
-      _logger.e('❌ Error eliminando log: $e');
       return false;
     }
   }
@@ -293,10 +270,9 @@ class DeviceLogRepository {
   Future<int> eliminarTodos() async {
     try {
       final count = await db.delete('device_log');
-      _logger.w('⚠️ Todos los logs eliminados: $count');
+
       return count;
     } catch (e) {
-      _logger.e('❌ Error eliminando todos los logs: $e');
       return 0;
     }
   }
@@ -324,7 +300,6 @@ class DeviceLogRepository {
         'ultimo_registro': row['ultimo_registro'],
       };
     } catch (e) {
-      _logger.e('❌ Error obteniendo estadísticas: $e');
       return {
         'total': 0,
         'pendientes': 0,
@@ -346,7 +321,6 @@ class DeviceLogRepository {
 
       return maps.map((map) => DeviceLog.fromMap(map)).toList();
     } catch (e) {
-      _logger.e('❌ Error obteniendo logs recientes: $e');
       return [];
     }
   }
@@ -354,15 +328,10 @@ class DeviceLogRepository {
   /// Resetear estado de sincronización (útil para testing)
   Future<int> resetearSincronizacion() async {
     try {
-      final count = await db.update(
-        'device_log',
-        {'sincronizado': 0},
-      );
+      final count = await db.update('device_log', {'sincronizado': 0});
 
-      _logger.w('⚠️ Sincronización reseteada para $count logs');
       return count;
     } catch (e) {
-      _logger.e('❌ Error reseteando sincronización: $e');
       return 0;
     }
   }

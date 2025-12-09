@@ -614,13 +614,11 @@ class CensusSyncService extends BaseSyncService {
       'fecha_revision': apiCensus['fechaDeRevision'],
       'fecha_creacion': apiCensus['creationDate'],
       'fecha_actualizacion': DateTime.now().toIso8601String(),
-      'sincronizado': 1,
       'observaciones': apiCensus['observaciones']?.toString(),
       'estado_censo':  'migrado',
     };
   }
 
-  /// Helper para parsear enteros de forma segura
   static int? _parseIntSafely(dynamic value) {
     if (value == null) return null;
     if (value is int) return value;

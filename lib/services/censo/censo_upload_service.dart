@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:ada_app/models/censo_activo.dart';
 import 'package:logger/logger.dart';
-import 'package:http/http.dart' as http;
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
@@ -24,11 +22,11 @@ class CensoUploadService {
   static const int maxIntentos = 10;
   static const Duration intervaloTimer = Duration(minutes: 1);
 
-  static Timer? _syncTimer;
-  static bool _syncActivo = false;
-  static bool _syncEnProgreso = false;
-  static int? _usuarioActual;
-  static final Set<String> _censosEnProceso = {};
+  // static Timer? _syncTimer;
+  // static bool _syncActivo = false;
+  // static bool _syncEnProgreso = false;
+  // static int? _usuarioActual;
+  // static final Set<String> _censosEnProceso = {};
 
   CensoUploadService({
     CensoActivoRepository? estadoEquipoRepository,
@@ -36,18 +34,20 @@ class CensoUploadService {
     CensoLogService? logService,
     EquipoPendienteRepository? equipoPendienteRepository,
     EquipoRepository? equipoRepository,
-  })  : censoActivoRepository = estadoEquipoRepository ?? CensoActivoRepository(),
-        _fotoRepository = fotoRepository ?? CensoActivoFotoRepository(),
-        _logService = logService ?? CensoLogService(),
-        _equipoPendienteRepository = equipoPendienteRepository ?? EquipoPendienteRepository(),
-        _equipoRepository = equipoRepository ?? EquipoRepository();
+  }) : censoActivoRepository =
+           estadoEquipoRepository ?? CensoActivoRepository(),
+       _fotoRepository = fotoRepository ?? CensoActivoFotoRepository(),
+       _logService = logService ?? CensoLogService(),
+       _equipoPendienteRepository =
+           equipoPendienteRepository ?? EquipoPendienteRepository(),
+       _equipoRepository = equipoRepository ?? EquipoRepository();
 
   //=====METODO UNIFICADO PARA CONSULTAR Y ENVIAR POST CENSO ACTIVO=====
   Future<void> enviarCensoUnificado({
     required String censoActivoId,
     required int usuarioId,
     required String edfVendedorId,
-    required bool guardarLog
+    required bool guardarLog,
   }) async {
     String? fullUrl;
 
@@ -102,44 +102,46 @@ class CensoUploadService {
       final yaAsignado = await _verificarEquipoAsignado(equipoId, clienteId);
       final crearPendiente = !yaAsignado;
 
-      _logger.i('Flags - Nuevo: $esNuevoEquipo, Crear pendiente: $crearPendiente');
-
-      final pendienteExistente = await _equipoPendienteRepository.dbHelper.consultar(
-        'equipos_pendientes',
-        where: 'equipo_id = ? AND cliente_id = ?',
-        whereArgs: [equipoId, clienteId],
-        orderBy: 'fecha_creacion DESC',
-        limit: 1,
+      _logger.i(
+        'Flags - Nuevo: $esNuevoEquipo, Crear pendiente: $crearPendiente',
       );
+
+      final pendienteExistente = await _equipoPendienteRepository.dbHelper
+          .consultar(
+            'equipos_pendientes',
+            where: 'equipo_id = ? AND cliente_id = ?',
+            whereArgs: [equipoId, clienteId],
+            orderBy: 'fecha_creacion DESC',
+            limit: 1,
+          );
 
       await CensoActivoPostService.enviarCensoActivo(
-          censoId: censoActivoId,
-          equipoId: equipoId,
-          codigoBarras: censoActivoMap['codigo_barras']?.toString(),
-          marcaId: censoActivoMap['marca_id'] as int?,
-          modeloId: censoActivoMap['modelo_id'] as int?,
-          logoId: censoActivoMap['logo_id'] as int?,
-          numeroSerie: censoActivoMap['numero_serie']?.toString(),
-          esNuevoEquipo: esNuevoEquipo,
-          clienteId: clienteId,
-          edfVendedorId: edfVendedorId,
-          crearPendiente: crearPendiente,
-          pendienteExistente: pendienteExistente,
-          usuarioId: usuarioId,
-          latitud: censoActivoMap['latitud']?.toDouble() ?? 0.0,
-          longitud: censoActivoMap['longitud']?.toDouble() ?? 0.0,
-          observaciones: censoActivoMap['observaciones']?.toString(),
-          enLocal: censoActivoMap['en_local'] == true,
-          estadoCenso: yaAsignado ? 'asignado' : 'pendiente',
-          fotos: fotos,
-          clienteNombre: censoActivoMap['cliente_nombre']?.toString(),
-          marca: censoActivoMap['marca_nombre']?.toString(),
-          modelo: censoActivoMap['modelo']?.toString(),
-          logo: censoActivoMap['logo']?.toString(),
-          guardarLog: guardarLog,
-          equipoDataMap: equipoDataMap
+        censoId: censoActivoId,
+        equipoId: equipoId,
+        codigoBarras: censoActivoMap['codigo_barras']?.toString(),
+        marcaId: censoActivoMap['marca_id'] as int?,
+        modeloId: censoActivoMap['modelo_id'] as int?,
+        logoId: censoActivoMap['logo_id'] as int?,
+        numeroSerie: censoActivoMap['numero_serie']?.toString(),
+        esNuevoEquipo: esNuevoEquipo,
+        clienteId: clienteId,
+        edfVendedorId: edfVendedorId,
+        crearPendiente: crearPendiente,
+        pendienteExistente: pendienteExistente,
+        usuarioId: usuarioId,
+        latitud: censoActivoMap['latitud']?.toDouble() ?? 0.0,
+        longitud: censoActivoMap['longitud']?.toDouble() ?? 0.0,
+        observaciones: censoActivoMap['observaciones']?.toString(),
+        enLocal: censoActivoMap['en_local'] == true,
+        estadoCenso: yaAsignado ? 'asignado' : 'pendiente',
+        fotos: fotos,
+        clienteNombre: censoActivoMap['cliente_nombre']?.toString(),
+        marca: censoActivoMap['marca_nombre']?.toString(),
+        modelo: censoActivoMap['modelo']?.toString(),
+        logo: censoActivoMap['logo']?.toString(),
+        guardarLog: guardarLog,
+        equipoDataMap: equipoDataMap,
       );
-
     } catch (e, stackTrace) {
       _logger.e('Error en enviarCensoUnificado: $e', stackTrace: stackTrace);
 
@@ -171,8 +173,8 @@ class CensoUploadService {
       final registrosCreados = await censoActivoRepository.obtenerCreados();
       final registrosError = await censoActivoRepository.obtenerConError();
       final registrosErrorListos = await _filtrarRegistrosListosParaReintento(
-          registrosError,
-          registrosCreados
+        registrosError,
+        registrosCreados,
       );
 
       final todosLosRegistros = [...registrosCreados, ...registrosErrorListos];
@@ -183,14 +185,29 @@ class CensoUploadService {
 
       for (final censoActivo in censoActivoList) {
         try {
-          await _sincronizarCensoActivoIndividualUnificado(censoActivo, usuarioId);
+          await _sincronizarCensoActivoIndividualUnificado(
+            censoActivo,
+            usuarioId,
+          );
           censosExitosos++;
         } catch (e, stacktrace) {
-          _logger.e('Error en censo ${censoActivo.id}: $e', stackTrace: stacktrace);
+          _logger.e(
+            'Error en censo ${censoActivo.id}: $e',
+            stackTrace: stacktrace,
+          );
           totalFallidos++;
           if (censoActivo.id != null) {
-            await censoActivoRepository.marcarComoError(censoActivo.id!,'Excepción: ${e.toString()}');
-            await ErrorLogService.manejarExcepcion(e, censoActivo.id!, null, usuarioId, _tableName);
+            await censoActivoRepository.marcarComoError(
+              censoActivo.id!,
+              'Excepción: ${e.toString()}',
+            );
+            await ErrorLogService.manejarExcepcion(
+              e,
+              censoActivo.id!,
+              null,
+              usuarioId,
+              _tableName,
+            );
           }
         }
         await Future.delayed(Duration(milliseconds: 500));
@@ -205,9 +222,11 @@ class CensoUploadService {
         'fallidos': totalFallidos,
         'total': censosExitosos,
       };
-
     } catch (e, stackTrace) {
-      _logger.e('Error en sincronización periódica: $e', stackTrace: stackTrace);
+      _logger.e(
+        'Error en sincronización periódica: $e',
+        stackTrace: stackTrace,
+      );
 
       await ErrorLogService.manejarExcepcion(
         e,
@@ -225,7 +244,10 @@ class CensoUploadService {
     }
   }
 
-  Future<void> _sincronizarCensoActivoIndividualUnificado(dynamic registro,int usuarioId) async {
+  Future<void> _sincronizarCensoActivoIndividualUnificado(
+    dynamic registro,
+    int usuarioId,
+  ) async {
     try {
       final censoActivoId = registro.id as String;
 
@@ -251,9 +273,13 @@ class CensoUploadService {
         return;
       }
 
-      _logger.i('Sincronizando $censoActivoId (intento #$numeroIntento/$maxIntentos)');
+      _logger.i(
+        'Sincronizando $censoActivoId (intento #$numeroIntento/$maxIntentos)',
+      );
 
-      final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(usuarioId);
+      final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(
+        usuarioId,
+      );
       if (edfVendedorId == null || edfVendedorId.isEmpty) {
         throw Exception('edfVendedorId no encontrado');
       }
@@ -270,14 +296,13 @@ class CensoUploadService {
     } catch (e) {
       rethrow;
     }
-
   }
 
   Future<Map<String, dynamic>> reintentarEnvioCenso(
-      String censoActivoId,
-      int usuarioId,
-      String? edfVendedorId,
-      ) async {
+    String censoActivoId,
+    int usuarioId,
+    String? edfVendedorId,
+  ) async {
     bool success = false;
     String message = '';
 
@@ -289,10 +314,10 @@ class CensoUploadService {
       }
 
       await enviarCensoUnificado(
-          censoActivoId: censoActivoId,
-          usuarioId: usuarioId,
-          edfVendedorId: edfVendedorId,
-          guardarLog: true
+        censoActivoId: censoActivoId,
+        usuarioId: usuarioId,
+        edfVendedorId: edfVendedorId,
+        guardarLog: true,
       );
 
       final censoActivoMapList = await censoActivoRepository.dbHelper.consultar(
@@ -306,7 +331,9 @@ class CensoUploadService {
         throw Exception('Censo no encontrado después del envío');
       }
 
-      final censoActivoMap = Map<String, dynamic>.from(censoActivoMapList.first);
+      final censoActivoMap = Map<String, dynamic>.from(
+        censoActivoMapList.first,
+      );
       var estadoCenso = censoActivoMap['estado_censo'];
 
       if (estadoCenso == 'migrado') {
@@ -316,26 +343,23 @@ class CensoUploadService {
         success = false;
         message = censoActivoMap['error_mensaje'] ?? 'Error desconocido';
       }
-
     } catch (e, stackTrace) {
       _logger.e('Error en reintentarEnvioCenso: $e', stackTrace: stackTrace);
       success = false;
       message = e.toString();
     }
 
-    return {
-      'success': success,
-      'message': message,
-    };
+    return {'success': success, 'message': message};
   }
 
   Future<void> _enriquecerDatosEquipo(
-      Map<String, dynamic> datosLocales,
-      String equipoId,
-      ) async {
+    Map<String, dynamic> datosLocales,
+    String equipoId,
+  ) async {
     try {
       final db = await _equipoRepository.dbHelper.database;
-      final result = await db.rawQuery('''
+      final result = await db.rawQuery(
+        '''
       SELECT 
         e.id,
         e.cod_barras,
@@ -352,7 +376,9 @@ class CensoUploadService {
       LEFT JOIN modelos mo ON e.modelo_id = mo.id
       LEFT JOIN logo l ON e.logo_id = l.id
       WHERE e.id = ?
-    ''', [equipoId]);
+    ''',
+        [equipoId],
+      );
 
       if (result.isNotEmpty) {
         final infoEquipo = result.first;
@@ -389,7 +415,6 @@ class CensoUploadService {
       tableName: 'censo_activo',
     );
 
-
     if (equipoId != null && esNuevoEquipo) {
       await _equipoRepository.marcarEquipoComoSincronizado(equipoId);
     }
@@ -406,92 +431,89 @@ class CensoUploadService {
         await _fotoRepository.marcarComoSincronizada(foto.id!);
       }
     }
-
-
   }
 
-  static void iniciarSincronizacionAutomatica(int usuarioId) {
-    if (_syncActivo && _usuarioActual == usuarioId) {
-      Logger().w('Sincronización ya activa para usuario $usuarioId');
-      return;
-    }
+  // static void iniciarSincronizacionAutomatica(int usuarioId) {
+  //   if (_syncActivo && _usuarioActual == usuarioId) {
+  //     Logger().w('Sincronización ya activa para usuario $usuarioId');
+  //     return;
+  //   }
+  //
+  //   detenerSincronizacionAutomatica();
+  //
+  //   _usuarioActual = usuarioId;
+  //   _syncActivo = true;
+  //
+  //   Logger().i(
+  //     'Iniciando sincronización automática cada ${intervaloTimer.inMinutes} min',
+  //   );
+  //
+  //   _syncTimer = Timer.periodic(intervaloTimer, (timer) async {
+  //     await _ejecutarSincronizacionAutomatica();
+  //   });
+  //
+  //   Timer(const Duration(seconds: 15), () async {
+  //     await _ejecutarSincronizacionAutomatica();
+  //   });
+  // }
 
-    detenerSincronizacionAutomatica();
+  // static void detenerSincronizacionAutomatica() {
+  //   if (_syncTimer != null) {
+  //     _syncTimer!.cancel();
+  //     _syncTimer = null;
+  //     _syncActivo = false;
+  //     _syncEnProgreso = false;
+  //     _usuarioActual = null;
+  //     _censosEnProceso.clear();
+  //     Logger().i('Sincronización automática detenida');
+  //   }
+  // }
 
-    _usuarioActual = usuarioId;
-    _syncActivo = true;
+  // static Future<void> _ejecutarSincronizacionAutomatica() async {
+  //   if (_syncEnProgreso || !_syncActivo || _usuarioActual == null) return;
+  //
+  //   _syncEnProgreso = true;
+  //
+  //   try {
+  //     final conexion = await BaseSyncService.testConnection();
+  //     if (!conexion.exito) {
+  //       Logger().w('Sin conexión al servidor: ${conexion.mensaje}');
+  //       return;
+  //     }
+  //
+  //     final service = CensoUploadService();
+  //     final resultado = await service.sincronizarCensosNoMigrados(
+  //       _usuarioActual!,
+  //     );
+  //
+  //     if (resultado['total']! > 0) {
+  //       Logger().i(
+  //         'Auto-sync: ${resultado['censos_exitosos']}/${resultado['total']}',
+  //       );
+  //     }
+  //   } catch (e, stackTrace) {
+  //     Logger().e('Error en auto-sync: $e', stackTrace: stackTrace);
+  //
+  //     await ErrorLogService.manejarExcepcion(
+  //       e,
+  //       null,
+  //       null,
+  //       _usuarioActual,
+  //       'censo_activo',
+  //     );
+  //   } finally {
+  //     _syncEnProgreso = false;
+  //   }
+  // }
 
-    Logger().i('Iniciando sincronización automática cada ${intervaloTimer.inMinutes} min');
 
-    _syncTimer = Timer.periodic(intervaloTimer, (timer) async {
-      await _ejecutarSincronizacionAutomatica();
-    });
-
-    Timer(const Duration(seconds: 15), () async {
-      await _ejecutarSincronizacionAutomatica();
-    });
-  }
-
-  static void detenerSincronizacionAutomatica() {
-    if (_syncTimer != null) {
-      _syncTimer!.cancel();
-      _syncTimer = null;
-      _syncActivo = false;
-      _syncEnProgreso = false;
-      _usuarioActual = null;
-      _censosEnProceso.clear();
-      Logger().i('Sincronización automática detenida');
-    }
-  }
-
-  static Future<void> _ejecutarSincronizacionAutomatica() async {
-    if (_syncEnProgreso || !_syncActivo || _usuarioActual == null) return;
-
-    _syncEnProgreso = true;
-
-    try {
-      final conexion = await BaseSyncService.testConnection();
-      if (!conexion.exito) {
-        Logger().w('Sin conexión al servidor: ${conexion.mensaje}');
-        return;
-      }
-
-      final service = CensoUploadService();
-      final resultado = await service.sincronizarCensosNoMigrados(_usuarioActual!);
-
-      if (resultado['total']! > 0) {
-        Logger().i('Auto-sync: ${resultado['censos_exitosos']}/${resultado['total']}');
-      }
-    } catch (e, stackTrace) {
-      Logger().e('Error en auto-sync: $e', stackTrace: stackTrace);
-
-      await ErrorLogService.manejarExcepcion(
-        e,
-        null,
-        null,
-        _usuarioActual,
-        'censo_activo',
-      );
-    } finally {
-      _syncEnProgreso = false;
-    }
-  }
-
-  static Future<Map<String, int>?> forzarSincronizacion() async {
-    if (!_syncActivo || _usuarioActual == null) return null;
-
-    Logger().i('Forzando sincronización...');
-    final service = CensoUploadService();
-    return await service.sincronizarCensosNoMigrados(_usuarioActual!);
-  }
-
-  static bool get esSincronizacionActiva => _syncActivo;
-  static bool get estaEnProgreso => _syncEnProgreso;
+  // static bool get esSincronizacionActiva => _syncActivo;
+  // static bool get estaEnProgreso => _syncEnProgreso;
 
   Future<List<dynamic>> _filtrarRegistrosListosParaReintento(
-      List<dynamic> registrosError,
-      [List<CensoActivo>? registrosCreados]
-      ) async {
+    List<dynamic> registrosError, [
+    List<CensoActivo>? registrosCreados,
+  ]) async {
     final registrosListos = <dynamic>[];
     final ahora = DateTime.now();
 
@@ -509,7 +531,9 @@ class CensoUploadService {
         final minutosEspera = _calcularProximoIntento(intentos);
         if (minutosEspera < 0) continue;
 
-        final tiempoProximoIntento = ultimoIntento.add(Duration(minutes: minutosEspera));
+        final tiempoProximoIntento = ultimoIntento.add(
+          Duration(minutes: minutosEspera),
+        );
 
         if (ahora.isAfter(tiempoProximoIntento)) {
           registrosListos.add(registro);
@@ -525,13 +549,20 @@ class CensoUploadService {
   int _calcularProximoIntento(int numeroIntento) {
     if (numeroIntento > maxIntentos) return -1;
     switch (numeroIntento) {
-      case 1: return 1;
-      case 2: return 5;
-      case 3: return 10;
-      case 4: return 15;
-      case 5: return 20;
-      case 6: return 25;
-      default: return 30;
+      case 1:
+        return 1;
+      case 2:
+        return 5;
+      case 3:
+        return 10;
+      case 4:
+        return 15;
+      case 5:
+        return 20;
+      case 6:
+        return 25;
+      default:
+        return 30;
     }
   }
 
@@ -571,7 +602,10 @@ class CensoUploadService {
     return null;
   }
 
-  Future<void> _actualizarUltimoIntento(String estadoId, int numeroIntento) async {
+  Future<void> _actualizarUltimoIntento(
+    String estadoId,
+    int numeroIntento,
+  ) async {
     try {
       await censoActivoRepository.dbHelper.actualizar(
         'censo_activo',
@@ -608,7 +642,10 @@ class CensoUploadService {
     }
   }
 
-  Future<bool> _verificarEquipoAsignado(String? equipoId, dynamic clienteId) async {
+  Future<bool> _verificarEquipoAsignado(
+    String? equipoId,
+    dynamic clienteId,
+  ) async {
     try {
       if (equipoId == null || clienteId == null) return false;
 

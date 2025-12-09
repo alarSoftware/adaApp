@@ -18,30 +18,35 @@ class DynamicFormTemplateListScreen extends StatefulWidget {
   });
 
   @override
-  State<DynamicFormTemplateListScreen> createState() => _DynamicFormTemplateListScreenState();
+  State<DynamicFormTemplateListScreen> createState() =>
+      _DynamicFormTemplateListScreenState();
 }
 
-class _DynamicFormTemplateListScreenState extends State<DynamicFormTemplateListScreen> {
+class _DynamicFormTemplateListScreenState
+    extends State<DynamicFormTemplateListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Seleccionar Formulario', style: TextStyle(color: AppColors.onPrimary)),
+        title: Text(
+          'Seleccionar Formulario',
+          style: TextStyle(color: AppColors.onPrimary),
+        ),
         backgroundColor: AppColors.appBarBackground,
         foregroundColor: AppColors.appBarForeground,
         actions: [
           IconButton(
             icon: Icon(Icons.refresh, color: AppColors.onPrimary),
             onPressed: () async {
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
               await widget.viewModel.downloadTemplatesFromServer();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('✅ Formularios actualizados'),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
-              }
+              if (!mounted) return;
+              scaffoldMessenger.showSnackBar(
+                SnackBar(
+                  content: Text('✅ Formularios actualizados'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
             },
             tooltip: 'Actualizar formularios',
           ),
@@ -122,7 +127,9 @@ class _DynamicFormTemplateListScreenState extends State<DynamicFormTemplateListS
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: _getCategoryColor(template.category).withOpacity(0.1),
+                      color: _getCategoryColor(
+                        template.category,
+                      ).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: _getCategoryColor(template.category),
@@ -150,9 +157,14 @@ class _DynamicFormTemplateListScreenState extends State<DynamicFormTemplateListS
                         if (template.category != null) ...[
                           SizedBox(height: 4),
                           Container(
-                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: _getCategoryColor(template.category).withOpacity(0.1),
+                              color: _getCategoryColor(
+                                template.category,
+                              ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                               border: Border.all(
                                 color: _getCategoryColor(template.category),
@@ -181,17 +193,18 @@ class _DynamicFormTemplateListScreenState extends State<DynamicFormTemplateListS
               SizedBox(height: 12),
               Text(
                 template.description,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               ),
               SizedBox(height: 12),
               Divider(color: AppColors.border, height: 1),
               SizedBox(height: 12),
               Row(
                 children: [
-                  Icon(Icons.assignment, size: 16, color: AppColors.textSecondary),
+                  Icon(
+                    Icons.assignment,
+                    size: 16,
+                    color: AppColors.textSecondary,
+                  ),
                   SizedBox(width: 4),
                   Text(
                     '${template.fieldCount} campos',
@@ -252,10 +265,7 @@ class _DynamicFormTemplateListScreenState extends State<DynamicFormTemplateListS
             SizedBox(height: 8),
             Text(
               'Descarga formularios desde el servidor',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 24),
@@ -284,11 +294,7 @@ class _DynamicFormTemplateListScreenState extends State<DynamicFormTemplateListS
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 80,
-              color: AppColors.error,
-            ),
+            Icon(Icons.error_outline, size: 80, color: AppColors.error),
             SizedBox(height: 16),
             Text(
               'Error al cargar',
@@ -301,10 +307,7 @@ class _DynamicFormTemplateListScreenState extends State<DynamicFormTemplateListS
             SizedBox(height: 8),
             Text(
               widget.viewModel.errorMessage ?? 'Error desconocido',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 24),
@@ -339,6 +342,7 @@ class _DynamicFormTemplateListScreenState extends State<DynamicFormTemplateListS
 
     // ✅ Obtener usuario actual
     final usuario = await AuthService().getCurrentUser();
+    if (!mounted) return;
 
     // ✅ Iniciar formulario con todos los datos
     widget.viewModel.startNewForm(
@@ -350,35 +354,31 @@ class _DynamicFormTemplateListScreenState extends State<DynamicFormTemplateListS
 
     // ✅ Guardar inmediatamente en la BD como borrador
     final saved = await widget.viewModel.saveDraft();
+    if (!mounted) return;
 
     // Cerrar loading
-    if (mounted) {
-      Navigator.pop(context);
-    }
+    Navigator.pop(context);
 
     if (saved) {
       // Navegar a la pantalla de llenado
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DynamicFormFillScreen(viewModel: widget.viewModel),
-          ),
-        ).then((_) {
-          // Cuando regresa de llenar el formulario, cierra esta pantalla también
-          Navigator.pop(context);
-        });
-      }
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              DynamicFormFillScreen(viewModel: widget.viewModel),
+        ),
+      ).then((_) {
+        // Cuando regresa de llenar el formulario, cierra esta pantalla también
+        if (mounted) Navigator.pop(context);
+      });
     } else {
       // Mostrar error
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error al crear el formulario'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error al crear el formulario'),
+          backgroundColor: AppColors.error,
+        ),
+      );
     }
   }
 

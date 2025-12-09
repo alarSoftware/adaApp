@@ -21,15 +21,24 @@ class ClienteRepository extends BaseRepository<Cliente> {
   @override
   List<dynamic> getBuscarArgs(String query) {
     final searchTerm = '%${query.toLowerCase()}%';
-    return [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm];
+    return [
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+    ];
   }
 
   @override
   String getEntityName() => 'Cliente';
 
-  // ✅ VERSIÓN CORREGIDA - Aparece con CUALQUIER estado en censo_activo
-  @override
-  Future<List<Cliente>> buscar(String query) async {
+  // MÉTODO PRINCIPAL CON FILTROS COMBINADOS
+  Future<List<Cliente>> buscarConFiltros({
+    String? query,
+    String? rutaDia,
+  }) async {
     try {
       String sql = '''
         SELECT 
@@ -42,7 +51,6 @@ class ClienteRepository extends BaseRepository<Cliente> {
             ) THEN 1 ELSE 0 
           END as tiene_censo_hoy,
           
-          -- ✅ Formulario completado HOY
           CASE 
             WHEN EXISTS(
               SELECT 1 FROM dynamic_form_response 
@@ -58,7 +66,14 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
       final List<dynamic> params = [];
 
-      if (query.trim().isNotEmpty) {
+      // Filtro por día de ruta
+      if (rutaDia != null && rutaDia.isNotEmpty) {
+        sql += ' AND c.ruta_dia = ?';
+        params.add(rutaDia);
+      }
+
+      // Filtro por búsqueda
+      if (query != null && query.trim().isNotEmpty) {
         sql += ' AND (${getBuscarWhere()})';
         params.addAll(getBuscarArgs(query));
       }
@@ -68,17 +83,21 @@ class ClienteRepository extends BaseRepository<Cliente> {
       final db = await dbHelper.database;
       final List<Map<String, dynamic>> rows = await db.rawQuery(sql, params);
 
-      return rows.map((row) => fromMap(row)).toList();
 
+      return rows.map((row) => fromMap(row)).toList();
     } catch (e) {
-      logger.e('Error en ${getEntityName()}Repository.buscar: $e');
       throw Exception('Error al buscar ${getEntityName().toLowerCase()}s: $e');
     }
   }
 
   @override
+  Future<List<Cliente>> buscar(String query) async {
+    return await buscarConFiltros(query: query);
+  }
+
+  @override
   Future<List<Cliente>> obtenerTodos() async {
-    return await buscar('');
+    return await buscarConFiltros();
   }
 
   @override
@@ -114,9 +133,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
       if (result.isEmpty) return null;
 
       return fromMap(result.first);
-
     } catch (e) {
-      logger.e('Error en ${getEntityName()}Repository.obtenerPorId: $e');
       throw Exception('Error al obtener ${getEntityName().toLowerCase()}: $e');
     }
   }
@@ -147,9 +164,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
       final result = await consultarPersonalizada(sql);
       return result.map((row) => fromMap(row)).toList();
-
     } catch (e) {
-      logger.e('Error en obtenerConCensoPendiente: $e');
       throw Exception('Error al obtener clientes con censo pendiente: $e');
     }
   }
@@ -181,9 +196,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
       final result = await consultarPersonalizada(sql);
       return result.map((row) => fromMap(row)).toList();
-
     } catch (e) {
-      logger.e('Error en obtenerConFormularioPendiente: $e');
       throw Exception('Error al obtener clientes con formulario pendiente: $e');
     }
   }
@@ -213,9 +226,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
       final result = await consultarPersonalizada(sql);
       return result.map((row) => fromMap(row)).toList();
-
     } catch (e) {
-      logger.e('Error en obtenerCompletados: $e');
       throw Exception('Error al obtener clientes completados: $e');
     }
   }
@@ -271,11 +282,10 @@ class ClienteRepository extends BaseRepository<Cliente> {
         'conCensoHoy': row['con_censo_hoy'] as int,
         'conFormularioHoy': row['con_formulario_hoy'] as int,
         'completadosHoy': row['completados_hoy'] as int,
-        'pendientesHoy': (row['total_clientes'] as int) - (row['completados_hoy'] as int),
+        'pendientesHoy':
+        (row['total_clientes'] as int) - (row['completados_hoy'] as int),
       };
-
     } catch (e) {
-      logger.e('Error en obtenerEstadisticas: $e');
       throw Exception('Error al obtener estadísticas: $e');
     }
   }
@@ -304,22 +314,18 @@ class ClienteRepository extends BaseRepository<Cliente> {
       final db = await dbHelper.database;
 
       final censoActivo = await db.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='censo_activo'"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='censo_activo'",
       );
 
       final dynamicFormResponse = await db.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='dynamic_form_response'"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='dynamic_form_response'",
       );
 
       final tieneCensoActivo = censoActivo.isNotEmpty;
       final tieneDynamicForm = dynamicFormResponse.isNotEmpty;
 
-      logger.i('Verificación de tablas - CensoActivo: $tieneCensoActivo, DynamicFormResponse: $tieneDynamicForm');
-
       return tieneCensoActivo && tieneDynamicForm;
-
     } catch (e) {
-      logger.e('Error verificando tablas de estado: $e');
       return false;
     }
   }
@@ -329,11 +335,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
     try {
       final tieneTablasEstado = await verificarTablasEstado();
-      if (!tieneTablasEstado) {
-        logger.w('⚠️  Las tablas de estado (censo_activo/dynamic_form_response) no existen aún');
-      }
-    } catch (e) {
-      logger.e('Error en verificación completa: $e');
-    }
+      if (!tieneTablasEstado) {}
+    } catch (e) {}
   }
 }

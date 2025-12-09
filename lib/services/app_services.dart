@@ -1,9 +1,5 @@
-// lib/services/app_services.dart
 
-import 'package:ada_app/services/database_helper.dart';
-import 'package:ada_app/repositories/device_log_repository.dart';
 import 'package:ada_app/services/device_log/device_log_background_extension.dart';
-import 'package:ada_app/services/censo/censo_upload_service.dart';
 import 'package:ada_app/services/dynamic_form/dynamic_form_upload_service.dart';
 import 'package:ada_app/services/device_log/device_log_upload_service.dart';
 import 'package:ada_app/services/auth_service.dart';
@@ -76,14 +72,14 @@ class AppServices {
       _logger.i('🔄 Iniciando sincronizaciones automáticas (SIN device logging)...');
 
       // Sincronización de Censos (cada 1 minuto)
-      if (usuario.id != null) {
-        CensoUploadService.iniciarSincronizacionAutomatica(usuario.id!);
-        _logger.i('  ✅ Censos: cada 1 minuto');
-      }
+      // if (usuario.id != null) {
+      //   CensoUploadService.iniciarSincronizacionAutomatica(usuario.id!);
+      //   _logger.i('  ✅ Censos: cada 1 minuto');
+      // }
 
       // Sincronización de Formularios Dinámicos (cada 2 minutos)
       if (usuario.edfVendedorId != null && usuario.edfVendedorId!.isNotEmpty) {
-        DynamicFormUploadService.iniciarSincronizacionAutomatica(usuario.edfVendedorId!);
+        // DynamicFormUploadService.iniciarSincronizacionAutomatica(usuario.edfVendedorId!);
         _logger.i('  ✅ Formularios: cada 2 minutos');
       }
 
@@ -122,23 +118,17 @@ class AppServices {
   /// Detener todas las sincronizaciones automáticas
   Future<void> _detenerSincronizacionesAutomaticas() async {
     try {
-      _logger.i('🛑 Deteniendo sincronizaciones automáticas...');
-
       // Detener Censos
-      CensoUploadService.detenerSincronizacionAutomatica();
-      _logger.i('  ✅ Censos detenidos');
+      // CensoUploadService.detenerSincronizacionAutomatica();
+      // OperacionComercialSyncService.detenerSincronizacionAutomatica();
 
       // Detener Formularios
       DynamicFormUploadService.detenerSincronizacionAutomatica();
-      _logger.i('  ✅ Formularios detenidos');
 
       // Detener Device Logs
       DeviceLogUploadService.detenerSincronizacionAutomatica();
-      _logger.i('  ✅ Device Logs detenidos');
 
-      _logger.i('✅ Sincronizaciones automáticas detenidas');
     } catch (e) {
-      _logger.e('Error deteniendo sincronizaciones: $e');
     }
   }
 
@@ -149,7 +139,7 @@ class AppServices {
       _logger.i('Inicializando servicios de la aplicación');
 
       if (_isUserLoggedIn) {
-        // ❌ CAMBIO: NO inicializar device logging automáticamente
+        //NO inicializar device logging automáticamente
         // Solo los servicios básicos
         _logger.i('Servicios básicos inicializados (device logging pendiente)');
       } else {
@@ -157,22 +147,6 @@ class AppServices {
       }
     } catch (e) {
       _logger.e('Error al inicializar servicios: $e');
-    }
-  }
-
-  // ❌ MÉTODO REMOVIDO/RENOMBRADO
-  // Este método SOLO se llamará después de sincronización exitosa
-  Future<void> _inicializarExtensionLogging() async {
-    try {
-      if (!_isUserLoggedIn) {
-        _logger.w('⚠️ No se puede iniciar logging sin usuario logueado');
-        return;
-      }
-
-      await DeviceLogBackgroundExtension.inicializar();
-      _logger.i('✅ Extensión de logging iniciada para usuario');
-    } catch (e) {
-      _logger.e('💥 Error inicializando extensión: $e');
     }
   }
 
@@ -208,7 +182,7 @@ class AppServices {
       return {
         'usuario_logueado': _isUserLoggedIn,
         'extension_activa': DeviceLogBackgroundExtension.estaActivo,
-        'censo_sync_activo': CensoUploadService.esSincronizacionActiva,
+        // 'censo_sync_activo': CensoUploadService.esSincronizacionActiva,
         'formularios_sync_activo': DynamicFormUploadService.esSincronizacionActiva,
         'device_logs_sync_activo': DeviceLogUploadService.esSincronizacionActiva,
         // ✅ Agregar campos del background state individualmente
@@ -262,7 +236,7 @@ class AppServices {
   Future<Map<String, int>?> forzarSincronizacionCensos() async {
     try {
       _logger.i('⚡ Forzando sincronización de censos...');
-      return await CensoUploadService.forzarSincronizacion();
+      // return await CensoUploadService.forzarSincronizacion();
     } catch (e) {
       _logger.e('Error forzando sync de censos: $e');
       return null;

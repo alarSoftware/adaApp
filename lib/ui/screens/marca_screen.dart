@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../repositories/marca_repository.dart';
 import '../../services/sync/equipment_sync_service.dart';
-import 'package:logger/logger.dart';
 
-final _logger = Logger();
+
 
 class MarcaScreen extends StatefulWidget {
   const MarcaScreen({super.key});
@@ -78,9 +77,7 @@ class _MarcaScreenState extends State<MarcaScreen> {
         });
       }
 
-      _logger.i('Marcas locales cargadas: ${_marcas.length}');
     } catch (e) {
-      _logger.e('Error cargando marcas locales: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -99,8 +96,6 @@ class _MarcaScreenState extends State<MarcaScreen> {
     });
 
     try {
-      _logger.i('Iniciando sincronización de marcas desde el servidor...');
-
       // Usar EquipmentSyncService en lugar de MarcaRepository
       final resultado = await EquipmentSyncService.sincronizarMarcas();
 
@@ -128,7 +123,6 @@ class _MarcaScreenState extends State<MarcaScreen> {
         }
 
         final cantidadSincronizada = resultado.itemsSincronizados;
-        _logger.i('Marcas sincronizadas exitosamente: $cantidadSincronizada');
 
         // Mostrar mensaje de éxito con la cantidad
         ScaffoldMessenger.of(context).showSnackBar(
@@ -151,7 +145,6 @@ class _MarcaScreenState extends State<MarcaScreen> {
           _errorMessage = mensaje;
         });
 
-        _logger.e('Error sincronizando marcas: $mensaje');
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -162,7 +155,6 @@ class _MarcaScreenState extends State<MarcaScreen> {
         );
       }
     } catch (e) {
-      _logger.e('Error sincronizando marcas: $e');
       if (mounted) {
         setState(() {
           _isSyncing = false;

@@ -13,16 +13,15 @@ import 'package:ada_app/services/auth_service.dart';
 class DynamicFormResponsesScreen extends StatefulWidget {
   final Cliente cliente;
 
-  const DynamicFormResponsesScreen({
-    super.key,
-    required this.cliente,
-  });
+  const DynamicFormResponsesScreen({super.key, required this.cliente});
 
   @override
-  State<DynamicFormResponsesScreen> createState() => _DynamicFormResponsesScreenState();
+  State<DynamicFormResponsesScreen> createState() =>
+      _DynamicFormResponsesScreenState();
 }
 
-class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen> {
+class _DynamicFormResponsesScreenState
+    extends State<DynamicFormResponsesScreen> {
   late DynamicFormViewModel _viewModel;
   String _filterStatus = 'all';
   final _dateFormat = DateFormat('dd/MM/yyyy HH:mm');
@@ -141,7 +140,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
           _filterStatus = value;
         });
       },
-      selectedColor: AppColors.primary.withOpacity(0.2),
+      selectedColor: AppColors.primary.withValues(alpha: 0.2),
       checkmarkColor: AppColors.primary,
       labelStyle: TextStyle(
         color: isSelected ? AppColors.primary : AppColors.textSecondary,
@@ -184,7 +183,8 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
             child: ListView.builder(
               padding: EdgeInsets.all(16),
               itemCount: responses.length,
-              itemBuilder: (context, index) => _buildResponseCard(responses[index]),
+              itemBuilder: (context, index) =>
+                  _buildResponseCard(responses[index]),
             ),
           );
         },
@@ -223,7 +223,9 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _viewResponse(response),
-        onLongPress: response.status == 'completed' ? null : () => _deleteResponse(response),
+        onLongPress: response.status == 'completed'
+            ? null
+            : () => _deleteResponse(response),
         child: Padding(
           padding: EdgeInsets.all(16),
           child: Column(
@@ -242,10 +244,10 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
   }
 
   Widget _buildCardHeader(
-      DynamicFormResponse response,
-      dynamic template,
-      bool isSynced,
-      ) {
+    DynamicFormResponse response,
+    dynamic template,
+    bool isSynced,
+  ) {
     return Row(
       children: [
         // Icono del estado del formulario
@@ -253,7 +255,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: _getStatusColor(response.status).withOpacity(0.1),
+            color: _getStatusColor(response.status).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
@@ -286,7 +288,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
           padding: EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: (isSynced ? AppColors.success : AppColors.warning)
-                .withOpacity(0.1),
+                .withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Icon(
@@ -300,19 +302,11 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
           SizedBox(width: 8),
           Tooltip(
             message: 'No se puede eliminar (completado)',
-            child: Icon(
-              Icons.lock,
-              size: 18,
-              color: AppColors.textSecondary,
-            ),
+            child: Icon(Icons.lock, size: 18, color: AppColors.textSecondary),
           ),
         ],
         SizedBox(width: 8),
-        Icon(
-          Icons.arrow_forward_ios,
-          size: 16,
-          color: AppColors.textSecondary,
-        ),
+        Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
       ],
     );
   }
@@ -396,38 +390,13 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     );
   }
 
-  Widget _buildErrorMessage(String message) {
-    return Container(
-      margin: EdgeInsets.only(top: 8),
-      padding: EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: AppColors.error.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, size: 12, color: AppColors.error),
-          SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(fontSize: 10, color: AppColors.error),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildStatusBadge(String status) {
     final config = _getStatusConfig(status);
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: config['color'].withOpacity(0.1),
+        color: config['color'].withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
         border: Border.all(color: config['color'], width: 1),
       ),
@@ -468,10 +437,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
             SizedBox(height: 8),
             Text(
               _getEmptyMessage(),
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 24),
@@ -498,11 +464,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 80,
-              color: AppColors.error,
-            ),
+            Icon(Icons.error_outline, size: 80, color: AppColors.error),
             SizedBox(height: 16),
             Text(
               'Error al cargar',
@@ -515,10 +477,7 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
             SizedBox(height: 8),
             Text(
               _viewModel.errorMessage ?? 'Error desconocido',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 24),
@@ -557,7 +516,10 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
       case 'draft':
         return {'label': 'BORRADOR', 'color': AppColors.warning};
       default:
-        return {'label': status.toUpperCase(), 'color': AppColors.textSecondary};
+        return {
+          'label': status.toUpperCase(),
+          'color': AppColors.textSecondary,
+        };
     }
   }
 
@@ -607,30 +569,32 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
   // ==================== DOWNLOAD ====================
 
   Future<void> _downloadTemplates() async {
-    print('🔴 DESCARGA INICIADA');
+    debugPrint('🔴 DESCARGA INICIADA');
 
     // ✅ Obtener usuario actual (igual que cuando creas formularios)
     final usuario = await AuthService().getCurrentUser();
     final edfvendedorId = usuario?.edfVendedorId ?? '';
 
-    print('🔍 edfVendedorId: $edfvendedorId');
+    debugPrint('🔍 edfVendedorId: $edfvendedorId');
 
     _showLoadingDialog();
 
     // PASO 1: Descargar templates
-    print('📥 [1/2] Descargando templates...');
+    debugPrint('📥 [1/2] Descargando templates...');
     final templatesSuccess = await _viewModel.downloadTemplatesFromServer();
-    print('📋 Templates: $templatesSuccess');
+    debugPrint('📋 Templates: $templatesSuccess');
 
     // PASO 2: Descargar respuestas
-    print('📥 [2/2] Descargando respuestas...');
+    debugPrint('📥 [2/2] Descargando respuestas...');
     bool responsesSuccess = false;
 
     if (edfvendedorId.isNotEmpty) {
-      responsesSuccess = await _viewModel.downloadResponsesFromServer(edfvendedorId);
-      print('📝 Responses: $responsesSuccess');
+      responsesSuccess = await _viewModel.downloadResponsesFromServer(
+        edfvendedorId,
+      );
+      debugPrint('📝 Responses: $responsesSuccess');
     } else {
-      print('⚠️ Sin edfVendedorId - saltando descarga de respuestas');
+      debugPrint('⚠️ Sin edfVendedorId - saltando descarga de respuestas');
     }
 
     if (!mounted) return;
@@ -649,7 +613,8 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
           : '❌ Error descargando formularios';
       backgroundColor = templatesSuccess ? AppColors.warning : AppColors.error;
     } else if (templatesSuccess && responsesSuccess) {
-      message = '✅ Descarga completa:\n📋 $templatesCount formularios\n📝 $responsesCount respuestas';
+      message =
+          '✅ Descarga completa:\n📋 $templatesCount formularios\n📝 $responsesCount respuestas';
       backgroundColor = AppColors.success;
     } else if (templatesSuccess && !responsesSuccess) {
       message = '⚠️ Formularios: OK ($templatesCount)\n❌ Respuestas: Error';
@@ -665,11 +630,11 @@ class _DynamicFormResponsesScreenState extends State<DynamicFormResponsesScreen>
     _showSnackBar(message, backgroundColor);
 
     if (templatesSuccess || responsesSuccess) {
-      print('🔄 Recargando datos...');
+      debugPrint('🔄 Recargando datos...');
       await _loadData();
     }
 
-    print('🔴 DESCARGA FINALIZADA');
+    debugPrint('🔴 DESCARGA FINALIZADA');
   }
 
   void _showLoadingDialog() {

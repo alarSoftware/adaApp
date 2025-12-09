@@ -47,7 +47,9 @@ class DatabaseValidationResult {
       buffer.writeln('• ${item.displayName}: ${item.count} registro(s)');
     }
 
-    buffer.write('\nPor favor, sincroniza estos datos antes de eliminar la base de datos.');
+    buffer.write(
+      '\nPor favor, sincroniza estos datos antes de eliminar la base de datos.',
+    );
     return buffer.toString();
   }
 }
@@ -79,7 +81,9 @@ class DatabaseValidationService {
 
   /// Verifica tablas que usan sync_status (pending, synced, draft, error)
   /// Solo bloquea si hay registros con sync_status que NO sean 'synced' o 'draft'
-  Future<void> _checkSyncStatusTables(List<PendingSyncInfo> pendingItems) async {
+  Future<void> _checkSyncStatusTables(
+    List<PendingSyncInfo> pendingItems,
+  ) async {
     final tables = {
       'dynamic_form_response': 'Respuestas de Formularios',
       'dynamic_form_response_detail': 'Detalles de Respuestas',
@@ -99,21 +103,24 @@ class DatabaseValidationService {
         final count = Sqflite.firstIntValue(result) ?? 0;
 
         if (count > 0) {
-          pendingItems.add(PendingSyncInfo(
-            tableName: tableName,
-            count: count,
-            displayName: displayName,
-          ));
+          pendingItems.add(
+            PendingSyncInfo(
+              tableName: tableName,
+              count: count,
+              displayName: displayName,
+            ),
+          );
         }
       } catch (e) {
         // Si la tabla no existe o hay error, continuamos
-        print('Error verificando $tableName: $e');
       }
     }
   }
 
   /// Verifica tablas que usan el campo 'sincronizado' (0 o 1)
-  Future<void> _checkSincronizadoTables(List<PendingSyncInfo> pendingItems) async {
+  Future<void> _checkSincronizadoTables(
+    List<PendingSyncInfo> pendingItems,
+  ) async {
     final tables = {
       'equipos_pendientes': 'Equipos Pendientes',
       'censo_activo': 'Censos Activos',
@@ -134,15 +141,15 @@ class DatabaseValidationService {
         final count = Sqflite.firstIntValue(result) ?? 0;
 
         if (count > 0) {
-          pendingItems.add(PendingSyncInfo(
-            tableName: tableName,
-            count: count,
-            displayName: displayName,
-          ));
+          pendingItems.add(
+            PendingSyncInfo(
+              tableName: tableName,
+              count: count,
+              displayName: displayName,
+            ),
+          );
         }
-      } catch (e) {
-        print('Error verificando $tableName: $e');
-      }
+      } catch (e) {}
     }
   }
 
@@ -159,15 +166,15 @@ class DatabaseValidationService {
       final count = Sqflite.firstIntValue(result) ?? 0;
 
       if (count > 0) {
-        pendingItems.add(PendingSyncInfo(
-          tableName: 'censo_activo',
-          count: count,
-          displayName: 'Censos Pendientes o con Error',
-        ));
+        pendingItems.add(
+          PendingSyncInfo(
+            tableName: 'censo_activo',
+            count: count,
+            displayName: 'Censos Pendientes o con Error',
+          ),
+        );
       }
-    } catch (e) {
-      print('Error verificando estados de censos: $e');
-    }
+    } catch (e) {}
   }
 
   /// Obtiene un resumen detallado de todos los registros pendientes
@@ -178,13 +185,17 @@ class DatabaseValidationService {
       'can_delete': result.canDelete,
       'total_pending': result.pendingItems.fold<int>(
         0,
-            (sum, item) => sum + item.count,
+        (sum, item) => sum + item.count,
       ),
-      'pending_by_table': result.pendingItems.map((item) => {
-        'table': item.tableName,
-        'display_name': item.displayName,
-        'count': item.count,
-      }).toList(),
+      'pending_by_table': result.pendingItems
+          .map(
+            (item) => {
+              'table': item.tableName,
+              'display_name': item.displayName,
+              'count': item.count,
+            },
+          )
+          .toList(),
       'message': result.message,
     };
   }

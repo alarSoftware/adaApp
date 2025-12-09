@@ -8,20 +8,15 @@ import 'package:ada_app/ui/widgets/preview/preview_image_section.dart';
 import 'package:ada_app/ui/widgets/preview/preview_bottom_bar.dart';
 import 'package:ada_app/ui/widgets/preview/preview_cards.dart';
 import 'package:ada_app/ui/screens/equipos_clientes_detail_screen.dart';
-import 'package:ada_app/repositories/equipo_repository.dart';
+
 import 'dart:io';
 import 'dart:convert';
-
 
 class PreviewScreen extends StatefulWidget {
   final Map<String, dynamic> datos;
   final dynamic historialItem;
 
-  const PreviewScreen({
-    super.key,
-    required this.datos,
-    this.historialItem,
-  });
+  const PreviewScreen({super.key, required this.datos, this.historialItem});
 
   @override
   State<PreviewScreen> createState() => _PreviewScreenState();
@@ -64,7 +59,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
           });
 
           debugPrint('✅ Imagen 1 cargada desde archivo: $imagenPath');
-          debugPrint('📊 Tamaño: ${bytes.length} bytes (${(bytes.length / 1024).toStringAsFixed(2)} KB)');
+          debugPrint(
+            '📊 Tamaño: ${bytes.length} bytes (${(bytes.length / 1024).toStringAsFixed(2)} KB)',
+          );
 
           // ⚠️ ADVERTENCIA si es muy pequeña
           if (bytes.length < 10240) {
@@ -87,7 +84,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
               _imageBase64 = imagenBase64DB;
             });
 
-            debugPrint('✅ Imagen 1 cargada desde base64 (${bytes.length} bytes)');
+            debugPrint(
+              '✅ Imagen 1 cargada desde base64 (${bytes.length} bytes)',
+            );
 
             // ⚠️ ADVERTENCIA si es muy pequeña
             if (bytes.length < 10240) {
@@ -122,7 +121,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
           });
 
           debugPrint('✅ Imagen 2 cargada desde archivo: $imagenPath2');
-          debugPrint('📊 Tamaño: ${bytes.length} bytes (${(bytes.length / 1024).toStringAsFixed(2)} KB)');
+          debugPrint(
+            '📊 Tamaño: ${bytes.length} bytes (${(bytes.length / 1024).toStringAsFixed(2)} KB)',
+          );
 
           // ⚠️ ADVERTENCIA si es muy pequeña
           if (bytes.length < 10240) {
@@ -145,7 +146,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
               _imageBase64_2 = imagenBase64DB_2;
             });
 
-            debugPrint('✅ Imagen 2 cargada desde base64 (${bytes.length} bytes)');
+            debugPrint(
+              '✅ Imagen 2 cargada desde base64 (${bytes.length} bytes)',
+            );
 
             // ⚠️ ADVERTENCIA si es muy pequeña
             if (bytes.length < 10240) {
@@ -184,7 +187,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
     });
 
     if (!viewModel.canConfirm) {
-      _mostrarSnackBar('Ya hay un proceso en curso. Por favor espere.', AppColors.warning);
+      _mostrarSnackBar(
+        'Ya hay un proceso en curso. Por favor espere.',
+        AppColors.warning,
+      );
       return;
     }
 
@@ -201,7 +207,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
     // Ya no necesitamos volver a marcar _yaConfirmado aquí porque ya lo hicimos arriba
 
     if (!viewModel.canConfirm) {
-      _mostrarSnackBar('Ya hay un proceso en curso. Por favor espere.', AppColors.warning);
+      _mostrarSnackBar(
+        'Ya hay un proceso en curso. Por favor espere.',
+        AppColors.warning,
+      );
       setState(() {
         _yaConfirmado = false;
       });
@@ -209,7 +218,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
 
     final datosCompletos = Map<String, dynamic>.from(widget.datos);
-    print("QUIERO VER datosCompletos: $datosCompletos ");
 
     // Preparar imagen 1 con logging mejorado
     if (_imagePath != null && _imageBase64 != null) {
@@ -217,7 +225,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
       debugPrint('📸 IMAGEN 1 PREPARADA:');
       debugPrint('   Path: $_imagePath');
-      debugPrint('   Tamaño: ${bytes.length} bytes (${(bytes.length / 1024).toStringAsFixed(2)} KB)');
+      debugPrint(
+        '   Tamaño: ${bytes.length} bytes (${(bytes.length / 1024).toStringAsFixed(2)} KB)',
+      );
 
       datosCompletos['imagen_path'] = _imagePath;
       datosCompletos['imagen_base64'] = _imageBase64;
@@ -257,9 +267,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     final resultado = await viewModel.confirmarRegistro(datosCompletos);
 
     if (mounted) {
-
       if (resultado['success']) {
-
         // Navegar INMEDIATAMENTE sin delays
         if (mounted) {
           await _navegarAEquipoClienteDetail(resultado); // ✅ PASAR resultado
@@ -279,14 +287,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
   }
 
-  Future<void> _navegarAEquipoClienteDetail(Map<String, dynamic> resultado) async {
+  Future<void> _navegarAEquipoClienteDetail(
+    Map<String, dynamic> resultado,
+  ) async {
     try {
-
-
       final cliente = widget.datos['cliente'] as Cliente;
 
-      final equipoCompleto = resultado['equipo_completo'] ?? widget.datos['equipo_completo'];
-
+      final equipoCompleto =
+          resultado['equipo_completo'] ?? widget.datos['equipo_completo'];
 
       if (cliente.id == null) {
         debugPrint('❌ FALLA: cliente.id es NULL');
@@ -296,8 +304,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
       if (equipoCompleto == null) {
         debugPrint('❌ FALLA: equipoCompleto es NULL');
-        debugPrint('   resultado["equipo_completo"]: ${resultado['equipo_completo']}');
-        debugPrint('   widget.datos["equipo_completo"]: ${widget.datos['equipo_completo']}');
+        debugPrint(
+          '   resultado["equipo_completo"]: ${resultado['equipo_completo']}',
+        );
+        debugPrint(
+          '   widget.datos["equipo_completo"]: ${widget.datos['equipo_completo']}',
+        );
         Navigator.of(context).pop(true);
         return;
       }
@@ -318,7 +330,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
         'cliente_nombre': cliente.nombre,
         'cliente_telefono': cliente.telefono,
         'cliente_direccion': cliente.direccion,
-        'tipo_estado': resultado['ya_asignado'] ?? widget.datos['ya_asignado'] == true
+        'tipo_estado':
+            resultado['ya_asignado'] ?? widget.datos['ya_asignado'] == true
             ? 'asignado'
             : 'pendiente',
       };
@@ -337,18 +350,18 @@ class _PreviewScreenState extends State<PreviewScreen> {
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => EquiposClientesDetailScreen(
-            equipoCliente: equipoCliente,
-          ),
+          builder: (context) =>
+              EquiposClientesDetailScreen(equipoCliente: equipoCliente),
         ),
       );
 
       debugPrint('✅ Push ejecutado - navegación completada');
-
     } catch (e, stackTrace) {
       debugPrint('❌ EXCEPCIÓN en navegación: $e');
       debugPrint('📍 StackTrace: $stackTrace');
-      Navigator.of(context).pop(true);
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
     }
   }
 
@@ -370,7 +383,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
 
     if (!viewModel.canConfirm) {
-      _mostrarSnackBar('Ya hay un proceso en curso. Por favor espere.', AppColors.warning);
+      _mostrarSnackBar(
+        'Ya hay un proceso en curso. Por favor espere.',
+        AppColors.warning,
+      );
       setState(() {
         _yaReintentando = false;
       });
@@ -388,7 +404,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
         final mensaje = resultado['message'] as String? ?? 'Reintento exitoso';
         _mostrarSnackBar(mensaje, AppColors.success);
       } else {
-        final error = resultado['error'] as String? ?? 'Error al reintentar envío';
+        final error =
+            resultado['error'] as String? ?? 'Error al reintentar envío';
 
         await showDialog(
           context: context,
@@ -418,7 +435,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
         builder: (context, vm, child) {
           return PopScope(
             canPop: vm.canConfirm,
-            onPopInvoked: (didPop) {
+            onPopInvokedWithResult: (didPop, result) {
               if (!didPop && !vm.canConfirm) {
                 PreviewDialogs.mostrarProcesoEnCurso(context);
               }
@@ -453,12 +470,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
       leading: vm.canConfirm
           ? null
           : Container(
-        margin: const EdgeInsets.all(12),
-        child: CircularProgressIndicator(
-          color: AppColors.onPrimary,
-          strokeWidth: 2,
-        ),
-      ),
+              margin: const EdgeInsets.all(12),
+              child: CircularProgressIndicator(
+                color: AppColors.onPrimary,
+                strokeWidth: 2,
+              ),
+            ),
     );
   }
 
@@ -513,11 +530,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
       final estadoId = widget.datos['id'] as String?;
 
       return FutureBuilder<Map<String, dynamic>>(
-        future: vm.obtenerInfoSincronizacion(estadoId ),
+        future: vm.obtenerInfoSincronizacion(estadoId),
         builder: (context, snapshot) {
           final info = snapshot.data;
           final envioFallido = info?['envioFallido'] == true;
-
 
           return PreviewBottomBar(
             esHistorial: esHistorial,
@@ -527,7 +543,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
             onVolver: () => Navigator.of(context).pop(),
             onConfirmar: null, // No mostrar confirmar en historial
             // 🔴 Deshabilitar si ya está reintentando
-            onReintentarEnvio: (envioFallido && estadoId != null && !_yaReintentando)
+            onReintentarEnvio:
+                (envioFallido && estadoId != null && !_yaReintentando)
                 ? () => _reintentarEnvioHistorial(estadoId)
                 : null,
           );
@@ -565,7 +582,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
                   height: 60,
                   child: CircularProgressIndicator(
                     strokeWidth: 4,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -607,7 +626,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
         }
 
         final info = snapshot.data!;
-        final estado = info['estado'] as String;
+
         final mensaje = info['mensaje'] as String;
         final icono = info['icono'] as IconData;
         final color = info['color'] as Color;

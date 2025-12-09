@@ -8,16 +8,11 @@ import 'package:ada_app/services/error_log/error_log_service.dart';
 
 class DynamicFormSyncService extends BaseSyncService {
 
-  // ==================== CONSTANTES ====================
-
   static const String _getDynamicFormEndpoint = '/api/getDynamicForm';
   static const String _getDynamicFormDetailEndpoint = '/api/getDynamicFormDetail';
   static const String _getDynamicFormResponseEndpoint = '/api/getDynamicFormResponse';
   static const String _getDynamicFormResponseImageEndpoint = '/api/getDynamicFormResponseImage';
 
-  // ==================== FORMULARIOS Y DETALLES ====================
-
-  /// Obtener todos los formularios dinámicos (con sus detalles)
   static Future<SyncResult> obtenerFormulariosDinamicos({
     String? estado,
     int? limit,
@@ -26,9 +21,6 @@ class DynamicFormSyncService extends BaseSyncService {
     String? currentEndpoint;
 
     try {
-      BaseSyncService.logger.i('📋 Obteniendo formularios dinámicos desde el servidor...');
-
-      // 1. OBTENER FORMULARIOS
       final formulariosData = await _fetchFormularios(estado, limit, offset);
 
       if (formulariosData == null) {
@@ -40,7 +32,6 @@ class DynamicFormSyncService extends BaseSyncService {
       }
 
       if (formulariosData.isEmpty) {
-        BaseSyncService.logger.w('⚠️ No se encontraron formularios en la respuesta');
         return SyncResult(
           exito: true,
           mensaje: 'No hay formularios disponibles',
@@ -48,17 +39,10 @@ class DynamicFormSyncService extends BaseSyncService {
         );
       }
 
-      BaseSyncService.logger.i('✅ Formularios parseados: ${formulariosData.length}');
-
-      // 2. GUARDAR FORMULARIOS EN BD LOCAL
       try {
         final repo = DynamicFormRepository();
         final guardados = await repo.templates.saveTemplatesFromServer(formulariosData);
-        BaseSyncService.logger.i('💾 Formularios guardados en BD local: $guardados');
       } catch (dbError) {
-        BaseSyncService.logger.e('Error guardando formularios: $dbError');
-
-        // 🚨 LOG ERROR: Error de BD
         await ErrorLogService.logDatabaseError(
           tableName: 'dynamic_form',
           operation: 'bulk_insert',
@@ -66,7 +50,6 @@ class DynamicFormSyncService extends BaseSyncService {
         );
       }
 
-      // 3. OBTENER Y GUARDAR DETALLES
       final detallesGuardados = await _syncDetalles(DynamicFormRepository());
 
       return SyncResult(
@@ -77,9 +60,6 @@ class DynamicFormSyncService extends BaseSyncService {
       );
 
     } catch (e) {
-      BaseSyncService.logger.e('💥 Error obteniendo formularios: $e');
-
-      // 🚨 LOG ERROR: Error general
       await ErrorLogService.logError(
         tableName: 'dynamic_form',
         operation: 'sync_from_server',
@@ -96,13 +76,10 @@ class DynamicFormSyncService extends BaseSyncService {
     }
   }
 
-  /// Obtener formulario específico por ID
   static Future<SyncResult> obtenerFormularioPorId(int formId) async {
     String? currentEndpoint;
 
     try {
-      BaseSyncService.logger.i('📋 Obteniendo formulario ID: $formId');
-
       final baseUrl = await BaseSyncService.getBaseUrl();
       currentEndpoint = '$baseUrl/api/getFormularios/$formId';
 
@@ -123,11 +100,9 @@ class DynamicFormSyncService extends BaseSyncService {
           throw 'Formato de respuesta inesperado';
         }
 
-        // Guardar en BD usando nueva API
         try {
           final repo = DynamicFormRepository();
           await repo.templates.saveTemplatesFromServer([formData]);
-          BaseSyncService.logger.i('✅ Formulario obtenido: ID ${formData['id']}');
         } catch (dbError) {
           await ErrorLogService.logDatabaseError(
             tableName: 'dynamic_form',
@@ -145,7 +120,6 @@ class DynamicFormSyncService extends BaseSyncService {
       } else {
         final mensaje = BaseSyncService.extractErrorMessage(response);
 
-        // 🚨 LOG ERROR: Error del servidor
         await ErrorLogService.logServerError(
           tableName: 'dynamic_form',
           operation: 'get_by_id',
@@ -193,8 +167,6 @@ class DynamicFormSyncService extends BaseSyncService {
       );
 
     } catch (e) {
-      BaseSyncService.logger.e('❌ Error obteniendo formulario por ID: $e');
-
       await ErrorLogService.logError(
         tableName: 'dynamic_form',
         operation: 'get_by_id',
@@ -211,13 +183,11 @@ class DynamicFormSyncService extends BaseSyncService {
       );
     }
   }
-  /// Obtener detalles de un formulario específico
+
   static Future<SyncResult> obtenerDetallesFormulario(String formId) async {
     String? currentEndpoint;
 
     try {
-      BaseSyncService.logger.i('📋 Obteniendo detalles del formulario ID: $formId');
-
       final baseUrl = await BaseSyncService.getBaseUrl();
       currentEndpoint = '$baseUrl$_getDynamicFormDetailEndpoint?dynamicFormId=$formId';
 
@@ -254,11 +224,9 @@ class DynamicFormSyncService extends BaseSyncService {
           );
         }
 
-        // Guardar usando nueva API
         try {
           final repo = DynamicFormRepository();
           final guardados = await repo.templates.saveDetailsFromServer(detallesData);
-          BaseSyncService.logger.i('✅ Detalles guardados: $guardados');
 
           return SyncResult(
             exito: true,
@@ -325,8 +293,6 @@ class DynamicFormSyncService extends BaseSyncService {
       );
 
     } catch (e) {
-      BaseSyncService.logger.e('❌ Error obteniendo detalles: $e');
-
       await ErrorLogService.logError(
         tableName: 'dynamic_form_detail',
         operation: 'sync_from_server',
@@ -343,25 +309,18 @@ class DynamicFormSyncService extends BaseSyncService {
     }
   }
 
-  /// Sincronizar todos los detalles de formularios
   static Future<SyncResult> sincronizarTodosLosDetalles() async {
     String? currentEndpoint;
 
     try {
-      BaseSyncService.logger.i('📋 Sincronizando todos los detalles de formularios...');
-
       final baseUrl = await BaseSyncService.getBaseUrl();
       final uri = Uri.parse('$baseUrl$_getDynamicFormDetailEndpoint');
       currentEndpoint = uri.toString();
-
-      BaseSyncService.logger.i('📡 Llamando a: $currentEndpoint');
 
       final response = await http.get(
         uri,
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
-
-      BaseSyncService.logger.i('📥 Respuesta: ${response.statusCode}');
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final detallesData = _parseListResponse(response.body);
@@ -383,8 +342,6 @@ class DynamicFormSyncService extends BaseSyncService {
           );
         }
 
-        BaseSyncService.logger.i('✅ Detalles parseados: ${detallesData.length}');
-
         if (detallesData.isEmpty) {
           return SyncResult(
             exito: true,
@@ -393,11 +350,9 @@ class DynamicFormSyncService extends BaseSyncService {
           );
         }
 
-        // Guardar usando nueva API
         try {
           final repo = DynamicFormRepository();
           final guardados = await repo.templates.saveDetailsFromServer(detallesData);
-          BaseSyncService.logger.i('💾 Detalles guardados en BD local: $guardados');
 
           return SyncResult(
             exito: true,
@@ -465,8 +420,6 @@ class DynamicFormSyncService extends BaseSyncService {
       );
 
     } catch (e) {
-      BaseSyncService.logger.e('💥 Error sincronizando detalles: $e');
-
       await ErrorLogService.logError(
         tableName: 'dynamic_form_detail',
         operation: 'sync_all',
@@ -482,9 +435,7 @@ class DynamicFormSyncService extends BaseSyncService {
       );
     }
   }
-  // ==================== RESPUESTAS ====================
 
-  /// Obtener respuestas de formularios dinámicos desde el servidor
   static Future<SyncResult> obtenerRespuestasFormularios({
     String? contactoId,
     String? dynamicFormId,
@@ -494,8 +445,6 @@ class DynamicFormSyncService extends BaseSyncService {
     String? currentEndpoint;
 
     try {
-      BaseSyncService.logger.i('📥 Obteniendo respuestas de formularios desde el servidor...');
-
       final queryParams = _buildQueryParams(
         contactoId: contactoId,
         dynamicFormId: dynamicFormId,
@@ -508,29 +457,15 @@ class DynamicFormSyncService extends BaseSyncService {
           .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
       currentEndpoint = uri.toString();
 
-      BaseSyncService.logger.i('📡 Llamando a: $currentEndpoint');
-
       final response = await http.get(
         uri,
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
-      BaseSyncService.logger.i('📥 Respuesta getDynamicFormResponse: ${response.statusCode}');
-
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final responsesData = _parseListResponse(response.body);
 
         if (responsesData == null) {
-          // await ErrorLogService.logError(
-          //   tableName: 'dynamic_form_response',
-          //   operation: 'parse_response',
-          //   errorMessage: 'Error parseando respuesta',
-          //   errorType: 'server',
-          //   errorCode: 'PARSE_ERROR',
-          //   endpoint: currentEndpoint,
-          //   userId: edfvendedorId,
-          // );
-
           return SyncResult(
             exito: false,
             mensaje: 'Error parseando respuesta del servidor',
@@ -538,10 +473,7 @@ class DynamicFormSyncService extends BaseSyncService {
           );
         }
 
-        BaseSyncService.logger.i('✅ Respuestas parseadas: ${responsesData.length}');
-
         if (responsesData.isEmpty) {
-          BaseSyncService.logger.w('⚠️ No se encontraron respuestas en la respuesta');
           return SyncResult(
             exito: true,
             mensaje: 'No hay respuestas disponibles',
@@ -549,11 +481,9 @@ class DynamicFormSyncService extends BaseSyncService {
           );
         }
 
-        // Guardar usando nueva API
         try {
           final repo = DynamicFormRepository();
           final guardados = await repo.responses.saveResponsesFromServer(responsesData);
-          BaseSyncService.logger.i('💾 Respuestas guardadas en BD local: $guardados');
 
           return SyncResult(
             exito: true,
@@ -576,16 +506,6 @@ class DynamicFormSyncService extends BaseSyncService {
         }
       } else {
         final mensaje = BaseSyncService.extractErrorMessage(response);
-        BaseSyncService.logger.e('❌ Error del servidor: $mensaje');
-
-        // await ErrorLogService.logServerError(
-        //   tableName: 'dynamic_form_response',
-        //   operation: 'sync_from_server',
-        //   errorMessage: mensaje,
-        //   errorCode: response.statusCode.toString(),
-        //   endpoint: currentEndpoint,
-        //   userId: edfvendedorId,
-        // );
 
         return SyncResult(
           exito: false,
@@ -594,30 +514,14 @@ class DynamicFormSyncService extends BaseSyncService {
         );
       }
 
-    } on TimeoutException catch (timeoutError) {
-      // await ErrorLogService.logNetworkError(
-      //   tableName: 'dynamic_form_response',
-      //   operation: 'sync_from_server',
-      //   errorMessage: 'Timeout: $timeoutError',
-      //   endpoint: currentEndpoint,
-      //   userId: edfvendedorId,
-      // );
-
+    } on TimeoutException {
       return SyncResult(
         exito: false,
         mensaje: 'Timeout de conexión',
         itemsSincronizados: 0,
       );
 
-    } on SocketException catch (socketError) {
-      // await ErrorLogService.logNetworkError(
-      //   tableName: 'dynamic_form_response',
-      //   operation: 'sync_from_server',
-      //   errorMessage: 'Sin conexión: $socketError',
-      //   endpoint: currentEndpoint,
-      //   userId: edfvendedorId,
-      // );
-
+    } on SocketException {
       return SyncResult(
         exito: false,
         mensaje: 'Sin conexión de red',
@@ -625,17 +529,6 @@ class DynamicFormSyncService extends BaseSyncService {
       );
 
     } catch (e) {
-      BaseSyncService.logger.e('💥 Error obteniendo respuestas: $e');
-
-      // await ErrorLogService.logError(
-      //   tableName: 'dynamic_form_response',
-      //   operation: 'sync_from_server',
-      //   errorMessage: 'Error: $e',
-      //   errorType: 'unknown',
-      //   endpoint: currentEndpoint,
-      //   userId: edfvendedorId,
-      // );
-
       return SyncResult(
         exito: false,
         mensaje: BaseSyncService.getErrorMessage(e),
@@ -644,7 +537,6 @@ class DynamicFormSyncService extends BaseSyncService {
     }
   }
 
-  /// Obtener imágenes de respuestas de formularios dinámicos desde el servidor
   static Future<SyncResult> obtenerImagenesRespuestasFormularios({
     String? edfvendedorId,
     String? contactoId,
@@ -654,8 +546,6 @@ class DynamicFormSyncService extends BaseSyncService {
     String? currentEndpoint;
 
     try {
-      BaseSyncService.logger.i('🖼️ Obteniendo imágenes de respuestas de formularios desde el servidor...');
-
       final queryParams = _buildQueryParams(
         edfvendedorId: edfvendedorId,
         contactoId: contactoId,
@@ -668,34 +558,15 @@ class DynamicFormSyncService extends BaseSyncService {
           .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
       currentEndpoint = uri.toString();
 
-      BaseSyncService.logger.i('📡 Llamando a: $currentEndpoint');
-
       final response = await http.get(
         uri,
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
-      BaseSyncService.logger.i('📥 Respuesta getDynamicFormResponseImage: ${response.statusCode}');
-
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final imagenesData = _parseListResponse(response.body);
 
-        for (final f in imagenesData! ) {
-          var foto = f["id"];
-          print ('ID DE LA FOTO $foto');
-        }
-
         if (imagenesData == null) {
-          // await ErrorLogService.logError(
-          //   tableName: 'dynamic_form_response_image',
-          //   operation: 'parse_response',
-          //   errorMessage: 'Error parseando respuesta',
-          //   errorType: 'server',
-          //   errorCode: 'PARSE_ERROR',
-          //   endpoint: currentEndpoint,
-          //   userId: edfvendedorId,
-          // );
-
           return SyncResult(
             exito: false,
             mensaje: 'Error parseando respuesta del servidor',
@@ -703,10 +574,7 @@ class DynamicFormSyncService extends BaseSyncService {
           );
         }
 
-        BaseSyncService.logger.i('✅ Imágenes parseadas: ${imagenesData.length}');
-
         if (imagenesData.isEmpty) {
-          BaseSyncService.logger.w('⚠️ No se encontraron imágenes en la respuesta');
           return SyncResult(
             exito: true,
             mensaje: 'No hay imágenes disponibles',
@@ -714,11 +582,9 @@ class DynamicFormSyncService extends BaseSyncService {
           );
         }
 
-        // Guardar usando nueva API del repositorio
         try {
           final repo = DynamicFormRepository();
           final guardados = await repo.responses.saveResponseImagesFromServer(imagenesData);
-          BaseSyncService.logger.i('💾 Imágenes guardadas en BD local: $guardados');
 
           return SyncResult(
             exito: true,
@@ -741,16 +607,6 @@ class DynamicFormSyncService extends BaseSyncService {
         }
       } else {
         final mensaje = BaseSyncService.extractErrorMessage(response);
-        BaseSyncService.logger.e('❌ Error del servidor: $mensaje');
-
-        // await ErrorLogService.logServerError(
-        //   tableName: 'dynamic_form_response_image',
-        //   operation: 'sync_from_server',
-        //   errorMessage: mensaje,
-        //   errorCode: response.statusCode.toString(),
-        //   endpoint: currentEndpoint,
-        //   userId: edfvendedorId,
-        // );
 
         return SyncResult(
           exito: false,
@@ -759,30 +615,14 @@ class DynamicFormSyncService extends BaseSyncService {
         );
       }
 
-    } on TimeoutException catch (timeoutError) {
-      // await ErrorLogService.logNetworkError(
-      //   tableName: 'dynamic_form_response_image',
-      //   operation: 'sync_from_server',
-      //   errorMessage: 'Timeout: $timeoutError',
-      //   endpoint: currentEndpoint,
-      //   userId: edfvendedorId,
-      // );
-
+    } on TimeoutException {
       return SyncResult(
         exito: false,
         mensaje: 'Timeout de conexión',
         itemsSincronizados: 0,
       );
 
-    } on SocketException catch (socketError) {
-      // await ErrorLogService.logNetworkError(
-      //   tableName: 'dynamic_form_response_image',
-      //   operation: 'sync_from_server',
-      //   errorMessage: 'Sin conexión: $socketError',
-      //   endpoint: currentEndpoint,
-      //   userId: edfvendedorId,
-      // );
-
+    } on SocketException {
       return SyncResult(
         exito: false,
         mensaje: 'Sin conexión de red',
@@ -790,17 +630,6 @@ class DynamicFormSyncService extends BaseSyncService {
       );
 
     } catch (e) {
-      BaseSyncService.logger.e('💥 Error obteniendo imágenes: $e');
-
-      // await ErrorLogService.logError(
-      //   tableName: 'dynamic_form_response_image',
-      //   operation: 'sync_from_server',
-      //   errorMessage: 'Error: $e',
-      //   errorType: 'unknown',
-      //   endpoint: currentEndpoint,
-      //   userId: edfvendedorId,
-      // );
-
       return SyncResult(
         exito: false,
         mensaje: BaseSyncService.getErrorMessage(e),
@@ -808,26 +637,21 @@ class DynamicFormSyncService extends BaseSyncService {
       );
     }
   }
-  // ==================== MÉTODOS DE CONVENIENCIA ====================
 
-  /// Método de conveniencia para obtener respuestas por vendedor
   static Future<SyncResult> obtenerRespuestasPorVendedor(String edfvendedorId) {
     return obtenerRespuestasFormularios(edfvendedorId: edfvendedorId);
   }
 
-  /// Método de conveniencia para obtener imágenes por vendedor
   static Future<SyncResult> obtenerImagenesPorVendedor(String edfvendedorId) {
     return obtenerImagenesRespuestasFormularios(edfvendedorId: edfvendedorId);
   }
 
-  /// 🆕 MÉTODO FALTANTE: Obtener imágenes de formularios por vendedor
   static Future<SyncResult> obtenerImagenesFormularios({
     String? edfVendedorId,
   }) {
     return obtenerImagenesRespuestasFormularios(edfvendedorId: edfVendedorId);
   }
 
-  /// Obtener todas las respuestas completadas
   static Future<SyncResult> obtenerRespuestasCompletadas({String? edfvendedorId}) {
     return obtenerRespuestasFormularios(
       edfvendedorId: edfvendedorId,
@@ -843,9 +667,6 @@ class DynamicFormSyncService extends BaseSyncService {
     return obtenerFormulariosDinamicos(estado: 'BORRADOR');
   }
 
-  // ==================== MÉTODOS PRIVADOS - HELPERS ====================
-
-  /// Obtiene los formularios del servidor
   static Future<List<Map<String, dynamic>>?> _fetchFormularios(
       String? estado,
       int? limit,
@@ -865,20 +686,15 @@ class DynamicFormSyncService extends BaseSyncService {
           .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
       currentEndpoint = uri.toString();
 
-      BaseSyncService.logger.i('📡 Llamando a: $currentEndpoint');
-
       final response = await http.get(
         uri,
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
-      BaseSyncService.logger.i('📥 Respuesta getDynamicForm: ${response.statusCode}');
-
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return _parseListResponse(response.body);
       } else {
         final mensaje = BaseSyncService.extractErrorMessage(response);
-        BaseSyncService.logger.e('❌ Error del servidor: $mensaje');
 
         await ErrorLogService.logServerError(
           tableName: 'dynamic_form',
@@ -921,13 +737,10 @@ class DynamicFormSyncService extends BaseSyncService {
     }
   }
 
-  /// Sincroniza los detalles después de obtener los formularios
   static Future<int> _syncDetalles(DynamicFormRepository repo) async {
     String? currentEndpoint;
 
     try {
-      BaseSyncService.logger.i('📋 Obteniendo detalles de formularios...');
-
       final baseUrl = await BaseSyncService.getBaseUrl();
       final uriDetalles = Uri.parse('$baseUrl$_getDynamicFormDetailEndpoint');
       currentEndpoint = uriDetalles.toString();
@@ -937,17 +750,12 @@ class DynamicFormSyncService extends BaseSyncService {
         headers: BaseSyncService.headers,
       ).timeout(BaseSyncService.timeout);
 
-      BaseSyncService.logger.i('📥 Respuesta getDynamicFormDetail: ${responseDetalles.statusCode}');
-
       if (responseDetalles.statusCode >= 200 && responseDetalles.statusCode < 300) {
         final detallesData = _parseListResponse(responseDetalles.body);
 
         if (detallesData != null && detallesData.isNotEmpty) {
-          BaseSyncService.logger.i('✅ Detalles parseados: ${detallesData.length}');
-
           try {
             final detallesGuardados = await repo.templates.saveDetailsFromServer(detallesData);
-            BaseSyncService.logger.i('💾 Detalles guardados en BD local: $detallesGuardados');
             return detallesGuardados;
           } catch (dbError) {
             await ErrorLogService.logDatabaseError(
@@ -1000,21 +808,17 @@ class DynamicFormSyncService extends BaseSyncService {
     }
   }
 
-  /// Parse genérico para respuestas tipo lista del servidor
   static List<Map<String, dynamic>>? _parseListResponse(String responseBody) {
     try {
       final parsed = jsonDecode(responseBody);
 
-      // Caso 1: Respuesta directa como lista
       if (parsed is List) {
         return parsed.cast<Map<String, dynamic>>();
       }
 
-      // Caso 2: Respuesta con campo 'data'
       if (parsed is Map && parsed.containsKey('data')) {
         final dataValue = parsed['data'];
 
-        // data es un string JSON
         if (dataValue is String) {
           final decoded = jsonDecode(dataValue);
           if (decoded is List) {
@@ -1022,21 +826,17 @@ class DynamicFormSyncService extends BaseSyncService {
           }
         }
 
-        // data es una lista directa
         if (dataValue is List) {
           return dataValue.cast<Map<String, dynamic>>();
         }
       }
 
-      BaseSyncService.logger.w('⚠️ Formato de respuesta no reconocido');
       return null;
     } catch (e) {
-      BaseSyncService.logger.e('❌ Error parseando respuesta: $e');
       return null;
     }
   }
 
-  /// Construye query parameters filtrando valores nulos
   static Map<String, String> _buildQueryParams({
     String? contactoId,
     String? dynamicFormId,

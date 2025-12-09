@@ -6,9 +6,7 @@ class Cliente {
   final String direccion;
   final String rucCi;
   final String propietario;
-
-  // ✅ CAMPOS CALCULADOS - NO VAN A LA BASE DE DATOS
-  // Solo se llenan cuando se obtienen desde queries con JOIN
+  final String? condicionVenta;
   final bool tieneCensoHoy;
   final bool tieneFormularioCompleto;
 
@@ -20,7 +18,7 @@ class Cliente {
     required this.direccion,
     required this.rucCi,
     required this.propietario,
-    // ✅ Campos calculados con valores por defecto
+    this.condicionVenta,
     this.tieneCensoHoy = false,
     this.tieneFormularioCompleto = false,
   });
@@ -32,6 +30,13 @@ class Cliente {
     return nombre;
   }
 
+  bool get esCredito => condicionVenta?.toUpperCase().trim() == 'CREDITO';
+  bool get esContado => condicionVenta?.toUpperCase().trim() == 'CONTADO';
+  String get displayCondicionVenta {
+    if (condicionVenta == null || condicionVenta!.isEmpty) return 'No especificado';
+    return condicionVenta!.toUpperCase();
+  }
+
   factory Cliente.fromJson(Map<String, dynamic> json) {
     return Cliente(
       id: json['id'] as int?,
@@ -41,13 +46,12 @@ class Cliente {
       direccion: _parseString(json['direccion']) ?? '',
       rucCi: _parseString(json['ruc'] ?? json['cedula']) ?? '',
       propietario: _parseString(json['propietario']) ?? '',
-      // ✅ Estados desde JSON (para futuras APIs) - opcional
+      condicionVenta: _parseString(json['terminoPago'] ?? json['condicionVenta']),
       tieneCensoHoy: json['tiene_censo_hoy'] == 1 || json['tiene_censo_hoy'] == true,
       tieneFormularioCompleto: json['tiene_formulario_completo'] == 1 || json['tiene_formulario_completo'] == true,
     );
   }
 
-  // ✅ FROMMAP - CARGA ESTADOS CALCULADOS DESDE QUERIES
   factory Cliente.fromMap(Map<String, dynamic> map) {
     return Cliente(
       id: map['id'] is int
@@ -64,15 +68,13 @@ class Cliente {
       direccion: map['direccion']?.toString() ?? '',
       rucCi: map['ruc_ci']?.toString() ?? '',
       propietario: map['propietario']?.toString() ?? '',
+      condicionVenta: map['condicion_venta']?.toString(),
 
-      // ✅ ESTADOS CALCULADOS DESDE QUERIES (1/0 o true/false)
-      // Si el query no incluye estos campos, quedan en false por defecto
       tieneCensoHoy: map['tiene_censo_hoy'] == 1 || map['tiene_censo_hoy'] == true,
       tieneFormularioCompleto: map['tiene_formulario_completo'] == 1 || map['tiene_formulario_completo'] == true,
     );
   }
 
-  // ✅ TOMAP - SOLO CAMPOS DE LA TABLA (SIN ESTADOS CALCULADOS)
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -82,12 +84,10 @@ class Cliente {
       'direccion': direccion,
       'ruc_ci': rucCi,
       'propietario': propietario,
-      // ✅ NO incluir los campos calculados aquí
-      // porque no van a la tabla clientes
+      'condicion_venta': condicionVenta,
     };
   }
 
-  // Convertir a JSON para enviar a la API
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{
       'cliente': nombre,
@@ -99,10 +99,10 @@ class Cliente {
     };
 
     if (id != null) json['id'] = id;
+    if (condicionVenta != null) json['terminoPago'] = condicionVenta;
     return json;
   }
 
-  // ✅ COPYWITH - INCLUYE CAMPOS CALCULADOS
   Cliente copyWith({
     int? id,
     String? nombre,
@@ -111,6 +111,7 @@ class Cliente {
     String? direccion,
     String? rucCi,
     String? propietario,
+    String? condicionVenta,
     bool? tieneCensoHoy,
     bool? tieneFormularioCompleto,
   }) {
@@ -122,19 +123,18 @@ class Cliente {
       direccion: direccion ?? this.direccion,
       rucCi: rucCi ?? this.rucCi,
       propietario: propietario ?? this.propietario,
+      condicionVenta: condicionVenta ?? this.condicionVenta,
       tieneCensoHoy: tieneCensoHoy ?? this.tieneCensoHoy,
       tieneFormularioCompleto: tieneFormularioCompleto ?? this.tieneFormularioCompleto,
     );
   }
 
-  // Validación básica de campos requeridos
   bool get isValid =>
       nombre.isNotEmpty &&
           direccion.isNotEmpty &&
           rucCi.isNotEmpty &&
           propietario.isNotEmpty;
 
-  // Detectar tipo de documento de forma simple
   String get tipoDocumento {
     if (rucCi.isEmpty) return 'Documento';
 
@@ -142,7 +142,7 @@ class Cliente {
       return 'RUC';
     }
 
-    final clean = rucCi.replaceAll(RegExp(r'[\s]'), '');
+    final clean = rucCi.replaceAll(RegExp(r'\s'), '');
     if (RegExp(r'^\d+$').hasMatch(clean)) {
       return 'CI';
     }
@@ -191,6 +191,7 @@ class Cliente {
               direccion == other.direccion &&
               rucCi == other.rucCi &&
               propietario == other.propietario &&
+              condicionVenta == other.condicionVenta &&
               tieneCensoHoy == other.tieneCensoHoy &&
               tieneFormularioCompleto == other.tieneFormularioCompleto;
 
@@ -203,11 +204,12 @@ class Cliente {
       direccion.hashCode ^
       rucCi.hashCode ^
       propietario.hashCode ^
+      condicionVenta.hashCode ^
       tieneCensoHoy.hashCode ^
       tieneFormularioCompleto.hashCode;
 
   @override
   String toString() {
-    return 'Cliente{id: $id, nombre: $nombre, codigo: $codigo, tipo: $tipoDocumento, ruc_ci: $rucCi, censo: $tieneCensoHoy, form: $tieneFormularioCompleto}';
+    return 'Cliente{id: $id, nombre: $nombre, codigo: $codigo, tipo: $tipoDocumento, ruc_ci: $rucCi, condicion: $condicionVenta, censo: $tieneCensoHoy, form: $tieneFormularioCompleto}';
   }
 }

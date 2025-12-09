@@ -41,9 +41,7 @@ class DatabaseTables {
     await db.execute(_sqlDynamicFormResponse());
     await db.execute(_sqlDynamicFormResponseDetail());
     await db.execute(_sqlDynamicFormResponseImage());
-
     await db.execute(_sqlProductos());
-    await db.execute(_sqlUnidadesMedida());
     await db.execute(_sqlOperacionComercial());
     await db.execute(_sqlOperacionComercialDetalle());
   }
@@ -78,7 +76,7 @@ class DatabaseTables {
       direccion TEXT,
       ruc_ci TEXT,
       propietario TEXT,
-      condicio_venta TEXT
+      condicion_venta TEXT
     )
   ''';
 
@@ -295,17 +293,14 @@ class DatabaseTables {
     tipo_operacion TEXT NOT NULL,
     fecha_creacion TEXT NOT NULL,
     fecha_retiro TEXT,
-    estado TEXT DEFAULT 'borrador',
     observaciones TEXT,
     total_productos INTEGER DEFAULT 0,
     usuario_id INTEGER,
-    sincronizado INTEGER DEFAULT 0,
-    fecha_sincronizacion TEXT,
     server_id INTEGER,
-    sync_status TEXT DEFAULT 'pending',
-    intentos_sync INTEGER DEFAULT 0,
-    ultimo_intento_sync TEXT,
-    mensaje_error_sync TEXT,
+    sync_status TEXT DEFAULT 'creado',
+    sync_error TEXT,
+    synced_at TEXT,
+    sync_retry_count INTEGER DEFAULT 0,
     FOREIGN KEY (cliente_id) REFERENCES clientes (id),
     FOREIGN KEY (usuario_id) REFERENCES Users (id)
   )
@@ -326,7 +321,6 @@ class DatabaseTables {
     subtotal REAL,
     orden INTEGER DEFAULT 1,
     fecha_creacion TEXT NOT NULL,
-    sincronizado INTEGER DEFAULT 0,
     producto_reemplazo_id INTEGER,
     producto_reemplazo_codigo TEXT,
     producto_reemplazo_descripcion TEXT,
@@ -335,14 +329,6 @@ class DatabaseTables {
   )
 ''';
 
-  String _sqlUnidadesMedida() => '''
-  CREATE TABLE unidades_medida (
-    id INTEGER PRIMARY KEY,
-    codigo TEXT NOT NULL,
-    descripcion TEXT NOT NULL,
-    activo INTEGER DEFAULT 1
-  )
-''';
 
   String _sqlProductos() => '''
   CREATE TABLE productos (
@@ -350,7 +336,8 @@ class DatabaseTables {
     codigo TEXT,
     codigo_barras TEXT,
     nombre TEXT,
-    categoria TEXT
+    categoria TEXT,
+    unidad_medida TEXT
   )
 ''';
 
@@ -496,7 +483,6 @@ class DatabaseTables {
       // Índices para operacion_comercial
       'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_cliente_id ON operacion_comercial (cliente_id)',
       'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_tipo ON operacion_comercial (tipo_operacion)',
-      'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_estado ON operacion_comercial (estado)',
       'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_sync_status ON operacion_comercial (sync_status)',
       'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_fecha_creacion ON operacion_comercial (fecha_creacion)',
       'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_usuario_id ON operacion_comercial (usuario_id)',
@@ -506,7 +492,6 @@ class DatabaseTables {
       'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_operacion_id ON operacion_comercial_detalle (operacion_comercial_id)',
       'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_codigo ON operacion_comercial_detalle (producto_codigo)',
       'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_categoria ON operacion_comercial_detalle (producto_categoria)',
-      'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_sincronizado ON operacion_comercial_detalle (sincronizado)',
 
       // Índices para productos
       'CREATE INDEX IF NOT EXISTS idx_productos_codigo ON productos (codigo)',

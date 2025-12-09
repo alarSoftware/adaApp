@@ -11,18 +11,20 @@ class CensosPendientesDetailScreen extends StatefulWidget {
   final PendingDataGroup group;
 
   const CensosPendientesDetailScreen({
-    Key? key,
+    super.key,
     required this.viewModel,
     required this.group,
-  }) : super(key: key);
+  });
 
   @override
-  State<CensosPendientesDetailScreen> createState() => _CensosPendientesDetailScreenState();
+  State<CensosPendientesDetailScreen> createState() =>
+      _CensosPendientesDetailScreenState();
 }
 
-class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScreen> {
+class _CensosPendientesDetailScreenState
+    extends State<CensosPendientesDetailScreen> {
   bool _isLoading = true;
-  bool _isRetrying = false;
+
   List<Map<String, dynamic>> _censosFallidos = [];
   String? _error;
   final DatabaseHelper _dbHelper = DatabaseHelper();
@@ -106,18 +108,20 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
       // Obtener datos completos del censo para el preview
-      final datosParaPreview = await _obtenerDatosCompletosDelCenso(censo['id']);
+      final datosParaPreview = await _obtenerDatosCompletosDelCenso(
+        censo['id'],
+      );
 
       // Cerrar indicador de carga
-      if (Navigator.canPop(context)) {
+      if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
+
+      if (!mounted) return;
 
       if (datosParaPreview == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -141,30 +145,31 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
       if (resultado == true) {
         await _loadCensosFallidos();
       }
-
     } catch (e) {
       // Cerrar indicador de carga si está abierto
-      if (Navigator.canPop(context)) {
+      if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
 
       debugPrint('Error navegando al preview: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
   // 🆕 MÉTODO AUXILIAR - Obtener datos completos del censo (FORMATO CORRECTO PARA PREVIEW)
-  Future<Map<String, dynamic>?> _obtenerDatosCompletosDelCenso(String censoId) async {
+  Future<Map<String, dynamic>?> _obtenerDatosCompletosDelCenso(
+    String censoId,
+  ) async {
     try {
       final db = await _dbHelper.database;
 
       // Obtener censo con JOINs
-      final censos = await db.rawQuery('''
+      final censos = await db.rawQuery(
+        '''
         SELECT 
           ca.*,
           eq.cod_barras,
@@ -186,7 +191,9 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
         LEFT JOIN modelos mo ON eq.modelo_id = mo.id
         LEFT JOIN logo l ON eq.logo_id = l.id
         WHERE ca.id = ?
-      ''', [censoId]);
+      ''',
+        [censoId],
+      );
 
       if (censos.isEmpty) return null;
 
@@ -201,7 +208,7 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
       }
 
       final cliente = await clienteRepository.obtenerPorId(
-          clienteId is int ? clienteId : int.parse(clienteId.toString())
+        clienteId is int ? clienteId : int.parse(clienteId.toString()),
       );
 
       if (cliente == null) {
@@ -282,14 +289,12 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
         'es_censo': true,
         'es_historial': true, // 🔑 MODO HISTORIAL
         'es_censo_pendiente': true, // 🆕 Flag especial
-
         // ✅ Datos de sincronización
         'sincronizado': (censo['sincronizado'] as int?) == 1,
         'estado_censo': censo['estado_censo'],
         'intentos_sync': censo['intentos_sync'],
         'error_mensaje': censo['error_mensaje'],
       };
-
     } catch (e, stackTrace) {
       debugPrint('Error obteniendo datos completos: $e');
       debugPrint('StackTrace: $stackTrace');
@@ -305,7 +310,7 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
         actions: [
-          if (_censosFallidos.isNotEmpty && !_isRetrying)
+          if (_censosFallidos.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _loadCensosFallidos,
@@ -314,8 +319,7 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
         ],
       ),
       body: _buildBody(),
-      bottomNavigationBar: _censosFallidos.isNotEmpty
-          ? null : null
+      bottomNavigationBar: _censosFallidos.isNotEmpty ? null : null,
     );
   }
 
@@ -359,7 +363,11 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.check_circle_outline, size: 64, color: Colors.green[300]),
+            Icon(
+              Icons.check_circle_outline,
+              size: 64,
+              color: Colors.green[300],
+            ),
             const SizedBox(height: 16),
             Text(
               'Todos los censos sincronizados',
@@ -389,7 +397,8 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
   }
 
   Widget _buildCensoCard(Map<String, dynamic> censo) {
-    final equipoNombre = '${censo['marca_nombre'] ?? ''} ${censo['modelo_nombre'] ?? ''}'.trim();
+    final equipoNombre =
+        '${censo['marca_nombre'] ?? ''} ${censo['modelo_nombre'] ?? ''}'.trim();
     final codigoBarras = censo['cod_barras']?.toString() ?? 'Sin código';
     final clienteNombre = censo['cliente_nombre']?.toString() ?? 'Sin cliente';
     final fechaCreacion = censo['fecha_creacion'] != null
@@ -416,7 +425,7 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -431,7 +440,9 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          equipoNombre.isNotEmpty ? equipoNombre : 'Equipo sin datos',
+                          equipoNombre.isNotEmpty
+                              ? equipoNombre
+                              : 'Equipo sin datos',
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 16,
@@ -483,9 +494,11 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    border: Border.all(
+                      color: Colors.red.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -534,7 +547,12 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value, {Color? valueColor}) {
+  Widget _buildInfoRow(
+    IconData icon,
+    String label,
+    String value, {
+    Color? valueColor,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -543,10 +561,7 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
           const SizedBox(width: 8),
           Text(
             '$label:',
-            style: TextStyle(
-              fontSize: 13,
-              color: Theme.of(context).hintColor,
-            ),
+            style: TextStyle(fontSize: 13, color: Theme.of(context).hintColor),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -555,7 +570,8 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: valueColor ?? Theme.of(context).textTheme.bodyLarge?.color,
+                color:
+                    valueColor ?? Theme.of(context).textTheme.bodyLarge?.color,
               ),
             ),
           ),
@@ -574,7 +590,7 @@ class _CensosPendientesDetailScreenState extends State<CensosPendientesDetailScr
   //       ),
   //       boxShadow: [
   //         BoxShadow(
-  //           color: Colors.black.withOpacity(0.05),
+  //           color: Colors.black.withValues(alpha: 0.05),
   //           offset: const Offset(0, -2),
   //           blurRadius: 4,
   //         ),

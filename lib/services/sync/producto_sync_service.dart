@@ -6,17 +6,11 @@ import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/repositories/producto_repository.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
-/// Servicio de sincronización de productos
-/// Formato del API: {"data": "[{...}]", "status": "OK"}
 class ProductoSyncService extends BaseSyncService {
-
-  // Variables estáticas para almacenar los últimos productos obtenidos
   static List<dynamic> _ultimosProductos = [];
 
-  // Getter para acceder a los datos
   static List<dynamic> get ultimosProductosObtenidos => List.from(_ultimosProductos);
 
-  /// Método principal para obtener productos desde el servidor
   static Future<SyncResult> obtenerProductos({
     int? categoriaId,
     String? estado,
@@ -29,8 +23,6 @@ class ProductoSyncService extends BaseSyncService {
     String? currentEndpoint;
 
     try {
-      BaseSyncService.logger.i('Obteniendo productos desde el servidor...');
-
       final queryParams = _buildQueryParams(
         categoriaId: categoriaId,
         estado: estado,
@@ -43,30 +35,14 @@ class ProductoSyncService extends BaseSyncService {
 
       final response = await _makeHttpRequest(queryParams);
       currentEndpoint = response.request?.url.toString();
-      BaseSyncService.logger.i('📡 Llamando a: $currentEndpoint');
 
       if (!_isSuccessStatusCode(response.statusCode)) {
-        BaseSyncService.logger.e('❌ Error del servidor: ${response.statusCode}');
-
-        // 🚨 LOG ERROR: Error del servidor
-        // await ErrorLogService.logServerError(
-        //   tableName: 'productos',
-        //   operation: 'sync_from_server',
-        //   errorMessage: BaseSyncService.extractErrorMessage(response),
-        //   errorCode: response.statusCode.toString(),
-        //   endpoint: currentEndpoint,
-        //   userId: edfVendedorId,
-        // );
-
         return _handleErrorResponse(response);
       }
 
       final productosData = await _parseProductResponse(response);
-      BaseSyncService.logger.i('✅ Productos parseados: ${productosData.length}');
-
       final processedResult = await _processAndSaveProducts(productosData);
 
-      // Guardar los datos para acceso posterior
       _ultimosProductos = processedResult;
 
       return SyncResult(
@@ -77,16 +53,6 @@ class ProductoSyncService extends BaseSyncService {
       );
 
     } on TimeoutException catch (timeoutError) {
-      BaseSyncService.logger.e('⏰ Timeout obteniendo productos: $timeoutError');
-
-      // await ErrorLogService.logNetworkError(
-      //   tableName: 'productos',
-      //   operation: 'sync_from_server',
-      //   errorMessage: 'Timeout de conexión: $timeoutError',
-      //   endpoint: currentEndpoint,
-      //   userId: edfVendedorId,
-      // );
-
       _ultimosProductos = [];
       return SyncResult(
         exito: false,
@@ -95,16 +61,6 @@ class ProductoSyncService extends BaseSyncService {
       );
 
     } on SocketException catch (socketError) {
-      BaseSyncService.logger.e('📡 Error de red: $socketError');
-
-      // await ErrorLogService.logNetworkError(
-      //   tableName: 'productos',
-      //   operation: 'sync_from_server',
-      //   errorMessage: 'Sin conexión de red: $socketError',
-      //   endpoint: currentEndpoint,
-      //   userId: edfVendedorId,
-      // );
-
       _ultimosProductos = [];
       return SyncResult(
         exito: false,
@@ -113,18 +69,6 @@ class ProductoSyncService extends BaseSyncService {
       );
 
     } catch (e) {
-      BaseSyncService.logger.e('💥 Error obteniendo productos: $e');
-
-      // await ErrorLogService.logError(
-      //   tableName: 'productos',
-      //   operation: 'sync_from_server',
-      //   errorMessage: 'Error general: $e',
-      //   errorType: 'unknown',
-      //   errorCode: 'GENERAL_ERROR',
-      //   endpoint: currentEndpoint,
-      //   userId: edfVendedorId,
-      // );
-
       _ultimosProductos = [];
       return SyncResult(
         exito: false,
@@ -134,7 +78,6 @@ class ProductoSyncService extends BaseSyncService {
     }
   }
 
-  // Métodos de conveniencia
   static Future<SyncResult> obtenerProductosActivos() {
     return obtenerProductos(activo: true);
   }
@@ -146,8 +89,6 @@ class ProductoSyncService extends BaseSyncService {
   static Future<SyncResult> buscarPorCodigoBarras(String codigoBarras) {
     return obtenerProductos(codigoBarras: codigoBarras);
   }
-
-  // ========== MÉTODOS PRIVADOS ==========
 
   static Map<String, String> _buildQueryParams({
     int? categoriaId,
@@ -215,7 +156,6 @@ class ProductoSyncService extends BaseSyncService {
             final parsed = jsonDecode(dataValue) as List;
             return parsed;
           } catch (e) {
-            BaseSyncService.logger.e('Error parseando data como JSON: $e');
             return [];
           }
         } else if (dataValue is List) {
@@ -229,18 +169,15 @@ class ProductoSyncService extends BaseSyncService {
 
       return [];
     } catch (e) {
-      BaseSyncService.logger.e('Error parseando respuesta: $e');
       throw Exception('Error parseando respuesta del servidor: $e');
     }
   }
 
-  /// Procesar y guardar productos usando el repository
   static Future<List<Map<String, dynamic>>> _processAndSaveProducts(
       List<dynamic> productosData,
       ) async {
     if (productosData.isEmpty) return [];
 
-    // Convertir datos del API al formato local
     final productosParaGuardar = <Map<String, dynamic>>[];
 
     for (final producto in productosData) {
@@ -250,21 +187,16 @@ class ProductoSyncService extends BaseSyncService {
           final productoParaGuardar = _mapApiToLocalFormat(productoMap);
           productosParaGuardar.add(productoParaGuardar);
         } catch (e) {
-          BaseSyncService.logger.e('Error procesando producto ID ${producto['id']}: $e');
+          // Error procesando producto
         }
       }
     }
 
-    // 🆕 Usar el repository para guardar
     if (productosParaGuardar.isNotEmpty) {
       try {
         final repo = ProductoRepositoryImpl();
         await repo.guardarProductosDesdeServidor(productosParaGuardar);
-        BaseSyncService.logger.i('✅ ${productosParaGuardar.length} productos guardados vía repository');
       } catch (e) {
-        BaseSyncService.logger.e('❌ Error guardando en repository: $e');
-
-        // Log error pero no fallar, los datos se obtuvieron correctamente
         await ErrorLogService.logDatabaseError(
           tableName: 'productos',
           operation: 'guardar_via_repository',
@@ -278,11 +210,12 @@ class ProductoSyncService extends BaseSyncService {
 
   static Map<String, dynamic> _mapApiToLocalFormat(Map<String, dynamic> apiProduct) {
     return {
-      'id': apiProduct['id']?.toString(),
-      'codigo': apiProduct['codigo']?.toString() ?? '',
+      'id': _parseIntSafely(apiProduct['id']),
+      'codigo': apiProduct['codigo']?.toString(),
       'nombre': apiProduct['nombre']?.toString() ?? '',
       'categoria': apiProduct['categoria']?.toString(),
       'codigo_barras': apiProduct['codigoBarras']?.toString(),
+      'unidad_medida': apiProduct['unidadMedida']?.toString(),
     };
   }
 
@@ -292,20 +225,6 @@ class ProductoSyncService extends BaseSyncService {
     if (value is String) {
       try {
         return int.parse(value);
-      } catch (e) {
-        return null;
-      }
-    }
-    return null;
-  }
-
-  static double? _parseDoubleSafely(dynamic value) {
-    if (value == null) return null;
-    if (value is double) return value;
-    if (value is num) return value.toDouble();
-    if (value is String) {
-      try {
-        return double.parse(value);
       } catch (e) {
         return null;
       }

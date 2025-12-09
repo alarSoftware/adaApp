@@ -38,7 +38,6 @@ class MarcaRepository extends BaseRepository<Marca> {
 
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
-      print('Error obteniendo todas las marcas: $e');
       return [];
     }
   }

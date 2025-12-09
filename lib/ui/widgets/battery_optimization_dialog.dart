@@ -3,7 +3,6 @@ import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/services/battery_optimization/battery_optimization_service.dart';
 
 class BatteryOptimizationDialog {
-
   /// Muestra el diálogo principal de optimización de batería
   static Future<bool?> showBatteryOptimizationDialog(BuildContext context) {
     return showDialog<bool>(
@@ -17,11 +16,7 @@ class BatteryOptimizationDialog {
           ),
           title: Row(
             children: [
-              Icon(
-                Icons.battery_alert,
-                color: AppColors.warning,
-                size: 28,
-              ),
+              Icon(Icons.battery_alert, color: AppColors.warning, size: 28),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -52,13 +47,19 @@ class BatteryOptimizationDialog {
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.1),
+                    color: AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                    border: Border.all(
+                      color: AppColors.error.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                      Icon(
+                        Icons.error_outline,
+                        color: AppColors.error,
+                        size: 20,
+                      ),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -77,16 +78,22 @@ class BatteryOptimizationDialog {
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.info.withOpacity(0.1),
+                    color: AppColors.info.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                    border: Border.all(
+                      color: AppColors.info.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                          Icon(
+                            Icons.info_outline,
+                            color: AppColors.info,
+                            size: 20,
+                          ),
                           SizedBox(width: 8),
                           Text(
                             'Esto permite que la app:',
@@ -103,10 +110,22 @@ class BatteryOptimizationDialog {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('• Sincronice datos automáticamente', style: _benefitTextStyle()),
-                            Text('• Mantenga la conectividad activa', style: _benefitTextStyle()),
-                            Text('• Registre actividad del dispositivo', style: _benefitTextStyle()),
-                            Text('• Funcione correctamente en background', style: _benefitTextStyle()),
+                            Text(
+                              '• Sincronice datos automáticamente',
+                              style: _benefitTextStyle(),
+                            ),
+                            Text(
+                              '• Mantenga la conectividad activa',
+                              style: _benefitTextStyle(),
+                            ),
+                            Text(
+                              '• Registre actividad del dispositivo',
+                              style: _benefitTextStyle(),
+                            ),
+                            Text(
+                              '• Funcione correctamente en background',
+                              style: _benefitTextStyle(),
+                            ),
                           ],
                         ),
                       ),
@@ -117,13 +136,19 @@ class BatteryOptimizationDialog {
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.warning.withOpacity(0.1),
+                    color: AppColors.warning.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                    border: Border.all(
+                      color: AppColors.warning.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.warning_amber, color: AppColors.warning, size: 20),
+                      Icon(
+                        Icons.warning_amber,
+                        color: AppColors.warning,
+                        size: 20,
+                      ),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -171,11 +196,7 @@ class BatteryOptimizationDialog {
           ),
           title: Row(
             children: [
-              Icon(
-                Icons.check_circle,
-                color: AppColors.success,
-                size: 28,
-              ),
+              Icon(Icons.check_circle, color: AppColors.success, size: 28),
               SizedBox(width: 12),
               Text(
                 '¡Configurado!',
@@ -189,10 +210,7 @@ class BatteryOptimizationDialog {
           ),
           content: Text(
             'AdaApp ahora puede funcionar correctamente en segundo plano.',
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.textPrimary,
-            ),
+            style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
           ),
           actions: [
             ElevatedButton(
@@ -221,11 +239,7 @@ class BatteryOptimizationDialog {
           ),
           title: Row(
             children: [
-              Icon(
-                Icons.warning,
-                color: AppColors.warning,
-                size: 28,
-              ),
+              Icon(Icons.warning, color: AppColors.warning, size: 28),
               SizedBox(width: 12),
               Text(
                 'Configuración Pendiente',
@@ -243,18 +257,12 @@ class BatteryOptimizationDialog {
             children: [
               Text(
                 'La optimización de batería sigue activa. Esto puede afectar el funcionamiento de la app.',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: AppColors.textPrimary,
-                ),
+                style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
               ),
               SizedBox(height: 16),
               Text(
                 'Puedes configurarlo más tarde desde el menú de configuración.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -284,9 +292,13 @@ class BatteryOptimizationDialog {
   }
 
   /// Maneja la solicitud de optimización de batería
-  static Future<void> _handleBatteryOptimizationRequest(BuildContext context) async {
+  static Future<void> _handleBatteryOptimizationRequest(
+    BuildContext context,
+  ) async {
     try {
-      final bool result = await BatteryOptimizationService.requestIgnoreBatteryOptimizations();
+      final bool result =
+          await BatteryOptimizationService.requestIgnoreBatteryOptimizations();
+      if (!context.mounted) return;
 
       if (result) {
         await showSuccessDialog(context);
@@ -295,17 +307,21 @@ class BatteryOptimizationDialog {
       }
     } catch (e) {
       // Mostrar error genérico
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error configurando optimización de batería'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error configurando optimización de batería'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
   /// Función principal que maneja todo el flujo - PERSISTENTE
-  static Future<void> checkAndRequestBatteryOptimization(BuildContext context) async {
+  static Future<void> checkAndRequestBatteryOptimization(
+    BuildContext context,
+  ) async {
     try {
       bool isConfigured = false;
       int attempts = 0;
@@ -315,7 +331,9 @@ class BatteryOptimizationDialog {
         attempts++;
 
         // Verificar si ya está configurado
-        final bool isIgnoring = await BatteryOptimizationService.isIgnoringBatteryOptimizations();
+        final bool isIgnoring =
+            await BatteryOptimizationService.isIgnoringBatteryOptimizations();
+        if (!context.mounted) return;
 
         if (isIgnoring) {
           isConfigured = true;
@@ -324,17 +342,26 @@ class BatteryOptimizationDialog {
 
         // Mostrar diálogo explicativo
         await showBatteryOptimizationDialog(context);
+        if (!context.mounted) return;
 
         // Intentar configurar
-        final bool result = await BatteryOptimizationService.requestIgnoreBatteryOptimizations();
+        final bool result =
+            await BatteryOptimizationService.requestIgnoreBatteryOptimizations();
+        if (!context.mounted) return;
 
         if (result) {
           isConfigured = true;
           await showSuccessDialog(context);
+          if (!context.mounted) return;
         } else {
           // Si falla, mostrar advertencia y dar opción de reintentar
           if (attempts < maxAttempts) {
-            final bool? retry = await _showRetryDialog(context, attempts, maxAttempts);
+            final bool? retry = await _showRetryDialog(
+              context,
+              attempts,
+              maxAttempts,
+            );
+            if (!context.mounted) return;
             if (retry != true) {
               // Usuario decidió no reintentar
               break;
@@ -347,22 +374,27 @@ class BatteryOptimizationDialog {
       if (!isConfigured) {
         await _showFinalWarningDialog(context);
       }
-
     } catch (e) {
-      print('Error configurando optimización de batería: $e');
+      debugPrint('Error configurando optimización de batería: $e');
       // Continuar con la app aunque falle la configuración
     }
   }
 
   /// Diálogo para reintentar configuración
-  static Future<bool?> _showRetryDialog(BuildContext context, int attempt, int maxAttempts) {
+  static Future<bool?> _showRetryDialog(
+    BuildContext context,
+    int attempt,
+    int maxAttempts,
+  ) {
     return showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           backgroundColor: AppColors.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: [
               Icon(Icons.refresh, color: AppColors.warning, size: 28),
@@ -396,7 +428,10 @@ class BatteryOptimizationDialog {
             if (attempt >= maxAttempts - 1)
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: Text('Continuar Sin Configurar', style: TextStyle(color: AppColors.error)),
+                child: Text(
+                  'Continuar Sin Configurar',
+                  style: TextStyle(color: AppColors.error),
+                ),
               ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
@@ -420,7 +455,9 @@ class BatteryOptimizationDialog {
       builder: (BuildContext context) {
         return AlertDialog(
           backgroundColor: AppColors.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: [
               Icon(Icons.warning_amber, color: AppColors.error, size: 28),
@@ -447,16 +484,24 @@ class BatteryOptimizationDialog {
               Container(
                 padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.error.withOpacity(0.1),
+                  color: AppColors.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                  border: Border.all(
+                    color: AppColors.error.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('• Sincronización puede fallar', style: _warningTextStyle()),
+                    Text(
+                      '• Sincronización puede fallar',
+                      style: _warningTextStyle(),
+                    ),
                     Text('• Datos pueden perderse', style: _warningTextStyle()),
-                    Text('• Funcionalidad reducida', style: _warningTextStyle()),
+                    Text(
+                      '• Funcionalidad reducida',
+                      style: _warningTextStyle(),
+                    ),
                   ],
                 ),
               ),
@@ -482,15 +527,9 @@ class BatteryOptimizationDialog {
     );
   }
 
-  static TextStyle _warningTextStyle() => TextStyle(
-    color: AppColors.error,
-    fontSize: 13,
-    height: 1.3,
-  );
+  static TextStyle _warningTextStyle() =>
+      TextStyle(color: AppColors.error, fontSize: 13, height: 1.3);
 
-  static TextStyle _benefitTextStyle() => TextStyle(
-    color: AppColors.info,
-    fontSize: 13,
-    height: 1.3,
-  );
+  static TextStyle _benefitTextStyle() =>
+      TextStyle(color: AppColors.info, fontSize: 13, height: 1.3);
 }

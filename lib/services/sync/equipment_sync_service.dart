@@ -12,9 +12,6 @@ class EquipmentSyncService extends BaseSyncService {
   static final _dbHelper = DatabaseHelper();
   static final _equipoRepo = EquipoRepository();
 
-  // ===============================================================
-  // 1. SINCRONIZAR MARCAS (Con vaciado total previo)
-  // ===============================================================
   static Future<SyncResult> sincronizarMarcas() async {
     final baseUrl = await BaseSyncService.getBaseUrl();
     final endpoint = '$baseUrl/api/getEdfMarcas';
@@ -28,7 +25,11 @@ class EquipmentSyncService extends BaseSyncService {
       if (response.statusCode != 200) {
         final mensaje = BaseSyncService.extractErrorMessage(response);
         await ErrorLogService.logError(
-            tableName: 'marcas', operation: 'sync_from_server', errorMessage: mensaje, errorType: 'server', endpoint: endpoint
+            tableName: 'marcas',
+            operation: 'sync_from_server',
+            errorMessage: mensaje,
+            errorType: 'server',
+            endpoint: endpoint
         );
         return SyncResult(exito: false, mensaje: mensaje, itemsSincronizados: 0);
       }
@@ -36,7 +37,6 @@ class EquipmentSyncService extends BaseSyncService {
       final responseData = jsonDecode(response.body);
       final List<dynamic> marcasAPI = _extraerListaDatos(responseData);
 
-      // Preparamos la lista limpia para insertar
       final List<Map<String, dynamic>> marcasParaInsertar = [];
 
       for (var item in marcasAPI) {
@@ -48,14 +48,9 @@ class EquipmentSyncService extends BaseSyncService {
         }
       }
 
-      // NOTA: Quitamos el "return" si está vacío para permitir que limpie la tabla
-
       try {
-        // Esto vacía la tabla y luego inserta (o deja vacío si la lista es vacía)
         await _dbHelper.vaciarEInsertar('marcas', marcasParaInsertar);
-        BaseSyncService.logger.i('Marcas renovadas: ${marcasParaInsertar.length}');
       } catch (dbError) {
-        BaseSyncService.logger.e('Error DB Marcas: $dbError');
         return SyncResult(exito: false, mensaje: 'Error guardando marcas', itemsSincronizados: 0);
       }
 
@@ -71,15 +66,15 @@ class EquipmentSyncService extends BaseSyncService {
     }
   }
 
-  // ===============================================================
-  // 2. SINCRONIZAR MODELOS (Con vaciado total previo)
-  // ===============================================================
   static Future<SyncResult> sincronizarModelos() async {
     final baseUrl = await BaseSyncService.getBaseUrl();
     final endpoint = '$baseUrl/api/getEdfModelos';
 
     try {
-      final response = await http.get(Uri.parse(endpoint), headers: BaseSyncService.headers).timeout(BaseSyncService.timeout);
+      final response = await http.get(
+          Uri.parse(endpoint),
+          headers: BaseSyncService.headers
+      ).timeout(BaseSyncService.timeout);
 
       if (response.statusCode != 200) {
         return SyncResult(exito: false, mensaje: 'Error ${response.statusCode}', itemsSincronizados: 0);
@@ -95,34 +90,36 @@ class EquipmentSyncService extends BaseSyncService {
           modelosParaInsertar.add({
             'id': item['id'],
             'nombre': item['modelo'],
-            // Si tu tabla modelos tiene marca_id, agrégalo aquí
           });
         }
       }
 
       try {
         await _dbHelper.vaciarEInsertar('modelos', modelosParaInsertar);
-        BaseSyncService.logger.i('Modelos renovados: ${modelosParaInsertar.length}');
       } catch (dbError) {
         return SyncResult(exito: false, mensaje: 'Error BD Modelos', itemsSincronizados: 0);
       }
 
-      return SyncResult(exito: true, mensaje: 'Modelos sincronizados', itemsSincronizados: modelosParaInsertar.length);
+      return SyncResult(
+          exito: true,
+          mensaje: 'Modelos sincronizados',
+          itemsSincronizados: modelosParaInsertar.length
+      );
 
     } catch (e) {
       return _manejarExcepcion(e, 'modelos', endpoint);
     }
   }
 
-  // ===============================================================
-  // 3. SINCRONIZAR LOGOS (Con vaciado total previo)
-  // ===============================================================
   static Future<SyncResult> sincronizarLogos() async {
     final baseUrl = await BaseSyncService.getBaseUrl();
     final endpoint = '$baseUrl/api/getEdfLogos';
 
     try {
-      final response = await http.get(Uri.parse(endpoint), headers: BaseSyncService.headers).timeout(BaseSyncService.timeout);
+      final response = await http.get(
+          Uri.parse(endpoint),
+          headers: BaseSyncService.headers
+      ).timeout(BaseSyncService.timeout);
 
       if (response.statusCode != 200) {
         return SyncResult(exito: false, mensaje: 'Error ${response.statusCode}', itemsSincronizados: 0);
@@ -145,28 +142,26 @@ class EquipmentSyncService extends BaseSyncService {
 
       try {
         await _dbHelper.vaciarEInsertar('logo', logosParaInsertar);
-        BaseSyncService.logger.i('Logos renovados: ${logosParaInsertar.length}');
       } catch (dbError) {
         return SyncResult(exito: false, mensaje: 'Error BD Logos', itemsSincronizados: 0);
       }
 
-      return SyncResult(exito: true, mensaje: 'Logos sincronizados', itemsSincronizados: logosParaInsertar.length);
+      return SyncResult(
+          exito: true,
+          mensaje: 'Logos sincronizados',
+          itemsSincronizados: logosParaInsertar.length
+      );
 
     } catch (e) {
       return _manejarExcepcion(e, 'logo', endpoint);
     }
   }
 
-  // ===============================================================
-  // 4. SINCRONIZAR EQUIPOS (CORREGIDO: PROCESA AUNQUE ESTÉ VACÍO)
-  // ===============================================================
   static Future<SyncResult> sincronizarEquipos() async {
     final baseUrl = await BaseSyncService.getBaseUrl();
     final endpoint = '$baseUrl/api/getEdfEquipos';
 
     try {
-      BaseSyncService.logger.i('🔄 Iniciando sincronización de equipos...');
-
       final response = await http.get(
         Uri.parse(endpoint),
         headers: BaseSyncService.headers,
@@ -175,16 +170,16 @@ class EquipmentSyncService extends BaseSyncService {
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final mensaje = BaseSyncService.extractErrorMessage(response);
         await ErrorLogService.logError(
-            tableName: 'equipos', operation: 'sync_from_server', errorMessage: 'HTTP ${response.statusCode}: $mensaje', errorType: 'server', endpoint: endpoint
+            tableName: 'equipos',
+            operation: 'sync_from_server',
+            errorMessage: 'HTTP ${response.statusCode}: $mensaje',
+            errorType: 'server',
+            endpoint: endpoint
         );
         return SyncResult(exito: false, mensaje: 'Error del servidor: $mensaje', itemsSincronizados: 0);
       }
 
       final List<dynamic> equiposData = BaseSyncService.parseResponse(response.body);
-
-      // 🔥 CORRECCIÓN PRINCIPAL:
-      // Hemos eliminado el bloque "if (equiposData.isEmpty) return..."
-      // Ahora el flujo continúa para limpiar la tabla aunque no vengan datos.
 
       final equipos = <Equipo>[];
       int procesados = 0;
@@ -195,24 +190,19 @@ class EquipmentSyncService extends BaseSyncService {
           equipos.add(equipo);
           procesados++;
         } catch (e) {
-          BaseSyncService.logger.w('Error procesando equipo ID ${equipoJson['id']}: $e');
+          // Skip invalid equipment
         }
       }
 
-      BaseSyncService.logger.i('💾 Guardando ${equipos.length} equipos en BD local...');
-
       try {
         final equiposMapas = equipos.map((e) => e.toMap()).toList();
-
-        // Llamamos al método que hace DELETE FROM equipos e INSERT
-        // Si equiposMapas está vacío, la tabla quedará vacía.
         await _equipoRepo.limpiarYSincronizar(equiposMapas);
-
-        BaseSyncService.logger.i('✅ Tabla equipos actualizada correctamente');
       } catch (dbError) {
-        BaseSyncService.logger.e('Error guardando equipos en BD: $dbError');
         await ErrorLogService.logError(
-            tableName: 'equipos', operation: 'database_insert', errorMessage: dbError.toString(), errorType: 'database'
+            tableName: 'equipos',
+            operation: 'database_insert',
+            errorMessage: dbError.toString(),
+            errorType: 'database'
         );
         return SyncResult(exito: false, mensaje: 'Error guardando en BD', itemsSincronizados: 0);
       }
@@ -231,10 +221,6 @@ class EquipmentSyncService extends BaseSyncService {
     }
   }
 
-  // ===============================================================
-  // MÉTODOS AUXILIARES
-  // ===============================================================
-
   static List<dynamic> _extraerListaDatos(dynamic responseData) {
     if (responseData is Map<String, dynamic>) {
       if (responseData.containsKey('data')) {
@@ -251,13 +237,16 @@ class EquipmentSyncService extends BaseSyncService {
   }
 
   static Future<SyncResult> _manejarExcepcion(dynamic e, String tabla, String endpoint) async {
-    BaseSyncService.logger.e('Error sincronizando $tabla: $e');
-
     String errorType = 'unknown';
     String mensaje = BaseSyncService.getErrorMessage(e);
 
-    if (e is TimeoutException) { errorType = 'network'; mensaje = 'Timeout'; }
-    else if (e is SocketException) { errorType = 'network'; mensaje = 'Sin conexión'; }
+    if (e is TimeoutException) {
+      errorType = 'network';
+      mensaje = 'Timeout';
+    } else if (e is SocketException) {
+      errorType = 'network';
+      mensaje = 'Sin conexión';
+    }
 
     await ErrorLogService.logError(
       tableName: tabla,

@@ -7,12 +7,8 @@ import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 class OperacionesComercialesMenuViewModel extends ChangeNotifier {
   final OperacionComercialRepository _repository;
   final int clienteId;
-
-  // Estado
   bool _isLoading = false;
   String? _errorMessage;
-
-  // Operaciones por tipo
   List<OperacionComercial> _operacionesReposicion = [];
   List<OperacionComercial> _operacionesRetiro = [];
   List<OperacionComercial> _operacionesDiscontinuos = [];
@@ -82,7 +78,7 @@ class OperacionesComercialesMenuViewModel extends ChangeNotifier {
   Future<bool> eliminarOperacion(String operacionId) async {
     try {
       await _repository.eliminarOperacion(operacionId);
-      await cargarOperaciones(); // Recargar lista
+      await cargarOperaciones();
       return true;
     } catch (e) {
       _errorMessage = 'Error eliminando operación: $e';

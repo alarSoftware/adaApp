@@ -6,18 +6,12 @@ import 'package:ada_app/ui/widgets/client_info_card.dart';
 import 'forms_screen.dart';
 import 'dart:async';
 import 'package:ada_app/ui/theme/colors.dart';
-import 'package:logger/logger.dart';
 import 'package:ada_app/main.dart';
-
-var logger = Logger();
 
 class ClienteDetailScreen extends StatefulWidget {
   final Cliente cliente;
 
-  const ClienteDetailScreen({
-    super.key,
-    required this.cliente,
-  });
+  const ClienteDetailScreen({super.key, required this.cliente});
 
   @override
   State<ClienteDetailScreen> createState() => _ClienteDetailScreenState();
@@ -46,7 +40,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
 
   @override
   void didPopNext() {
-    logger.i('🔄 Pantalla visible nuevamente - Refrescando datos');
     if (mounted) {
       _viewModel.refresh();
     }
@@ -88,10 +81,9 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   Future<void> _navigateToForms(Cliente cliente) async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => FormsScreen(cliente: cliente),
-      ),
+      MaterialPageRoute(builder: (context) => FormsScreen(cliente: cliente)),
     );
+    if (!mounted) return;
     if (result == true) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -106,19 +98,11 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   }
 
   void _navigateToEquipoDetail(dynamic equipoData) {
-    final isAsignado = equipoData['tipo_estado'] == 'asignado';
-
-    logger.i('Navegando a detalle de equipo:');
-    logger.i('- Código: ${equipoData['cod_barras']}');
-    logger.i('- Tipo estado: ${equipoData['tipo_estado']}');
-    logger.i('- Es asignado: $isAsignado');
-
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EquiposClientesDetailScreen(
-          equipoCliente: equipoData,
-        ),
+        builder: (context) =>
+            EquiposClientesDetailScreen(equipoCliente: equipoData),
       ),
     );
   }
@@ -135,9 +119,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
               child: _buildClienteInfoCard(),
             ),
             _buildTabBar(),
-            Expanded(
-              child: _buildTabBarView(),
-            ),
+            Expanded(child: _buildTabBarView()),
           ],
         ),
       ),
@@ -161,9 +143,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   }
 
   Widget _buildClienteInfoCard() {
-    return ClientInfoCard(
-      cliente: widget.cliente,
-    );
+    return ClientInfoCard(cliente: widget.cliente);
   }
 
   Widget _buildTabBar() {
@@ -194,14 +174,14 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                     Icon(Icons.check_circle_outline, size: 16),
                     const SizedBox(width: 6),
                     Flexible(
-                      child: Text(
-                        'Asignados',
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      child: Text('Asignados', overflow: TextOverflow.ellipsis),
                     ),
                     if (_viewModel.equiposAsignadosCount > 0) ...[
                       const SizedBox(width: 4),
-                      _buildCountBadge(_viewModel.equiposAsignadosCount, AppColors.success),
+                      _buildCountBadge(
+                        _viewModel.equiposAsignadosCount,
+                        AppColors.success,
+                      ),
                     ],
                   ],
                 ),
@@ -220,7 +200,10 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                     ),
                     if (_viewModel.equiposPendientesCount > 0) ...[
                       const SizedBox(width: 4),
-                      _buildCountBadge(_viewModel.equiposPendientesCount, AppColors.warning),
+                      _buildCountBadge(
+                        _viewModel.equiposPendientesCount,
+                        AppColors.warning,
+                      ),
                     ],
                   ],
                 ),
@@ -271,7 +254,8 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
               equipos: _viewModel.equiposAsignadosList,
               isAsignado: true,
               emptyTitle: 'Sin equipos asignados',
-              emptySubtitle: 'Este cliente no tiene equipos asignados actualmente',
+              emptySubtitle:
+              'Este cliente no tiene equipos asignados actualmente',
               emptyIcon: Icons.check_circle_outline,
             ),
             _buildEquiposTab(
@@ -323,7 +307,9 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     required bool isAsignado,
   }) {
     final color = isAsignado ? AppColors.success : AppColors.warning;
-    final backgroundColor = isAsignado ? AppColors.successContainer : AppColors.warningContainer;
+    final backgroundColor = isAsignado
+        ? AppColors.successContainer
+        : AppColors.warningContainer;
 
     return Center(
       child: Padding(
@@ -338,11 +324,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                 color: backgroundColor,
                 borderRadius: BorderRadius.circular(40),
               ),
-              child: Icon(
-                icon,
-                size: 40,
-                color: color,
-              ),
+              child: Icon(icon, size: 40, color: color),
             ),
             const SizedBox(height: 24),
             Text(
@@ -357,10 +339,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -379,10 +358,14 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     );
   }
 
-  Widget _buildEquipoCard(Map<String, dynamic> equipoData, {required bool isAsignado}) {
+  Widget _buildEquipoCard(
+      Map<String, dynamic> equipoData, {
+        required bool isAsignado,
+      }) {
     final equipoColor = isAsignado ? AppColors.success : AppColors.warning;
-    final borderColor = isAsignado ? AppColors.borderSuccess : AppColors.borderWarning;
-    final backgroundColor = isAsignado ? AppColors.successContainer : AppColors.warningContainer;
+    final borderColor = isAsignado
+        ? AppColors.borderSuccess
+        : AppColors.borderWarning;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -391,10 +374,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
         color: AppColors.cardBackground,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: borderColor,
-            width: 1,
-          ),
+          side: BorderSide(color: borderColor, width: 1),
         ),
         child: InkWell(
           onTap: () => _viewModel.navegarADetalleEquipo(equipoData),
@@ -467,12 +447,19 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            Icon(Icons.access_time, size: 14, color: AppColors.textTertiary),
+                            Icon(
+                              Icons.access_time,
+                              size: 14,
+                              color: AppColors.textTertiary,
+                            ),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 _viewModel.getEquipoFechaCensado(equipoData),
-                                style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textTertiary,
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -484,7 +471,11 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                   ),
                 ),
                 const SizedBox(width: 8),
-                Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textTertiary),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: AppColors.textTertiary,
+                ),
               ],
             ),
           ),
@@ -494,8 +485,8 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   }
 
   String _getFormattedEquipoTitle(Map<String, dynamic> equipoData) {
-    final marca = equipoData['marca_nombre']?.toString()?.trim() ?? '';
-    final modelo = equipoData['modelo_nombre']?.toString()?.trim() ?? '';
+    final marca = (equipoData['marca_nombre'] ?? '').toString().trim();
+    final modelo = (equipoData['modelo_nombre'] ?? '').toString().trim();
 
     if (marca.isNotEmpty && modelo.isNotEmpty) {
       return '$marca $modelo';
@@ -517,28 +508,20 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
         child: Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: AppColors.success.withOpacity(0.1),
+            color: AppColors.success.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: AppColors.success.withOpacity(0.3),
+              color: AppColors.success.withValues(alpha: 0.3),
               width: 0.5,
             ),
           ),
-          child: Icon(
-            Icons.cloud_done,
-            size: 14,
-            color: AppColors.success,
-          ),
+          child: Icon(Icons.cloud_done, size: 14, color: AppColors.success),
         ),
       );
     } else {
       return FutureBuilder<Map<String, dynamic>?>(
         future: _viewModel.getEstadoCensoInfo(equipoData),
         builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data != null) {
-            logger.i('Estado info para ${equipoData['cod_barras']}: ${snapshot.data}');
-          }
-
           if (!snapshot.hasData || snapshot.data == null) {
             return SizedBox.shrink();
           }
@@ -548,14 +531,15 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
           IconData icon;
           String tooltip;
 
-          final estadoCenso = estadoInfo['estado_censo']?.toString().toLowerCase();
+          final estadoCenso = estadoInfo['estado_censo']
+              ?.toString()
+              .toLowerCase();
 
-          final sincronizado = estadoInfo['sincronizado']?.toString() == '1' ||
-              estadoInfo['sincronizado'] == 1 ||
-              estadoInfo['sincronizado'] == true ||
-              estadoInfo['esta_sincronizado'] == true;
-
-          logger.i('Estado censo: $estadoCenso, Sincronizado: $sincronizado');
+          final sincronizado =
+              estadoInfo['sincronizado']?.toString() == '1' ||
+                  estadoInfo['sincronizado'] == 1 ||
+                  estadoInfo['sincronizado'] == true ||
+                  estadoInfo['esta_sincronizado'] == true;
 
           if (estadoCenso == 'migrado' || sincronizado) {
             iconColor = AppColors.success;
@@ -570,7 +554,6 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
             icon = Icons.cloud_off;
             tooltip = 'Error en sincronización';
           } else {
-            logger.w('No se encontró estado_censo válido: $estadoCenso');
             return SizedBox.shrink();
           }
 
@@ -579,18 +562,14 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
+                color: iconColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: iconColor.withOpacity(0.3),
+                  color: iconColor.withValues(alpha: 0.3),
                   width: 0.5,
                 ),
               ),
-              child: Icon(
-                icon,
-                size: 14,
-                color: iconColor,
-              ),
+              child: Icon(icon, size: 14, color: iconColor),
             ),
           );
         },
@@ -605,10 +584,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(
-              color: AppColors.primary,
-              strokeWidth: 3,
-            ),
+            CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3),
             const SizedBox(height: 16),
             Text(
               _viewModel.getLoadingMessage(),

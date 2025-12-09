@@ -13,10 +13,7 @@ import '../screens/preview_screen.dart';
 class FormsScreen extends StatefulWidget {
   final Cliente cliente;
 
-  const FormsScreen({
-    super.key,
-    required this.cliente,
-  });
+  const FormsScreen({super.key, required this.cliente});
 
   @override
   State<FormsScreen> createState() => _FormsScreenState();
@@ -80,8 +77,8 @@ class _FormsScreenState extends State<FormsScreen> {
           'encontrado',
         ];
 
-        bool esInline = mensajesInline.any((msg) =>
-            event.message.toLowerCase().contains(msg.toLowerCase())
+        bool esInline = mensajesInline.any(
+          (msg) => event.message.toLowerCase().contains(msg.toLowerCase()),
         );
 
         if (esInline) {
@@ -91,7 +88,8 @@ class _FormsScreenState extends State<FormsScreen> {
 
           // 🟢 Verde: "¡Equipo encontrado!" (mensaje corto, equipo YA asignado)
           if (message.contains('¡Equipo encontrado!') ||
-              (message.contains('Equipo encontrado') && !message.contains('pero no asignado'))) {
+              (message.contains('Equipo encontrado') &&
+                  !message.contains('pero no asignado'))) {
             color = AppColors.success;
           }
           // 🟠 Amarillo/Naranja: "Equipo encontrado pero no asignado..." (mensaje largo, pendiente)
@@ -140,11 +138,7 @@ class _FormsScreenState extends State<FormsScreen> {
     }
 
     // ✅ Mostrar notificación moderna
-    AppNotification.show(
-      context,
-      message: message,
-      type: type,
-    );
+    AppNotification.show(context, message: message, type: type);
   }
 
   // ✅ NUEVO: Método para mostrar notificación inline
@@ -184,8 +178,11 @@ class _FormsScreenState extends State<FormsScreen> {
     });
   }
 
-  Future<void> _showDialog(String title, String message,
-      List<DialogAction> actions) async {
+  Future<void> _showDialog(
+    String title,
+    String message,
+    List<DialogAction> actions,
+  ) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -247,10 +244,7 @@ class _FormsScreenState extends State<FormsScreen> {
 
           content: ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: MediaQuery
-                  .of(context)
-                  .size
-                  .height * 0.5,
+              maxHeight: MediaQuery.of(context).size.height * 0.5,
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -310,36 +304,40 @@ class _FormsScreenState extends State<FormsScreen> {
                 margin: const EdgeInsets.only(left: 6),
                 child: isPrimary
                     ? ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    action.onPressed();
-                  },
-                  icon: Icon(_getButtonIcon(action.text), size: 16),
-                  label: Text(action.text),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.buttonPrimary,
-                    foregroundColor: AppColors.buttonTextPrimary,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    elevation: 2,
-                  ),
-                )
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          action.onPressed();
+                        },
+                        icon: Icon(_getButtonIcon(action.text), size: 16),
+                        label: Text(action.text),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.buttonPrimary,
+                          foregroundColor: AppColors.buttonTextPrimary,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          elevation: 2,
+                        ),
+                      )
                     : TextButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    action.onPressed();
-                  },
-                  icon: Icon(_getButtonIcon(action.text), size: 16),
-                  label: Text(action.text),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.textSecondary,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                  ),
-                ),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          action.onPressed();
+                        },
+                        icon: Icon(_getButtonIcon(action.text), size: 16),
+                        label: Text(action.text),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                        ),
+                      ),
               );
             }),
           ],
@@ -350,13 +348,24 @@ class _FormsScreenState extends State<FormsScreen> {
 
   Color _getIconBackgroundColor(String title) {
     if (title.contains('Advertencia') || title.contains('Atención')) {
-      return AppColors.warning.withOpacity(0.1);
+      return AppColors.warning.withValues(alpha: 0.1);
     } else if (title.contains('Error') || title.contains('Problema')) {
-      return AppColors.error.withOpacity(0.1);
+      return AppColors.error;
     } else if (title.contains('Éxito') || title.contains('Completado')) {
-      return AppColors.success.withOpacity(0.1);
+      return AppColors.success;
     }
-    return AppColors.info.withOpacity(0.1);
+    return AppColors.info.withValues(alpha: 0.1);
+  }
+
+  Color _getIconColor(String title) {
+    if (title.contains('Advertencia') || title.contains('Atención')) {
+      return AppColors.warning;
+    } else if (title.contains('Error') || title.contains('Problema')) {
+      return AppColors.error;
+    } else if (title.contains('Éxito') || title.contains('Completado')) {
+      return AppColors.success;
+    }
+    return AppColors.info;
   }
 
   IconData _getIconForTitle(String title) {
@@ -370,17 +379,6 @@ class _FormsScreenState extends State<FormsScreen> {
       return Icons.qr_code_scanner;
     }
     return Icons.info_outline;
-  }
-
-  Color _getIconColor(String title) {
-    if (title.contains('Advertencia') || title.contains('Atención')) {
-      return AppColors.warning;
-    } else if (title.contains('Error') || title.contains('Problema')) {
-      return AppColors.error;
-    } else if (title.contains('Éxito') || title.contains('Completado')) {
-      return AppColors.success;
-    }
-    return AppColors.info;
   }
 
   String _getSubtitle(String title) {
@@ -423,11 +421,7 @@ class _FormsScreenState extends State<FormsScreen> {
   void _navigateToPreview(Map<String, dynamic> datos) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => PreviewScreen(
-          datos: datos,
-        ),
-      ),
+      MaterialPageRoute(builder: (context) => PreviewScreen(datos: datos)),
     );
   }
 
@@ -435,7 +429,7 @@ class _FormsScreenState extends State<FormsScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false, // ✅ Evita que se cierre automáticamente
-      onPopInvoked: (didPop) async {
+      onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
 
         // ✅ Mostrar diálogo de confirmación
@@ -567,18 +561,18 @@ class _FormsScreenState extends State<FormsScreen> {
                           : _viewModel.escanearCodigoBarras,
                       icon: _viewModel.isScanning
                           ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
                           : const Icon(
-                        Icons.camera_alt,
-                        color: AppColors.background,
-                        size: 24,
-                      ),
+                              Icons.camera_alt,
+                              color: AppColors.background,
+                              size: 24,
+                            ),
                       tooltip: 'Escanear código',
                     ),
                   ),
@@ -724,9 +718,7 @@ class _FormsScreenState extends State<FormsScreen> {
             prefixIcon: Icon(icon),
             fillColor: backgroundColor,
             filled: backgroundColor != null,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: AppColors.border),
@@ -853,11 +845,15 @@ class _FormsScreenState extends State<FormsScreen> {
                 right: 8,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.6),
+                    color: Colors.black.withValues(alpha: 0.6),
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                     onPressed: onEliminar,
                   ),
                 ),
@@ -922,12 +918,7 @@ class _FormsScreenState extends State<FormsScreen> {
 
   Widget _buildBottomButtons() {
     return Container(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: 16,
-      ),
+      padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -956,10 +947,7 @@ class _FormsScreenState extends State<FormsScreen> {
                   ),
                   child: const Text(
                     'Cancelar',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -967,9 +955,7 @@ class _FormsScreenState extends State<FormsScreen> {
               Expanded(
                 flex: 2,
                 child: ElevatedButton(
-                  onPressed: _viewModel.isLoading
-                      ? null
-                      : _handleContinuar,
+                  onPressed: _viewModel.isLoading ? null : _handleContinuar,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.buttonPrimary,
                     foregroundColor: AppColors.buttonTextPrimary,
@@ -981,31 +967,28 @@ class _FormsScreenState extends State<FormsScreen> {
                   ),
                   child: _viewModel.isLoading
                       ? const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      ),
-                      SizedBox(width: 12),
-                      Text('Procesando...'),
-                    ],
-                  )
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Text('Procesando...'),
+                          ],
+                        )
                       : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _viewModel.buttonIcon,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(_viewModel.buttonText),
-                    ],
-                  ),
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(_viewModel.buttonIcon, size: 20),
+                            const SizedBox(width: 8),
+                            Text(_viewModel.buttonText),
+                          ],
+                        ),
                 ),
               ),
             ],
@@ -1062,74 +1045,66 @@ class _FormsScreenState extends State<FormsScreen> {
   Future<bool> _showCancelConfirmation() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) =>
-          AlertDialog(
-            backgroundColor: AppColors.surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: AppColors.warning,
+              size: 28,
             ),
-            title: Row(
-              children: [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  color: AppColors.warning,
-                  size: 28,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                '¿Cancelar censo?',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '¿Cancelar censo?',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            content: Text(
-              '¿Estás seguro que quieres cancelar el censo? Se perderán los datos ingresados.',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-                height: 1.4,
               ),
             ),
-            actions: [
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, false),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.success,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Continuar censo',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(
-                  'Cancelar',
-                  style: TextStyle(
-                    color: AppColors.error,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
+          ],
+        ),
+        content: Text(
+          '¿Estás seguro que quieres cancelar el censo? Se perderán los datos ingresados.',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+            height: 1.4,
           ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, false),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Continuar censo',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(
+                color: AppColors.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
 
     return confirmed ?? false;

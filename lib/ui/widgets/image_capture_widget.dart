@@ -47,7 +47,9 @@ class _ImageCaptureWidgetState extends State<ImageCaptureWidget> {
         // Verificar tamano usando tu service
         final double tamanoMB = await _imageService.obtenerTamanoImagen(image);
         if (tamanoMB > 10.0) {
-          _showErrorDialog('La imagen es demasiado grande (${tamanoMB.toStringAsFixed(1)}MB). Maximo 10MB.');
+          _showErrorDialog(
+            'La imagen es demasiado grande (${tamanoMB.toStringAsFixed(1)}MB). Maximo 10MB.',
+          );
           return;
         }
 
@@ -91,7 +93,9 @@ class _ImageCaptureWidgetState extends State<ImageCaptureWidget> {
         // Verificar tamano usando tu service
         final double tamanoMB = await _imageService.obtenerTamanoImagen(image);
         if (tamanoMB > 10.0) {
-          _showErrorDialog('La imagen es demasiado grande (${tamanoMB.toStringAsFixed(1)}MB). Maximo 10MB.');
+          _showErrorDialog(
+            'La imagen es demasiado grande (${tamanoMB.toStringAsFixed(1)}MB). Maximo 10MB.',
+          );
           return;
         }
 
@@ -186,7 +190,7 @@ class _ImageCaptureWidgetState extends State<ImageCaptureWidget> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(Icons.camera_alt, color: AppColors.primary),
@@ -204,7 +208,7 @@ class _ImageCaptureWidgetState extends State<ImageCaptureWidget> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.secondary.withOpacity(0.1),
+                    color: AppColors.secondary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(Icons.photo_library, color: AppColors.secondary),
@@ -302,14 +306,10 @@ class _ImageCaptureWidgetState extends State<ImageCaptureWidget> {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: backgroundColor.withOpacity(0.9),
+          color: backgroundColor.withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Icon(
-          icon,
-          color: Colors.white,
-          size: 20,
-        ),
+        child: Icon(icon, color: Colors.white, size: 20),
       ),
     );
   }
@@ -337,18 +337,12 @@ class _ImageCaptureWidgetState extends State<ImageCaptureWidget> {
           const SizedBox(height: 12),
           Text(
             'Agregar Imagen',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
           ),
           const SizedBox(height: 4),
           Text(
             'Camara o Galeria',
-            style: TextStyle(
-              color: AppColors.textTertiary,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
           ),
         ],
       ),
@@ -366,10 +360,7 @@ class _ImageCaptureWidgetState extends State<ImageCaptureWidget> {
 class ImagePreviewDialog extends StatelessWidget {
   final String imagePath;
 
-  const ImagePreviewDialog({
-    super.key,
-    required this.imagePath,
-  });
+  const ImagePreviewDialog({super.key, required this.imagePath});
 
   @override
   Widget build(BuildContext context) {
@@ -396,10 +387,7 @@ class ImagePreviewDialog extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.preview,
-                    color: Colors.white,
-                  ),
+                  const Icon(Icons.preview, color: Colors.white),
                   const SizedBox(width: 8),
                   const Text(
                     'Confirmar Imagen',

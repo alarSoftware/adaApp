@@ -71,7 +71,9 @@ class DeviceLogUploadService {
         }
       }
 
-      logger.i('✅ Sincronización completada - Exitosos: $exitosos, Fallidos: $fallidos');
+      logger.i(
+        '✅ Sincronización completada - Exitosos: $exitosos, Fallidos: $fallidos',
+      );
 
       return {
         'exitosos': exitosos,
@@ -93,12 +95,16 @@ class DeviceLogUploadService {
   }
 
   /// Enviar múltiples device logs en batch
-  static Future<Map<String, int>> enviarDeviceLogsBatch(List<DeviceLog> logs) async {
+  static Future<Map<String, int>> enviarDeviceLogsBatch(
+    List<DeviceLog> logs,
+  ) async {
     final logger = Logger();
 
     try {
       // 🔍 Mostrar URL para debugging
-      final urlCompleta = await ApiConfigService.getFullUrl('/appDeviceLog/insertAppDeviceLog');
+      final urlCompleta = await ApiConfigService.getFullUrl(
+        '/appDeviceLog/insertAppDeviceLog',
+      );
       logger.i('📤 Enviando batch de ${logs.length} device logs...');
       logger.i('🌐 URL destino: $urlCompleta');
 
@@ -139,20 +145,20 @@ class DeviceLogUploadService {
         errorType: 'upload',
       );
 
-      return {
-        'exitosos': 0,
-        'fallidos': logs.length,
-        'total': logs.length,
-      };
+      return {'exitosos': 0, 'fallidos': logs.length, 'total': logs.length};
     }
   }
 
   /// Limpiar logs antiguos ya sincronizados
-  static Future<int> limpiarLogsSincronizadosAntiguos({int diasAntiguos = 7}) async {
+  static Future<int> limpiarLogsSincronizadosAntiguos({
+    int diasAntiguos = 7,
+  }) async {
     final logger = Logger();
 
     try {
-      logger.i('🧹 Limpiando device logs sincronizados antiguos (>${diasAntiguos} días)...');
+      logger.i(
+        '🧹 Limpiando device logs sincronizados antiguos (>${diasAntiguos} días)...',
+      );
 
       final db = await DatabaseHelper().database;
       final repository = DeviceLogRepository(db);
@@ -184,11 +190,7 @@ class DeviceLogUploadService {
       };
     } catch (e) {
       Logger().e('❌ Error obteniendo estadísticas: $e');
-      return {
-        'total': 0,
-        'sincronizados': 0,
-        'pendientes': 0,
-      };
+      return {'total': 0, 'sincronizados': 0, 'pendientes': 0};
     }
   }
 
@@ -203,7 +205,9 @@ class DeviceLogUploadService {
     _syncActivo = true;
     final urlActual = await ApiConfigService.getBaseUrl();
 
-    Logger().i('🚀 Iniciando sincronización automática de device logs cada 10 minutos...');
+    Logger().i(
+      '🚀 Iniciando sincronización automática de device logs cada 10 minutos...',
+    );
     Logger().i('🌐 Sincronizando con: $urlActual');
 
     _syncTimer = Timer.periodic(Duration(minutes: 10), (timer) async {
@@ -235,11 +239,15 @@ class DeviceLogUploadService {
       final resultado = await sincronizarDeviceLogsPendientes();
 
       if (resultado['total']! > 0) {
-        logger.i('✅ Auto-sync completado: ${resultado['exitosos']}/${resultado['total']} enviados');
+        logger.i(
+          '✅ Auto-sync completado: ${resultado['exitosos']}/${resultado['total']} enviados',
+        );
 
         // 📊 Mostrar estadísticas después de la sincronización
         final stats = await obtenerEstadisticasSincronizacion();
-        logger.i('📊 Estado actual: ${stats['sincronizados']} sync, ${stats['pendientes']} pendientes');
+        logger.i(
+          '📊 Estado actual: ${stats['sincronizados']} sync, ${stats['pendientes']} pendientes',
+        );
       } else {
         logger.i('💤 No hay device logs pendientes para sincronizar');
       }
@@ -263,7 +271,9 @@ class DeviceLogUploadService {
   /// Verificar configuración actual del servicio
   static Future<Map<String, dynamic>> verificarConfiguracion() async {
     final baseUrl = await ApiConfigService.getBaseUrl();
-    final fullUrl = await ApiConfigService.getFullUrl('/appDeviceLog/insertAppDeviceLog');
+    final fullUrl = await ApiConfigService.getFullUrl(
+      '/appDeviceLog/insertAppDeviceLog',
+    );
     final stats = await obtenerEstadisticasSincronizacion();
 
     return {
@@ -285,7 +295,9 @@ class DeviceLogUploadService {
     logger.i("═══════════════════════════════════════");
     logger.i("🌐 Base URL: ${config['base_url']}");
     logger.i("🔗 URL Completa: ${config['full_url']}");
-    logger.i("🔄 Sync Automático: ${config['sync_activo'] ? 'ACTIVO' : 'INACTIVO'}");
+    logger.i(
+      "🔄 Sync Automático: ${config['sync_activo'] ? 'ACTIVO' : 'INACTIVO'}",
+    );
     logger.i("⏰ Timer Activo: ${config['timer_activo'] ? 'SÍ' : 'NO'}");
     logger.i("📊 Estadísticas:");
     final stats = config['estadisticas'] as Map<String, int>;

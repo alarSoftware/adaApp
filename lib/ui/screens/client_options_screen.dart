@@ -10,10 +10,7 @@ import 'package:ada_app/ui/widgets/client_info_card.dart';
 class ClientOptionsScreen extends StatelessWidget {
   final Cliente cliente;
 
-  const ClientOptionsScreen({
-    Key? key,
-    required this.cliente,
-  }) : super(key: key);
+  const ClientOptionsScreen({super.key, required this.cliente});
 
   @override
   Widget build(BuildContext context) {
@@ -38,14 +35,15 @@ class ClientOptionsScreen extends StatelessWidget {
               // Header con información del cliente (DISEÑO CONSISTENTE)
               Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: ClientInfoCard(
-                  cliente: cliente,
-                ),
+                child: ClientInfoCard(cliente: cliente),
               ),
 
               // Título de opciones
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 8.0,
+                ),
                 child: Text(
                   '¿Qué deseas hacer?',
                   style: TextStyle(
@@ -82,7 +80,7 @@ class ClientOptionsScreen extends StatelessWidget {
                     _buildOptionCard(
                       context: context,
                       title: 'Operaciones Comerciales',
-                      description: 'Pedidos, reposiciones y retiros',
+                      description: 'Reposiciones y retiros',
                       icon: Icons.receipt_long,
                       color: AppColors.success,
                       onTap: () => _navigateToOperacionesComerciales(context),
@@ -124,9 +122,9 @@ class ClientOptionsScreen extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: color.withOpacity(0.2)),
+                  border: Border.all(color: color.withValues(alpha: 0.2)),
                 ),
                 child: Icon(icon, color: color, size: 28),
               ),
@@ -188,7 +186,8 @@ class ClientOptionsScreen extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => OperacionesComercialesMenuScreen(cliente: cliente),
+        builder: (context) =>
+            OperacionesComercialesMenuScreen(cliente: cliente),
       ),
     );
   }

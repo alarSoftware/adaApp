@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:logger/logger.dart';
+
 import 'dart:async';
 import 'package:uuid/uuid.dart';
-import '../../models/cliente.dart';
 import '../../models/usuario.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
-import 'package:ada_app/services/post/censo_activo_post_service.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
@@ -18,7 +16,6 @@ import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:ada_app/services/database_helper.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 
-final _logger = Logger();
 final Uuid _uuid = const Uuid();
 
 class PreviewScreenViewModel extends ChangeNotifier {
@@ -30,7 +27,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
   final EquipoRepository _equipoRepository = EquipoRepository();
   final CensoActivoRepository _estadoEquipoRepository = CensoActivoRepository();
   final CensoActivoFotoRepository _fotoRepository = CensoActivoFotoRepository();
-  final EquipoPendienteRepository _equipoPendienteRepository = EquipoPendienteRepository();
+  final EquipoPendienteRepository _equipoPendienteRepository =
+      EquipoPendienteRepository();
 
   final AuthService _authService = AuthService();
 
@@ -56,14 +54,13 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   Future<int> get _getUsuarioId async {
     try {
-      if (_usuarioActual != null && _usuarioActual!.id != null) return _usuarioActual!.id!;
+      if (_usuarioActual != null && _usuarioActual!.id != null)
+        return _usuarioActual!.id!;
       _usuarioActual = await _authService.getCurrentUser();
       if (_usuarioActual?.id != null) return _usuarioActual!.id!;
 
-      _logger.w('No se pudo obtener usuario, usando ID 1 como fallback');
       return 1;
     } catch (e) {
-      _logger.e('Error obteniendo usuario: $e');
       rethrow;
     }
   }
@@ -74,16 +71,18 @@ class PreviewScreenViewModel extends ChangeNotifier {
       _usuarioActual = await _authService.getCurrentUser();
       return _usuarioActual?.edfVendedorId;
     } catch (e) {
-      _logger.e('Error obteniendo edf_vendedor_id: $e');
       rethrow;
     }
   }
 
-  Future<Map<String, dynamic>> confirmarRegistro(Map<String, dynamic> datos) async {
+  Future<Map<String, dynamic>> confirmarRegistro(
+    Map<String, dynamic> datos,
+  ) async {
     if (_isProcessing) {
       return {
         'success': false,
-        'error': 'Ya hay un proceso de confirmación en curso. Por favor espere.'
+        'error':
+            'Ya hay un proceso de confirmación en curso. Por favor espere.',
       };
     }
 
@@ -102,8 +101,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> _insertarEnviarCensoActivo(
-      Map<String, dynamic> datos, String processId) async {
-
+    Map<String, dynamic> datos,
+    String processId,
+  ) async {
     _setSaving(true);
     String? censoActivoId;
     String? equipoId;
@@ -115,17 +115,19 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
 
       var esNuevoEquipo = datos['es_nuevo_equipo'] as bool? ?? false;
-      var cliente       = datos['cliente'];
-      var id            = equipoId;
-      var numeroSerie   = datos['numero_serie']?.toString();
-      var modeloId      = datos['modelo_id'];
-      var logoId        = datos['logo_id'];
-      var marcaId       = datos['marca_id'];
-      var marcaNombre   = datos['marca_nombre']?.toString() ?? '';
-      var modeloNombre  = datos['modelo']?.toString() ?? '';
-      var logoNombre    = datos['logo']?.toString() ?? '';
-      int? clienteId = cliente != null ? int.tryParse(cliente.id.toString()) : null;
-      var codBarras     = datos['codigo_barras']?.toString() ?? '';
+      var cliente = datos['cliente'];
+      var id = equipoId;
+      var numeroSerie = datos['numero_serie']?.toString();
+      var modeloId = datos['modelo_id'];
+      var logoId = datos['logo_id'];
+      var marcaId = datos['marca_id'];
+      var marcaNombre = datos['marca_nombre']?.toString() ?? '';
+      var modeloNombre = datos['modelo']?.toString() ?? '';
+      var logoNombre = datos['logo']?.toString() ?? '';
+      int? clienteId = cliente != null
+          ? int.tryParse(cliente.id.toString())
+          : null;
+      var codBarras = datos['codigo_barras']?.toString() ?? '';
 
       if (cliente == null || cliente.id == null) {
         throw 'Cliente no válido';
@@ -137,25 +139,21 @@ class PreviewScreenViewModel extends ChangeNotifier {
       if (esNuevoEquipo) {
         _setStatusMessage('Registrando equipo...');
         equipoId = await _crearEquipoNuevo(
-            datos,
-            clienteId,
-            processId,
-            usuarioId.toString()
+          datos,
+          clienteId,
+          processId,
+          usuarioId.toString(),
         );
-        _logger.i('Equipo creado localmente: $equipoId');
       } else {
         equipoId = datos['equipo_completo']?['id']?.toString();
         if (equipoId == null) throw 'Equipo ID no válido';
-        _logger.i('Usando equipo existente: $equipoId');
       }
 
       bool yaAsignado;
       if (esNuevoEquipo) {
         yaAsignado = false;
-        _logger.i('Equipo NUEVO - Marcando como pendiente automáticamente');
       } else {
         yaAsignado = await _verificarAsignacionLocal(equipoId, clienteId!);
-        _logger.i('Equipo existente - Ya asignado: $yaAsignado');
       }
 
       final edfVendedorId = await SyncService.obtenerEdfVendedorId();
@@ -166,65 +164,58 @@ class PreviewScreenViewModel extends ChangeNotifier {
       if (!yaAsignado) {
         _setStatusMessage('Registrando asignación pendiente...');
         await _equipoPendienteRepository.procesarEscaneoCenso(
-            equipoId: equipoId,
-            clienteId: clienteId!,
-            usuarioId: usuarioId,
-            edfVendedorId: edfVendedorId
-        );
-        _logger.i('Pendiente registrado localmente');
-      } else {
-        _logger.i('Equipo YA asignado - NO se crea pendiente');
-      }
-
-      _setStatusMessage('Guardando censo...');
-      censoActivoId = await _crearCensoLocalConUsuario(
           equipoId: equipoId,
           clienteId: clienteId!,
           usuarioId: usuarioId,
-          datos: datos,
-          processId: processId,
-          yaAsignado: yaAsignado,
-          edfVendedorId: edfVendedorId
+          edfVendedorId: edfVendedorId,
+        );
+      } else {}
+
+      _setStatusMessage('Guardando censo...');
+      censoActivoId = await _crearCensoLocalConUsuario(
+        equipoId: equipoId,
+        clienteId: clienteId!,
+        usuarioId: usuarioId,
+        datos: datos,
+        processId: processId,
+        yaAsignado: yaAsignado,
+        edfVendedorId: edfVendedorId,
       );
 
       if (censoActivoId == null) {
         throw 'No se pudo crear el censo en la base de datos';
       }
 
-      _logger.i('Censo creado localmente: $censoActivoId (estado: ${yaAsignado ? "asignado" : "pendiente"})');
-
       final idsImagenes = await _fotoService.guardarFotosDelCenso(
-          censoActivoId,
-          datos
+        censoActivoId,
+        datos,
       );
       final tiempoLocal = DateTime.now().difference(now).inSeconds;
 
       await _uploadService.enviarCensoUnificado(
-          censoActivoId: censoActivoId,
-          usuarioId: usuarioId,
-          edfVendedorId: edfVendedorId,
-          guardarLog: true
+        censoActivoId: censoActivoId,
+        usuarioId: usuarioId,
+        edfVendedorId: edfVendedorId,
+        guardarLog: true,
       );
 
       Map<String, dynamic>? equipoCompleto;
 
       if (esNuevoEquipo) {
         equipoCompleto = {
-          'id'            : equipoId,
-          'cod_barras'    : codBarras,
-          'numero_serie'  : numeroSerie,
-          'marca_id'      : marcaId,
-          'modelo_id'     : modeloId,
-          'logo_id'       : logoId,
-          'marca_nombre'  : marcaNombre,
-          'modelo_nombre' : modeloNombre,
-          'logo_nombre'   : logoNombre,
-          'cliente_id'    : clienteId,
+          'id': equipoId,
+          'cod_barras': codBarras,
+          'numero_serie': numeroSerie,
+          'marca_id': marcaId,
+          'modelo_id': modeloId,
+          'logo_id': logoId,
+          'marca_nombre': marcaNombre,
+          'modelo_nombre': modeloNombre,
+          'logo_nombre': logoNombre,
+          'cliente_id': clienteId,
         };
-        _logger.i('equipo_completo construido para equipo nuevo');
       } else {
         equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
-        _logger.i('equipo_completo obtenido de datos existentes');
       }
 
       return {
@@ -237,14 +228,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
         'tiempo_guardado': '${tiempoLocal}s',
         'ya_asignado': yaAsignado,
       };
-
-    } catch (e, stackTrace) {
-      _logger.e('Error en _insertarEnviarCensoActivo: $e', stackTrace: stackTrace);
-
-      return {
-        'success': false,
-        'error': 'Error guardando registro: $e'
-      };
+    } catch (e) {
+      return {'success': false, 'error': 'Error guardando registro: $e'};
     } finally {
       _setSaving(false);
     }
@@ -261,11 +246,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<String> _crearEquipoNuevo(
-      Map<String, dynamic> datos,
-      int? clienteId,
-      String processId,
-      String? userId,
-      ) async {
+    Map<String, dynamic> datos,
+    int? clienteId,
+    String processId,
+    String? userId,
+  ) async {
     _setStatusMessage('Registrando equipo nuevo...');
 
     if (_currentProcessId != processId) throw 'Proceso cancelado';
@@ -281,14 +266,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
       );
 
       if (clienteId != null) {
-        _logger.i('Equipo creado y PRE-ASIGNADO al cliente $clienteId: $equipoId');
-      } else {
-        _logger.i('Equipo creado localmente (disponible): $equipoId');
-      }
+      } else {}
 
       return equipoId;
-    } catch (e, stackTrace) {
-      _logger.e('Error creando equipo: $e', stackTrace: stackTrace);
+    } catch (e) {
       rethrow;
     }
   }
@@ -296,11 +277,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
   Future<bool> _verificarAsignacionLocal(String equipoId, int clienteId) async {
     try {
       return await _equipoRepository.verificarAsignacionEquipoCliente(
-          equipoId,
-          clienteId
+        equipoId,
+        clienteId,
       );
     } catch (e) {
-      _logger.e('Error verificando asignación: $e');
       rethrow;
     }
   }
@@ -312,7 +292,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     required Map<String, dynamic> datos,
     required String processId,
     required bool yaAsignado,
-    required String edfVendedorId
+    required String edfVendedorId,
   }) async {
     _setStatusMessage('Registrando censo...');
 
@@ -323,15 +303,15 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final estadoCenso = yaAsignado ? 'asignado' : 'pendiente';
 
       final censoActivo = await _estadoEquipoRepository.crearCensoActivo(
-          equipoId: equipoId,
-          clienteId: clienteId,
-          latitud: datos['latitud'],
-          longitud: datos['longitud'],
-          fechaRevision: now,
-          enLocal: true,
-          observaciones: datos['observaciones']?.toString(),
-          estadoCenso: estadoCenso,
-          edfVendedorId: edfVendedorId
+        equipoId: equipoId,
+        clienteId: clienteId,
+        latitud: datos['latitud'],
+        longitud: datos['longitud'],
+        fechaRevision: now,
+        enLocal: true,
+        observaciones: datos['observaciones']?.toString(),
+        estadoCenso: estadoCenso,
+        edfVendedorId: edfVendedorId,
       );
 
       if (censoActivo.id != null) {
@@ -345,8 +325,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
           whereArgs: [censoActivo.id!],
         );
 
-        _logger.i('Censo creado y usuario_id actualizado: $usuarioId');
-
         final verificacion = await _estadoEquipoRepository.dbHelper.consultar(
           'censo_activo',
           where: 'id = ?',
@@ -356,10 +334,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
         if (verificacion.isNotEmpty) {
           final usuarioEnBD = verificacion.first['usuario_id'];
-          _logger.i('Verificación - usuario_id en BD: $usuarioEnBD');
 
           if (usuarioEnBD == null) {
-            _logger.e('usuario_id sigue siendo NULL después de actualizar');
             throw 'Error: usuario_id no se pudo guardar en la BD';
           }
         }
@@ -368,8 +344,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
 
       return null;
-    } catch (e, stackTrace) {
-      _logger.e('Error creando censo: $e', stackTrace: stackTrace);
+    } catch (e) {
       rethrow;
     }
   }
@@ -389,7 +364,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> verificarSincronizacionPendiente(String? estadoId) async {
+  Future<Map<String, dynamic>> verificarSincronizacionPendiente(
+    String? estadoId,
+  ) async {
     if (estadoId == null) return {'pendiente': false};
 
     try {
@@ -407,15 +384,18 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final sincronizado = estado['sincronizado'] as int?;
 
       return {
-        'pendiente': (estadoCenso == 'creado' || estadoCenso == 'error') && sincronizado == 0
+        'pendiente':
+            (estadoCenso == 'creado' || estadoCenso == 'error') &&
+            sincronizado == 0,
       };
     } catch (e) {
-      _logger.e('Error verificando sincronización: $e');
       rethrow;
     }
   }
 
-  Future<Map<String, dynamic>> obtenerInfoSincronizacion(String? censoActivoId) async {
+  Future<Map<String, dynamic>> obtenerInfoSincronizacion(
+    String? censoActivoId,
+  ) async {
     if (censoActivoId == null) {
       return {
         'estado': 'desconocido',
@@ -475,103 +455,107 @@ class PreviewScreenViewModel extends ChangeNotifier {
             'envioFallido': envioFallido,
           };
 
-        case 'sincronizado': {
-          final errorLog = await db.query(
-            'error_log',
-            where: 'registro_fail_id = ? AND table_name = ?',
-            whereArgs: [censoActivoId, 'censo_activo'],
-            orderBy: 'timestamp DESC',
-            limit: 1,
-          );
+        case 'sincronizado':
+          {
+            final errorLog = await db.query(
+              'error_log',
+              where: 'registro_fail_id = ? AND table_name = ?',
+              whereArgs: [censoActivoId, 'censo_activo'],
+              orderBy: 'timestamp DESC',
+              limit: 1,
+            );
 
-          String? errorDetalle;
-          if (errorLog.isNotEmpty) {
-            final errorType = errorLog.first['error_type'] as String?;
-            if (errorType == 'resuelto') {
+            String? errorDetalle;
+            if (errorLog.isNotEmpty) {
+              final errorType = errorLog.first['error_type'] as String?;
+              if (errorType == 'resuelto') {
+                final errorMessage = errorLog.first['error_message'] as String?;
+                final retryCount = errorLog.first['retry_count'] as int? ?? 0;
+                final errorCode = errorLog.first['error_code'] as String?;
+                final endpoint = errorLog.first['endpoint'] as String?;
+
+                errorDetalle =
+                    'Sincronizado después de ${retryCount + 1} intento(s)\n\nÚltimo error encontrado:\n$errorMessage';
+
+                if (errorCode != null) {
+                  errorDetalle += '\n\nCódigo: $errorCode';
+                }
+                if (endpoint != null) {
+                  errorDetalle += '\nEndpoint: ${_formatEndpoint(endpoint)}';
+                }
+              }
+            }
+
+            return {
+              'estado': estado,
+              'mensaje': 'Sincronizado exitosamente',
+              'icono': Icons.check_circle,
+              'color': AppColors.success,
+              'error_detalle': errorDetalle,
+              'envioFallido': envioFallido,
+            };
+          }
+
+        case 'error':
+          {
+            final errorLog = await db.query(
+              'error_log',
+              where: 'registro_fail_id = ? AND table_name = ?',
+              whereArgs: [censoActivoId, 'censo_activo'],
+              orderBy: 'timestamp DESC',
+              limit: 1,
+            );
+
+            String? errorDetalle;
+            if (errorLog.isNotEmpty) {
               final errorMessage = errorLog.first['error_message'] as String?;
-              final retryCount = errorLog.first['retry_count'] as int? ?? 0;
+              final errorType = errorLog.first['error_type'] as String?;
               final errorCode = errorLog.first['error_code'] as String?;
               final endpoint = errorLog.first['endpoint'] as String?;
+              final retryCount = errorLog.first['retry_count'] as int? ?? 0;
+              final timestamp = errorLog.first['timestamp'] as String?;
 
-              errorDetalle =
-              'Sincronizado después de ${retryCount + 1} intento(s)\n\nÚltimo error encontrado:\n$errorMessage';
+              errorDetalle = errorMessage ?? 'Error desconocido';
+
+              if (errorType != null && errorType != 'unknown') {
+                errorDetalle += '\n\nTipo: ${_formatErrorType(errorType)}';
+              }
 
               if (errorCode != null) {
-                errorDetalle += '\n\nCódigo: $errorCode';
+                errorDetalle += '\nCódigo: $errorCode';
               }
+
               if (endpoint != null) {
                 errorDetalle += '\nEndpoint: ${_formatEndpoint(endpoint)}';
               }
+
+              if (retryCount > 0) {
+                errorDetalle += '\n\nReintentos: $retryCount';
+              }
+
+              if (timestamp != null) {
+                try {
+                  errorDetalle +=
+                      '\n\nOcurrió el: ${_formatTimestamp(DateTime.parse(timestamp))}';
+                } catch (_) {}
+              }
+            } else {
+              errorDetalle = result.first['error_mensaje'] as String?;
+              if (errorDetalle != null) {
+                errorDetalle += '\n\n(Sin detalles adicionales)';
+              }
             }
+
+            return {
+              'estado': estado,
+              'mensaje': 'Error de sincronización',
+              'icono': Icons.error,
+              'color': AppColors.error,
+              'error_detalle':
+                  errorDetalle ?? 'No se encontró detalle del error',
+              'envioFallido': envioFallido,
+            };
           }
-
-          return {
-            'estado': estado,
-            'mensaje': 'Sincronizado exitosamente',
-            'icono': Icons.check_circle,
-            'color': AppColors.success,
-            'error_detalle': errorDetalle,
-            'envioFallido': envioFallido,
-          };
-        }
-
-        case 'error': {
-          final errorLog = await db.query(
-            'error_log',
-            where: 'registro_fail_id = ? AND table_name = ?',
-            whereArgs: [censoActivoId, 'censo_activo'],
-            orderBy: 'timestamp DESC',
-            limit: 1,
-          );
-
-          String? errorDetalle;
-          if (errorLog.isNotEmpty) {
-            final errorMessage = errorLog.first['error_message'] as String?;
-            final errorType = errorLog.first['error_type'] as String?;
-            final errorCode = errorLog.first['error_code'] as String?;
-            final endpoint = errorLog.first['endpoint'] as String?;
-            final retryCount = errorLog.first['retry_count'] as int? ?? 0;
-            final timestamp = errorLog.first['timestamp'] as String?;
-
-            errorDetalle = errorMessage ?? 'Error desconocido';
-
-            if (errorType != null && errorType != 'unknown') {
-              errorDetalle += '\n\nTipo: ${_formatErrorType(errorType)}';
-            }
-
-            if (errorCode != null) {
-              errorDetalle += '\nCódigo: $errorCode';
-            }
-
-            if (endpoint != null) {
-              errorDetalle += '\nEndpoint: ${_formatEndpoint(endpoint)}';
-            }
-
-            if (retryCount > 0) {
-              errorDetalle += '\n\nReintentos: $retryCount';
-            }
-
-            if (timestamp != null) {
-              try {
-                errorDetalle += '\n\nOcurrió el: ${_formatTimestamp(DateTime.parse(timestamp))}';
-              } catch (_) {}
-            }
-          } else {
-            errorDetalle = result.first['error_mensaje'] as String?;
-            if (errorDetalle != null) {
-              errorDetalle += '\n\n(Sin detalles adicionales)';
-            }
-          }
-
-          return {
-            'estado': estado,
-            'mensaje': 'Error de sincronización',
-            'icono': Icons.error,
-            'color': AppColors.error,
-            'error_detalle': errorDetalle ?? 'No se encontró detalle del error',
-            'envioFallido': envioFallido,
-          };
-        }
 
         default:
           return {
@@ -584,7 +568,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
           };
       }
     } catch (e) {
-      debugPrint('Error obteniendo info de sincronización: $e');
       rethrow;
     }
   }
@@ -645,15 +628,12 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final edfVendedorId = await _getEdfVendedorId;
 
       return await _uploadService.reintentarEnvioCenso(
-          estadoId,
-          usuarioId,
-          edfVendedorId
+        estadoId,
+        usuarioId,
+        edfVendedorId,
       );
     } catch (e) {
-      return {
-        'success': false,
-        'error': 'Error al reintentar: $e',
-      };
+      return {'success': false, 'error': 'Error al reintentar: $e'};
     }
   }
 
@@ -663,7 +643,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
   void cancelarProcesoActual() {
     if (_isProcessing) {
-      _logger.i('Cancelando proceso: $_currentProcessId');
       _currentProcessId = null;
       _isProcessing = false;
       _setSaving(false);

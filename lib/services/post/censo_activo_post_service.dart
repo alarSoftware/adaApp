@@ -3,19 +3,15 @@ import 'dart:async';
 import 'dart:io';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:http/http.dart' as http;
-import 'package:logger/logger.dart';
+
 import 'package:uuid/uuid.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:ada_app/services/api_config_service.dart';
-import 'package:ada_app/config/constants/server_constants.dart';
-import 'package:ada_app/services/error_log/error_log_service.dart';
 
 import '../../config/constants/server_response.dart';
 import '../censo/censo_upload_service.dart';
 
 class CensoActivoPostService {
-  static final Logger _logger = Logger();
   static const String _tableName = 'censo_activo';
   static const String _endpoint = '/censoActivo/insertCensoActivo';
   static const Uuid _uuid = Uuid();
@@ -51,26 +47,13 @@ class CensoActivoPostService {
     String? fullUrl;
 
     try {
-      _logger.i('=== ENVIANDO CENSO UNIFICADO ===');
-
       final now = DateTime.now().toLocal();
       final censoIdFinal = censoId ?? now.millisecondsSinceEpoch.toString();
 
-      if (censoId != null) {
-        _logger.i('Usando censo ID de BD: $censoIdFinal');
-      } else {
-        _logger.w('No se proporcionó censoId, generando nuevo: $censoIdFinal');
-      }
+      if (censoId != null) {}
 
       final equipoIdFinal =
           equipoId ?? codigoBarras ?? 'EQUIPO_${censoIdFinal}';
-
-      _logger.i('Preparando payload unificado...');
-      _logger.i('   - Censo ID: $censoIdFinal');
-      _logger.i('   - Equipo ID: $equipoIdFinal');
-      _logger.i('   - Cliente ID: $clienteId');
-      _logger.i('   - Es nuevo equipo: $esNuevoEquipo');
-      _logger.i('   - Crear pendiente: $crearPendiente');
 
       final payloadUnificado = _construirPayloadUnificado(
         equipoId: equipoIdFinal,
@@ -100,14 +83,8 @@ class CensoActivoPostService {
         equipoDataMap: equipoDataMap,
       );
 
-      _logger.i(
-        'Payload size: ${jsonEncode(payloadUnificado).length} caracteres',
-      );
-
       final baseUrl = await ApiConfigService.getBaseUrl();
       fullUrl = '$baseUrl$_endpoint';
-
-      _logger.i('Enviando a: $fullUrl');
 
       if (guardarLog) {
         await _guardarLogSimple(
@@ -128,8 +105,6 @@ class CensoActivoPostService {
             body: jsonEncode(payloadUnificado),
           )
           .timeout(Duration(seconds: timeoutSegundos));
-
-      _logger.i('Response: ${response.statusCode}');
 
       ServerResponse resultObject = ServerResponse.fromHttp(response);
 
@@ -154,7 +129,7 @@ class CensoActivoPostService {
           fotos: fotosSeguras,
         );
       }
-    } catch (e, stackTrace) {
+    } catch (e) {
       rethrow;
     }
   }
@@ -165,22 +140,11 @@ class CensoActivoPostService {
     required String timestamp,
   }) async {
     try {
-      _logger.i('═══════════════════════════════════════════════════════');
-      _logger.i('DEBUG LOG: INICIO DE GUARDADO');
-      _logger.i('═══════════════════════════════════════════════════════');
-
       final file = await _obtenerArchivoLog();
 
       if (file == null) {
-        _logger.e('DEBUG LOG: file = NULL (no se pudo obtener archivo)');
-        _logger.e('Revisar método _obtenerArchivoLog()');
         return;
       }
-
-      _logger.i('DEBUG LOG: Archivo obtenido');
-      _logger.i('Ruta completa: ${file.path}');
-      _logger.i('Directorio padre: ${file.parent.path}');
-      _logger.i('¿Directorio existe?: ${await file.parent.exists()}');
 
       final contenido = _generarContenidoLogSimple(
         url: url,
@@ -190,8 +154,7 @@ class CensoActivoPostService {
       );
 
       await file.writeAsString(contenido);
-    } catch (e, stackTrace) {
-      _logger.e('Error guardando log: $e');
+    } catch (e) {
       rethrow;
     }
   }
@@ -348,24 +311,13 @@ class CensoActivoPostService {
 
   static Future<File?> _obtenerArchivoLog() async {
     try {
-      _logger.i('Obteniendo directorio de descargas...');
-
       final downloadsDir = await _obtenerDirectorioDescargas();
 
       if (downloadsDir == null) {
-        _logger.e('downloadsDir = NULL');
         return null;
       }
 
-      _logger.i('Directorio obtenido: ${downloadsDir.path}');
-
-      if (!await downloadsDir.exists()) {
-        _logger.w('Directorio no existe, intentando crear...');
-        await downloadsDir.create(recursive: true);
-        _logger.i('Directorio creado');
-      } else {
-        _logger.i('Directorio ya existe');
-      }
+      if (!await downloadsDir.exists()) {}
 
       final now = DateTime.now();
       final fechaFormateada =
@@ -378,52 +330,32 @@ class CensoActivoPostService {
       final fileName = 'censo_activo_post_$fechaFormateada.txt';
       final filePath = '${downloadsDir.path}/$fileName';
 
-      _logger.i('Nombre del archivo: $fileName');
-      _logger.i('Ruta completa: $filePath');
-
       return File(filePath);
-    } catch (e, stackTrace) {
-      _logger.e('Error en _obtenerArchivoLog: $e');
-      _logger.e('StackTrace: $stackTrace');
+    } catch (e) {
       rethrow;
     }
   }
 
   static Future<Directory?> _obtenerDirectorioDescargas() async {
     try {
-      _logger.i('Detectando plataforma...');
-
       if (Platform.isAndroid) {
-        _logger.i('Plataforma = Android');
-
         var downloadsDir = Directory('/storage/emulated/0/Download');
-        _logger.i('Intentando ruta: ${downloadsDir.path}');
 
         if (!await downloadsDir.exists()) {
-          _logger.w('Ruta principal no existe, buscando alternativa...');
-
           final externalDir = await getExternalStorageDirectory();
-          _logger.i('ExternalStorageDirectory: ${externalDir?.path}');
 
           downloadsDir = Directory('${externalDir?.path}/Download');
-          _logger.i('Usando ruta alternativa: ${downloadsDir.path}');
-        } else {
-          _logger.i('Ruta principal existe');
-        }
+        } else {}
 
         return downloadsDir;
       } else if (Platform.isIOS) {
-        _logger.i('Plataforma = iOS');
         final appDocDir = await getApplicationDocumentsDirectory();
-        _logger.i('App Documents Directory: ${appDocDir.path}');
+
         return appDocDir;
       }
 
-      _logger.w('Plataforma no soportada');
       return null;
-    } catch (e, stackTrace) {
-      _logger.e('Error obteniendo directorio: $e');
-      _logger.e('StackTrace: $stackTrace');
+    } catch (e) {
       rethrow;
     }
   }
@@ -462,10 +394,8 @@ class CensoActivoPostService {
           modeloId != null &&
           logoId != null) {
         payload['equipo'] = _construirJsonEquipo(equipoDataMap);
-        _logger.i('JSON Equipo agregado (nuevo equipo)');
       } else {
         payload['equipo'] = {};
-        _logger.i('JSON Equipo vacío (equipo existente)');
       }
 
       if (pendienteExistente != null &&
@@ -473,10 +403,8 @@ class CensoActivoPostService {
         payload['equipo_pendiente'] = _construirJsonEquipoPendiente(
           pendienteExistente,
         );
-        _logger.i('JSON Equipo_Pendiente agregado (crear asignación)');
       } else {
         payload['equipo_pendiente'] = {};
-        _logger.i('JSON Equipo_Pendiente vacío (ya asignado)');
       }
 
       payload['censo_activo'] = _construirJsonCensoActivo(
@@ -650,5 +578,52 @@ class CensoActivoPostService {
     }
 
     return censo;
+  }
+
+  static Future<Map<String, dynamic>> enviarCambioEstado({
+    required String codigoBarras,
+    required int clienteId,
+    required bool enLocal,
+    required dynamic position, // Geolocator Position
+    String? observaciones,
+    required String equipoId,
+    required String clienteNombre,
+    required String numeroSerie,
+    required String modelo,
+    required String marca,
+    required String logo,
+    required int usuarioId,
+    required String edfVendedorId,
+  }) async {
+    try {
+      await enviarCensoActivo(
+        censoId: DateTime.now().millisecondsSinceEpoch.toString(),
+        equipoId: equipoId,
+        codigoBarras: codigoBarras,
+        clienteId: clienteId,
+        usuarioId: usuarioId,
+        edfVendedorId: edfVendedorId,
+        latitud: position.latitude,
+        longitud: position.longitude,
+        observaciones: observaciones,
+        enLocal: enLocal,
+        estadoCenso: 'migrado', // Se asume migrado si se envía directo
+        esNuevoEquipo: false,
+        crearPendiente: false,
+        clienteNombre: clienteNombre,
+        numeroSerie: numeroSerie,
+        modelo: modelo,
+        marca: marca,
+        logo: logo,
+        guardarLog: true,
+      );
+
+      return {'exito': true, 'mensaje': 'Estado actualizado correctamente'};
+    } catch (e) {
+      return {
+        'exito': false,
+        'mensaje': e.toString().replaceAll('Exception: ', ''),
+      };
+    }
   }
 }
