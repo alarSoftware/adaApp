@@ -217,7 +217,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       } else {
         equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
       }
-
+//TODO Sacar este return afuera
       return {
         'success': true,
         'message': 'Registro guardado. Sincronizando en segundo plano...',

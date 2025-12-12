@@ -1,13 +1,17 @@
-// lib/viewmodels/operaciones_comerciales_menu_viewmodel.dart
+// lib/viewmodels/operaciones_comerciales/operaciones_comerciales_menu_viewmodel.dart
+
 import 'package:flutter/foundation.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
+import 'package:ada_app/services/sync/operacion_comercial_sync_service.dart';
+import 'package:ada_app/services/database_helper.dart';
 
 class OperacionesComercialesMenuViewModel extends ChangeNotifier {
   final OperacionComercialRepository _repository;
   final int clienteId;
   bool _isLoading = false;
+  bool _isSyncing = false;
   String? _errorMessage;
   List<OperacionComercial> _operacionesReposicion = [];
   List<OperacionComercial> _operacionesRetiro = [];
@@ -22,6 +26,7 @@ class OperacionesComercialesMenuViewModel extends ChangeNotifier {
 
   // Getters
   bool get isLoading => _isLoading;
+  bool get isSyncing => _isSyncing;
   String? get errorMessage => _errorMessage;
 
   List<OperacionComercial> get operacionesReposicion => List.unmodifiable(_operacionesReposicion);
@@ -39,6 +44,73 @@ class OperacionesComercialesMenuViewModel extends ChangeNotifier {
         return operacionesDiscontinuos;
       default:
         return [];
+    }
+  }
+
+  // Sincronizar operaciones desde el servidor
+  Future<Map<String, int>?> sincronizarOperacionesDesdeServidor() async {
+    if (_isSyncing) return null;
+
+    _isSyncing = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      // Obtener edfVendedorId del usuario actual
+      final edfVendedorId = await _obtenerEdfVendedorId();
+
+      if (edfVendedorId == null) {
+        _errorMessage = 'No se pudo obtener el ID del vendedor';
+        _isSyncing = false;
+        notifyListeners();
+        return null;
+      }
+
+      // Sincronizar con el servidor
+      final resultado = await OperacionComercialSyncService.obtenerOperacionesPorVendedor(edfVendedorId);
+
+      if (resultado.exito) {
+        // Recargar las operaciones locales después de sincronizar
+        await cargarOperaciones();
+
+        _isSyncing = false;
+        notifyListeners();
+
+        return {
+          'total': resultado.itemsSincronizados,
+          'nuevas': resultado.itemsSincronizados,
+        };
+      } else {
+        _errorMessage = resultado.mensaje;
+        _isSyncing = false;
+        notifyListeners();
+        return null;
+      }
+    } catch (e) {
+      _errorMessage = 'Error sincronizando: $e';
+      _isSyncing = false;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  // Obtener el edfVendedorId del usuario actual
+  Future<String?> _obtenerEdfVendedorId() async {
+    try {
+      final db = await DatabaseHelper().database;
+      final result = await db.query(
+        'Users',
+        columns: ['edf_vendedor_id'],
+        limit: 1,
+      );
+
+      if (result.isNotEmpty) {
+        return result.first['edf_vendedor_id'] as String?;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error obteniendo edfVendedorId: $e');
+      return null;
     }
   }
 

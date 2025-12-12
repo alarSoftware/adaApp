@@ -1,8 +1,11 @@
+// lib/repositories/operacion_comercial_repository.dart
+
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 import 'package:ada_app/services/post/operaciones_comerciales_post_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
+import 'package:sqflite/sqflite.dart';
 import 'base_repository.dart';
 
 import 'package:uuid/uuid.dart';
@@ -23,6 +26,8 @@ abstract class OperacionComercialRepository {
 
   Future<void> marcarPendienteSincronizacion(String operacionId);
   Future<List<OperacionComercial>> obtenerOperacionesPendientes();
+  Future<void> guardarOperacionesDesdeServidor(
+      List<Map<String, dynamic>> operacionesData);
 }
 
 class OperacionComercialRepositoryImpl
@@ -383,5 +388,104 @@ class OperacionComercialRepositoryImpl
     } catch (e) {
       rethrow;
     }
+  }
+
+  // ==================== MÉTODOS NUEVOS PARA SINCRONIZACIÓN GET ====================
+
+  @override
+  Future<void> guardarOperacionesDesdeServidor(
+      List<Map<String, dynamic>> operacionesData,
+      ) async {
+    try {
+      final db = await dbHelper.database;
+
+      await db.transaction((txn) async {
+        for (final operacionData in operacionesData) {
+          // Extraer detalles
+          final detalles = operacionData['detalles'] as List<Map<String, dynamic>>?;
+
+          // Remover detalles del mapa principal
+          final operacionMap = Map<String, dynamic>.from(operacionData);
+          operacionMap.remove('detalles');
+
+          // Verificar si la operación ya existe por ID o server_id
+          final existente = await _operacionExisteEnTransaccion(
+            txn,
+            operacionMap['id'] as String?,
+            operacionMap['server_id'] as int?,
+          );
+
+          if (existente) {
+            // Actualizar operación existente
+            await txn.update(
+              tableName,
+              operacionMap,
+              where: 'id = ? OR server_id = ?',
+              whereArgs: [operacionMap['id'], operacionMap['server_id']],
+            );
+
+            // Eliminar detalles anteriores
+            await txn.delete(
+              'operacion_comercial_detalle',
+              where: 'operacion_comercial_id = ?',
+              whereArgs: [operacionMap['id']],
+            );
+          } else {
+            // Insertar nueva operación
+            await txn.insert(
+              tableName,
+              operacionMap,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+
+          // Insertar detalles
+          if (detalles != null && detalles.isNotEmpty) {
+            for (final detalle in detalles) {
+              await txn.insert(
+                'operacion_comercial_detalle',
+                detalle,
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
+            }
+          }
+        }
+      });
+    } catch (e) {
+      await ErrorLogService.logDatabaseError(
+        tableName: tableName,
+        operation: 'guardar_operaciones_desde_servidor',
+        errorMessage: 'Error guardando operaciones desde servidor: $e',
+      );
+      rethrow;
+    }
+  }
+
+  Future<bool> _operacionExisteEnTransaccion(
+      Transaction txn,
+      String? uuid,
+      int? serverId,
+      ) async {
+    if (uuid != null) {
+      final result = await txn.query(
+        tableName,
+        where: 'id = ?',
+        whereArgs: [uuid],
+        limit: 1,
+      );
+      if (result.isNotEmpty) return true;
+    }
+
+    if (serverId != null) {
+      final result = await txn.query(
+        tableName,
+        where: 'server_id = ?',
+        whereArgs: [serverId],
+        limit: 1,
+      );
+      if (result.isNotEmpty) return true;
+    }
+
+    return false;
   }
 }
