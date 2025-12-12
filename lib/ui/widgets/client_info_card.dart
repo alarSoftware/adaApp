@@ -55,6 +55,21 @@ class ClientInfoCard extends StatelessWidget {
                   value: cliente.rucCi,
                 )),
 
+              // Condición de Venta
+              if (cliente.condicionVenta != null && cliente.condicionVenta!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _buildInfoRow(ClientInfoRow(
+                  icon: cliente.esCredito
+                      ? Icons.credit_card_outlined
+                      : Icons.payments_outlined,
+                  label: 'Condición de Venta',
+                  value: cliente.displayCondicionVenta,
+                  valueColor: cliente.esCredito
+                      ? Colors.orange.shade700
+                      : Colors.green.shade700,
+                )),
+              ],
+
               // Propietario
               if (cliente.propietario.isNotEmpty) ...[
                 const SizedBox(height: 10),
@@ -157,7 +172,7 @@ class ClientInfoCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimary,
+                  color: info.valueColor ?? AppColors.textPrimary,
                   height: 1.2,
                 ),
               ),
@@ -174,10 +189,12 @@ class ClientInfoRow {
   final IconData icon;
   final String? label;
   final String value;
+  final Color? valueColor;
 
   ClientInfoRow({
     required this.icon,
     this.label,
     required this.value,
+    this.valueColor,
   });
 }

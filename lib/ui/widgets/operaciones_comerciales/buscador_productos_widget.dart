@@ -83,7 +83,7 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
         controller: _controller,
         onChanged: widget.onSearchChanged,
         decoration: InputDecoration(
-          hintText: 'Buscar por código, nombre o código de barras...', // ✅ Actualizado
+          hintText: 'Buscar por código, nombre o código de barras...',
           hintStyle: TextStyle(color: AppColors.textSecondary),
           prefixIcon: Icon(Icons.search, color: AppColors.primary),
           suffixIcon: widget.searchQuery.isNotEmpty
@@ -124,18 +124,30 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
               color: yaSeleccionado ? AppColors.success : AppColors.primary,
               size: 20,
             ),
-            // ✅ Usa displayName de tu modelo (funciona con la nueva estructura)
-            title: Text(
-              producto.displayName, // "[BEB001] Coca Cola 2L" o "Coca Cola 2L"
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
+            title: RichText(
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              text: TextSpan(
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
+                ),
+                children: [
+                  TextSpan(
+                    text: '[${producto.codigo ?? 'S/C'}] ',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  TextSpan(
+                    text: producto.nombre ?? 'Sin nombre',
+                  ),
+                ],
               ),
             ),
-            // ✅ Mejora: Muestra categoría y código de barras si están disponibles
             subtitle: _buildSubtitle(producto),
-            // ✅ Solo verificar si es válido (no stock/precio que no existen)
             enabled: !yaSeleccionado && producto.isValid,
             onTap: () {
               if (!yaSeleccionado && producto.isValid) {
@@ -152,7 +164,6 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
     );
   }
 
-  // ✅ Actualizado: Construir subtitle solo con información disponible
   Widget _buildSubtitle(Producto producto) {
     final parts = <String>[];
 
@@ -201,7 +212,6 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
   }
 
   bool _isProductoSeleccionado(String? codigo) {
-    // ✅ Manejar código nullable
     if (codigo == null) return false;
     return widget.productosSeleccionados
         .any((detalle) => detalle.productoCodigo == codigo);

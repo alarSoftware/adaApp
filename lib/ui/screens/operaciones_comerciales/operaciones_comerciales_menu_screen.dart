@@ -8,6 +8,7 @@ import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/ui/screens/operaciones_comerciales/operacion_comercial_form_screen.dart';
 import 'package:ada_app/viewmodels/operaciones_comerciales/operaciones_comerciales_menu_viewmodel.dart';
+import 'package:ada_app/main.dart';
 
 class OperacionesComercialesMenuScreen extends StatelessWidget {
   final Cliente cliente;
@@ -36,7 +37,8 @@ class _OperacionesComercialesMenuView extends StatefulWidget {
 
 class _OperacionesComercialesMenuViewState
     extends State<_OperacionesComercialesMenuView>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, RouteAware {
+
   late TabController _tabController;
   late List<_TabConfig> _availableTabs;
 
@@ -48,16 +50,42 @@ class _OperacionesComercialesMenuViewState
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final ModalRoute? modalRoute = ModalRoute.of(context);
+    if (modalRoute is PageRoute) {
+      MyApp.routeObserver.subscribe(this, modalRoute);
+    }
+  }
+
+  @override
   void dispose() {
+    MyApp.routeObserver.unsubscribe(this);
     _tabController.dispose();
     super.dispose();
   }
 
-  // 👇 MÉTODO QUE DETERMINA QUÉ TABS MOSTRAR
+  @override
+  void didPush() {
+    _refreshData();
+  }
+
+  @override
+  void didPopNext() {
+    _refreshData();
+  }
+
+  void _refreshData() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<OperacionesComercialesMenuViewModel>().cargarOperaciones();
+      }
+    });
+  }
+
   List<_TabConfig> _getAvailableTabs() {
     final List<_TabConfig> tabs = [];
 
-    // Reposición: TODOS los clientes
     tabs.add(_TabConfig(
       tipo: TipoOperacion.notaReposicion,
       label: 'Reposición',
@@ -67,7 +95,6 @@ class _OperacionesComercialesMenuViewState
       description: 'Solicita productos para reponer en el cliente',
     ));
 
-    // NDR (Retiro): SOLO CRÉDITO
     if (widget.cliente.esCredito) {
       tabs.add(_TabConfig(
         tipo: TipoOperacion.notaRetiro,
@@ -79,7 +106,6 @@ class _OperacionesComercialesMenuViewState
       ));
     }
 
-    // NDR Discontinuo: SOLO CONTADO
     if (widget.cliente.esContado) {
       tabs.add(_TabConfig(
         tipo: TipoOperacion.notaRetiroDiscontinuos,
@@ -175,10 +201,7 @@ class _OperacionesComercialesMenuViewState
       children: _availableTabs
           .map((tab) => _buildOperacionTab(
         tipoOperacion: tab.tipo,
-        icon: tab.icon,
         color: tab.color,
-        title: tab.title,
-        description: tab.description,
       ))
           .toList(),
     );
@@ -187,19 +210,13 @@ class _OperacionesComercialesMenuViewState
   Widget _buildSingleTab(_TabConfig tab) {
     return _buildOperacionTab(
       tipoOperacion: tab.tipo,
-      icon: tab.icon,
       color: tab.color,
-      title: tab.title,
-      description: tab.description,
     );
   }
 
   Widget _buildOperacionTab({
     required TipoOperacion tipoOperacion,
-    required IconData icon,
     required Color color,
-    required String title,
-    required String description,
   }) {
     return Consumer<OperacionesComercialesMenuViewModel>(
       builder: (context, viewModel, _) {
@@ -209,64 +226,6 @@ class _OperacionesComercialesMenuViewState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 16),
-
-              // Encabezado (Banner de color)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withValues(alpha: 0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                  border: Border.all(color: color.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(icon, color: color, size: 28),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            description,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Botón Principal
               SizedBox(
                 height: 54,
                 child: ElevatedButton.icon(
@@ -291,10 +250,7 @@ class _OperacionesComercialesMenuViewState
                   ),
                 ),
               ),
-
               const SizedBox(height: 24),
-
-              // Título de sección
               Row(
                 children: [
                   Icon(Icons.history, size: 20, color: AppColors.textSecondary),
@@ -310,8 +266,6 @@ class _OperacionesComercialesMenuViewState
                 ],
               ),
               const SizedBox(height: 12),
-
-              // Lista de operaciones
               Expanded(
                 child: _buildOperacionesList(viewModel, tipoOperacion, color),
               ),
@@ -527,8 +481,6 @@ class _OperacionesComercialesMenuViewState
     );
 
     if (result == true && mounted) {
-      await viewModel.cargarOperaciones();
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Operación creada exitosamente'),
@@ -546,7 +498,7 @@ class _OperacionesComercialesMenuViewState
       OperacionComercial operacion,
       OperacionesComercialesMenuViewModel viewModel,
       ) async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => OperacionComercialFormScreen(
@@ -557,14 +509,9 @@ class _OperacionesComercialesMenuViewState
         ),
       ),
     );
-
-    if (result == true && mounted) {
-      await viewModel.cargarOperaciones();
-    }
   }
 }
 
-// 👇 CLASE HELPER PARA CONFIGURACIÓN DE TABS
 class _TabConfig {
   final TipoOperacion tipo;
   final String label;

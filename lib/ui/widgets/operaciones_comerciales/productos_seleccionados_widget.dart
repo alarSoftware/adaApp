@@ -300,16 +300,29 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           ],
         ),
         if (esDiscontinuos) const SizedBox(height: 6),
-        Text(
-          detalle.productoDescripcion,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-            height: 1.3,
-          ),
+        RichText(
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
+          text: TextSpan(
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+              height: 1.3,
+            ),
+            children: [
+              TextSpan(
+                text: '[${detalle.productoCodigo}] ',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              TextSpan(
+                text: detalle.productoDescripcion,
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 4),
         Row(
@@ -684,15 +697,28 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  detalle.productoReemplazoDescripcion ?? '',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
+                RichText(
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
+                  text: TextSpan(
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                    children: [
+                      TextSpan(
+                        text: '[${detalle.productoReemplazoCodigo ?? 'S/C'}] ',
+                        style: TextStyle(
+                          color: AppColors.success,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      TextSpan(
+                        text: detalle.productoReemplazoDescripcion ?? 'Sin nombre',
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Row(

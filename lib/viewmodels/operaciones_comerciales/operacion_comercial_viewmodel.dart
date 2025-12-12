@@ -40,6 +40,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
   // Datos del formulario
   DateTime? _fechaRetiro;
+  String? _snc; // 👈 NUEVO CAMPO SNC
   List<OperacionComercialDetalle> _productosSeleccionados = [];
   String _observaciones = '';
 
@@ -68,6 +69,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   FormState get formState => _formState;
   String? get errorMessage => _errorMessage;
   DateTime? get fechaRetiro => _fechaRetiro;
+  String? get snc => _snc; // 👈 NUEVO GETTER SNC
   List<OperacionComercialDetalle> get productosSeleccionados =>
       List.unmodifiable(_productosSeleccionados);
   String get observaciones => _observaciones;
@@ -99,6 +101,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     final operacion = operacionExistente!;
     _observaciones = operacion.observaciones ?? '';
     _fechaRetiro = operacion.fechaRetiro;
+    _snc = operacion.snc; // 👈 CARGAR SNC SI EXISTE
     _productosSeleccionados = List.from(operacion.detalles);
     notifyListeners();
   }
@@ -116,6 +119,16 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   void setFechaRetiro(DateTime? fecha) {
     if (isViewOnly) return;
     _fechaRetiro = fecha;
+    notifyListeners();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // MANEJO DE SNC
+  // ═══════════════════════════════════════════════════════════════════
+
+  void setSnc(String value) {
+    if (isViewOnly) return;
+    _snc = value.trim().isEmpty ? null : value.trim();
     notifyListeners();
   }
 
@@ -224,7 +237,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
     final detalle = OperacionComercialDetalle(
       operacionComercialId: '',
-      productoCodigo: identificador, // 👈 Usar identificador en lugar de producto.codigo!
+      productoCodigo: identificador,
       productoDescripcion: producto.nombre ?? 'Sin nombre',
       productoCategoria: producto.categoria,
       productoId: producto.id,
@@ -425,36 +438,49 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   // GUARDADO
   // ═══════════════════════════════════════════════════════════════════
 
-  Future<bool> guardarOperacion() async {
-    if (isViewOnly) return false;
+  Future<OperacionComercial?> guardarOperacion() async {
+    if (isViewOnly) return null;
 
     final validation = validateForm();
     if (!validation.isValid) {
       _setError(validation.errorMessage!);
-      return false;
+      return null;
     }
 
     _setFormState(FormState.saving);
 
     try {
+      // Crear la operación
       final operacion = OperacionComercial(
         id: operacionExistente?.id,
         clienteId: cliente.id!,
         tipoOperacion: tipoOperacion,
         fechaCreacion: operacionExistente?.fechaCreacion ?? DateTime.now(),
         fechaRetiro: _fechaRetiro,
+        snc: tipoOperacion == TipoOperacion.notaRetiro ? _snc : null,
         observaciones: _observaciones.isEmpty ? null : _observaciones,
         totalProductos: _productosSeleccionados.length,
         usuarioId: 1,
         syncStatus: 'creado',
         detalles: _productosSeleccionados,
       );
-      await _operacionRepository.crearOperacion(operacion);
+
+      // Guardar en base de datos local y obtener el ID generado
+      final operacionId = await _operacionRepository.crearOperacion(operacion);
+
+      // Crear una copia de la operación con el ID asignado
+      final operacionConId = operacion.copyWith(id: operacionId);
+
+      // Obtener la operación completa desde el repository (con detalles actualizados)
+      final operacionCompleta = await _operacionRepository.obtenerOperacionPorId(operacionId);
+
       _setFormState(FormState.idle);
-      return true;
+
+      // Retornar la operación completa (ya tiene el estado correcto de sync desde crearOperacion)
+      return operacionCompleta ?? operacionConId;
     } catch (e) {
       _setError('Error al guardar: $e');
-      return false;
+      return null;
     }
   }
 
@@ -488,11 +514,13 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     if (operacionExistente == null) {
       return _productosSeleccionados.isNotEmpty ||
           _observaciones.isNotEmpty ||
-          _fechaRetiro != null;
+          _fechaRetiro != null ||
+          _snc != null; // 👈 INCLUIR SNC EN DETECCIÓN DE CAMBIOS
     }
 
     return _observaciones != (operacionExistente!.observaciones ?? '') ||
         _fechaRetiro != operacionExistente!.fechaRetiro ||
+        _snc != operacionExistente!.snc || // 👈 INCLUIR SNC EN COMPARACIÓN
         _productosSeleccionados.length != operacionExistente!.detalles.length;
   }
 }

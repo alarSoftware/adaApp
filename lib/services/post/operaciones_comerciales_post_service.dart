@@ -17,9 +17,9 @@ class OperacionesComercialesPostService {
       '/operacionComercial/insertOperacionComercial';
 
   static Future<void> enviarOperacion(
-    OperacionComercial operacion, {
-    int timeoutSegundos = 60,
-  }) async {
+      OperacionComercial operacion, {
+        int timeoutSegundos = 60,
+      }) async {
     String? fullUrl;
     try {
       if (operacion.id == null || operacion.id!.isEmpty) {
@@ -38,14 +38,14 @@ class OperacionesComercialesPostService {
 
       final response = await http
           .post(
-            Uri.parse(fullUrl),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'ngrok-skip-browser-warning': 'true',
-            },
-            body: jsonEncode(payload),
-          )
+        Uri.parse(fullUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: jsonEncode(payload),
+      )
           .timeout(Duration(seconds: timeoutSegundos));
 
       ServerResponse resultObject = ServerResponse.fromHttp(response);
@@ -77,6 +77,7 @@ class OperacionesComercialesPostService {
       'tipoOperacion': operacion.tipoOperacion.valor,
       'fechaCreacion': operacion.fechaCreacion.toIso8601String(),
       'fechaRetiro': operacion.fechaRetiro?.toIso8601String(),
+      if (operacion.snc != null) 'snc': operacion.snc,
       'usuarioId': operacion.usuarioId,
       'totalProductos': operacion.totalProductos,
     };
@@ -93,9 +94,9 @@ class OperacionesComercialesPostService {
   }
 
   static Map<String, dynamic> _construirDetalle(
-    OperacionComercialDetalle detalle,
-    TipoOperacion tipoOperacion,
-  ) {
+      OperacionComercialDetalle detalle,
+      TipoOperacion tipoOperacion,
+      ) {
     final detalleBase = {
       'productoCodigo': detalle.productoCodigo,
       'productoDescripcion': detalle.productoDescripcion,

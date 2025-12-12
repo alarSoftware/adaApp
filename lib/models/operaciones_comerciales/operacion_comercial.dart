@@ -7,6 +7,7 @@ class OperacionComercial {
   final TipoOperacion tipoOperacion;
   final DateTime fechaCreacion;
   final DateTime? fechaRetiro;
+  final String? snc;
   final String? observaciones;
   final int totalProductos;
   final int? usuarioId;
@@ -24,6 +25,7 @@ class OperacionComercial {
     required this.tipoOperacion,
     required this.fechaCreacion,
     this.fechaRetiro,
+    this.snc,
     this.observaciones,
     this.totalProductos = 0,
     this.usuarioId,
@@ -46,6 +48,7 @@ class OperacionComercial {
       fechaRetiro: map['fecha_retiro'] != null
           ? DateTime.parse(map['fecha_retiro'] as String)
           : null,
+      snc: map['snc'] as String?,
       observaciones: map['observaciones'] as String?,
       totalProductos: map['total_productos'] as int? ?? 0,
       usuarioId: map['usuario_id'] as int?,
@@ -66,6 +69,7 @@ class OperacionComercial {
       'tipo_operacion': tipoOperacion.valor,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_retiro': fechaRetiro?.toIso8601String(),
+      if (snc != null) 'snc': snc,
       'observaciones': observaciones,
       'total_productos': totalProductos,
       'usuario_id': usuarioId,
@@ -84,6 +88,7 @@ class OperacionComercial {
       'tipo_operacion': tipoOperacion.valor,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_retiro': fechaRetiro?.toIso8601String(),
+      if (snc != null) 'snc': snc,
       'observaciones': observaciones,
       'detalles': detalles.map((d) => d.toJson()).toList(),
     };
@@ -95,6 +100,7 @@ class OperacionComercial {
     TipoOperacion? tipoOperacion,
     DateTime? fechaCreacion,
     DateTime? fechaRetiro,
+    String? snc, // 👈 NUEVO PARÁMETRO EN COPYWITH
     String? observaciones,
     int? totalProductos,
     int? usuarioId,
@@ -111,6 +117,7 @@ class OperacionComercial {
       tipoOperacion: tipoOperacion ?? this.tipoOperacion,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       fechaRetiro: fechaRetiro ?? this.fechaRetiro,
+      snc: snc ?? this.snc,
       observaciones: observaciones ?? this.observaciones,
       totalProductos: totalProductos ?? this.totalProductos,
       usuarioId: usuarioId ?? this.usuarioId,
@@ -160,6 +167,6 @@ class OperacionComercial {
 
   @override
   String toString() {
-    return 'OperacionComercial{id: $id, tipo: ${tipoOperacion.valor}, cliente: $clienteId, detalles: ${detalles.length}, sync: $syncStatus, retries: $syncRetryCount}';
+    return 'OperacionComercial{id: $id, tipo: ${tipoOperacion.valor}, cliente: $clienteId, snc: $snc, detalles: ${detalles.length}, sync: $syncStatus, retries: $syncRetryCount}';
   }
 }
