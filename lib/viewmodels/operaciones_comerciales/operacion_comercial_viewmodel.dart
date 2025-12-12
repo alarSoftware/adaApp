@@ -10,10 +10,8 @@ import 'package:ada_app/repositories/producto_repository.dart';
 
 import '../../utils/unidad_medida_helper.dart';
 
-/// Estados del formulario
 enum FormState { idle, loading, saving, error, retrying }
 
-/// Resultado de validación
 class ValidationResult {
   final bool isValid;
   final String? errorMessage;
@@ -22,29 +20,23 @@ class ValidationResult {
   ValidationResult.error(this.errorMessage) : isValid = false;
 }
 
-/// ViewModel para el formulario de operación comercial
 class OperacionComercialFormViewModel extends ChangeNotifier {
-  // Dependencias - Repositories
   final OperacionComercialRepository _operacionRepository;
   final ProductoRepository _productoRepository;
   final bool isViewOnly;
 
-  // Datos básicos
   final Cliente cliente;
   final TipoOperacion tipoOperacion;
   final OperacionComercial? operacionExistente;
 
-  // Estado del formulario
   FormState _formState = FormState.idle;
   String? _errorMessage;
 
-  // Datos del formulario
   DateTime? _fechaRetiro;
-  String? _snc; // 👈 NUEVO CAMPO SNC
+  String? _snc;
   List<OperacionComercialDetalle> _productosSeleccionados = [];
   String _observaciones = '';
 
-  // Búsqueda de productos
   String _searchQuery = '';
   List<Producto> _productosFiltrados = [];
   List<Producto> _productosDisponibles = [];
@@ -62,14 +54,10 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     _initializeForm();
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // GETTERS
-  // ═══════════════════════════════════════════════════════════════════
-
   FormState get formState => _formState;
   String? get errorMessage => _errorMessage;
   DateTime? get fechaRetiro => _fechaRetiro;
-  String? get snc => _snc; // 👈 NUEVO GETTER SNC
+  String? get snc => _snc;
   List<OperacionComercialDetalle> get productosSeleccionados =>
       List.unmodifiable(_productosSeleccionados);
   String get observaciones => _observaciones;
@@ -86,10 +74,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   int get totalProductos => _productosSeleccionados.length;
   bool get necesitaFechaRetiro => tipoOperacion.necesitaFechaRetiro;
 
-  // ═══════════════════════════════════════════════════════════════════
-  // INICIALIZACIÓN
-  // ═══════════════════════════════════════════════════════════════════
-
   void _initializeForm() {
     if (operacionExistente != null) {
       _cargarOperacionExistente();
@@ -101,20 +85,15 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     final operacion = operacionExistente!;
     _observaciones = operacion.observaciones ?? '';
     _fechaRetiro = operacion.fechaRetiro;
-    _snc = operacion.snc; // 👈 CARGAR SNC SI EXISTE
+    _snc = operacion.snc;
     _productosSeleccionados = List.from(operacion.detalles);
     notifyListeners();
   }
 
   Future<void> _cargarProductosIniciales() async {
     try {
-      // Opcional: Cargar productos disponibles
     } catch (e) {}
   }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // MANEJO DE FECHA
-  // ═══════════════════════════════════════════════════════════════════
 
   void setFechaRetiro(DateTime? fecha) {
     if (isViewOnly) return;
@@ -122,29 +101,17 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // MANEJO DE SNC
-  // ═══════════════════════════════════════════════════════════════════
-
   void setSnc(String value) {
     if (isViewOnly) return;
     _snc = value.trim().isEmpty ? null : value.trim();
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // MANEJO DE OBSERVACIONES
-  // ═══════════════════════════════════════════════════════════════════
-
   void setObservaciones(String observaciones) {
     if (isViewOnly) return;
     _observaciones = observaciones;
     notifyListeners();
   }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // BÚSQUEDA DE PRODUCTOS
-  // ═══════════════════════════════════════════════════════════════════
 
   void setSearchQuery(String query) {
     if (isViewOnly) return;
@@ -180,10 +147,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // MANEJO DE PRODUCTOS (AGREGAR / QUITAR / CANTIDAD)
-  // ═══════════════════════════════════════════════════════════════════
-
   bool isProductoSeleccionado(String? codigoProducto) {
     if (codigoProducto == null) return false;
     return _productosSeleccionados.any(
@@ -194,18 +157,9 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   bool agregarProducto(Producto producto) {
     if (isViewOnly) return false;
 
-    // Usar código si existe, sino usar ID como fallback
     final identificador = producto.codigo ?? producto.id?.toString();
 
-    print('🔍 DEBUG - Intentando agregar producto:');
-    print('   - ID: ${producto.id}');
-    print('   - Código: ${producto.codigo}');
-    print('   - Identificador final: $identificador');
-    print('   - Nombre: ${producto.nombre}');
-    print('   - Unidad: ${producto.unidadMedida}');
-
     if (identificador == null || identificador.isEmpty) {
-      print('❌ Producto sin identificador válido');
       _setError('El producto no tiene un identificador válido');
       return false;
     }
@@ -215,7 +169,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       return false;
     }
 
-    // Validar que el producto tenga la unidad correcta según tipo de operación
     final errorUnidad = tipoOperacion.validarUnidadMedida(producto.unidadMedida);
     if (errorUnidad != null) {
       print('❌ Error de unidad: $errorUnidad');
@@ -240,6 +193,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       productoCodigo: identificador,
       productoDescripcion: producto.nombre ?? 'Sin nombre',
       productoCategoria: producto.categoria,
+      productoCodigoBarras: producto.codigoBarras,
       productoId: producto.id,
       cantidad: 0.0,
       unidadMedida: producto.unidadMedida,
@@ -250,6 +204,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     _productosSeleccionados.add(detalle);
 
     print('✅ Producto agregado a la lista: ${_productosSeleccionados.length} productos');
+    print('   - Código de barras incluido: ${producto.codigoBarras}');
     print('   - Limpiando búsqueda...');
 
     clearSearch();
@@ -265,7 +220,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
     if (index >= 0 && index < _productosSeleccionados.length) {
       _productosSeleccionados.removeAt(index);
-      // Reordenar
       for (int i = 0; i < _productosSeleccionados.length; i++) {
         _productosSeleccionados[i] = _productosSeleccionados[i].copyWith(
           orden: i + 1,
@@ -287,10 +241,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // MANEJO DE PRODUCTOS DE REEMPLAZO
-  // ═══════════════════════════════════════════════════════════════════
 
   Future<List<Producto>> obtenerProductosReemplazo(
       Producto productoOriginal,
@@ -340,31 +290,25 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         productoReemplazoCodigo: productoReemplazo.codigo ?? 'S/C',
         productoReemplazoDescripcion: productoReemplazo.nombre ?? 'Sin nombre',
         productoReemplazoCategoria: productoReemplazo.categoria,
+        productoReemplazoCodigoBarras: productoReemplazo.codigoBarras,
       );
       notifyListeners();
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // VALIDACIONES
-  // ═══════════════════════════════════════════════════════════════════
-
   ValidationResult validateForm() {
     if (isViewOnly) return ValidationResult.valid();
 
-    // 1. Fecha de retiro
     if (tipoOperacion.necesitaFechaRetiro && _fechaRetiro == null) {
       return ValidationResult.error('⚠️ Falta seleccionar la fecha de retiro');
     }
 
-    // 2. Mínimo un producto
     if (_productosSeleccionados.isEmpty) {
       return ValidationResult.error(
         '⚠️ Debes agregar al menos un producto a la operación',
       );
     }
 
-    // 3. Cantidades válidas
     final productosSinCantidad = _productosSeleccionados
         .where((detalle) => detalle.cantidad <= 0)
         .toList();
@@ -380,7 +324,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       );
     }
 
-    // 4. Validación específica para DISCONTINUOS
     if (tipoOperacion == TipoOperacion.notaRetiroDiscontinuos) {
       final sinReemplazo = _productosSeleccionados
           .where((detalle) => detalle.productoReemplazoId == null)
@@ -434,10 +377,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     return ValidationResult.valid();
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // GUARDADO
-  // ═══════════════════════════════════════════════════════════════════
-
   Future<OperacionComercial?> guardarOperacion() async {
     if (isViewOnly) return null;
 
@@ -450,7 +389,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     _setFormState(FormState.saving);
 
     try {
-      // Crear la operación
       final operacion = OperacionComercial(
         id: operacionExistente?.id,
         clienteId: cliente.id!,
@@ -465,28 +403,20 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         detalles: _productosSeleccionados,
       );
 
-      // Guardar en base de datos local y obtener el ID generado
       final operacionId = await _operacionRepository.crearOperacion(operacion);
 
-      // Crear una copia de la operación con el ID asignado
       final operacionConId = operacion.copyWith(id: operacionId);
 
-      // Obtener la operación completa desde el repository (con detalles actualizados)
       final operacionCompleta = await _operacionRepository.obtenerOperacionPorId(operacionId);
 
       _setFormState(FormState.idle);
 
-      // Retornar la operación completa (ya tiene el estado correcto de sync desde crearOperacion)
       return operacionCompleta ?? operacionConId;
     } catch (e) {
       _setError('Error al guardar: $e');
       return null;
     }
   }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // MÉTODOS PRIVADOS DE ESTADO
-  // ═══════════════════════════════════════════════════════════════════
 
   void _setFormState(FormState state) {
     _formState = state;
@@ -515,12 +445,12 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       return _productosSeleccionados.isNotEmpty ||
           _observaciones.isNotEmpty ||
           _fechaRetiro != null ||
-          _snc != null; // 👈 INCLUIR SNC EN DETECCIÓN DE CAMBIOS
+          _snc != null;
     }
 
     return _observaciones != (operacionExistente!.observaciones ?? '') ||
         _fechaRetiro != operacionExistente!.fechaRetiro ||
-        _snc != operacionExistente!.snc || // 👈 INCLUIR SNC EN COMPARACIÓN
+        _snc != operacionExistente!.snc ||
         _productosSeleccionados.length != operacionExistente!.detalles.length;
   }
 }

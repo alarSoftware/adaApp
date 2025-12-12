@@ -7,7 +7,6 @@ import '../services/auth_service.dart';
 
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ada_app/services/sync/full_sync_service.dart';
 
 import 'package:ada_app/models/usuario.dart';
@@ -54,7 +53,6 @@ class RequiredSyncEvent extends UIEvent {
 
 class RequestDeleteConfirmationEvent extends UIEvent {}
 
-// 🆕 NUEVO: Evento con validación de eliminación
 class RequestDeleteWithValidationEvent extends UIEvent {
   final DatabaseValidationResult validationResult;
   RequestDeleteWithValidationEvent(this.validationResult);
@@ -67,7 +65,6 @@ class SyncCompletedEvent extends UIEvent {
 
 class RedirectToLoginEvent extends UIEvent {}
 
-// Evento para actualizar progreso de sincronización
 class SyncProgressEvent extends UIEvent {
   final double progress;
   final String currentStep;
@@ -80,7 +77,6 @@ class SyncProgressEvent extends UIEvent {
   });
 }
 
-// 🆕 NUEVO: Evento para errores de sincronización
 class SyncErrorEvent extends UIEvent {
   final String message;
   final String? details;
@@ -168,7 +164,7 @@ class SelectScreenViewModel extends ChangeNotifier {
 
   // ========== STREAMS PARA COMUNICACIÓN ==========
   final StreamController<UIEvent> _eventController =
-      StreamController<UIEvent>.broadcast();
+  StreamController<UIEvent>.broadcast();
   Stream<UIEvent> get uiEvents => _eventController.stream;
 
   // ========== SUBSCRIPTIONS ==========
@@ -221,7 +217,7 @@ class SelectScreenViewModel extends ChangeNotifier {
     _checkInitialConnection();
   }
 
-  // MÉTODO MEJORADO PARA CARGAR USUARIO Y VALIDAR SINCRONIZACIÓN
+  // ✅ MÉTODO REFACTORIZADO - USA AuthService COMO FUENTE ÚNICA DE VERDAD
   Future<void> _loadCurrentUserAndValidateSync() async {
     try {
       _isLoadingUser = true;
@@ -237,24 +233,36 @@ class SelectScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      // 2. Actualizar display name
-      _userFullName = _currentUser!.fullname.isNotEmpty
-          ? _currentUser!.fullname
-          : _currentUser!.username;
+      // 2. Construir display name con formato: username - Nombre Vendedor
+      String displayName;
+      if (_currentUser!.edfVendedorNombre != null &&
+          _currentUser!.edfVendedorNombre!.trim().isNotEmpty) {
+        displayName = '${_currentUser!.username} - ${_currentUser!.edfVendedorNombre}';
+      } else {
+        displayName = _currentUser!.username;
+      }
+      _userFullName = displayName;
 
-      // 3. Validar si se requiere sincronización obligatoria
-      final validationResult = await _validateSyncRequirement(
+      // 3. ✅ USAR AuthService para validar sincronización (NO código duplicado)
+      final authValidationResult = await _authService.validateSyncRequirement(
         _currentUser!.edfVendedorId ?? '',
+        displayName,
       );
 
-      _syncValidationResult = validationResult;
+      // Convertir resultado de AuthService a formato del ViewModel
+      _syncValidationResult = SyncValidationResult(
+        requiereSincronizacion: authValidationResult.requiereSincronizacion,
+        razon: authValidationResult.razon,
+        vendedorAnterior: authValidationResult.vendedorAnteriorNombre,
+        vendedorActual: authValidationResult.vendedorActualNombre,
+      );
 
-      if (validationResult.requiereSincronizacion) {
+      if (authValidationResult.requiereSincronizacion) {
         _syncValidationState = SyncValidationState.required;
 
         // Emitir evento para mostrar UI de sincronización obligatoria
         _eventController.add(
-          RequiredSyncEvent(validationResult, _currentUser!),
+          RequiredSyncEvent(_syncValidationResult!, _currentUser!),
         );
       } else {
         _syncValidationState = SyncValidationState.optional;
@@ -269,92 +277,7 @@ class SelectScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // Validación de sincronización
-  Future<SyncValidationResult> _validateSyncRequirement(
-    String currentEdfVendedorId,
-  ) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final lastSyncedVendedor = prefs.getString('last_synced_vendedor_id');
-
-      // Si es la primera vez o no hay vendedor previo
-      if (lastSyncedVendedor == null) {
-        return SyncValidationResult(
-          requiereSincronizacion: true,
-          razon: 'Primera sincronización requerida',
-          vendedorAnterior: null,
-          vendedorActual: currentEdfVendedorId,
-        );
-      }
-
-      // Si el vendedor es diferente al último sincronizado
-      if (lastSyncedVendedor != currentEdfVendedorId) {
-        return SyncValidationResult(
-          requiereSincronizacion: true,
-          razon: 'Cambio de vendedor detectado',
-          vendedorAnterior: lastSyncedVendedor,
-          vendedorActual: currentEdfVendedorId,
-        );
-      }
-
-      // Vendedor es el mismo, no requiere sincronización forzada
-
-      return SyncValidationResult(
-        requiereSincronizacion: false,
-        razon: 'Mismo vendedor que la sincronización anterior',
-        vendedorAnterior: lastSyncedVendedor,
-        vendedorActual: currentEdfVendedorId,
-      );
-    } catch (e) {
-      return SyncValidationResult(
-        requiereSincronizacion: true,
-        razon: 'Error en validación - sincronización por seguridad',
-        vendedorAnterior: null,
-        vendedorActual: currentEdfVendedorId,
-      );
-    }
-  }
-
-  Future<void> _markSyncCompleted(String edfVendedorId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('last_synced_vendedor_id', edfVendedorId);
-      await prefs.setString('last_sync_date', DateTime.now().toIso8601String());
-    } catch (e) {}
-  }
-
-  Future<void> _clearSyncData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('last_synced_vendedor_id');
-      await prefs.remove('last_sync_date');
-
-      // Limpiar clientes de la base de datos local
-      await _dbHelper.eliminar('clientes');
-    } catch (e) {}
-  }
-
-  // IMPLEMENTACIÓN REAL DE BÚSQUEDA EN BASE DE DATOS
-  Future<String?> _getFullNameFromDatabase(String username) async {
-    try {
-      final resultado = await _dbHelper.consultarPersonalizada(
-        'SELECT fullname FROM Users WHERE username = ? LIMIT 1',
-        [username],
-      );
-
-      if (resultado.isNotEmpty) {
-        final fullname = resultado.first['fullname']?.toString();
-        if (fullname != null && fullname.isNotEmpty) {
-          return fullname;
-        }
-      }
-
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-
+  // ========== MÉTODOS DE CONECTIVIDAD ==========
   void _startConnectivityMonitoring() {
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
       _onConnectivityChanged,
@@ -364,11 +287,10 @@ class SelectScreenViewModel extends ChangeNotifier {
   void _startApiMonitoring() {
     _apiMonitorTimer = Timer.periodic(
       Duration(minutes: 10),
-      (_) => _checkApiConnectionSilently(),
+          (_) => _checkApiConnectionSilently(),
     );
   }
 
-  // ========== LÓGICA DE CONECTIVIDAD ==========
   void _onConnectivityChanged(List<ConnectivityResult> results) {
     final hasInternet = results.any((r) => r != ConnectivityResult.none);
 
@@ -387,7 +309,7 @@ class SelectScreenViewModel extends ChangeNotifier {
   Future<void> _checkInitialConnection() async {
     final connectivityResults = await Connectivity().checkConnectivity();
     final hasInternet = connectivityResults.any(
-      (r) => r != ConnectivityResult.none,
+          (r) => r != ConnectivityResult.none,
     );
 
     if (hasInternet) {
@@ -478,14 +400,11 @@ class SelectScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      // 🆕 VALIDAR Y USAR EL MISMO POPUP QUE BORRAR BD
-
       final db = await _dbHelper.database;
       final validationService = DatabaseValidationService(db);
       final validationResult = await validationService.canDeleteDatabase();
 
       if (!validationResult.canDelete) {
-        // USAR EL MISMO EVENTO QUE EL BOTÓN DE BORRAR
         _eventController.add(
           RequestDeleteWithValidationEvent(validationResult),
         );
@@ -506,10 +425,10 @@ class SelectScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== 🎯 MÉTODO UNIFICADO DE SINCRONIZACIÓN ==========
   /// Ejecuta sincronización usando el servicio centralizado FullSyncService
   Future<void> _executeUnifiedSync({
     required String edfVendedorId,
+    String? edfVendedorNombre,
     String? previousVendedorId,
     bool forceClear = false,
   }) async {
@@ -517,37 +436,35 @@ class SelectScreenViewModel extends ChangeNotifier {
     _resetSyncProgress();
 
     try {
-      // USAR EL SERVICIO UNIFICADO
       final result = await FullSyncService.syncAllDataWithProgress(
         edfVendedorId: edfVendedorId,
+        edfVendedorNombre: edfVendedorNombre,
         previousVendedorId: previousVendedorId,
         forceClear: forceClear,
-        onProgress:
-            ({
-              required double progress,
-              required String currentStep,
-              required List<String> completedSteps,
-            }) {
-              // Actualizar estado interno
-              _syncProgress = progress;
-              _syncCurrentStep = currentStep;
-              _syncCompletedSteps = List.from(completedSteps);
+        onProgress: ({
+          required double progress,
+          required String currentStep,
+          required List<String> completedSteps,
+        }) {
+          // Actualizar estado interno
+          _syncProgress = progress;
+          _syncCurrentStep = currentStep;
+          _syncCompletedSteps = List.from(completedSteps);
 
-              // Emitir evento para la UI
-              _eventController.add(
-                SyncProgressEvent(
-                  progress: progress,
-                  currentStep: currentStep,
-                  completedSteps: completedSteps,
-                ),
-              );
+          // Emitir evento para la UI
+          _eventController.add(
+            SyncProgressEvent(
+              progress: progress,
+              currentStep: currentStep,
+              completedSteps: completedSteps,
+            ),
+          );
 
-              notifyListeners();
-            },
+          notifyListeners();
+        },
       );
 
       if (!result.exito) {
-        // 🆕 NUEVO: Emitir evento de error en lugar de throw
         _eventController.add(
           SyncErrorEvent(
             'No se pudo completar la sincronización',
@@ -569,7 +486,6 @@ class SelectScreenViewModel extends ChangeNotifier {
       _eventController.add(SyncCompletedEvent(syncResult));
       await _checkApiConnection();
     } catch (e) {
-      // 🆕 NUEVO: Emitir evento de error con detalles técnicos
       _eventController.add(
         SyncErrorEvent(
           'Error durante la sincronización',
@@ -599,9 +515,20 @@ class SelectScreenViewModel extends ChangeNotifier {
         return;
       }
 
+      // Construir nombre para logs: username - Nombre Vendedor
+      String nombreVendedor;
+      if (_currentUser!.edfVendedorNombre != null &&
+          _currentUser!.edfVendedorNombre!.trim().isNotEmpty) {
+        nombreVendedor =
+        '${_currentUser!.username} - ${_currentUser!.edfVendedorNombre}';
+      } else {
+        nombreVendedor = _currentUser!.username;
+      }
+
       // USAR MÉTODO UNIFICADO
       await _executeUnifiedSync(
         edfVendedorId: _currentUser!.edfVendedorId ?? '',
+        edfVendedorNombre: nombreVendedor,
         previousVendedorId: _syncValidationResult?.vendedorAnterior,
       );
 
@@ -625,9 +552,20 @@ class SelectScreenViewModel extends ChangeNotifier {
       return;
     }
 
+    // Construir nombre para logs: username - Nombre Vendedor
+    String nombreVendedor;
+    if (_currentUser!.edfVendedorNombre != null &&
+        _currentUser!.edfVendedorNombre!.trim().isNotEmpty) {
+      nombreVendedor =
+      '${_currentUser!.username} - ${_currentUser!.edfVendedorNombre}';
+    } else {
+      nombreVendedor = _currentUser!.username;
+    }
+
     // USAR MÉTODO UNIFICADO
     await _executeUnifiedSync(
       edfVendedorId: _currentUser!.edfVendedorId ?? '',
+      edfVendedorNombre: nombreVendedor,
       previousVendedorId: null,
       forceClear: true,
     );
@@ -662,24 +600,16 @@ class SelectScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // 🔒 VALIDACIÓN ANTES DE ELIMINAR BASE DE DATOS
   /// Solicita borrar la base de datos CON VALIDACIÓN
   Future<void> requestDeleteDatabase() async {
     try {
-      // Obtener la base de datos
       final db = await _dbHelper.database;
-
-      // Crear servicio de validación
       final validationService = DatabaseValidationService(db);
-
-      // Verificar si se puede eliminar
       final validationResult = await validationService.canDeleteDatabase();
 
       if (validationResult.canDelete) {
-        // Enviar evento de confirmación normal
         _eventController.add(RequestDeleteConfirmationEvent());
       } else {
-        // Enviar evento con la validación para mostrar detalles
         _eventController.add(
           RequestDeleteWithValidationEvent(validationResult),
         );
@@ -691,7 +621,7 @@ class SelectScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// Ejecuta el borrado de la base de datos (excepto usuarios)
+  /// ✅ REFACTORIZADO - USA AuthService.clearSyncData()
   Future<void> executeDeleteDatabase() async {
     _setSyncLoading(true);
 
@@ -715,10 +645,8 @@ class SelectScreenViewModel extends ChangeNotifier {
       // Borrar imágenes de censos
       await _dbHelper.eliminar('censo_activo_foto');
 
-      // Limpiar datos de sincronización
-      await _clearSyncData();
-
-      // NOTA: NO se borra la tabla Users
+      // ✅ USAR AuthService para limpiar datos de sincronización
+      await _authService.clearSyncData();
 
       // Revalidar sincronización después del borrado
       await _loadCurrentUserAndValidateSync();

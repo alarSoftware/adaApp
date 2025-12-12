@@ -26,7 +26,7 @@ class Usuario {
       id: ParsingHelpers.parseInt(map['id']),
       edfVendedorId: ParsingHelpers.parseString(map['edf_vendedor_id']),
       // Asegúrate de que la clave coincida con tu CREATE TABLE ('edfVendedorNombre')
-      edfVendedorNombre: ParsingHelpers.parseString(map['edfVendedorNombre']),
+      edfVendedorNombre: ParsingHelpers.parseString(map['edf_vendedor_nombre']),
       code: ParsingHelpers.parseInt(map['code']),
       username: ParsingHelpers.parseString(map['username']) ?? '',
       password: ParsingHelpers.parseString(map['password']) ?? '',
@@ -54,7 +54,7 @@ class Usuario {
     return {
       'id': id,
       'edf_vendedor_id': edfVendedorId,
-      'edfVendedorNombre': edfVendedorNombre, // <--- Añadido
+      'edf_vendedor_nommbre': edfVendedorNombre,
       'code': code,
       'username': username,
       'password': password,

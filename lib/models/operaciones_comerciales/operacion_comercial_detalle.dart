@@ -4,6 +4,7 @@ class OperacionComercialDetalle {
   final String productoCodigo;
   final String productoDescripcion;
   final String? productoCategoria;
+  final String? productoCodigoBarras;
   final int? productoId;
   final double cantidad;
   final String unidadMedida;
@@ -13,11 +14,11 @@ class OperacionComercialDetalle {
   final int orden;
   final DateTime fechaCreacion;
 
-  // 🆕 CAMPOS PARA INTERCAMBIO (RETIRO DISCONTINUOS)
   final int? productoReemplazoId;
   final String? productoReemplazoCodigo;
   final String? productoReemplazoDescripcion;
   final String? productoReemplazoCategoria;
+  final String? productoReemplazoCodigoBarras;
 
   const OperacionComercialDetalle({
     this.id,
@@ -25,6 +26,7 @@ class OperacionComercialDetalle {
     required this.productoCodigo,
     required this.productoDescripcion,
     this.productoCategoria,
+    this.productoCodigoBarras,
     this.productoId,
     required this.cantidad,
     required this.unidadMedida,
@@ -37,6 +39,7 @@ class OperacionComercialDetalle {
     this.productoReemplazoCodigo,
     this.productoReemplazoDescripcion,
     this.productoReemplazoCategoria,
+    this.productoReemplazoCodigoBarras,
   });
 
   factory OperacionComercialDetalle.fromMap(Map<String, dynamic> map) {
@@ -46,6 +49,7 @@ class OperacionComercialDetalle {
       productoCodigo: map['producto_codigo'] as String? ?? '',
       productoDescripcion: map['producto_descripcion'] as String? ?? '',
       productoCategoria: map['producto_categoria'] as String?,
+      productoCodigoBarras: map['producto_codigo_barras'] as String?,
       productoId: map['producto_id'] as int?,
       cantidad: (map['cantidad'] as num?)?.toDouble() ?? 0.0,
       unidadMedida: map['unidad_medida'] as String? ?? '',
@@ -60,6 +64,7 @@ class OperacionComercialDetalle {
       productoReemplazoCodigo: map['producto_reemplazo_codigo'] as String?,
       productoReemplazoDescripcion: map['producto_reemplazo_descripcion'] as String?,
       productoReemplazoCategoria: map['producto_reemplazo_categoria'] as String?,
+      productoReemplazoCodigoBarras: map['producto_reemplazo_codigo_barras'] as String?,
     );
   }
 
@@ -111,6 +116,7 @@ class OperacionComercialDetalle {
     String? productoCodigo,
     String? productoDescripcion,
     String? productoCategoria,
+    String? productoCodigoBarras,
     int? productoId,
     double? cantidad,
     String? unidadMedida,
@@ -123,6 +129,7 @@ class OperacionComercialDetalle {
     String? productoReemplazoCodigo,
     String? productoReemplazoDescripcion,
     String? productoReemplazoCategoria,
+    String? productoReemplazoCodigoBarras,
   }) {
     return OperacionComercialDetalle(
       id: id ?? this.id,
@@ -130,6 +137,7 @@ class OperacionComercialDetalle {
       productoCodigo: productoCodigo ?? this.productoCodigo,
       productoDescripcion: productoDescripcion ?? this.productoDescripcion,
       productoCategoria: productoCategoria ?? this.productoCategoria,
+      productoCodigoBarras: productoCodigoBarras ?? this.productoCodigoBarras,
       productoId: productoId ?? this.productoId,
       cantidad: cantidad ?? this.cantidad,
       unidadMedida: unidadMedida ?? this.unidadMedida,
@@ -142,15 +150,16 @@ class OperacionComercialDetalle {
       productoReemplazoCodigo: productoReemplazoCodigo ?? this.productoReemplazoCodigo,
       productoReemplazoDescripcion: productoReemplazoDescripcion ?? this.productoReemplazoDescripcion,
       productoReemplazoCategoria: productoReemplazoCategoria ?? this.productoReemplazoCategoria,
+      productoReemplazoCodigoBarras: productoReemplazoCodigoBarras ?? this.productoReemplazoCodigoBarras,
     );
   }
 
-  // Getters útiles
   String get displayInfo => '$productoCodigo - $productoDescripcion';
   bool get tieneTicket => ticket != null && ticket!.isNotEmpty;
   bool get tienePrecio => precioUnitario != null && precioUnitario! > 0;
   bool get esIntercambio => productoReemplazoCodigo != null;
   bool get intercambioCompleto => productoReemplazoCodigo != null && productoReemplazoDescripcion != null;
+  bool get tieneCodigoBarras => productoCodigoBarras != null && productoCodigoBarras!.isNotEmpty;
 
   @override
   bool operator ==(Object other) =>
@@ -166,6 +175,6 @@ class OperacionComercialDetalle {
 
   @override
   String toString() {
-    return 'OperacionComercialDetalle{id: $id, codigo: $productoCodigo, descripcion: $productoDescripcion, cantidad: $cantidad, unidad: $unidadMedida, reemplazo: $productoReemplazoCodigo}';
+    return 'OperacionComercialDetalle{id: $id, codigo: $productoCodigo, barras: $productoCodigoBarras, descripcion: $productoDescripcion, cantidad: $cantidad, unidad: $unidadMedida, reemplazo: $productoReemplazoCodigo}';
   }
 }

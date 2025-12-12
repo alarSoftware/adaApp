@@ -4,8 +4,6 @@ import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
 
-/// Widget para mostrar y manejar productos seleccionados
-/// Incluye funcionalidad específica para productos discontinuos con reemplazos
 class ProductosSeleccionadosWidget extends StatelessWidget {
   final List<OperacionComercialDetalle> productosSeleccionados;
   final TipoOperacion tipoOperacion;
@@ -72,7 +70,6 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
-        // Lista de productos seleccionados
         if (productosSeleccionados.isEmpty)
           _buildEmptyState()
         else
@@ -107,11 +104,6 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.inventory_2_outlined,
-              size: 48,
-              color: AppColors.primary.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 16),
@@ -191,7 +183,6 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: Column(
           children: [
-            // Barra superior con gradiente si es discontinuo
             if (esDiscontinuos)
               Container(
                 height: 4,
@@ -207,44 +198,16 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Icono del producto con gradiente
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          gradient: esDiscontinuos
-                              ? AppColors.errorGradient
-                              : AppColors.primaryGradient,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: (esDiscontinuos ? AppColors.error : AppColors.primary)
-                                  .withValues(alpha: 0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          esDiscontinuos ? Icons.remove_circle_outline : Icons.inventory_2,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-
                       const SizedBox(width: 16),
 
-                      // Información del producto
                       Expanded(
                         child: _buildProductInfo(detalle, esDiscontinuos),
                       ),
 
                       const SizedBox(width: 12),
 
-                      // Campo de cantidad
                       _buildQuantityField(index, detalle),
 
-                      // Botón eliminar (oculto en modo solo lectura)
                       if (!isReadOnly) ...[
                         const SizedBox(width: 8),
                         _buildDeleteButton(index),
@@ -252,7 +215,6 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                     ],
                   ),
 
-                  // Sección de intercambio para discontinuos
                   if (esDiscontinuos) ...[
                     const SizedBox(height: 16),
                     _buildExchangeSection(context, index, detalle),
@@ -265,6 +227,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
       ),
     );
   }
+
 
   Widget _buildProductInfo(OperacionComercialDetalle detalle, bool esDiscontinuos) {
     return Column(
@@ -325,20 +288,21 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Row(
-          children: [
-            Icon(Icons.qr_code, size: 12, color: AppColors.textSecondary),
-            const SizedBox(width: 4),
-            Text(
-              detalle.productoCodigo,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
+        if (detalle.productoCodigoBarras != null && detalle.productoCodigoBarras!.isNotEmpty)
+          Row(
+            children: [
+              Icon(Icons.barcode_reader, size: 12, color: AppColors.textSecondary),
+              const SizedBox(width: 4),
+              Text(
+                detalle.productoCodigoBarras!,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         if (detalle.productoCategoria != null) ...[
           const SizedBox(height: 4),
           Container(
@@ -469,7 +433,6 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Icono de intercambio con animación
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -479,7 +442,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                 curve: Curves.easeInOut,
                 builder: (context, value, child) {
                   return Transform.rotate(
-                    angle: value * 3.14159, // 180 grados
+                    angle: value * 3.14159,
                     child: child,
                   );
                 },
@@ -517,7 +480,6 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Producto de reemplazo
           if (detalle.productoReemplazoCodigo == null)
             _buildSelectReplacementButton(index, detalle)
           else
@@ -528,7 +490,6 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
   }
 
   Widget _buildSelectReplacementButton(int index, OperacionComercialDetalle detalle) {
-    // Si está en modo solo lectura, mostrar mensaje en lugar del botón
     if (isReadOnly) {
       return Container(
         padding: const EdgeInsets.all(16),
@@ -721,24 +682,24 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.qr_code, size: 11, color: AppColors.textSecondary),
-                    const SizedBox(width: 4),
-                    Text(
-                      detalle.productoReemplazoCodigo ?? '',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w500,
+                if (detalle.productoReemplazoCodigoBarras != null && detalle.productoReemplazoCodigoBarras!.isNotEmpty)
+                  Row(
+                    children: [
+                      Icon(Icons.barcode_reader, size: 11, color: AppColors.textSecondary),
+                      const SizedBox(width: 4),
+                      Text(
+                        detalle.productoReemplazoCodigoBarras!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
               ],
             ),
           ),
-          // Botón de editar (oculto en modo solo lectura)
           if (!isReadOnly)
             Material(
               color: Colors.transparent,

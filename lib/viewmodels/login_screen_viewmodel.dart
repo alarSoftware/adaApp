@@ -144,9 +144,11 @@ class LoginScreenViewModel extends ChangeNotifier {
     try {
       final bool isAvailable = await _localAuth.canCheckBiometrics;
       final bool isDeviceSupported = await _localAuth.isDeviceSupported();
-      final bool hasLoggedInBefore = await _authService.hasUserLoggedInBefore();
+      final bool hasLoggedInBefore =
+      await _authService.hasUserLoggedInBefore();
 
-      _biometricAvailable = isAvailable && isDeviceSupported && hasLoggedInBefore;
+      _biometricAvailable =
+          isAvailable && isDeviceSupported && hasLoggedInBefore;
       notifyListeners();
     } catch (e) {
       // Silently fail
@@ -179,6 +181,15 @@ class LoginScreenViewModel extends ChangeNotifier {
 
   void focusNextField() {
     passwordFocusNode.requestFocus();
+  }
+
+  // ✅ MÉTODO HELPER PARA CONSTRUIR EL DISPLAY NAME (igual que en AuthService)
+  String _buildVendorDisplayName(Usuario usuario) {
+    if (usuario.edfVendedorNombre != null &&
+        usuario.edfVendedorNombre!.trim().isNotEmpty) {
+      return '${usuario.username} - ${usuario.edfVendedorNombre}';
+    }
+    return usuario.username;
   }
 
   Future<void> handleLogin() async {
@@ -221,9 +232,8 @@ class LoginScreenViewModel extends ChangeNotifier {
 
       if (syncValidation.requiereSincronizacion) {
         _syncValidationResult = syncValidation;
-        _eventController.add(
-            ShowSyncRequiredDialogEvent(syncValidation, _currentUser!)
-        );
+        _eventController
+            .add(ShowSyncRequiredDialogEvent(syncValidation, _currentUser!));
         return;
       }
 
@@ -233,7 +243,6 @@ class LoginScreenViewModel extends ChangeNotifier {
         Icons.check_circle_outline,
       ));
       _eventController.add(NavigateToHomeEvent());
-
     } catch (e) {
       HapticFeedback.heavyImpact();
       _errorMessage = 'Error de conexión. Intenta nuevamente.';
@@ -274,7 +283,8 @@ class LoginScreenViewModel extends ChangeNotifier {
       _currentUser = await _authService.getCurrentUser();
 
       if (_currentUser == null) {
-        _eventController.add(ShowErrorEvent('Error obteniendo información del usuario'));
+        _eventController
+            .add(ShowErrorEvent('Error obteniendo información del usuario'));
         return;
       }
 
@@ -285,9 +295,8 @@ class LoginScreenViewModel extends ChangeNotifier {
 
       if (syncValidation.requiereSincronizacion) {
         _syncValidationResult = syncValidation;
-        _eventController.add(
-            ShowSyncRequiredDialogEvent(syncValidation, _currentUser!)
-        );
+        _eventController
+            .add(ShowSyncRequiredDialogEvent(syncValidation, _currentUser!));
         return;
       }
 
@@ -296,7 +305,6 @@ class LoginScreenViewModel extends ChangeNotifier {
         Icons.fingerprint,
       ));
       _eventController.add(NavigateToHomeEvent());
-
     } on PlatformException catch (e) {
       _eventController.add(ShowErrorEvent(
         'Error: ${e.message ?? 'Error desconocido'}',
@@ -310,7 +318,6 @@ class LoginScreenViewModel extends ChangeNotifier {
     try {
       if (_currentUser?.edfVendedorId == null ||
           _currentUser!.edfVendedorId!.trim().isEmpty) {
-
         final errorMsg = 'Su usuario no tiene vendedor asociado.\n\n'
             'Comuníquese con el administrador del sistema para obtener acceso a los clientes.\n\n'
             'Si es un usuario nuevo, es posible que su cuenta aún no haya sido configurada completamente.';
@@ -328,16 +335,20 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
+  // ✅ MÉTODO CORREGIDO - Construye el display name completo antes de validar
   Future<SyncValidationResult> _validateSyncRequirement() async {
     try {
-      final nombreVendedor = _currentUser!.edfVendedorNombre ?? _currentUser!.username;
+      // ✅ CORRECCIÓN CLAVE: Construir el nombre completo "username - Nombre Vendedor"
+      final displayName = _buildVendorDisplayName(_currentUser!);
 
+      // ✅ Pasar el nombre completo construido a validateSyncRequirement
       return await _authService.validateSyncRequirement(
         _currentUser!.edfVendedorId!,
-        nombreVendedor,
+        displayName, // ← Ahora incluye "username - Nombre Vendedor"
       );
     } catch (e) {
-      final nombreVendedor = _currentUser?.edfVendedorNombre ?? 'Desconocido';
+      // ✅ En caso de error, también construir el nombre completo
+      final displayName = _buildVendorDisplayName(_currentUser!);
 
       return SyncValidationResult(
         requiereSincronizacion: true,
@@ -345,7 +356,7 @@ class LoginScreenViewModel extends ChangeNotifier {
         vendedorAnteriorId: null,
         vendedorActualId: _currentUser!.edfVendedorId ?? '',
         vendedorAnteriorNombre: null,
-        vendedorActualNombre: nombreVendedor,
+        vendedorActualNombre: displayName, // ← Nombre completo
       );
     }
   }
@@ -364,7 +375,6 @@ class LoginScreenViewModel extends ChangeNotifier {
       }
 
       await executeSync();
-
     } catch (e) {
       _eventController.add(ShowErrorEvent('Error al validar datos: $e'));
     }
@@ -381,8 +391,12 @@ class LoginScreenViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // ✅ Usar el método helper para construir el nombre consistentemente
+      final displayName = _buildVendorDisplayName(_currentUser!);
+
       final result = await FullSyncService.syncAllDataWithProgress(
         edfVendedorId: _currentUser!.edfVendedorId!,
+        edfVendedorNombre: displayName, // ← Nombre completo "username - Nombre Vendedor"
         previousVendedorId: _syncValidationResult?.vendedorAnteriorId,
         onProgress: ({
           required double progress,
@@ -406,12 +420,8 @@ class LoginScreenViewModel extends ChangeNotifier {
         throw Exception(result.mensaje);
       }
 
-      final nombreVendedor = _currentUser!.edfVendedorNombre ?? _currentUser!.username;
-
-      await _authService.markSyncCompleted(
-        _currentUser!.edfVendedorId!,
-        nombreVendedor,
-      );
+      // FullSyncService ya marca la sincronización como completada internamente
+      // por lo que no necesitamos llamar a markSyncCompleted aquí
 
       _eventController.add(SyncCompletedEvent(
         result.mensaje,
@@ -424,7 +434,6 @@ class LoginScreenViewModel extends ChangeNotifier {
       ));
 
       _eventController.add(NavigateToHomeEvent());
-
     } catch (e) {
       _eventController.add(ShowErrorEvent('Error en sincronización: $e'));
     } finally {
@@ -442,7 +451,8 @@ class LoginScreenViewModel extends ChangeNotifier {
       final resultado = await AuthService.sincronizarSoloUsuarios();
 
       if (resultado.exito) {
-        _eventController.add(ShowSuccessEvent('Usuarios sincronizados', Icons.cloud_done));
+        _eventController
+            .add(ShowSuccessEvent('Usuarios sincronizados', Icons.cloud_done));
       } else {
         _eventController.add(ShowErrorEvent(resultado.mensaje));
       }
@@ -460,7 +470,8 @@ class LoginScreenViewModel extends ChangeNotifier {
 
     try {
       await _dbHelper.eliminar('Users');
-      _eventController.add(ShowSuccessEvent('Tabla de usuarios eliminada correctamente', Icons.delete_sweep));
+      _eventController.add(ShowSuccessEvent(
+          'Tabla de usuarios eliminada correctamente', Icons.delete_sweep));
     } catch (e) {
       _eventController.add(ShowErrorEvent('Error al eliminar usuarios: $e'));
     } finally {

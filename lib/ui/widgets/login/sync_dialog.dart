@@ -64,7 +64,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
             children: [
               _buildReasonContainer(),
               const SizedBox(height: 12),
-              _buildVendorInfo(), // 👈 Aquí se mostrarán los nombres
+              _buildVendorInfo(),
               const SizedBox(height: 12),
               _buildWarningContainer(),
               if (_isSyncing) ...[
@@ -141,7 +141,6 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
     );
   }
 
-  // ✅ MODIFICADO: Muestra el NOMBRE en lugar del ID
   Widget _buildVendorInfo() {
     return Column(
       mainAxisSize: MainAxisSize.min,

@@ -758,7 +758,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
           ),
         ),
       );
-
       // Pasar el resultado hacia atrás cuando se cierre la vista de detalle
       if (!mounted) return;
       Navigator.pop(context, result ?? true);

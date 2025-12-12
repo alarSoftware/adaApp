@@ -23,10 +23,12 @@ class FullSyncService {
     required SyncProgressCallback onProgress,
   }) async {
     final completedSteps = <String>[];
-    // ✅ VARIABLE EXTERNA PARA ACUMULAR EL TOTAL Y EVITAR EL ERROR 'Undefined name'
     int totalItemsSincronizados = 0;
 
     try {
+      // =================================================================
+      // 1. Limpiar datos anteriores si es necesario
+      // =================================================================
       if (forceClear || (previousVendedorId != null && previousVendedorId != edfVendedorId)) {
         try {
           onProgress(
@@ -41,13 +43,6 @@ class FullSyncService {
           completedSteps.add('Datos anteriores limpiados');
           await Future.delayed(const Duration(milliseconds: 300));
         } catch (e) {
-          // await ErrorLogService.logError(
-          //   tableName: 'N/A',
-          //   operation: 'clear_sync_data',
-          //   errorMessage: 'Error limpiando datos anteriores: $e',
-          //   errorType: 'database',
-          //   userId: edfVendedorNombre ?? edfVendedorId,
-          // );
           throw Exception('Error limpiando datos anteriores: $e');
         }
       }
@@ -68,8 +63,6 @@ class FullSyncService {
         }
 
         completedSteps.add('${userSyncResult.itemsSincronizados} usuarios');
-
-        // ➕ Sumamos al total general
         totalItemsSincronizados += userSyncResult.itemsSincronizados;
 
         onProgress(
@@ -79,18 +72,11 @@ class FullSyncService {
         );
         await Future.delayed(const Duration(milliseconds: 200));
       } catch (e) {
-        // await ErrorLogService.logServerError(
-        //   tableName: 'Users',
-        //   operation: 'sync_users',
-        //   errorMessage: 'Error sincronizando usuarios: $e',
-        //   errorCode: 'SYNC_ERROR',
-        //   userId: edfVendedorNombre ?? edfVendedorId,
-        // );
         throw Exception('Error sincronizando usuarios: $e');
       }
 
       // =================================================================
-      // 3. Sincronizar todos los datos (Clientes, Equipos, etc.)
+      // 3. Sincronizar todos los datos (usa SyncResultUnificado dinámicamente)
       // =================================================================
       try {
         onProgress(
@@ -99,84 +85,40 @@ class FullSyncService {
           completedSteps: completedSteps,
         );
 
-        // ✅ Aquí definimos 'syncResult' localmente, pero sumamos sus valores a la variable externa
         final syncResult = await SyncService.sincronizarTodosLosDatos();
 
         if (!syncResult.exito) {
           throw Exception(syncResult.mensaje);
         }
 
-        // ➕ Sumamos todos los datos al total general
-        totalItemsSincronizados += syncResult.clientesSincronizados +
-            syncResult.equiposSincronizados +
-            syncResult.censosSincronizados +
-            syncResult.imagenesCensosSincronizadas;
+        // ✅ Suma dinámica usando el getter
+        totalItemsSincronizados += syncResult.totalItemsSincronizados;
 
-        // --- Reporte de progreso ---
+        // ✅ Reporte dinámico de progreso
         double currentProgress = 0.25;
+        final steps = syncResult.syncSteps;
 
-        if (syncResult.clientesSincronizados > 0) {
-          completedSteps.add('${syncResult.clientesSincronizados} clientes');
-          currentProgress = 0.32;
-          onProgress(progress: currentProgress, currentStep: 'Clientes descargados', completedSteps: completedSteps);
+        // Calcular el incremento de progreso por paso
+        // Del 0.25 al 0.80 hay 0.55 de espacio para los pasos de datos
+        final progressStep = steps.isEmpty ? 0 : 0.55 / steps.length;
+
+        for (var step in steps) {
+          completedSteps.add(step.summary);
+          currentProgress += progressStep;
+          onProgress(
+            progress: currentProgress,
+            currentStep: step.description,
+            completedSteps: completedSteps,
+          );
           await Future.delayed(const Duration(milliseconds: 200));
         }
 
-        if (syncResult.equiposSincronizados > 0) {
-          completedSteps.add('${syncResult.equiposSincronizados} equipos');
-          currentProgress = 0.40;
-          onProgress(progress: currentProgress, currentStep: 'Equipos descargados', completedSteps: completedSteps);
-          await Future.delayed(const Duration(milliseconds: 200));
-        }
-
-        if (syncResult.censosSincronizados > 0) {
-          completedSteps.add('${syncResult.censosSincronizados} censos');
-          currentProgress = 0.50;
-          onProgress(progress: currentProgress, currentStep: 'Censos descargados', completedSteps: completedSteps);
-          await Future.delayed(const Duration(milliseconds: 200));
-        }
-
-        if (syncResult.imagenesCensosSincronizadas > 0) {
-          completedSteps.add('${syncResult.imagenesCensosSincronizadas} imágenes de censos');
-          currentProgress = 0.55;
-          onProgress(progress: currentProgress, currentStep: 'Imágenes de censos descargadas', completedSteps: completedSteps);
-          await Future.delayed(const Duration(milliseconds: 200));
-        } else if (syncResult.censosSincronizados > 0) {
-          completedSteps.add('Imágenes: no disponibles');
-          currentProgress = 0.55;
-          onProgress(progress: currentProgress, currentStep: 'Imágenes: no disponibles', completedSteps: completedSteps);
-          await Future.delayed(const Duration(milliseconds: 100));
-        }
-
-        if (syncResult.equiposPendientesSincronizados > 0) {
-          completedSteps.add('${syncResult.equiposPendientesSincronizados} equipos pendientes');
-          currentProgress = 0.62;
-          onProgress(progress: currentProgress, currentStep: 'Equipos pendientes descargados', completedSteps: completedSteps);
-          await Future.delayed(const Duration(milliseconds: 200));
-        }
-
-        if (syncResult.formulariosSincronizados > 0) {
-          completedSteps.add('${syncResult.formulariosSincronizados} formularios');
-          currentProgress = 0.70;
-          onProgress(progress: currentProgress, currentStep: 'Formularios descargados', completedSteps: completedSteps);
-          await Future.delayed(const Duration(milliseconds: 200));
-        }
-
-        if (syncResult.detallesFormulariosSincronizados > 0) {
-          completedSteps.add('${syncResult.detallesFormulariosSincronizados} detalles');
+        // Asegurar que llegamos al 0.80 después de todos los pasos
+        if (currentProgress < 0.80) {
           currentProgress = 0.80;
-          onProgress(progress: currentProgress, currentStep: 'Detalles de formularios descargados', completedSteps: completedSteps);
-          await Future.delayed(const Duration(milliseconds: 200));
         }
 
       } catch (e) {
-        // await ErrorLogService.logServerError(
-        //   tableName: 'ALL_DATA',
-        //   operation: 'full_sync',
-        //   errorMessage: 'Error en descarga masiva: $e',
-        //   errorCode: 'SYNC_ERROR',
-        //   userId: edfVendedorNombre ?? edfVendedorId,
-        // );
         throw Exception('Error en descarga masiva: $e');
       }
 
@@ -195,7 +137,6 @@ class FullSyncService {
         if (responsesResult.exito) {
           if (responsesResult.itemsSincronizados > 0) {
             completedSteps.add('${responsesResult.itemsSincronizados} respuestas');
-            // ➕ Sumamos al total general
             totalItemsSincronizados += responsesResult.itemsSincronizados;
           }
           onProgress(
@@ -204,21 +145,10 @@ class FullSyncService {
             completedSteps: completedSteps,
           );
         } else {
-          // ⛔ MODO ESTRICTO: Si falla, lanzamos excepción
           throw Exception('Error sincronizando respuestas: ${responsesResult.mensaje}');
         }
       } catch (e) {
         debugPrint('⚠️ Excepción al descargar respuestas: $e');
-
-        // await ErrorLogService.logServerError(
-        //   tableName: 'FormRespuestas',
-        //   operation: 'sync_responses',
-        //   errorMessage: 'Error crítico respuestas: $e',
-        //   errorCode: 'SYNC_RESP_ERROR',
-        //   userId: edfVendedorNombre ?? edfVendedorId,
-        // );
-
-        // ⛔ MODO ESTRICTO: Cancelamos todo
         throw Exception('Error crítico descargando respuestas: $e');
       }
       await Future.delayed(const Duration(milliseconds: 200));
@@ -263,7 +193,6 @@ class FullSyncService {
 
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // ✅ AQUÍ USAMOS LA VARIABLE EXTERNA (ya no hay error)
       return SyncResult(
         exito: true,
         mensaje: 'Sincronización completada exitosamente',
@@ -272,15 +201,6 @@ class FullSyncService {
 
     } catch (e) {
       debugPrint('❌ Error en sincronización completa: $e');
-
-      // Log final general por si acaso
-      // await ErrorLogService.logError(
-      //   tableName: 'FULL_PROCESS',
-      //   operation: 'sync_all_data',
-      //   errorMessage: 'Fallo crítico en proceso completo: $e',
-      //   errorType: 'critical',
-      //   userId: edfVendedorNombre ?? edfVendedorId,
-      // );
 
       return SyncResult(
         exito: false,

@@ -48,6 +48,14 @@ class AuthService {
 
   static final _dbHelper = DatabaseHelper();
 
+  // ✅ MÉTODO HELPER PARA CONSTRUIR EL NOMBRE DEL VENDEDOR
+  String _buildVendorDisplayName(Usuario usuario) {
+    if (usuario.edfVendedorNombre != null && usuario.edfVendedorNombre!.trim().isNotEmpty) {
+      return '${usuario.username} - ${usuario.edfVendedorNombre}';
+    }
+    return usuario.username;
+  }
+
   Future<SyncValidationResult> validateSyncRequirement(
       String currentEdfVendedorId,
       String currentEdfVendedorNombre,
@@ -369,8 +377,8 @@ class AuthService {
       final usuarioAuth = UsuarioAuth.fromUsuario(currentUser);
 
       if (currentUser.edfVendedorId != null) {
-        final nombreVendedor =
-            currentUser.edfVendedorNombre ?? currentUser.username;
+        // ✅ CORREGIDO: Usar el método helper para construir el nombre
+        final nombreVendedor = _buildVendorDisplayName(currentUser);
 
         final syncValidation = await validateSyncRequirement(
           currentUser.edfVendedorId!,

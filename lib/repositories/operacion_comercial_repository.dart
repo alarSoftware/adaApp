@@ -13,12 +13,12 @@ abstract class OperacionComercialRepository {
   Future<OperacionComercial?> obtenerOperacionPorId(String id);
   Future<List<OperacionComercial>> obtenerOperacionesPorCliente(int clienteId);
   Future<List<OperacionComercial>> obtenerOperacionesPorTipo(
-    TipoOperacion tipo,
-  );
+      TipoOperacion tipo,
+      );
   Future<List<OperacionComercial>> obtenerOperacionesPorClienteYTipo(
-    int clienteId,
-    TipoOperacion tipo,
-  );
+      int clienteId,
+      TipoOperacion tipo,
+      );
   Future<void> eliminarOperacion(String id);
 
   Future<void> marcarPendienteSincronizacion(String operacionId);
@@ -55,6 +55,48 @@ class OperacionComercialRepositoryImpl
 
   @override
   String getEntityName() => 'OperacionComercial';
+
+  Future<List<OperacionComercialDetalle>> _obtenerDetallesConCodigoBarras(
+      String operacionId,
+      ) async {
+    try {
+      final db = await dbHelper.database;
+
+      final resultado = await db.rawQuery('''
+        SELECT 
+          ocd.id,
+          ocd.operacion_comercial_id,
+          ocd.producto_codigo,
+          ocd.producto_descripcion,
+          ocd.producto_categoria,
+          ocd.producto_id,
+          ocd.cantidad,
+          ocd.unidad_medida,
+          ocd.ticket,
+          ocd.precio_unitario,
+          ocd.subtotal,
+          ocd.orden,
+          ocd.fecha_creacion,
+          ocd.producto_reemplazo_id,
+          ocd.producto_reemplazo_codigo,
+          ocd.producto_reemplazo_descripcion,
+          ocd.producto_reemplazo_categoria,
+          p.codigo_barras AS producto_codigo_barras,
+          pr.codigo_barras AS producto_reemplazo_codigo_barras
+        FROM operacion_comercial_detalle ocd
+        LEFT JOIN productos p ON ocd.producto_id = p.id
+        LEFT JOIN productos pr ON ocd.producto_reemplazo_id = pr.id
+        WHERE ocd.operacion_comercial_id = ?
+        ORDER BY ocd.orden ASC
+      ''', [operacionId]);
+
+      return resultado
+          .map((map) => OperacionComercialDetalle.fromMap(map))
+          .toList();
+    } catch (e) {
+      return [];
+    }
+  }
 
   @override
   Future<String> crearOperacion(OperacionComercial operacion) async {
@@ -115,16 +157,7 @@ class OperacionComercialRepositoryImpl
 
       if (operacionMaps.isEmpty) return null;
 
-      final detallesMaps = await dbHelper.consultar(
-        'operacion_comercial_detalle',
-        where: 'operacion_comercial_id = ?',
-        whereArgs: [id],
-        orderBy: 'orden ASC',
-      );
-
-      final detalles = detallesMaps
-          .map((map) => OperacionComercialDetalle.fromMap(map))
-          .toList();
+      final detalles = await _obtenerDetallesConCodigoBarras(id);
 
       final operacion = fromMap(operacionMaps.first);
       return operacion.copyWith(detalles: detalles);
@@ -135,8 +168,8 @@ class OperacionComercialRepositoryImpl
 
   @override
   Future<List<OperacionComercial>> obtenerOperacionesPorCliente(
-    int clienteId,
-  ) async {
+      int clienteId,
+      ) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -150,16 +183,7 @@ class OperacionComercialRepositoryImpl
       for (final operacionMap in operacionesMaps) {
         final operacionId = operacionMap['id'];
 
-        final detallesMaps = await dbHelper.consultar(
-          'operacion_comercial_detalle',
-          where: 'operacion_comercial_id = ?',
-          whereArgs: [operacionId],
-          orderBy: 'orden ASC',
-        );
-
-        final detalles = detallesMaps
-            .map((map) => OperacionComercialDetalle.fromMap(map))
-            .toList();
+        final detalles = await _obtenerDetallesConCodigoBarras(operacionId);
 
         final operacion = fromMap(operacionMap).copyWith(detalles: detalles);
         operaciones.add(operacion);
@@ -173,8 +197,8 @@ class OperacionComercialRepositoryImpl
 
   @override
   Future<List<OperacionComercial>> obtenerOperacionesPorTipo(
-    TipoOperacion tipo,
-  ) async {
+      TipoOperacion tipo,
+      ) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -191,9 +215,9 @@ class OperacionComercialRepositoryImpl
 
   @override
   Future<List<OperacionComercial>> obtenerOperacionesPorClienteYTipo(
-    int clienteId,
-    TipoOperacion tipo,
-  ) async {
+      int clienteId,
+      TipoOperacion tipo,
+      ) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -211,16 +235,7 @@ class OperacionComercialRepositoryImpl
       for (final operacionMap in operacionesMaps) {
         final operacionId = operacionMap['id'];
 
-        final detallesMaps = await dbHelper.consultar(
-          'operacion_comercial_detalle',
-          where: 'operacion_comercial_id = ?',
-          whereArgs: [operacionId],
-          orderBy: 'orden ASC',
-        );
-
-        final detalles = detallesMaps
-            .map((map) => OperacionComercialDetalle.fromMap(map))
-            .toList();
+        final detalles = await _obtenerDetallesConCodigoBarras(operacionId);
 
         final operacion = fromMap(operacionMap).copyWith(detalles: detalles);
         operaciones.add(operacion);
@@ -281,10 +296,6 @@ class OperacionComercialRepositoryImpl
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // MÉTODOS ESPECÍFICOS
-  // ═══════════════════════════════════════════════════════════════════
-
   Future<List<OperacionComercial>> obtenerOperacionesConError() async {
     try {
       final operacionesMaps = await dbHelper.consultar(
@@ -299,10 +310,6 @@ class OperacionComercialRepositoryImpl
       return [];
     }
   }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // MÉTODOS PRIVADOS - SINCRONIZACIÓN
-  // ═══════════════════════════════════════════════════════════════════
 
   Future<void> marcarComoMigrado(String operacionId, dynamic serverId) async {
     try {
@@ -329,15 +336,10 @@ class OperacionComercialRepositoryImpl
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // MÉTODOS PARA SISTEMA DE REINTENTOS AUTOMÁTICOS
-  // ═══════════════════════════════════════════════════════════════════
-
-  /// Actualiza el contador de intentos de sincronización
   Future<void> actualizarIntentoSync(
-    String operacionId,
-    int numeroIntento,
-  ) async {
+      String operacionId,
+      int numeroIntento,
+      ) async {
     try {
       await dbHelper.actualizar(
         tableName,

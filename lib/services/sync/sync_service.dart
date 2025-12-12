@@ -1,4 +1,5 @@
 import 'package:ada_app/services/sync/base_sync_service.dart';
+import 'package:ada_app/services/sync/producto_sync_service.dart';
 import 'package:ada_app/services/sync/user_sync_service.dart';
 import 'package:ada_app/services/sync/client_sync_service.dart';
 import 'package:ada_app/services/sync/equipment_sync_service.dart';
@@ -177,6 +178,21 @@ class SyncService {
       }
 
       try {
+        final resultadoProductos = await ProductoSyncService.obtenerProductos();
+        resultado.productosSincronizados = resultadoProductos.itemsSincronizados;
+        resultado.productosExito = resultadoProductos.exito;
+
+        if (!resultadoProductos.exito) {
+          resultado.erroresProductos = resultadoProductos.mensaje;
+        }
+      } catch (e) {
+        resultado.productosExito = false;
+        resultado.erroresProductos = 'Error al sincronizar productos: $e';
+        resultado.productosSincronizados = 0;
+      }
+
+
+      try {
         final resultadoCensos = await CensusSyncService.obtenerCensosActivos(
           edfVendedorId: edfVendedorId,
         );
@@ -286,6 +302,7 @@ class SyncService {
       final exitosos = [
         resultado.clientesExito,
         resultado.equiposExito,
+        resultado.productosExito,
         resultado.censosExito,
         resultado.imagenesCensosExito,
         resultado.equiposPendientesExito,
@@ -299,21 +316,10 @@ class SyncService {
 
       if (totalExitosos >= 7) {
         resultado.exito = true;
-        resultado.mensaje = 'Sincronización completa: ${resultado.clientesSincronizados} clientes, ${resultado.equiposSincronizados} equipos, ${resultado.censosSincronizados} censos, ${resultado.imagenesCensosSincronizadas} imágenes de censos, ${resultado.equiposPendientesSincronizados} equipos pendientes, ${resultado.formulariosSincronizados} formularios, ${resultado.detallesFormulariosSincronizados} detalles, ${resultado.respuestasFormulariosSincronizadas} respuestas, ${resultado.imagenesFormulariosSincronizadas} imágenes de formularios y ${resultado.asignacionesSincronizadas} asignaciones';
+        resultado.mensaje = 'Sincronización completa: ${resultado.resumenCompacto}';
       } else if (totalExitosos > 0) {
         resultado.exito = true;
-        final partes = <String>[];
-        if (resultado.clientesExito) partes.add('${resultado.clientesSincronizados} clientes');
-        if (resultado.equiposExito) partes.add('${resultado.equiposSincronizados} equipos');
-        if (resultado.censosExito) partes.add('${resultado.censosSincronizados} censos');
-        if (resultado.imagenesCensosExito && resultado.imagenesCensosSincronizadas > 0) partes.add('${resultado.imagenesCensosSincronizadas} imágenes de censos');
-        if (resultado.equiposPendientesExito) partes.add('${resultado.equiposPendientesSincronizados} equipos pendientes');
-        if (resultado.formulariosExito) partes.add('${resultado.formulariosSincronizados} formularios');
-        if (resultado.detallesFormulariosExito) partes.add('${resultado.detallesFormulariosSincronizados} detalles');
-        if (resultado.respuestasFormulariosExito) partes.add('${resultado.respuestasFormulariosSincronizadas} respuestas');
-        if (resultado.imagenesFormulariosExito && resultado.imagenesFormulariosSincronizadas > 0) partes.add('${resultado.imagenesFormulariosSincronizadas} imágenes de formularios');
-        if (resultado.asignacionesExito) partes.add('${resultado.asignacionesSincronizadas} asignaciones');
-        resultado.mensaje = 'Sincronización parcial: ${partes.join(', ')}';
+        resultado.mensaje = 'Sincronización parcial: ${resultado.resumenCompacto}';
       } else {
         resultado.exito = false;
         resultado.mensaje = 'Error: no se pudo sincronizar ningún dato';
@@ -346,6 +352,8 @@ class SyncService {
   }
 
   static Future<SyncResult> sincronizarEquipos() => EquipmentSyncService.sincronizarEquipos();
+
+  static Future<SyncResult> sincronizarProductos() => ProductoSyncService.obtenerProductos();
 
   static Future<SyncResult> sincronizarEquiposPendientes({String? edfVendedorId}) =>
       EquiposPendientesSyncService.obtenerEquiposPendientes(edfVendedorId: edfVendedorId);
@@ -486,6 +494,14 @@ class SyncService {
   }
 }
 
+/// Clase helper para representar un paso de sincronización
+class SyncStep {
+  final String summary;
+  final String description;
+
+  SyncStep(this.summary, this.description);
+}
+
 class SyncResultUnificado {
   bool exito = false;
   String mensaje = '';
@@ -500,6 +516,10 @@ class SyncResultUnificado {
   bool equiposExito = false;
   int equiposSincronizados = 0;
   String? erroresEquipos;
+
+  bool productosExito = false;
+  int productosSincronizados = 0;
+  String? erroresProductos;
 
   bool censosExito = false;
   int censosSincronizados = 0;
@@ -533,8 +553,66 @@ class SyncResultUnificado {
   int asignacionesSincronizadas = 0;
   String? erroresAsignaciones;
 
+  int get totalItemsSincronizados {
+    return clientesSincronizados +
+        equiposSincronizados +
+        productosSincronizados +
+        censosSincronizados +
+        imagenesCensosSincronizadas +
+        equiposPendientesSincronizados +
+        formulariosSincronizados +
+        detallesFormulariosSincronizados +
+        respuestasFormulariosSincronizadas +
+        imagenesFormulariosSincronizadas +
+        asignacionesSincronizadas;
+  }
+
+  List<SyncStep> get syncSteps {
+    return [
+      if (clientesSincronizados > 0)
+        SyncStep('$clientesSincronizados clientes', 'Clientes descargados'),
+      if (equiposSincronizados > 0)
+        SyncStep('$equiposSincronizados equipos', 'Equipos descargados'),
+      if (productosSincronizados > 0)
+        SyncStep('$productosSincronizados productos', 'Productos descargados'),
+      if (censosSincronizados > 0)
+        SyncStep('$censosSincronizados censos', 'Censos descargados'),
+      if (imagenesCensosSincronizadas > 0)
+        SyncStep('$imagenesCensosSincronizadas imágenes de censos', 'Imágenes de censos descargadas'),
+      if (equiposPendientesSincronizados > 0)
+        SyncStep('$equiposPendientesSincronizados equipos pendientes', 'Equipos pendientes descargados'),
+      if (formulariosSincronizados > 0)
+        SyncStep('$formulariosSincronizados formularios', 'Formularios descargados'),
+      if (detallesFormulariosSincronizados > 0)
+        SyncStep('$detallesFormulariosSincronizados detalles', 'Detalles descargados'),
+      if (respuestasFormulariosSincronizadas > 0)
+        SyncStep('$respuestasFormulariosSincronizadas respuestas', 'Respuestas descargadas'),
+      if (imagenesFormulariosSincronizadas > 0)
+        SyncStep('$imagenesFormulariosSincronizadas imágenes de formularios', 'Imágenes de formularios descargadas'),
+      if (asignacionesSincronizadas > 0)
+        SyncStep('$asignacionesSincronizadas asignaciones', 'Asignaciones descargadas'),
+    ];
+  }
+
+  /// Resumen compacto para mensajes
+  String get resumenCompacto {
+    final partes = <String>[];
+    if (clientesSincronizados > 0) partes.add('$clientesSincronizados clientes');
+    if (equiposSincronizados > 0) partes.add('$equiposSincronizados equipos');
+    if (productosSincronizados > 0) partes.add('$productosSincronizados productos');
+    if (censosSincronizados > 0) partes.add('$censosSincronizados censos');
+    if (imagenesCensosSincronizadas > 0) partes.add('$imagenesCensosSincronizadas imágenes de censos');
+    if (equiposPendientesSincronizados > 0) partes.add('$equiposPendientesSincronizados equipos pendientes');
+    if (formulariosSincronizados > 0) partes.add('$formulariosSincronizados formularios');
+    if (detallesFormulariosSincronizados > 0) partes.add('$detallesFormulariosSincronizados detalles');
+    if (respuestasFormulariosSincronizadas > 0) partes.add('$respuestasFormulariosSincronizadas respuestas');
+    if (imagenesFormulariosSincronizadas > 0) partes.add('$imagenesFormulariosSincronizadas imágenes de formularios');
+    if (asignacionesSincronizadas > 0) partes.add('$asignacionesSincronizadas asignaciones');
+    return partes.join(', ');
+  }
+
   @override
   String toString() {
-    return 'SyncResultUnificado(exito: $exito, clientes: $clientesSincronizados, equipos: $equiposSincronizados, censos: $censosSincronizados, imagenes: $imagenesCensosSincronizadas, equiposPendientes: $equiposPendientesSincronizados, formularios: $formulariosSincronizados, detalles: $detallesFormulariosSincronizados, respuestas: $respuestasFormulariosSincronizadas, imagenesFormularios: $imagenesFormulariosSincronizadas, asignaciones: $asignacionesSincronizadas, mensaje: $mensaje)';
+    return 'SyncResultUnificado(exito: $exito, total: $totalItemsSincronizados, mensaje: $mensaje)';
   }
 }

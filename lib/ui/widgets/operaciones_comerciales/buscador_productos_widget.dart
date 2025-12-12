@@ -172,7 +172,6 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
       parts.add(producto.displayCategoria);
     }
 
-    // Agregar código de barras si existe
     if (producto.tieneCodigoBarras) {
       parts.add('CB: ${producto.codigoBarras}');
     }
