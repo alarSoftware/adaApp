@@ -28,7 +28,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   final CensoActivoRepository _estadoEquipoRepository = CensoActivoRepository();
   final CensoActivoFotoRepository _fotoRepository = CensoActivoFotoRepository();
   final EquipoPendienteRepository _equipoPendienteRepository =
-      EquipoPendienteRepository();
+  EquipoPendienteRepository();
 
   final AuthService _authService = AuthService();
 
@@ -76,13 +76,13 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> confirmarRegistro(
-    Map<String, dynamic> datos,
-  ) async {
+      Map<String, dynamic> datos,
+      ) async {
     if (_isProcessing) {
       return {
         'success': false,
         'error':
-            'Ya hay un proceso de confirmación en curso. Por favor espere.',
+        'Ya hay un proceso de confirmación en curso. Por favor espere.',
       };
     }
 
@@ -101,17 +101,19 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> _insertarEnviarCensoActivo(
-    Map<String, dynamic> datos,
-    String processId,
-  ) async {
+      Map<String, dynamic> datos,
+      String processId,
+      ) async {
     _setSaving(true);
     String? censoActivoId;
     String? equipoId;
     int? usuarioId;
+    Map<String, dynamic> resultado = {};
 
     try {
       if (_currentProcessId != processId) {
-        return {'success': false, 'error': 'Proceso cancelado'};
+        resultado = {'success': false, 'error': 'Proceso cancelado'};
+        return resultado;
       }
 
       var esNuevoEquipo = datos['es_nuevo_equipo'] as bool? ?? false;
@@ -217,8 +219,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
       } else {
         equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
       }
-//TODO Sacar este return afuera
-      return {
+
+      resultado = {
         'success': true,
         'message': 'Registro guardado. Sincronizando en segundo plano...',
         'estado_id': censoActivoId,
@@ -229,10 +231,12 @@ class PreviewScreenViewModel extends ChangeNotifier {
         'ya_asignado': yaAsignado,
       };
     } catch (e) {
-      return {'success': false, 'error': 'Error guardando registro: $e'};
+      resultado = {'success': false, 'error': 'Error guardando registro: $e'};
     } finally {
       _setSaving(false);
     }
+
+    return resultado;
   }
 
   void _setSaving(bool saving) {
@@ -246,11 +250,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<String> _crearEquipoNuevo(
-    Map<String, dynamic> datos,
-    int? clienteId,
-    String processId,
-    String? userId,
-  ) async {
+      Map<String, dynamic> datos,
+      int? clienteId,
+      String processId,
+      String? userId,
+      ) async {
     _setStatusMessage('Registrando equipo nuevo...');
 
     if (_currentProcessId != processId) throw 'Proceso cancelado';
@@ -365,8 +369,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> verificarSincronizacionPendiente(
-    String? estadoId,
-  ) async {
+      String? estadoId,
+      ) async {
     if (estadoId == null) return {'pendiente': false};
 
     try {
@@ -385,7 +389,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       return {
         'pendiente':
-            (estadoCenso == 'creado' || estadoCenso == 'error') &&
+        (estadoCenso == 'creado' || estadoCenso == 'error') &&
             sincronizado == 0,
       };
     } catch (e) {
@@ -394,8 +398,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> obtenerInfoSincronizacion(
-    String? censoActivoId,
-  ) async {
+      String? censoActivoId,
+      ) async {
     if (censoActivoId == null) {
       return {
         'estado': 'desconocido',
@@ -475,7 +479,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
                 final endpoint = errorLog.first['endpoint'] as String?;
 
                 errorDetalle =
-                    'Sincronizado después de ${retryCount + 1} intento(s)\n\nÚltimo error encontrado:\n$errorMessage';
+                'Sincronizado después de ${retryCount + 1} intento(s)\n\nÚltimo error encontrado:\n$errorMessage';
 
                 if (errorCode != null) {
                   errorDetalle += '\n\nCódigo: $errorCode';
@@ -536,7 +540,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
               if (timestamp != null) {
                 try {
                   errorDetalle +=
-                      '\n\nOcurrió el: ${_formatTimestamp(DateTime.parse(timestamp))}';
+                  '\n\nOcurrió el: ${_formatTimestamp(DateTime.parse(timestamp))}';
                 } catch (_) {}
               }
             } else {
@@ -552,7 +556,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
               'icono': Icons.error,
               'color': AppColors.error,
               'error_detalle':
-                  errorDetalle ?? 'No se encontró detalle del error',
+              errorDetalle ?? 'No se encontró detalle del error',
               'envioFallido': envioFallido,
             };
           }

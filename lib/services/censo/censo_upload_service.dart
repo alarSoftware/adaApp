@@ -158,8 +158,6 @@ class CensoUploadService {
         usuarioId,
         _tableName,
       );
-
-      rethrow;
     }
   }
 
