@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
@@ -175,9 +176,17 @@ class EquipmentSyncService extends BaseSyncService {
     final endpoint = '$baseUrl/api/getEdfEquipos';
 
     try {
+      print('INICIO DESCARGA: ${DateTime.now()}');
+      final stopwatchDownload = Stopwatch()..start();
+
       final response = await http
           .get(Uri.parse(endpoint), headers: BaseSyncService.headers)
-          .timeout(BaseSyncService.timeout);
+          .timeout(const Duration(minutes: 5));
+
+      stopwatchDownload.stop();
+      print(
+        'FIN DESCARGA: ${DateTime.now()} - Duracion: ${stopwatchDownload.elapsedMilliseconds} ms',
+      );
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final mensaje = BaseSyncService.extractErrorMessage(response);
@@ -195,26 +204,45 @@ class EquipmentSyncService extends BaseSyncService {
         );
       }
 
-      final List<dynamic> equiposData = BaseSyncService.parseResponse(
-        response.body,
-      );
+      final equiposMapas = await _procesarEquiposEnIsolate(response.body);
 
-      final equipos = <Equipo>[];
-      int procesados = 0;
-
-      for (var equipoJson in equiposData) {
+      if (equiposMapas.isEmpty) {
         try {
-          final equipo = Equipo.fromJson(equipoJson);
-          equipos.add(equipo);
-          procesados++;
-        } catch (e) {
-          // Skip invalid equipment
+          await _equipoRepo.limpiarYSincronizar([]);
+        } catch (dbError) {
+          await ErrorLogService.logError(
+            tableName: 'equipos',
+            operation: 'database_clear',
+            errorMessage: dbError.toString(),
+            errorType: 'database',
+          );
+          return SyncResult(
+            exito: false,
+            mensaje: 'Error limpiando BD',
+            itemsSincronizados: 0,
+          );
         }
+
+        return SyncResult(
+          exito: true,
+          mensaje: 'Tabla limpiada (Sin equipos en servidor)',
+          itemsSincronizados: 0,
+          totalEnAPI: 0,
+        );
       }
 
       try {
-        final equiposMapas = equipos.map((e) => e.toMap()).toList();
-        await _equipoRepo.limpiarYSincronizar(equiposMapas);
+        print(
+          'INICIO INSERCION BD: ${DateTime.now()} (Total: ${equiposMapas.length} items)',
+        );
+        final stopwatch = Stopwatch()..start();
+
+        await _equipoRepo.limpiarYSincronizarEnChunks(equiposMapas);
+
+        stopwatch.stop();
+        print(
+          'FIN INSERCION BD: ${DateTime.now()} - Duracion: ${stopwatch.elapsedMilliseconds} ms',
+        );
       } catch (dbError) {
         await ErrorLogService.logError(
           tableName: 'equipos',
@@ -231,15 +259,70 @@ class EquipmentSyncService extends BaseSyncService {
 
       return SyncResult(
         exito: true,
-        mensaje: equiposData.isEmpty
-            ? 'Tabla limpiada (Sin equipos en servidor)'
-            : 'Equipos sincronizados: $procesados',
-        itemsSincronizados: equipos.length,
-        totalEnAPI: equiposData.length,
+        mensaje: 'Equipos sincronizados: ${equiposMapas.length}',
+        itemsSincronizados: equiposMapas.length,
+        totalEnAPI: equiposMapas.length,
       );
     } catch (e) {
       return _manejarExcepcion(e, 'equipos', endpoint);
     }
+  }
+
+  static Future<List<Map<String, dynamic>>> _procesarEquiposEnIsolate(
+    String responseBody,
+  ) async {
+    return await Isolate.run(() => _procesarEquiposJSON(responseBody));
+  }
+
+  static List<Map<String, dynamic>> _procesarEquiposJSON(String responseBody) {
+    final List<dynamic> equiposData = BaseSyncService.parseResponse(
+      responseBody,
+    );
+    final List<Map<String, dynamic>> equiposMapas = [];
+    final ahora = DateTime.now().toIso8601String();
+
+    for (var equipoJson in equiposData) {
+      if (equipoJson is Map<String, dynamic>) {
+        try {
+          equiposMapas.add(_mapearEquipo(equipoJson, ahora));
+        } catch (e) {
+          // Skip invalid item
+        }
+      }
+    }
+
+    return equiposMapas;
+  }
+
+  static Map<String, dynamic> _mapearEquipo(
+    Map<String, dynamic> equipoJson,
+    String fechaDefault,
+  ) {
+    return {
+      'id': equipoJson['id']?.toString() ?? '',
+      'cliente_id': equipoJson['clienteId']?.toString(),
+      'cod_barras': equipoJson['equipoId']?.toString() ?? '',
+      'marca_id': int.tryParse(equipoJson['marcaId']?.toString() ?? '1') ?? 1,
+      'modelo_id':
+          int.tryParse(equipoJson['edfModeloId']?.toString() ?? '1') ?? 1,
+      'numero_serie': equipoJson['numSerie']?.toString(),
+      'logo_id': int.tryParse(equipoJson['edfLogoId']?.toString() ?? '1') ?? 1,
+      'app_insert': _esAppInsert(equipoJson),
+      'sincronizado': 1,
+      'fecha_creacion':
+          equipoJson['fecha_creacion']?.toString() ??
+          equipoJson['fechaCreacion']?.toString() ??
+          equipoJson['fecha']?.toString() ??
+          fechaDefault,
+      'fecha_actualizacion':
+          equipoJson['fecha_actualizacion']?.toString() ??
+          equipoJson['fechaActualizacion']?.toString(),
+    };
+  }
+
+  static int _esAppInsert(Map<String, dynamic> json) {
+    final appInsert = json['appInsert'] ?? json['app_insert'];
+    return (appInsert == true || appInsert == 1) ? 1 : 0;
   }
 
   static List<dynamic> _extraerListaDatos(dynamic responseData) {

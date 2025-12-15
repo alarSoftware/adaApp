@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
-import 'package:ada_app/services/sync/sync_service.dart';
+
 import 'package:logger/logger.dart';
+import 'package:ada_app/services/sync/equipment_sync_service.dart';
 import 'dart:async';
 
 // Eventos UI
@@ -94,7 +95,8 @@ class EquipoListScreenViewModel extends ChangeNotifier {
       if (query.isEmpty) {
         // Sin filtro: cargar todos - SIN parámetro soloActivos
         _logger.i('Cargando TODOS los equipos...');
-        equiposDB = await _equipoRepository.obtenerCompletos(); // CORREGIDO: sin parámetro
+        equiposDB = await _equipoRepository
+            .obtenerCompletos(); // CORREGIDO: sin parámetro
       } else {
         // Con filtro: usar búsqueda del Repository
         _logger.i('Usando buscarConDetalles con query: "$query"');
@@ -113,7 +115,8 @@ class EquipoListScreenViewModel extends ChangeNotifier {
         _logger.w('¡NO SE ENCONTRARON EQUIPOS!');
 
         // Hacer una prueba: cargar todos para ver si hay datos
-        final todosLosEquipos = await _equipoRepository.obtenerCompletos(); // CORREGIDO: sin parámetro
+        final todosLosEquipos = await _equipoRepository
+            .obtenerCompletos(); // CORREGIDO: sin parámetro
         _logger.i('Prueba - Total de equipos en DB: ${todosLosEquipos.length}');
 
         if (todosLosEquipos.isNotEmpty) {
@@ -130,11 +133,12 @@ class EquipoListScreenViewModel extends ChangeNotifier {
       _logger.i('Equipos filtrados: ${_equiposFiltrados.length}');
 
       _cargarSiguientePagina();
-
     } catch (e, stackTrace) {
       _logger.e('Error cargando equipos: $e');
       _logger.e('StackTrace: $stackTrace');
-      _eventController.add(ShowSnackBarEvent('Error cargando equipos: $e', Colors.red));
+      _eventController.add(
+        ShowSnackBarEvent('Error cargando equipos: $e', Colors.red),
+      );
     } finally {
       _setLoading(false);
     }
@@ -154,26 +158,60 @@ class EquipoListScreenViewModel extends ChangeNotifier {
       final query = searchController.text.trim();
       _logger.i('=== REFRESH - Query actual: "$query" ===');
 
-      // Solo recargar datos locales manteniendo el filtro
-      await cargarEquipos();
+      _setLoading(true);
 
-      _eventController.add(ShowSnackBarEvent(
-          'Lista actualizada',
-          Colors.green,
-          durationSeconds: 1
-      ));
+      // 1. Sincronizar con el servidor (Descargar)
+      _eventController.add(
+        ShowSnackBarEvent(
+          'Sincronizando equipos... (Esto puede tardar unos minutos)',
+          Colors.blue,
+          durationSeconds: 2,
+        ),
+      );
+
+      final result = await EquipmentSyncService.sincronizarEquipos();
+
+      if (!result.exito) {
+        _logger.w('Error en sincronización: ${result.mensaje}');
+        _eventController.add(
+          ShowSnackBarEvent(
+            'Error descarga: ${result.mensaje}',
+            Colors.orange,
+            durationSeconds: 4,
+          ),
+        );
+      } else {
+        _logger.i('Sincronización exitosa: ${result.itemsSincronizados} items');
+        _eventController.add(
+          ShowSnackBarEvent(
+            'Descarga completada: ${result.itemsSincronizados} equipos',
+            Colors.green,
+            durationSeconds: 3,
+          ),
+        );
+      }
+
+      // 2. Solo recargar datos locales manteniendo el filtro
+      await cargarEquipos();
     } catch (e) {
       _logger.e('Error refrescando datos: $e');
-      _eventController.add(ShowSnackBarEvent('Error al actualizar: $e', Colors.red));
+      _eventController.add(
+        ShowSnackBarEvent('Error al actualizar: $e', Colors.red),
+      );
+      _setLoading(
+        false,
+      ); // Ensure loading is off in case of error outside cargarEquipos
     }
   }
+
   // Método auxiliar para probar la búsqueda simple
   Future<void> _testBusquedaSimple() async {
     try {
       _logger.i('=== TEST BÚSQUEDA SIMPLE ===');
 
       // Probar obtener todos - SIN parámetro soloActivos
-      final todos = await _equipoRepository.obtenerCompletos(); // CORREGIDO: sin parámetro
+      final todos = await _equipoRepository
+          .obtenerCompletos(); // CORREGIDO: sin parámetro
       _logger.i('Total equipos: ${todos.length}');
 
       // Probar búsqueda con "pepsi"
@@ -183,12 +221,10 @@ class EquipoListScreenViewModel extends ChangeNotifier {
       // Probar búsqueda vacía
       final vacia = await _equipoRepository.buscarConDetalles('');
       _logger.i('Búsqueda vacía: ${vacia.length}');
-
     } catch (e) {
       _logger.e('Error en test: $e');
     }
   }
-
 
   // ===============================
   // LÓGICA DE NEGOCIO - PAGINACIÓN
@@ -196,13 +232,18 @@ class EquipoListScreenViewModel extends ChangeNotifier {
 
   void _resetPaginacion() {
     _logger.i('=== RESET PAGINACIÓN ===');
-    _logger.i('Antes - _paginaActual: $_paginaActual, _equiposMostrados.length: ${_equiposMostrados.length}');
+    _logger.i(
+      'Antes - _paginaActual: $_paginaActual, _equiposMostrados.length: ${_equiposMostrados.length}',
+    );
 
     _paginaActual = 0;
     _equiposMostrados.clear();
 
-    _logger.i('Después - _paginaActual: $_paginaActual, _equiposMostrados.length: ${_equiposMostrados.length}');
+    _logger.i(
+      'Después - _paginaActual: $_paginaActual, _equiposMostrados.length: ${_equiposMostrados.length}',
+    );
   }
+
   void _cargarSiguientePagina() {
     _logger.i('=== CARGANDO SIGUIENTE PÁGINA ===');
     _logger.i('_cargandoMas: $_cargandoMas');
@@ -212,14 +253,19 @@ class EquipoListScreenViewModel extends ChangeNotifier {
     _logger.i('_equiposMostrados.length: ${_equiposMostrados.length}');
 
     if (_cargandoMas || !_hayMasDatos) {
-      _logger.w('Saliendo temprano - _cargandoMas: $_cargandoMas, _hayMasDatos: $_hayMasDatos');
+      _logger.w(
+        'Saliendo temprano - _cargandoMas: $_cargandoMas, _hayMasDatos: $_hayMasDatos',
+      );
       return;
     }
 
     _setCargandoMas(true);
 
     final startIndex = _paginaActual * equiposPorPagina;
-    final endIndex = (startIndex + equiposPorPagina).clamp(0, _equiposFiltrados.length);
+    final endIndex = (startIndex + equiposPorPagina).clamp(
+      0,
+      _equiposFiltrados.length,
+    );
 
     _logger.i('startIndex: $startIndex');
     _logger.i('endIndex: $endIndex');
@@ -239,7 +285,9 @@ class EquipoListScreenViewModel extends ChangeNotifier {
       _logger.i('- _paginaActual: $_paginaActual');
       _logger.i('- _hayMasDatos: $_hayMasDatos');
     } else {
-      _logger.w('startIndex ($startIndex) >= _equiposFiltrados.length (${_equiposFiltrados.length})');
+      _logger.w(
+        'startIndex ($startIndex) >= _equiposFiltrados.length (${_equiposFiltrados.length})',
+      );
       _hayMasDatos = false;
     }
 
@@ -248,7 +296,6 @@ class EquipoListScreenViewModel extends ChangeNotifier {
     notifyListeners();
     _logger.i('=== FIN CARGANDO SIGUIENTE PÁGINA ===');
   }
-
 
   void _onScroll() {
     if (scrollController.position.pixels >=
@@ -354,7 +401,8 @@ class EquipoListScreenViewModel extends ChangeNotifier {
   // GETTERS PARA UI
   // ===============================
 
-  String get appBarTitle => 'Equipos (${_equiposFiltrados.length}/${_equipos.length})';
+  String get appBarTitle =>
+      'Equipos (${_equiposFiltrados.length}/${_equipos.length})';
 
   String get searchHint => 'Buscar por código, marca, modelo o logo...';
 

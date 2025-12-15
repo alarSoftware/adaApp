@@ -9,6 +9,7 @@ class DynamicFormField {
   final String? respuestaCorrectaText;
   final double? percentage;
   final bool isParent;
+  final bool isRequired;
   final List<DynamicFormField> children;
   final Map<String, dynamic>? metadata;
 
@@ -23,6 +24,7 @@ class DynamicFormField {
     this.respuestaCorrectaText,
     this.percentage,
     this.isParent = false,
+    this.isRequired = false,
     this.children = const [],
     this.metadata,
   });
@@ -34,11 +36,19 @@ class DynamicFormField {
       label: json['label'] as String,
       parentId: json['parent']?['id']?.toString(),
       sequence: json['sequence'] as int?,
-      points: json['points'] != null ? (json['points'] as num).toDouble() : null,
+      points: json['points'] != null
+          ? (json['points'] as num).toDouble()
+          : null,
       respuestaCorrectaOpt: json['respuestaCorrectaOpt'] as bool?,
       respuestaCorrectaText: json['respuestaCorrectaText'] as String?,
-      percentage: json['percentage'] != null ? (json['percentage'] as num).toDouble() : null,
+      percentage: json['percentage'] != null
+          ? (json['percentage'] as num).toDouble()
+          : null,
       isParent: _isParentType(json['type'] as String),
+      isRequired:
+          json['required'] == true ||
+          json['is_required'] == 1 ||
+          json['is_required'] == true,
     );
   }
 
@@ -54,9 +64,7 @@ class DynamicFormField {
 
   // ==================== GETTERS ====================
 
-  bool get required {
-    return false;  // ✅ TODO OPCIONAL - Cambiado de la lógica anterior
-  }
+  bool get required => isRequired;
 
   bool get isAnswerable => isAnswerableType(type);
 
@@ -80,7 +88,13 @@ class DynamicFormField {
   // ==================== VALIDACIÓN ====================
 
   String? validate(dynamic value) {
-    // Como nada es obligatorio, siempre retorna null
+    if (required) {
+      if (value == null) return 'Este campo es obligatorio';
+      if (value is String && value.trim().isEmpty)
+        return 'Este campo es obligatorio';
+      if (value is Iterable && value.isEmpty)
+        return 'Selecciona al menos una opción';
+    }
     return null;
   }
 
@@ -115,8 +129,7 @@ class DynamicFormField {
 
   /// Obtiene todos los campos obligatorios (recursivo)
   List<DynamicFormField> getAllRequiredFields() {
-    // Como nada es obligatorio, retorna lista vacía
-    return [];
+    return getAllAnswerableFields().where((f) => f.required).toList();
   }
 
   // ==================== COPIA Y MODIFICACIÓN ====================
@@ -133,6 +146,7 @@ class DynamicFormField {
       respuestaCorrectaText: respuestaCorrectaText,
       percentage: percentage,
       isParent: isParent,
+      isRequired: isRequired,
       children: children,
       metadata: metadata,
     );
@@ -149,6 +163,7 @@ class DynamicFormField {
     String? respuestaCorrectaText,
     double? percentage,
     bool? isParent,
+    bool? isRequired,
     List<DynamicFormField>? children,
     Map<String, dynamic>? metadata,
   }) {
@@ -160,9 +175,11 @@ class DynamicFormField {
       sequence: sequence ?? this.sequence,
       points: points ?? this.points,
       respuestaCorrectaOpt: respuestaCorrectaOpt ?? this.respuestaCorrectaOpt,
-      respuestaCorrectaText: respuestaCorrectaText ?? this.respuestaCorrectaText,
+      respuestaCorrectaText:
+          respuestaCorrectaText ?? this.respuestaCorrectaText,
       percentage: percentage ?? this.percentage,
       isParent: isParent ?? this.isParent,
+      isRequired: isRequired ?? this.isRequired,
       children: children ?? this.children,
       metadata: metadata ?? this.metadata,
     );
@@ -178,11 +195,15 @@ class DynamicFormField {
       if (parentId != null) 'parentId': parentId,
       if (sequence != null) 'sequence': sequence,
       if (points != null) 'points': points,
-      if (respuestaCorrectaOpt != null) 'respuestaCorrectaOpt': respuestaCorrectaOpt,
-      if (respuestaCorrectaText != null) 'respuestaCorrectaText': respuestaCorrectaText,
+      if (respuestaCorrectaOpt != null)
+        'respuestaCorrectaOpt': respuestaCorrectaOpt,
+      if (respuestaCorrectaText != null)
+        'respuestaCorrectaText': respuestaCorrectaText,
       if (percentage != null) 'percentage': percentage,
       'isParent': isParent,
-      if (children.isNotEmpty) 'children': children.map((c) => c.toJson()).toList(),
+      'isRequired': isRequired,
+      if (children.isNotEmpty)
+        'children': children.map((c) => c.toJson()).toList(),
       if (metadata != null) 'metadata': metadata,
     };
   }

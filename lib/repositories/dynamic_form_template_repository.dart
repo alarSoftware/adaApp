@@ -289,6 +289,7 @@ class DynamicFormTemplateRepository {
           'respuestaCorrectaText': detalle['respuesta_correcta']?.toString(),
           'percentage': detalle['percentage'],
           'dynamicForm': {'id': formId},
+          'is_required': _parseBooleanFromDb(detalle['is_required']) == true,
         });
       }
 
@@ -341,6 +342,10 @@ class DynamicFormTemplateRepository {
       'label': apiData['label']?.toString() ?? '',
       'parent_id': parentId,
       'percentage': apiData['percentage'],
+      'is_required':
+          (apiData['required'] == true || apiData['is_required'] == true)
+          ? 1
+          : 0,
     };
   }
 

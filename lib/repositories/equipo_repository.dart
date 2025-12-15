@@ -1,6 +1,5 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:ada_app/models/equipos.dart';
-
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import '../repositories/base_repository.dart';
 
@@ -30,28 +29,17 @@ class EquipoRepository extends BaseRepository<Equipo> {
   @override
   String getEntityName() => 'Equipo';
 
-  // ==============================================================
-  // 🔥 NUEVO MÉTODO DE SINCRONIZACIÓN MASIVA (VACIAR E INSERTAR)
-  // ==============================================================
-
-  /// Vacía la tabla de equipos e inserta los nuevos datos provenientes del servidor.
-  /// Usa Batch para máximo rendimiento.
-
   @override
   Future<void> limpiarYSincronizar(List<dynamic> items) async {
     try {
-      // 1. Convertimos la lista dinámica a la lista de mapas que necesitamos
-      // Esto soluciona el error de override
-      final List<Map<String, dynamic>> equipos = items
-          .cast<Map<String, dynamic>>();
+      final List<Map<String, dynamic>> equipos =
+      items.cast<Map<String, dynamic>>();
 
       final db = await dbHelper.database;
 
       await db.transaction((txn) async {
-        // 2. Vaciar la tabla completamente
         await txn.delete(tableName);
 
-        // 3. Preparar inserción masiva (Batch)
         final batch = txn.batch();
 
         for (final equipo in equipos) {
@@ -62,7 +50,6 @@ class EquipoRepository extends BaseRepository<Equipo> {
           );
         }
 
-        // 4. Ejecutar todas las inserciones
         await batch.commit(noResult: true);
       });
     } catch (e) {
@@ -70,13 +57,39 @@ class EquipoRepository extends BaseRepository<Equipo> {
     }
   }
 
-  // ================================
-  // MÉTODOS PARA EQUIPOS ASIGNADOS
-  // ================================
+  Future<void> limpiarYSincronizarEnChunks(
+      List<Map<String, dynamic>> equipos,
+      {int chunkSize = 500}) async {
+    try {
+      final db = await dbHelper.database;
+
+      await db.transaction((txn) async {
+        await txn.delete(tableName);
+
+        for (var i = 0; i < equipos.length; i += chunkSize) {
+          final end =
+          (i + chunkSize < equipos.length) ? i + chunkSize : equipos.length;
+          final chunk = equipos.sublist(i, end);
+
+          final batch = txn.batch();
+          for (var equipo in chunk) {
+            batch.insert(
+              tableName,
+              equipo,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+          await batch.commit(noResult: true);
+        }
+      });
+    } catch (e) {
+      rethrow;
+    }
+  }
 
   Future<List<Map<String, dynamic>>> obtenerEquiposAsignados(
-    int clienteId,
-  ) async {
+      int clienteId,
+      ) async {
     try {
       final sql = '''
     SELECT DISTINCT
@@ -141,8 +154,8 @@ class EquipoRepository extends BaseRepository<Equipo> {
   }
 
   Future<List<Map<String, dynamic>>> obtenerPorClienteCompleto(
-    int clienteId,
-  ) async {
+      int clienteId,
+      ) async {
     try {
       final sql = '''
       SELECT 
@@ -174,14 +187,10 @@ class EquipoRepository extends BaseRepository<Equipo> {
     }
   }
 
-  // ================================
-  // MÉTODOS DE VERIFICACIÓN
-  // ================================
-
   Future<bool> verificarAsignacionEquipoCliente(
-    String equipoId,
-    int clienteId,
-  ) async {
+      String equipoId,
+      int clienteId,
+      ) async {
     try {
       final resultPendientes = await dbHelper.consultar(
         'equipos_pendientes',
@@ -232,10 +241,6 @@ class EquipoRepository extends BaseRepository<Equipo> {
       rethrow;
     }
   }
-
-  // ================================
-  // BÚSQUEDA CON DETALLES
-  // ================================
 
   Future<List<Map<String, dynamic>>> buscarConDetalles(String query) async {
     if (query.trim().isEmpty) {
@@ -299,10 +304,6 @@ class EquipoRepository extends BaseRepository<Equipo> {
 
     return await dbHelper.consultarPersonalizada(sql);
   }
-
-  // ================================
-  // CREACIÓN DE EQUIPOS
-  // ================================
 
   Future<String> crearEquipoNuevo({
     required String codigoBarras,
@@ -385,10 +386,6 @@ class EquipoRepository extends BaseRepository<Equipo> {
     }
   }
 
-  // ================================
-  // MÉTODOS AUXILIARES
-  // ================================
-
   Future<void> marcarEquipoComoSincronizado(String equipoId) async {
     await dbHelper.actualizar(
       tableName,
@@ -453,14 +450,13 @@ class EquipoRepository extends BaseRepository<Equipo> {
   }
 
   Future<Map<String, dynamic>?> obtenerEquipoClientePorId(
-    dynamic equipoId,
-  ) async {
+      dynamic equipoId,
+      ) async {
     final result = await dbHelper.consultarPorId(
       tableName,
       int.tryParse(equipoId.toString()) ?? 0,
     );
     if (result == null && equipoId is String) {
-      // Fallback si es String ID
       final list = await dbHelper.consultar(
         tableName,
         where: 'id = ?',

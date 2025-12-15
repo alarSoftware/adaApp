@@ -4,7 +4,6 @@ import 'package:logger/logger.dart';
 var logger = Logger();
 
 class DatabaseTables {
-
   Future<void> onCreate(Database db, int version) async {
     logger.i('Creando tablas de base de datos v$version');
 
@@ -231,6 +230,7 @@ class DatabaseTables {
       label TEXT,
       parent_id TEXT,
       percentage REAL,
+      is_required INTEGER DEFAULT 0,
       FOREIGN KEY (dynamic_form_id) REFERENCES dynamic_form (id)
     )
   ''';
@@ -323,7 +323,6 @@ class DatabaseTables {
     FOREIGN KEY (producto_reemplazo_id) REFERENCES productos (id)
   )
 ''';
-
 
   String _sqlProductos() => '''
   CREATE TABLE productos (
@@ -458,7 +457,9 @@ class DatabaseTables {
   }
 
   Future<void> _crearIndicesDeviceLog(Database db) async {
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_device_log_fecha ON device_log (fecha_registro)');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_device_log_fecha ON device_log (fecha_registro)',
+    );
   }
 
   Future<void> _crearIndicesErrorLog(Database db) async {
