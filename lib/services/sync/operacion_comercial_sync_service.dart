@@ -332,9 +332,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       'id': operacionServerId.toString(),
       'cliente_id': partnerId,
       'tipo_operacion': tipo,
-      'fecha_creacion':
-          apiOperacion['creationDate']?.toString() ??
-          DateTime.now().toIso8601String(),
+      'fecha_creacion': _parseFechaServerToLocal(apiOperacion['creationDate']),
       'fecha_retiro': apiOperacion['fechaRetiro']?.toString(),
       'observaciones': null,
       'total_productos': 0,
@@ -372,6 +370,29 @@ class OperacionComercialSyncService extends BaseSyncService {
     operacionLocal['detalles'] = detalles;
 
     return operacionLocal;
+  }
+
+  static String _parseFechaServerToLocal(dynamic fechaServer) {
+    if (fechaServer == null) return DateTime.now().toIso8601String();
+
+    try {
+      String fechaStr = fechaServer.toString();
+
+      // Si la fecha no tiene indicador de zona horaria (Z o +/-), asumimos UTC
+      // Muchas APIs devuelven "2023-10-27T17:05:00" significando UTC
+      if (!fechaStr.endsWith('Z') &&
+          !fechaStr.contains(RegExp(r'[+\-]\d{2}:\d{2}'))) {
+        fechaStr += 'Z';
+      }
+
+      final fechaUtc = DateTime.parse(fechaStr);
+      final fechaLocal = fechaUtc.toLocal();
+
+      return fechaLocal.toIso8601String();
+    } catch (e) {
+      // Si falla el parseo, devolver la fecha original o actual
+      return fechaServer.toString();
+    }
   }
 
   static Future<Map<String, dynamic>> _mapDetalleToLocalFormat(

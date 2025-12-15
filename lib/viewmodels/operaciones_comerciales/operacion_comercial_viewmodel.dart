@@ -342,7 +342,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     return ValidationResult.valid();
   }
 
-  /// ✅ MÉTODO CORREGIDO - Ahora recarga la operación completa con detalles
   Future<OperacionComercial?> guardarOperacion() async {
     if (isViewOnly) return null;
 
@@ -372,7 +371,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       // Guardar la operación en la base de datos
       final operacionId = await _operacionRepository.crearOperacion(operacion);
 
-      // ✅ SOLUCIÓN: Recargar la operación completa desde la DB con sus detalles
+      // SOLUCIÓN: Recargar la operación completa desde la DB con sus detalles
       final operacionCompleta = await _operacionRepository
           .obtenerOperacionPorId(operacionId);
 
