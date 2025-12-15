@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:ada_app/config/constants/server_response.dart';
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
+import 'package:ada_app/repositories/producto_repository.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:ada_app/services/api_config_service.dart';
@@ -19,6 +20,7 @@ class OperacionesComercialesPostService {
   static Future<void> enviarOperacion(
       OperacionComercial operacion, {
         int timeoutSegundos = 60,
+        ProductoRepository? productoRepository,
       }) async {
     String? fullUrl;
     try {
@@ -29,7 +31,9 @@ class OperacionesComercialesPostService {
         throw Exception('La operación debe tener al menos un detalle');
       }
 
-      final payload = _construirPayload(operacion);
+      final repo = productoRepository ?? ProductoRepositoryImpl();
+      final payload = await _construirPayload(operacion, repo);
+
       final baseUrl = await ApiConfigService.getBaseUrl();
       final cleanBaseUrl = baseUrl.endsWith('/')
           ? baseUrl.substring(0, baseUrl.length - 1)
@@ -56,8 +60,6 @@ class OperacionesComercialesPostService {
         }
       }
 
-      // Éxito
-      if (resultObject.success || resultObject.isDuplicate) {}
     } catch (e) {
       await ErrorLogService.manejarExcepcion(
         e,
@@ -70,7 +72,10 @@ class OperacionesComercialesPostService {
     }
   }
 
-  static Map<String, dynamic> _construirPayload(OperacionComercial operacion) {
+  static Future<Map<String, dynamic>> _construirPayload(
+      OperacionComercial operacion,
+      ProductoRepository productoRepository,
+      ) async {
     final operacionComercialData = {
       'id': operacion.id,
       'clienteId': operacion.clienteId,
@@ -82,9 +87,13 @@ class OperacionesComercialesPostService {
       'totalProductos': operacion.totalProductos,
     };
 
-    final detalles = operacion.detalles
-        .map((d) => _construirDetalle(d, operacion.tipoOperacion))
-        .toList();
+    final detalles = await Future.wait(
+      operacion.detalles.map((d) => _construirDetalle(
+        d,
+        operacion.tipoOperacion,
+        productoRepository,
+      )),
+    );
 
     return {
       'operacionComercial': operacionComercialData,
@@ -93,30 +102,44 @@ class OperacionesComercialesPostService {
     };
   }
 
-  static Map<String, dynamic> _construirDetalle(
+  static Future<Map<String, dynamic>> _construirDetalle(
       OperacionComercialDetalle detalle,
       TipoOperacion tipoOperacion,
-      ) {
+      ProductoRepository productoRepository,
+      ) async {
+    final producto = await productoRepository.obtenerProductoPorId(detalle.productoId!);
+
+    if (producto == null) {
+      throw Exception('Producto con ID ${detalle.productoId} no encontrado');
+    }
+
     final detalleBase = {
-      'productoCodigo': detalle.productoCodigo,
-      'productoDescripcion': detalle.productoDescripcion,
-      'productoCategoria': detalle.productoCategoria,
+      'productoCodigo': producto.codigo,
+      'productoDescripcion': producto.nombre,
+      'productoCategoria': producto.categoria,
       'productoId': detalle.productoId,
       'cantidad': detalle.cantidad,
-      'unidadMedida': detalle.unidadMedida,
+      'unidadMedida': producto.unidadMedida,
     };
 
     if (tipoOperacion == TipoOperacion.notaRetiroDiscontinuos &&
         detalle.productoReemplazoId != null) {
-      detalleBase['productoIntercambio'] = [
-        {
-          'productoId': detalle.productoReemplazoId,
-          'productoCodigo': detalle.productoReemplazoCodigo,
-          'productoDescripcion': detalle.productoReemplazoDescripcion,
-          'productoCategoria': detalle.productoReemplazoCategoria,
-          'cantidad': detalle.cantidad,
-        },
-      ];
+
+      final productoReemplazo = await productoRepository.obtenerProductoPorId(
+        detalle.productoReemplazoId!,
+      );
+
+      if (productoReemplazo != null) {
+        detalleBase['productoIntercambio'] = [
+          {
+            'productoId': detalle.productoReemplazoId,
+            'productoCodigo': productoReemplazo.codigo,
+            'productoDescripcion': productoReemplazo.nombre,
+            'productoCategoria': productoReemplazo.categoria,
+            'cantidad': detalle.cantidad,
+          },
+        ];
+      }
     }
 
     return detalleBase;

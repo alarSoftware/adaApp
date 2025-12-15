@@ -1,16 +1,14 @@
 import 'package:ada_app/services/post/operaciones_comerciales_post_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Para HapticFeedback
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
-// Modelos
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/models/producto.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 
-// UI y Temas
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/ui/widgets/client_info_card.dart';
 import 'package:ada_app/ui/widgets/app_notification.dart';
@@ -18,7 +16,6 @@ import 'package:ada_app/ui/widgets/operaciones_comerciales/buscador_productos_wi
 import 'package:ada_app/ui/widgets/operaciones_comerciales/productos_seleccionados_widget.dart';
 import 'package:ada_app/ui/widgets/bottom_bar_widget.dart';
 
-// Lógica
 import 'package:ada_app/viewmodels/operaciones_comerciales/operacion_comercial_viewmodel.dart' as vm;
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 
@@ -38,7 +35,6 @@ class OperacionComercialFormScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Determinar si es modo visualización basado en parámetros o estado de la operación
     final esVisualizacion = isViewOnly ||
         (operacionExistente != null &&
             (operacionExistente!.estaSincronizado || operacionExistente!.tieneError));
@@ -70,7 +66,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     return Consumer<vm.OperacionComercialFormViewModel>(
       builder: (context, viewModel, child) {
 
-        // Listener para errores (se ejecuta después del renderizado)
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (viewModel.hasError && viewModel.errorMessage != null) {
             AppNotification.show(
@@ -98,20 +93,17 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
             }
           },
           child: Scaffold(
-            // Fondo "Slate 50" para un look moderno y limpio
             backgroundColor: const Color(0xFFF8FAFC),
             appBar: _buildStaticAppBar(viewModel),
-            resizeToAvoidBottomInset: false, // 👈 AÑADE ESTA LÍNEA
+            resizeToAvoidBottomInset: false,
             body: Column(
               children: [
-                // Banner superior de estado (si aplica)
                 if (viewModel.isViewOnly)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: _buildModernStatusBanner(viewModel),
                   ),
 
-                // Área Scrolleable Principal
                 Expanded(
                   child: GestureDetector(
                     onTap: () => FocusScope.of(context).unfocus(),
@@ -120,12 +112,10 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                       child: ListView(
                         padding: EdgeInsets.zero,
                         children: [
-                          // 1. Cabecera (Cliente y Fechas)
                           _buildHeaderSection(viewModel),
 
                           const SizedBox(height: 20),
 
-                          // 2. Buscador (Oculto en modo lectura)
                           if (!viewModel.isViewOnly) ...[
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -159,7 +149,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                             const SizedBox(height: 24),
                           ],
 
-                          // 3. Título de lista (Sutil)
                           if (itemCount > 0)
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -179,10 +168,8 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                               ),
                             ),
 
-                          // 4. Lista de Productos (Diseño limpio directo)
                           _buildProductListDirect(viewModel),
 
-                          // Espacio final para que el último producto no quede detrás del botón
                           SizedBox(height: MediaQuery.of(context).viewInsets.bottom + 100),
                         ],
                       ),
@@ -190,7 +177,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                   ),
                 ),
 
-                // Barra Inferior (Botones de acción)
                 if (!viewModel.isViewOnly || necesitaReintento)
                   _buildBottomArea(viewModel, necesitaReintento),
               ],
@@ -201,8 +187,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     );
   }
 
-  // --- WIDGETS DE LA PANTALLA ---
-
   PreferredSizeWidget _buildStaticAppBar(vm.OperacionComercialFormViewModel viewModel) {
     return AppBar(
       title: Column(
@@ -211,7 +195,7 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
             viewModel.isViewOnly ? 'Detalle de Pedido' : 'Nueva Operación',
             style: const TextStyle(
               fontWeight: FontWeight.w700,
-              color: Color(0xFF1E293B), // Slate 800
+              color: Color(0xFF1E293B),
               fontSize: 17,
             ),
           ),
@@ -251,7 +235,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
             child: ClientInfoCard(cliente: viewModel.cliente),
           ),
 
-          // Aquí siempre mostramos el selector de fecha, sin restricciones
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -355,7 +338,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     );
   }
 
-  // Widget de fecha rediseñado
   Widget _buildFechaRetiroCompact(vm.OperacionComercialFormViewModel viewModel) {
     final isError = !viewModel.isViewOnly && viewModel.fechaRetiro == null;
 
@@ -594,8 +576,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     );
   }
 
-  // --- HELPERS PARA MOSTRAR SPINNER ---
-
   void _showLoadingDialog(String message) {
     showDialog(
       context: context,
@@ -636,8 +616,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
       Navigator.of(context).pop();
     }
   }
-
-  // --- LÓGICA DE NEGOCIO ---
 
   Future<void> _reintentarSincronizacion(vm.OperacionComercialFormViewModel viewModel) async {
     final operacion = viewModel.operacionExistente;
@@ -744,7 +722,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
         type: NotificationType.success,
       );
 
-      // Navegar a la pantalla de visualización de la operación recién creada
       if (!mounted) return;
 
       final result = await Navigator.pushReplacement(
@@ -758,7 +735,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
           ),
         ),
       );
-      // Pasar el resultado hacia atrás cuando se cierre la vista de detalle
       if (!mounted) return;
       Navigator.pop(context, result ?? true);
     }
@@ -809,13 +785,18 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
       ) async {
     if (viewModel.isViewOnly) return;
 
-    final productoOriginal = Producto(
-      id: detalle.productoId,
-      codigo: detalle.productoCodigo,
-      nombre: detalle.productoDescripcion,
-      categoria: detalle.productoCategoria,
-      unidadMedida: detalle.unidadMedida ?? 'UN',
-    );
+    // Obtener el producto original desde el repository usando el productoId
+    final productoOriginal = await viewModel.obtenerProductoPorId(detalle.productoId);
+
+    if (productoOriginal == null) {
+      if (!mounted) return;
+      AppNotification.show(
+        context,
+        message: 'No se pudo cargar la información del producto',
+        type: NotificationType.error,
+      );
+      return;
+    }
 
     final productosReemplazo = await viewModel.obtenerProductosReemplazo(productoOriginal);
 
@@ -845,10 +826,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     }
   }
 }
-
-// ============================================================================
-// MODAL DE REEMPLAZO CON BUSCADOR
-// ============================================================================
 
 class _ReemplazoProductoModal extends StatefulWidget {
   final List<Producto> productosReemplazo;

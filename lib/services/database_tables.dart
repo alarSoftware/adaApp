@@ -310,22 +310,17 @@ class DatabaseTables {
   CREATE TABLE operacion_comercial_detalle (
     id TEXT PRIMARY KEY,
     operacion_comercial_id TEXT NOT NULL,
-    producto_codigo TEXT NOT NULL,
-    producto_descripcion TEXT NOT NULL,
-    producto_categoria TEXT,
     producto_id INTEGER,
     cantidad REAL NOT NULL,
-    unidad_medida TEXT NOT NULL,
     ticket TEXT,
     precio_unitario REAL,
     subtotal REAL,
     orden INTEGER DEFAULT 1,
     fecha_creacion TEXT NOT NULL,
     producto_reemplazo_id INTEGER,
-    producto_reemplazo_codigo TEXT,
-    producto_reemplazo_descripcion TEXT,
-    producto_reemplazo_categoria TEXT,
-    FOREIGN KEY (operacion_comercial_id) REFERENCES operacion_comercial (id) ON DELETE CASCADE
+    FOREIGN KEY (operacion_comercial_id) REFERENCES operacion_comercial (id) ON DELETE CASCADE,
+    FOREIGN KEY (producto_id) REFERENCES productos (id),
+    FOREIGN KEY (producto_reemplazo_id) REFERENCES productos (id)
   )
 ''';
 
@@ -480,7 +475,6 @@ class DatabaseTables {
 
   Future<void> _crearIndicesOperacionesComerciales(Database db) async {
     final indices = [
-      // Índices para operacion_comercial
       'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_cliente_id ON operacion_comercial (cliente_id)',
       'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_tipo ON operacion_comercial (tipo_operacion)',
       'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_sync_status ON operacion_comercial (sync_status)',
@@ -488,12 +482,10 @@ class DatabaseTables {
       'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_usuario_id ON operacion_comercial (usuario_id)',
       'CREATE INDEX IF NOT EXISTS idx_operacion_comercial_server_id ON operacion_comercial (server_id)',
 
-      // Índices para operacion_comercial_detalle
       'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_operacion_id ON operacion_comercial_detalle (operacion_comercial_id)',
-      'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_codigo ON operacion_comercial_detalle (producto_codigo)',
-      'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_categoria ON operacion_comercial_detalle (producto_categoria)',
+      'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_producto_id ON operacion_comercial_detalle (producto_id)',
+      'CREATE INDEX IF NOT EXISTS idx_operacion_detalle_reemplazo_id ON operacion_comercial_detalle (producto_reemplazo_id)',
 
-      // Índices para productos
       'CREATE INDEX IF NOT EXISTS idx_productos_codigo ON productos (codigo)',
       'CREATE INDEX IF NOT EXISTS idx_productos_categoria ON productos (categoria)',
     ];

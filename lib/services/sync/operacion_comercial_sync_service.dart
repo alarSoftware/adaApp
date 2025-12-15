@@ -36,9 +36,6 @@ class OperacionComercialSyncService extends BaseSyncService {
   static List<dynamic> get ultimasOperacionesObtenidas =>
       List.from(_ultimasOperaciones);
 
-  // ==================== MÉTODOS GET ====================
-
-  /// Obtiene operaciones comerciales desde el servidor
   static Future<SyncResult> obtenerOperaciones({
     String? edfVendedorId,
     int? partnerId,
@@ -47,7 +44,6 @@ class OperacionComercialSyncService extends BaseSyncService {
     String? currentEndpoint;
 
     try {
-      // 1. Obtener operaciones (cabecera)
       final queryParams = _buildQueryParams(
         edfVendedorId: edfVendedorId,
         partnerId: partnerId,
@@ -75,7 +71,6 @@ class OperacionComercialSyncService extends BaseSyncService {
         );
       }
 
-      // 2. Obtener detalles
       final detallesResponse = await _makeHttpRequest(
         '/api/getOperacionComercialDetalle',
         queryParams,
@@ -87,13 +82,11 @@ class OperacionComercialSyncService extends BaseSyncService {
 
       final detallesData = await _parseResponse(detallesResponse);
 
-      // 3. Vincular operaciones con sus detalles
       final operacionesConDetalles = await _vincularOperacionesConDetalles(
         operacionesData,
         detallesData,
       );
 
-      // 4. Procesar y guardar
       final processedResult = await _processAndSaveOperaciones(
         operacionesConDetalles,
       );
@@ -133,17 +126,14 @@ class OperacionComercialSyncService extends BaseSyncService {
     }
   }
 
-  /// Obtiene operaciones para un vendedor específico
   static Future<SyncResult> obtenerOperacionesPorVendedor(String edfVendedorId) {
     return obtenerOperaciones(edfVendedorId: edfVendedorId);
   }
 
-  /// Obtiene operaciones de un cliente específico
   static Future<SyncResult> obtenerOperacionesPorCliente(int partnerId) {
     return obtenerOperaciones(partnerId: partnerId);
   }
 
-  /// Obtiene operaciones por tipo
   static Future<SyncResult> obtenerOperacionesPorTipo(String tipo) {
     return obtenerOperaciones(tipo: tipo);
   }
@@ -221,37 +211,38 @@ class OperacionComercialSyncService extends BaseSyncService {
     }
   }
 
-  /// Vincula operaciones con sus detalles y completa info de productos
   static Future<List<Map<String, dynamic>>> _vincularOperacionesConDetalles(
       List<dynamic> operacionesData,
       List<dynamic> detallesData,
       ) async {
     final operacionesConDetalles = <Map<String, dynamic>>[];
 
-    // Agrupar detalles por operacionId
-    final detallesPorOperacion = <int, List<Map<String, dynamic>>>{};
-    for (final detalle in detallesData) {
-      if (detalle is Map) {
-        final detalleMap = Map<String, dynamic>.from(detalle);
-        final operacionId = detalleMap['operacionComercial']?['id'];
+    final todosLosDetalles = detallesData
+        .where((d) => d is Map)
+        .map((d) => Map<String, dynamic>.from(d as Map))
+        .toList();
 
-        if (operacionId != null) {
-          if (!detallesPorOperacion.containsKey(operacionId)) {
-            detallesPorOperacion[operacionId] = [];
-          }
-          detallesPorOperacion[operacionId]!.add(detalleMap);
+    final detallesPorOperacion = <int, List<Map<String, dynamic>>>{};
+    for (final detalleMap in todosLosDetalles) {
+      final operacionId = detalleMap['operacionComercial']?['id'];
+      final tieneParent = detalleMap['parentDetalle'] != null;
+
+      if (operacionId != null && !tieneParent) {
+        if (!detallesPorOperacion.containsKey(operacionId)) {
+          detallesPorOperacion[operacionId] = [];
         }
+        detallesPorOperacion[operacionId]!.add(detalleMap);
       }
     }
 
-    // Vincular cada operación con sus detalles
     for (final operacion in operacionesData) {
       if (operacion is Map) {
         final operacionMap = Map<String, dynamic>.from(operacion);
         final operacionId = operacionMap['id'];
 
-        // Agregar detalles a la operación
         operacionMap['detalles'] = detallesPorOperacion[operacionId] ?? [];
+        operacionMap['todosLosDetalles'] = todosLosDetalles;
+
         operacionesConDetalles.add(operacionMap);
       }
     }
@@ -272,9 +263,8 @@ class OperacionComercialSyncService extends BaseSyncService {
         final operacionParaGuardar = await _mapApiToLocalFormat(operacion);
         operacionesParaGuardar.add(operacionParaGuardar);
       } catch (e) {
-        // Saltar operación inválida
         operacionesInvalidas++;
-        print('⚠️ Error procesando operación: $e');
+        print('Error procesando operación: $e');
       }
     }
 
@@ -293,7 +283,7 @@ class OperacionComercialSyncService extends BaseSyncService {
     }
 
     if (operacionesInvalidas > 0) {
-      print('⚠️ Se saltaron $operacionesInvalidas operaciones con datos incompletos');
+      print('Se saltaron $operacionesInvalidas operaciones con datos incompletos');
     }
 
     return operacionesParaGuardar;
@@ -302,7 +292,6 @@ class OperacionComercialSyncService extends BaseSyncService {
   static Future<Map<String, dynamic>> _mapApiToLocalFormat(
       Map<String, dynamic> apiOperacion,
       ) async {
-    // Validar datos requeridos
     final partnerId = _parseIntSafely(apiOperacion['partnerId']);
     final tipo = apiOperacion['tipo']?.toString();
 
@@ -310,9 +299,13 @@ class OperacionComercialSyncService extends BaseSyncService {
       throw Exception('Operación sin datos requeridos (partnerId o tipo)');
     }
 
-    // Mapear operación (cabecera)
+    final operacionServerId = _parseIntSafely(apiOperacion['id']);
+    if (operacionServerId == null) {
+      throw Exception('Operación sin ID del servidor');
+    }
+
     final operacionLocal = {
-      'id': apiOperacion['uuid']?.toString() ?? apiOperacion['id']?.toString(),
+      'id': operacionServerId.toString(),
       'cliente_id': partnerId,
       'tipo_operacion': tipo,
       'fecha_creacion': apiOperacion['creationDate']?.toString() ??
@@ -321,14 +314,15 @@ class OperacionComercialSyncService extends BaseSyncService {
       'observaciones': null,
       'total_productos': 0,
       'usuario_id': _parseIntSafely(apiOperacion['creationUser']),
-      'server_id': _parseIntSafely(apiOperacion['id']),
+      'server_id': operacionServerId,
       'sync_status': 'migrado',
       'sync_error': apiOperacion['errorText']?.toString(),
       'synced_at': DateTime.now().toIso8601String(),
       'sync_retry_count': 0,
     };
 
-    // Mapear detalles
+    final todosLosDetalles = apiOperacion['todosLosDetalles'] as List<Map<String, dynamic>>? ?? [];
+
     final detalles = <Map<String, dynamic>>[];
     if (apiOperacion.containsKey('detalles') && apiOperacion['detalles'] is List) {
       final detallesApi = apiOperacion['detalles'] as List;
@@ -340,6 +334,7 @@ class OperacionComercialSyncService extends BaseSyncService {
             detalleMap,
             operacionLocal['id'] as String,
             i + 1,
+            todosLosDetalles,
           );
           detalles.add(detalleMapeado);
         }
@@ -356,76 +351,41 @@ class OperacionComercialSyncService extends BaseSyncService {
       Map<String, dynamic> apiDetalle,
       String operacionId,
       int orden,
+      List<Map<String, dynamic>> todosLosDetalles,
       ) async {
-    // Obtener info del producto desde la BD local
     final productId = _parseIntSafely(apiDetalle['productId']);
-    final productoInfo = await _obtenerInfoProducto(productId);
+
+    int? productoReemplazoId;
+
+    final detalleServerId = _parseIntSafely(apiDetalle['id']);
+    if (detalleServerId == null) {
+      throw Exception('Detalle sin ID del servidor');
+    }
+
+    final detalleReemplazo = todosLosDetalles.firstWhere(
+          (d) => d['parentDetalle'] != null &&
+          _parseIntSafely(d['parentDetalle']['id']) == detalleServerId,
+      orElse: () => <String, dynamic>{},
+    );
+
+    if (detalleReemplazo.isNotEmpty) {
+      productoReemplazoId = _parseIntSafely(detalleReemplazo['productId']);
+    }
 
     return {
-      'id': apiDetalle['uuid']?.toString() ??
-          apiDetalle['id']?.toString() ??
-          '${operacionId}_det_$orden',
+      'id': detalleServerId.toString(),
       'operacion_comercial_id': operacionId,
-      'producto_codigo': productoInfo['codigo'] ?? '',
-      'producto_descripcion': productoInfo['nombre'] ?? '',
-      'producto_categoria': productoInfo['categoria'] ?? '',
       'producto_id': productId,
       'cantidad': _parseDoubleSafely(apiDetalle['cantidad']),
-      'unidad_medida': productoInfo['unidadMedida'] ?? '',
       'ticket': apiDetalle['ticket']?.toString(),
-      'precio_unitario': 0.0, // No viene en el API
-      'subtotal': 0.0, // No viene en el API
+      'precio_unitario': 0.0,
+      'subtotal': 0.0,
       'orden': orden,
       'fecha_creacion': DateTime.now().toIso8601String(),
-      'producto_reemplazo_id': null,
-      'producto_reemplazo_codigo': null,
-      'producto_reemplazo_descripcion': null,
-      'producto_reemplazo_categoria': null,
+      'producto_reemplazo_id': productoReemplazoId,
     };
   }
 
-  /// Obtiene información del producto desde la BD local
-  /// Obtiene información del producto desde la BD local
-  static Future<Map<String, dynamic>> _obtenerInfoProducto(int? productId) async {
-    if (productId == null) {
-      return {
-        'codigo': '',
-        'nombre': 'Producto desconocido',
-        'categoria': '',
-        'unidadMedida': 'Units',
-      };
-    }
-
-    try {
-      final db = await DatabaseHelper().database;
-      final result = await db.query(
-        'Productos',
-        columns: ['codigo', 'nombre', 'categoria', 'unidadMedida'],
-        where: 'id = ?',
-        whereArgs: [productId],
-        limit: 1,
-      );
-
-      if (result.isNotEmpty) {
-        return Map<String, dynamic>.from(result.first);
-      }
-
-      return {
-        'codigo': '',
-        'nombre': 'Producto ID: $productId',
-        'categoria': '',
-        'unidadMedida': 'Units',
-      };
-    } catch (e) {
-      print('Error obteniendo info de producto $productId: $e');
-      return {
-        'codigo': '',
-        'nombre': 'Producto ID: $productId',
-        'categoria': '',
-        'unidadMedida': 'Units',
-      };
-    }
-  }
   static int? _parseIntSafely(dynamic value) {
     if (value == null) return null;
     if (value is int) return value;
@@ -453,9 +413,6 @@ class OperacionComercialSyncService extends BaseSyncService {
     return 0.0;
   }
 
-  // ==================== MÉTODOS POST (EXISTENTES) ====================
-
-  /// Sincroniza todas las operaciones pendientes o con error.
   Future<Map<String, int>> sincronizarOperacionesPendientes(
       int usuarioId,
       ) async {
@@ -606,8 +563,6 @@ class OperacionComercialSyncService extends BaseSyncService {
     }
   }
 
-  // ==================== SINCRONIZACIÓN AUTOMÁTICA ====================
-
   static void iniciarSincronizacionAutomatica(int usuarioId) {
     if (_syncActivo && _usuarioActual == usuarioId) {
       return;
@@ -652,7 +607,6 @@ class OperacionComercialSyncService extends BaseSyncService {
       await service.sincronizarOperacionesPendientes(_usuarioActual!);
 
     } catch (e) {
-      // Error handling managed internally
     } finally {
       _syncEnProgreso = false;
     }

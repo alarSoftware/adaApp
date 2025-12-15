@@ -1,8 +1,9 @@
-// lib/ui/screens/operaciones_comerciales/widgets/productos_seleccionados_widget.dart
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
+import 'package:ada_app/models/producto.dart';
+import 'package:ada_app/repositories/producto_repository.dart';
 
 class ProductosSeleccionadosWidget extends StatelessWidget {
   final List<OperacionComercialDetalle> productosSeleccionados;
@@ -11,8 +12,9 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
   final Function(int, double) onActualizarCantidad;
   final Function(int, dynamic)? onSeleccionarReemplazo;
   final bool isReadOnly;
+  final ProductoRepository _productoRepository;
 
-  const ProductosSeleccionadosWidget({
+  ProductosSeleccionadosWidget({
     Key? key,
     required this.productosSeleccionados,
     required this.tipoOperacion,
@@ -20,7 +22,9 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     required this.onActualizarCantidad,
     this.onSeleccionarReemplazo,
     this.isReadOnly = false,
-  }) : super(key: key);
+    ProductoRepository? productoRepository,
+  }) : _productoRepository = productoRepository ?? ProductoRepositoryImpl(),
+        super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -195,24 +199,33 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(width: 16),
+                  FutureBuilder<Producto?>(
+                    future: _productoRepository.obtenerProductoPorId(detalle.productoId!),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const SizedBox(
+                          height: 60,
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
 
-                      Expanded(
-                        child: _buildProductInfo(detalle, esDiscontinuos),
-                      ),
-
-                      const SizedBox(width: 12),
-
-                      _buildQuantityField(index, detalle),
-
-                      if (!isReadOnly) ...[
-                        const SizedBox(width: 8),
-                        _buildDeleteButton(index),
-                      ],
-                    ],
+                      final producto = snapshot.data!;
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildProductInfo(producto, esDiscontinuos),
+                          ),
+                          const SizedBox(width: 12),
+                          _buildQuantityField(index, detalle),
+                          if (!isReadOnly) ...[
+                            const SizedBox(width: 8),
+                            _buildDeleteButton(index),
+                          ],
+                        ],
+                      );
+                    },
                   ),
 
                   if (esDiscontinuos) ...[
@@ -228,8 +241,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     );
   }
 
-
-  Widget _buildProductInfo(OperacionComercialDetalle detalle, bool esDiscontinuos) {
+  Widget _buildProductInfo(Producto producto, bool esDiscontinuos) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -275,26 +287,26 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
             ),
             children: [
               TextSpan(
-                text: '[${detalle.productoCodigo}] ',
+                text: '[${producto.codigo ?? 'S/C'}] ',
                 style: TextStyle(
                   color: AppColors.primary,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               TextSpan(
-                text: detalle.productoDescripcion,
+                text: producto.nombre ?? 'Sin nombre',
               ),
             ],
           ),
         ),
         const SizedBox(height: 4),
-        if (detalle.productoCodigoBarras != null && detalle.productoCodigoBarras!.isNotEmpty)
+        if (producto.codigoBarras != null && producto.codigoBarras!.isNotEmpty)
           Row(
             children: [
               Icon(Icons.barcode_reader, size: 12, color: AppColors.textSecondary),
               const SizedBox(width: 4),
               Text(
-                detalle.productoCodigoBarras!,
+                producto.codigoBarras!,
                 style: TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
@@ -303,7 +315,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
               ),
             ],
           ),
-        if (detalle.productoCategoria != null) ...[
+        if (producto.categoria != null) ...[
           const SizedBox(height: 4),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -312,7 +324,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
-              detalle.productoCategoria!,
+              producto.categoria!,
               style: TextStyle(
                 fontSize: 10,
                 color: AppColors.primary,
@@ -480,7 +492,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          if (detalle.productoReemplazoCodigo == null)
+          if (detalle.productoReemplazoId == null)
             _buildSelectReplacementButton(index, detalle)
           else
             _buildReplacementInfo(index, detalle),
@@ -604,124 +616,138 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
   }
 
   Widget _buildReplacementInfo(int index, OperacionComercialDetalle detalle) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.success.withValues(alpha: 0.15),
-            AppColors.success.withValues(alpha: 0.2),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.success.withValues(alpha: 0.5),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.success.withValues(alpha: 0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              gradient: AppColors.successGradient,
-              borderRadius: BorderRadius.circular(6),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.success.withValues(alpha: 0.3),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
+    return FutureBuilder<Producto?>(
+      future: _productoRepository.obtenerProductoPorId(detalle.productoReemplazoId!),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const SizedBox(
+            height: 60,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final productoReemplazo = snapshot.data!;
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.success.withValues(alpha: 0.15),
+                AppColors.success.withValues(alpha: 0.2),
               ],
             ),
-            child: const Text(
-              'NUEVO',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppColors.success.withValues(alpha: 0.5),
+              width: 2,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.success.withValues(alpha: 0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                RichText(
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  text: TextSpan(
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: AppColors.successGradient,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.success.withValues(alpha: 0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
                     ),
-                    children: [
-                      TextSpan(
-                        text: '[${detalle.productoReemplazoCodigo ?? 'S/C'}] ',
-                        style: TextStyle(
-                          color: AppColors.success,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      TextSpan(
-                        text: detalle.productoReemplazoDescripcion ?? 'Sin nombre',
-                      ),
-                    ],
-                  ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                if (detalle.productoReemplazoCodigoBarras != null && detalle.productoReemplazoCodigoBarras!.isNotEmpty)
-                  Row(
-                    children: [
-                      Icon(Icons.barcode_reader, size: 11, color: AppColors.textSecondary),
-                      const SizedBox(width: 4),
-                      Text(
-                        detalle.productoReemplazoCodigoBarras!,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-          if (!isReadOnly)
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => onSeleccionarReemplazo?.call(index, detalle),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.edit_rounded,
-                    color: AppColors.success,
-                    size: 18,
+                child: const Text(
+                  'NUEVO',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),
-            ),
-        ],
-      ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RichText(
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      text: TextSpan(
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: '[${productoReemplazo.codigo ?? 'S/C'}] ',
+                            style: TextStyle(
+                              color: AppColors.success,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          TextSpan(
+                            text: productoReemplazo.nombre ?? 'Sin nombre',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (productoReemplazo.codigoBarras != null && productoReemplazo.codigoBarras!.isNotEmpty)
+                      Row(
+                        children: [
+                          Icon(Icons.barcode_reader, size: 11, color: AppColors.textSecondary),
+                          const SizedBox(width: 4),
+                          Text(
+                            productoReemplazo.codigoBarras!,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+              if (!isReadOnly)
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => onSeleccionarReemplazo?.call(index, detalle),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.edit_rounded,
+                        color: AppColors.success,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

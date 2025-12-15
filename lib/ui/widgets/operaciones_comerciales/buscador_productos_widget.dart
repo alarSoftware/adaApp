@@ -115,7 +115,7 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
         itemCount: widget.productosFiltrados.length,
         itemBuilder: (context, index) {
           final producto = widget.productosFiltrados[index];
-          final yaSeleccionado = _isProductoSeleccionado(producto.codigo);
+          final yaSeleccionado = _isProductoSeleccionado(producto.id);
 
           return ListTile(
             dense: true,
@@ -152,9 +152,7 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
             onTap: () {
               if (!yaSeleccionado && producto.isValid) {
                 widget.onProductoSelected(producto);
-                // Limpiar búsqueda después de seleccionar
                 widget.onClearSearch();
-                // Quitar el foco del TextField
                 FocusScope.of(context).unfocus();
               }
             },
@@ -210,9 +208,9 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
     );
   }
 
-  bool _isProductoSeleccionado(String? codigo) {
-    if (codigo == null) return false;
+  bool _isProductoSeleccionado(int? productoId) {
+    if (productoId == null) return false;
     return widget.productosSeleccionados
-        .any((detalle) => detalle.productoCodigo == codigo);
+        .any((detalle) => detalle.productoId == productoId);
   }
 }

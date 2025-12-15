@@ -147,31 +147,29 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     }
   }
 
-  bool isProductoSeleccionado(String? codigoProducto) {
-    if (codigoProducto == null) return false;
+  bool isProductoSeleccionado(int? productoId) {
+    if (productoId == null) return false;
     return _productosSeleccionados.any(
-          (detalle) => detalle.productoCodigo == codigoProducto,
+          (detalle) => detalle.productoId == productoId,
     );
   }
 
   bool agregarProducto(Producto producto) {
     if (isViewOnly) return false;
 
-    final identificador = producto.codigo ?? producto.id?.toString();
-
-    if (identificador == null || identificador.isEmpty) {
-      _setError('El producto no tiene un identificador válido');
+    if (producto.id == null) {
+      _setError('El producto no tiene un ID válido');
       return false;
     }
 
-    if (isProductoSeleccionado(identificador)) {
-      print('⚠️ Producto ya seleccionado');
+    if (isProductoSeleccionado(producto.id)) {
+      print('Producto ya seleccionado');
       return false;
     }
 
     final errorUnidad = tipoOperacion.validarUnidadMedida(producto.unidadMedida);
     if (errorUnidad != null) {
-      print('❌ Error de unidad: $errorUnidad');
+      print('Error de unidad: $errorUnidad');
       String mensajeEspecifico;
 
       if (tipoOperacion.esNotaRetiro) {
@@ -186,31 +184,25 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       return false;
     }
 
-    print('✅ Producto válido, agregando...');
+    print('Producto válido, agregando...');
 
     final detalle = OperacionComercialDetalle(
       operacionComercialId: '',
-      productoCodigo: identificador,
-      productoDescripcion: producto.nombre ?? 'Sin nombre',
-      productoCategoria: producto.categoria,
-      productoCodigoBarras: producto.codigoBarras,
-      productoId: producto.id,
+      productoId: producto.id!,
       cantidad: 0.0,
-      unidadMedida: producto.unidadMedida,
       orden: _productosSeleccionados.length + 1,
       fechaCreacion: DateTime.now(),
     );
 
     _productosSeleccionados.add(detalle);
 
-    print('✅ Producto agregado a la lista: ${_productosSeleccionados.length} productos');
-    print('   - Código de barras incluido: ${producto.codigoBarras}');
-    print('   - Limpiando búsqueda...');
+    print('Producto agregado a la lista: ${_productosSeleccionados.length} productos');
+    print('Limpiando búsqueda...');
 
     clearSearch();
     notifyListeners();
 
-    print('✅ notifyListeners() llamado');
+    print('notifyListeners() llamado');
 
     return true;
   }
@@ -261,7 +253,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
   Future<List<Producto>> getProductosReemplazo(
       String? categoriaOriginal,
-      String? codigoOriginal,
       int? idProductoActual,
       ) async {
     if (categoriaOriginal == null) return [];
@@ -287,10 +278,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     if (index >= 0 && index < _productosSeleccionados.length) {
       _productosSeleccionados[index] = _productosSeleccionados[index].copyWith(
         productoReemplazoId: productoReemplazo.id,
-        productoReemplazoCodigo: productoReemplazo.codigo ?? 'S/C',
-        productoReemplazoDescripcion: productoReemplazo.nombre ?? 'Sin nombre',
-        productoReemplazoCategoria: productoReemplazo.categoria,
-        productoReemplazoCodigoBarras: productoReemplazo.codigoBarras,
       );
       notifyListeners();
     }
@@ -300,12 +287,12 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     if (isViewOnly) return ValidationResult.valid();
 
     if (tipoOperacion.necesitaFechaRetiro && _fechaRetiro == null) {
-      return ValidationResult.error('⚠️ Falta seleccionar la fecha de retiro');
+      return ValidationResult.error('Falta seleccionar la fecha de retiro');
     }
 
     if (_productosSeleccionados.isEmpty) {
       return ValidationResult.error(
-        '⚠️ Debes agregar al menos un producto a la operación',
+        'Debes agregar al menos un producto a la operación',
       );
     }
 
@@ -314,13 +301,8 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         .toList();
 
     if (productosSinCantidad.isNotEmpty) {
-      final nombres = productosSinCantidad
-          .take(3)
-          .map((d) => '• ${d.productoDescripcion}')
-          .join('\n');
       return ValidationResult.error(
-        '⚠️ Productos con cantidad 0:\n$nombres' +
-            (productosSinCantidad.length > 3 ? '\n...y más.' : ''),
+        'Hay productos con cantidad 0',
       );
     }
 
@@ -330,35 +312,8 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
           .toList();
 
       if (sinReemplazo.isNotEmpty) {
-        final nombres = sinReemplazo
-            .take(3)
-            .map((d) => '• ${d.productoDescripcion}')
-            .join('\n');
         return ValidationResult.error(
-          '⚠️ Debes seleccionar un reemplazo para:\n$nombres',
-        );
-      }
-
-      final categoriasDiferentes = _productosSeleccionados
-          .where(
-            (detalle) =>
-        detalle.productoReemplazoId != null &&
-            detalle.productoCategoria != detalle.productoReemplazoCategoria,
-      )
-          .toList();
-
-      if (categoriasDiferentes.isNotEmpty) {
-        final detalles = categoriasDiferentes
-            .take(2)
-            .map(
-              (d) =>
-          '• ${d.productoDescripcion} (${d.productoCategoria}) \n'
-              '   → Intenta reemplazar con (${d.productoReemplazoCategoria})',
-        )
-            .join('\n\n');
-
-        return ValidationResult.error(
-          '⚠️ Los reemplazos deben ser de la misma categoría:\n\n$detalles',
+          'Debes seleccionar un reemplazo para todos los productos',
         );
       }
     }
@@ -377,6 +332,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     return ValidationResult.valid();
   }
 
+  /// ✅ MÉTODO CORREGIDO - Ahora recarga la operación completa con detalles
   Future<OperacionComercial?> guardarOperacion() async {
     if (isViewOnly) return null;
 
@@ -403,15 +359,20 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         detalles: _productosSeleccionados,
       );
 
+      // Guardar la operación en la base de datos
       final operacionId = await _operacionRepository.crearOperacion(operacion);
 
-      final operacionConId = operacion.copyWith(id: operacionId);
-
+      // ✅ SOLUCIÓN: Recargar la operación completa desde la DB con sus detalles
       final operacionCompleta = await _operacionRepository.obtenerOperacionPorId(operacionId);
 
       _setFormState(FormState.idle);
 
-      return operacionCompleta ?? operacionConId;
+      // Si por alguna razón falla la recarga, devolver la operación con el ID
+      if (operacionCompleta == null) {
+        return operacion.copyWith(id: operacionId);
+      }
+
+      return operacionCompleta;
     } catch (e) {
       _setError('Error al guardar: $e');
       return null;
@@ -452,5 +413,13 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         _fechaRetiro != operacionExistente!.fechaRetiro ||
         _snc != operacionExistente!.snc ||
         _productosSeleccionados.length != operacionExistente!.detalles.length;
+  }
+
+  Future<Producto?> obtenerProductoPorId(int productoId) async {
+    try {
+      return await _productoRepository.obtenerProductoPorId(productoId);
+    } catch (e) {
+      return null;
+    }
   }
 }
