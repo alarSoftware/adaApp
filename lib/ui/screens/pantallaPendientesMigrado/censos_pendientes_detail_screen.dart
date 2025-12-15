@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/viewmodels/pending_data_viewmodel.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/ui/screens/preview_screen.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/cliente_repository.dart';

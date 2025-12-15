@@ -5,7 +5,7 @@ import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart'
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 import 'package:ada_app/services/sync/operacion_comercial_sync_service.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 
 class OperacionesComercialesMenuViewModel extends ChangeNotifier {
   final OperacionComercialRepository _repository;
@@ -29,9 +29,12 @@ class OperacionesComercialesMenuViewModel extends ChangeNotifier {
   bool get isSyncing => _isSyncing;
   String? get errorMessage => _errorMessage;
 
-  List<OperacionComercial> get operacionesReposicion => List.unmodifiable(_operacionesReposicion);
-  List<OperacionComercial> get operacionesRetiro => List.unmodifiable(_operacionesRetiro);
-  List<OperacionComercial> get operacionesDiscontinuos => List.unmodifiable(_operacionesDiscontinuos);
+  List<OperacionComercial> get operacionesReposicion =>
+      List.unmodifiable(_operacionesReposicion);
+  List<OperacionComercial> get operacionesRetiro =>
+      List.unmodifiable(_operacionesRetiro);
+  List<OperacionComercial> get operacionesDiscontinuos =>
+      List.unmodifiable(_operacionesDiscontinuos);
 
   // Obtener operaciones por tipo
   List<OperacionComercial> getOperacionesPorTipo(TipoOperacion tipo) {
@@ -67,7 +70,10 @@ class OperacionesComercialesMenuViewModel extends ChangeNotifier {
       }
 
       // Sincronizar con el servidor
-      final resultado = await OperacionComercialSyncService.obtenerOperacionesPorVendedor(edfVendedorId);
+      final resultado =
+          await OperacionComercialSyncService.obtenerOperacionesPorVendedor(
+            edfVendedorId,
+          );
 
       if (resultado.exito) {
         // Recargar las operaciones locales después de sincronizar
@@ -122,20 +128,22 @@ class OperacionesComercialesMenuViewModel extends ChangeNotifier {
 
     try {
       // Cargar operaciones por tipo
-      _operacionesReposicion = await _repository.obtenerOperacionesPorClienteYTipo(
-        clienteId,
-        TipoOperacion.notaReposicion,
-      );
+      _operacionesReposicion = await _repository
+          .obtenerOperacionesPorClienteYTipo(
+            clienteId,
+            TipoOperacion.notaReposicion,
+          );
 
       _operacionesRetiro = await _repository.obtenerOperacionesPorClienteYTipo(
         clienteId,
         TipoOperacion.notaRetiro,
       );
 
-      _operacionesDiscontinuos = await _repository.obtenerOperacionesPorClienteYTipo(
-        clienteId,
-        TipoOperacion.notaRetiroDiscontinuos,
-      );
+      _operacionesDiscontinuos = await _repository
+          .obtenerOperacionesPorClienteYTipo(
+            clienteId,
+            TipoOperacion.notaRetiroDiscontinuos,
+          );
 
       _isLoading = false;
       notifyListeners();

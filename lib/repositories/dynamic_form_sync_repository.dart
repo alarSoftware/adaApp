@@ -1,4 +1,4 @@
-import '../services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import '../services/dynamic_form/dynamic_form_upload_service.dart';
 
 /// Repository especializado en gestionar el estado de sincronización

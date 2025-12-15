@@ -9,10 +9,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ada_app/services/sync/equipos_pendientes_sync_service.dart';
 import 'package:ada_app/services/sync/dynamic_form_sync_service.dart';
 import 'package:ada_app/services/sync/censo_image_sync_service.dart';
-import 'package:ada_app/services/database_validation_service.dart';
+import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:sqflite/sqflite.dart';
-import '../database_helper.dart';
+import '../data/database_helper.dart';
 
 class SyncService {
   static final _clienteRepo = ClienteRepository();
@@ -39,7 +39,6 @@ class SyncService {
       }
 
       return syncResult;
-
     } catch (e) {
       await ErrorLogService.logError(
         tableName: 'sync_general',
@@ -82,37 +81,33 @@ class SyncService {
   static Future<void> _limpiarDatosSincronizados(Database db) async {
     await db.transaction((txn) async {
       await txn.delete(
-          'dynamic_form_response',
-          where: 'sync_status = ?',
-          whereArgs: ['synced']
+        'dynamic_form_response',
+        where: 'sync_status = ?',
+        whereArgs: ['synced'],
       );
 
       await txn.delete(
-          'dynamic_form_response_detail',
-          where: 'sync_status = ?',
-          whereArgs: ['synced']
+        'dynamic_form_response_detail',
+        where: 'sync_status = ?',
+        whereArgs: ['synced'],
       );
 
       await txn.delete(
-          'dynamic_form_response_image',
-          where: 'sync_status = ?',
-          whereArgs: ['synced']
+        'dynamic_form_response_image',
+        where: 'sync_status = ?',
+        whereArgs: ['synced'],
       );
 
       await txn.delete(
-          'equipos_pendientes',
-          where: 'sincronizado = ?',
-          whereArgs: [1]
+        'equipos_pendientes',
+        where: 'sincronizado = ?',
+        whereArgs: [1],
       );
 
       await txn.delete('censo_activo');
       await txn.delete('censo_activo_foto');
 
-      await txn.delete(
-          'device_log',
-          where: 'sincronizado = ?',
-          whereArgs: [1]
-      );
+      await txn.delete('device_log', where: 'sincronizado = ?', whereArgs: [1]);
     });
   }
 
@@ -141,7 +136,8 @@ class SyncService {
         edfVendedorId = await obtenerEdfVendedorId();
       } catch (e) {
         resultado.exito = false;
-        resultado.mensaje = 'Error: No se pudo obtener información del usuario. $e';
+        resultado.mensaje =
+            'Error: No se pudo obtener información del usuario. $e';
         return resultado;
       }
 
@@ -150,7 +146,8 @@ class SyncService {
       await EquipmentSyncService.sincronizarLogos();
 
       try {
-        final resultadoClientes = await ClientSyncService.sincronizarClientesDelUsuario();
+        final resultadoClientes =
+            await ClientSyncService.sincronizarClientesDelUsuario();
         resultado.clientesSincronizados = resultadoClientes.itemsSincronizados;
         resultado.clientesExito = resultadoClientes.exito;
 
@@ -164,7 +161,8 @@ class SyncService {
       }
 
       try {
-        final resultadoEquipos = await EquipmentSyncService.sincronizarEquipos();
+        final resultadoEquipos =
+            await EquipmentSyncService.sincronizarEquipos();
         resultado.equiposSincronizados = resultadoEquipos.itemsSincronizados;
         resultado.equiposExito = resultadoEquipos.exito;
 
@@ -179,7 +177,8 @@ class SyncService {
 
       try {
         final resultadoProductos = await ProductoSyncService.obtenerProductos();
-        resultado.productosSincronizados = resultadoProductos.itemsSincronizados;
+        resultado.productosSincronizados =
+            resultadoProductos.itemsSincronizados;
         resultado.productosExito = resultadoProductos.exito;
 
         if (!resultadoProductos.exito) {
@@ -190,7 +189,6 @@ class SyncService {
         resultado.erroresProductos = 'Error al sincronizar productos: $e';
         resultado.productosSincronizados = 0;
       }
-
 
       try {
         final resultadoCensos = await CensusSyncService.obtenerCensosActivos(
@@ -210,10 +208,12 @@ class SyncService {
 
       if (resultado.censosExito && resultado.censosSincronizados > 0) {
         try {
-          final resultadoImagenes = await CensusImageSyncService.obtenerFotosCensos(
-            edfVendedorId: edfVendedorId,
-          );
-          resultado.imagenesCensosSincronizadas = resultadoImagenes.itemsSincronizados;
+          final resultadoImagenes =
+              await CensusImageSyncService.obtenerFotosCensos(
+                edfVendedorId: edfVendedorId,
+              );
+          resultado.imagenesCensosSincronizadas =
+              resultadoImagenes.itemsSincronizados;
           resultado.imagenesCensosExito = resultadoImagenes.exito;
 
           if (!resultadoImagenes.exito) {
@@ -221,7 +221,8 @@ class SyncService {
           }
         } catch (e) {
           resultado.imagenesCensosExito = false;
-          resultado.erroresImagenesCensos = 'Error al sincronizar imágenes de censos: $e';
+          resultado.erroresImagenesCensos =
+              'Error al sincronizar imágenes de censos: $e';
           resultado.imagenesCensosSincronizadas = 0;
         }
       } else {
@@ -231,10 +232,12 @@ class SyncService {
       }
 
       try {
-        final resultadoPendientes = await EquiposPendientesSyncService.obtenerEquiposPendientes(
-          edfVendedorId: edfVendedorId,
-        );
-        resultado.equiposPendientesSincronizados = resultadoPendientes.itemsSincronizados;
+        final resultadoPendientes =
+            await EquiposPendientesSyncService.obtenerEquiposPendientes(
+              edfVendedorId: edfVendedorId,
+            );
+        resultado.equiposPendientesSincronizados =
+            resultadoPendientes.itemsSincronizados;
         resultado.equiposPendientesExito = resultadoPendientes.exito;
 
         if (!resultadoPendientes.exito) {
@@ -242,13 +245,16 @@ class SyncService {
         }
       } catch (e) {
         resultado.equiposPendientesExito = false;
-        resultado.erroresEquiposPendientes = 'Error al sincronizar equipos pendientes: $e';
+        resultado.erroresEquiposPendientes =
+            'Error al sincronizar equipos pendientes: $e';
         resultado.equiposPendientesSincronizados = 0;
       }
 
       try {
-        final resultadoFormularios = await DynamicFormSyncService.obtenerFormulariosDinamicos();
-        resultado.formulariosSincronizados = resultadoFormularios.itemsSincronizados;
+        final resultadoFormularios =
+            await DynamicFormSyncService.obtenerFormulariosDinamicos();
+        resultado.formulariosSincronizados =
+            resultadoFormularios.itemsSincronizados;
         resultado.formulariosExito = resultadoFormularios.exito;
 
         if (!resultadoFormularios.exito) {
@@ -264,8 +270,12 @@ class SyncService {
       resultado.detallesFormulariosExito = true;
 
       try {
-        final resultadoRespuestas = await DynamicFormSyncService.obtenerRespuestasPorVendedor(edfVendedorId);
-        resultado.respuestasFormulariosSincronizadas = resultadoRespuestas.itemsSincronizados;
+        final resultadoRespuestas =
+            await DynamicFormSyncService.obtenerRespuestasPorVendedor(
+              edfVendedorId,
+            );
+        resultado.respuestasFormulariosSincronizadas =
+            resultadoRespuestas.itemsSincronizados;
         resultado.respuestasFormulariosExito = resultadoRespuestas.exito;
 
         if (!resultadoRespuestas.exito) {
@@ -273,24 +283,31 @@ class SyncService {
         }
       } catch (e) {
         resultado.respuestasFormulariosExito = false;
-        resultado.erroresRespuestasFormularios = 'Error al sincronizar respuestas: $e';
+        resultado.erroresRespuestasFormularios =
+            'Error al sincronizar respuestas: $e';
         resultado.respuestasFormulariosSincronizadas = 0;
       }
 
-      if (resultado.respuestasFormulariosExito && resultado.respuestasFormulariosSincronizadas > 0) {
+      if (resultado.respuestasFormulariosExito &&
+          resultado.respuestasFormulariosSincronizadas > 0) {
         try {
-          final resultadoImagenesFormularios = await DynamicFormSyncService.obtenerImagenesFormularios(
-            edfVendedorId: edfVendedorId,
-          );
-          resultado.imagenesFormulariosSincronizadas = resultadoImagenesFormularios.itemsSincronizados;
-          resultado.imagenesFormulariosExito = resultadoImagenesFormularios.exito;
+          final resultadoImagenesFormularios =
+              await DynamicFormSyncService.obtenerImagenesFormularios(
+                edfVendedorId: edfVendedorId,
+              );
+          resultado.imagenesFormulariosSincronizadas =
+              resultadoImagenesFormularios.itemsSincronizados;
+          resultado.imagenesFormulariosExito =
+              resultadoImagenesFormularios.exito;
 
           if (!resultadoImagenesFormularios.exito) {
-            resultado.erroresImagenesFormularios = resultadoImagenesFormularios.mensaje;
+            resultado.erroresImagenesFormularios =
+                resultadoImagenesFormularios.mensaje;
           }
         } catch (e) {
           resultado.imagenesFormulariosExito = false;
-          resultado.erroresImagenesFormularios = 'Error al sincronizar imágenes de formularios: $e';
+          resultado.erroresImagenesFormularios =
+              'Error al sincronizar imágenes de formularios: $e';
           resultado.imagenesFormulariosSincronizadas = 0;
         }
       } else {
@@ -310,23 +327,24 @@ class SyncService {
         resultado.detallesFormulariosExito,
         resultado.respuestasFormulariosExito,
         resultado.imagenesFormulariosExito,
-        resultado.asignacionesExito
+        resultado.asignacionesExito,
       ];
       final totalExitosos = exitosos.where((e) => e).length;
 
       if (totalExitosos >= 7) {
         resultado.exito = true;
-        resultado.mensaje = 'Sincronización completa: ${resultado.resumenCompacto}';
+        resultado.mensaje =
+            'Sincronización completa: ${resultado.resumenCompacto}';
       } else if (totalExitosos > 0) {
         resultado.exito = true;
-        resultado.mensaje = 'Sincronización parcial: ${resultado.resumenCompacto}';
+        resultado.mensaje =
+            'Sincronización parcial: ${resultado.resumenCompacto}';
       } else {
         resultado.exito = false;
         resultado.mensaje = 'Error: no se pudo sincronizar ningún dato';
       }
 
       return resultado;
-
     } catch (e) {
       await ErrorLogService.logError(
         tableName: 'sync_general',
@@ -342,7 +360,8 @@ class SyncService {
     }
   }
 
-  static Future<SyncResult> sincronizarUsuarios() => UserSyncService.sincronizarUsuarios();
+  static Future<SyncResult> sincronizarUsuarios() =>
+      UserSyncService.sincronizarUsuarios();
 
   static Future<SyncResult> sincronizarClientes({String? edfVendedorId}) {
     if (edfVendedorId != null) {
@@ -351,24 +370,36 @@ class SyncService {
     return ClientSyncService.sincronizarClientesDelUsuario();
   }
 
-  static Future<SyncResult> sincronizarEquipos() => EquipmentSyncService.sincronizarEquipos();
+  static Future<SyncResult> sincronizarEquipos() =>
+      EquipmentSyncService.sincronizarEquipos();
 
-  static Future<SyncResult> sincronizarProductos() => ProductoSyncService.obtenerProductos();
+  static Future<SyncResult> sincronizarProductos() =>
+      ProductoSyncService.obtenerProductos();
 
-  static Future<SyncResult> sincronizarEquiposPendientes({String? edfVendedorId}) =>
-      EquiposPendientesSyncService.obtenerEquiposPendientes(edfVendedorId: edfVendedorId);
+  static Future<SyncResult> sincronizarEquiposPendientes({
+    String? edfVendedorId,
+  }) => EquiposPendientesSyncService.obtenerEquiposPendientes(
+    edfVendedorId: edfVendedorId,
+  );
 
-  static Future<SyncResult> sincronizarImagenesCensos({String? edfVendedorId}) =>
-      CensusImageSyncService.obtenerFotosCensos(edfVendedorId: edfVendedorId);
+  static Future<SyncResult> sincronizarImagenesCensos({
+    String? edfVendedorId,
+  }) => CensusImageSyncService.obtenerFotosCensos(edfVendedorId: edfVendedorId);
 
-  static Future<SyncResult> sincronizarImagenesFormularios({String? edfVendedorId}) =>
-      DynamicFormSyncService.obtenerImagenesFormularios(edfVendedorId: edfVendedorId);
+  static Future<SyncResult> sincronizarImagenesFormularios({
+    String? edfVendedorId,
+  }) => DynamicFormSyncService.obtenerImagenesFormularios(
+    edfVendedorId: edfVendedorId,
+  );
 
   static Future<SyncResult> sincronizarFormulariosDinamicos() =>
       DynamicFormSyncService.obtenerFormulariosDinamicos();
 
-  static Future<SyncResult> sincronizarRespuestasFormularios({String? edfVendedorId}) =>
-      DynamicFormSyncService.obtenerRespuestasFormularios(edfvendedorId: edfVendedorId);
+  static Future<SyncResult> sincronizarRespuestasFormularios({
+    String? edfVendedorId,
+  }) => DynamicFormSyncService.obtenerRespuestasFormularios(
+    edfvendedorId: edfVendedorId,
+  );
 
   static Future<SyncResult> obtenerCensosActivos({
     int? clienteId,
@@ -407,7 +438,8 @@ class SyncService {
   static Future<SyncResult> obtenerCensosPendientes() =>
       CensusSyncService.obtenerCensosPendientes();
 
-  static Future<ApiResponse> probarConexion() => BaseSyncService.testConnection();
+  static Future<ApiResponse> probarConexion() =>
+      BaseSyncService.testConnection();
 
   static Future<String> obtenerEdfVendedorId() async {
     try {
@@ -425,15 +457,16 @@ class SyncService {
 
       final dbHelper = DatabaseHelper();
       final resultado = await dbHelper.consultarPersonalizada(
-          'SELECT edf_vendedor_id FROM Users WHERE username = ? LIMIT 1',
-          [currentUsername]
+        'SELECT edf_vendedor_id FROM Users WHERE username = ? LIMIT 1',
+        [currentUsername],
       );
 
       if (resultado.isEmpty) {
         await ErrorLogService.logDatabaseError(
           tableName: 'Users',
           operation: 'obtener_edf_vendedor_id',
-          errorMessage: 'Usuario $currentUsername no encontrado en la base de datos',
+          errorMessage:
+              'Usuario $currentUsername no encontrado en la base de datos',
         );
         throw 'Usuario $currentUsername no encontrado en la base de datos';
       }
@@ -445,7 +478,6 @@ class SyncService {
       }
 
       return edfVendedorId;
-
     } catch (e) {
       if (!e.toString().contains('no tiene edf_vendedor_id') &&
           !e.toString().contains('no encontrado') &&
@@ -578,36 +610,66 @@ class SyncResultUnificado {
       if (censosSincronizados > 0)
         SyncStep('$censosSincronizados censos', 'Censos descargados'),
       if (imagenesCensosSincronizadas > 0)
-        SyncStep('$imagenesCensosSincronizadas imágenes de censos', 'Imágenes de censos descargadas'),
+        SyncStep(
+          '$imagenesCensosSincronizadas imágenes de censos',
+          'Imágenes de censos descargadas',
+        ),
       if (equiposPendientesSincronizados > 0)
-        SyncStep('$equiposPendientesSincronizados equipos pendientes', 'Equipos pendientes descargados'),
+        SyncStep(
+          '$equiposPendientesSincronizados equipos pendientes',
+          'Equipos pendientes descargados',
+        ),
       if (formulariosSincronizados > 0)
-        SyncStep('$formulariosSincronizados formularios', 'Formularios descargados'),
+        SyncStep(
+          '$formulariosSincronizados formularios',
+          'Formularios descargados',
+        ),
       if (detallesFormulariosSincronizados > 0)
-        SyncStep('$detallesFormulariosSincronizados detalles', 'Detalles descargados'),
+        SyncStep(
+          '$detallesFormulariosSincronizados detalles',
+          'Detalles descargados',
+        ),
       if (respuestasFormulariosSincronizadas > 0)
-        SyncStep('$respuestasFormulariosSincronizadas respuestas', 'Respuestas descargadas'),
+        SyncStep(
+          '$respuestasFormulariosSincronizadas respuestas',
+          'Respuestas descargadas',
+        ),
       if (imagenesFormulariosSincronizadas > 0)
-        SyncStep('$imagenesFormulariosSincronizadas imágenes de formularios', 'Imágenes de formularios descargadas'),
+        SyncStep(
+          '$imagenesFormulariosSincronizadas imágenes de formularios',
+          'Imágenes de formularios descargadas',
+        ),
       if (asignacionesSincronizadas > 0)
-        SyncStep('$asignacionesSincronizadas asignaciones', 'Asignaciones descargadas'),
+        SyncStep(
+          '$asignacionesSincronizadas asignaciones',
+          'Asignaciones descargadas',
+        ),
     ];
   }
 
   /// Resumen compacto para mensajes
   String get resumenCompacto {
     final partes = <String>[];
-    if (clientesSincronizados > 0) partes.add('$clientesSincronizados clientes');
+    if (clientesSincronizados > 0)
+      partes.add('$clientesSincronizados clientes');
     if (equiposSincronizados > 0) partes.add('$equiposSincronizados equipos');
-    if (productosSincronizados > 0) partes.add('$productosSincronizados productos');
+    if (productosSincronizados > 0)
+      partes.add('$productosSincronizados productos');
     if (censosSincronizados > 0) partes.add('$censosSincronizados censos');
-    if (imagenesCensosSincronizadas > 0) partes.add('$imagenesCensosSincronizadas imágenes de censos');
-    if (equiposPendientesSincronizados > 0) partes.add('$equiposPendientesSincronizados equipos pendientes');
-    if (formulariosSincronizados > 0) partes.add('$formulariosSincronizados formularios');
-    if (detallesFormulariosSincronizados > 0) partes.add('$detallesFormulariosSincronizados detalles');
-    if (respuestasFormulariosSincronizadas > 0) partes.add('$respuestasFormulariosSincronizadas respuestas');
-    if (imagenesFormulariosSincronizadas > 0) partes.add('$imagenesFormulariosSincronizadas imágenes de formularios');
-    if (asignacionesSincronizadas > 0) partes.add('$asignacionesSincronizadas asignaciones');
+    if (imagenesCensosSincronizadas > 0)
+      partes.add('$imagenesCensosSincronizadas imágenes de censos');
+    if (equiposPendientesSincronizados > 0)
+      partes.add('$equiposPendientesSincronizados equipos pendientes');
+    if (formulariosSincronizados > 0)
+      partes.add('$formulariosSincronizados formularios');
+    if (detallesFormulariosSincronizados > 0)
+      partes.add('$detallesFormulariosSincronizados detalles');
+    if (respuestasFormulariosSincronizadas > 0)
+      partes.add('$respuestasFormulariosSincronizadas respuestas');
+    if (imagenesFormulariosSincronizadas > 0)
+      partes.add('$imagenesFormulariosSincronizadas imágenes de formularios');
+    if (asignacionesSincronizadas > 0)
+      partes.add('$asignacionesSincronizadas asignaciones');
     return partes.join(', ');
   }
 

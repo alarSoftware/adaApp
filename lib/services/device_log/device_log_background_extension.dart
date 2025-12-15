@@ -2,19 +2,19 @@
 import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:ada_app/repositories/device_log_repository.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/post/device_log_post_service.dart';
-import 'package:ada_app/services/api_config_service.dart';
+import 'package:ada_app/services/api/api_config_service.dart';
 import 'package:ada_app/utils/device_info_helper.dart';
-import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
 import 'package:logger/logger.dart';
 
 //  CONFIGURACIÓN CENTRALIZADA
 class BackgroundLogConfig {
   ///  HORARIO DE TRABAJO
-  static const int horaInicio = 9;  // 9 AM
-  static const int horaFin = 17;    // 5 PM
+  static const int horaInicio = 9; // 9 AM
+  static const int horaFin = 17; // 5 PM
 
   ///  INTERVALO ENTRE REGISTROS
   static const Duration intervalo = Duration(minutes: 10);
@@ -95,7 +95,7 @@ class DeviceLogBackgroundExtension {
       // Crear timer periódico para los siguientes logs
       _backgroundTimer = Timer.periodic(
         BackgroundLogConfig.intervalo,
-            (timer) async => await _ejecutarLoggingConHorario(),
+        (timer) async => await _ejecutarLoggingConHorario(),
       );
 
       _isInitialized = true;
@@ -104,16 +104,23 @@ class DeviceLogBackgroundExtension {
       final urlActual = await ApiConfigService.getBaseUrl();
       _logger.i('✅ Extensión de logging configurada');
       _logger.i('🌐 URL del servidor: $urlActual');
-      _logger.i('⏰ Horario: ${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00');
-      _logger.i('🔄 Intervalo: ${BackgroundLogConfig.intervalo.inMinutes} minutos');
+      _logger.i(
+        '⏰ Horario: ${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00',
+      );
+      _logger.i(
+        '🔄 Intervalo: ${BackgroundLogConfig.intervalo.inMinutes} minutos',
+      );
       _logger.i('🔁 Reintentos máximos: ${BackgroundLogConfig.maxReintentos}');
-      _logger.i('⏱️ Mínimo entre logs: ${BackgroundLogConfig.minutosMinimosEntreLogs} min');
-      _logger.i('🔒 Verificación de sesión: ${verificarSesion ? "ACTIVADA" : "DESACTIVADA"}');
+      _logger.i(
+        '⏱️ Mínimo entre logs: ${BackgroundLogConfig.minutosMinimosEntreLogs} min',
+      );
+      _logger.i(
+        '🔒 Verificación de sesión: ${verificarSesion ? "ACTIVADA" : "DESACTIVADA"}',
+      );
       _logger.i('═══════════════════════════════════════');
 
       // Verificar disponibilidad de servicios
       await DeviceInfoHelper.mostrarEstadoDisponibilidad();
-
     } catch (e) {
       _logger.e('💥 Error inicializando extensión: $e');
     }
@@ -129,7 +136,9 @@ class DeviceLogBackgroundExtension {
 
       // Verificar si estamos en horario laboral
       if (!estaEnHorarioTrabajo()) {
-        _logger.i('⏰ Fuera del horario de trabajo (${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00)');
+        _logger.i(
+          '⏰ Fuera del horario de trabajo (${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00)',
+        );
         return;
       }
 
@@ -181,7 +190,9 @@ class DeviceLogBackgroundExtension {
       final vendedorId = log?.edfVendedorId;
 
       if (log == null) {
-        _logger.w('⚠️ No se pudo crear el device log - posiblemente sin sesión activa');
+        _logger.w(
+          '⚠️ No se pudo crear el device log - posiblemente sin sesión activa',
+        );
         return;
       }
 
@@ -191,7 +202,9 @@ class DeviceLogBackgroundExtension {
       );
 
       if (existeReciente) {
-        _logger.i('⏭️ Ya existe un log reciente (últimos ${BackgroundLogConfig.minutosMinimosEntreLogs} min) - saltando creación');
+        _logger.i(
+          '⏭️ Ya existe un log reciente (últimos ${BackgroundLogConfig.minutosMinimosEntreLogs} min) - saltando creación',
+        );
         return;
       }
 
@@ -207,7 +220,6 @@ class DeviceLogBackgroundExtension {
       await _intentarEnviarConReintentos(log);
 
       _logger.i('✅ Proceso de logging completado para: ${log.id}');
-
     } catch (e) {
       _logger.e('💥 Error en proceso de logging: $e');
     } finally {
@@ -225,7 +237,8 @@ class DeviceLogBackgroundExtension {
     final esDiaLaboral = now.weekday >= 1 && now.weekday <= 5;
 
     // Verificar horario
-    final esHorarioTrabajo = hora >= BackgroundLogConfig.horaInicio &&
+    final esHorarioTrabajo =
+        hora >= BackgroundLogConfig.horaInicio &&
         hora < BackgroundLogConfig.horaFin;
 
     return esDiaLaboral && esHorarioTrabajo;
@@ -260,10 +273,14 @@ class DeviceLogBackgroundExtension {
       intento++;
 
       try {
-        _logger.i('🌐 Intento $intento de ${BackgroundLogConfig.maxReintentos}...');
+        _logger.i(
+          '🌐 Intento $intento de ${BackgroundLogConfig.maxReintentos}...',
+        );
 
         // Mostrar URL para debugging
-        final urlCompleta = await ApiConfigService.getFullUrl('/appDeviceLog/insertAppDeviceLog');
+        final urlCompleta = await ApiConfigService.getFullUrl(
+          '/appDeviceLog/insertAppDeviceLog',
+        );
         _logger.i('🔗 Enviando a: $urlCompleta');
 
         // Usar el servicio unificado
@@ -290,7 +307,9 @@ class DeviceLogBackgroundExtension {
       // 🕐 Backoff exponencial antes del siguiente intento
       if (intento < BackgroundLogConfig.maxReintentos) {
         final esperaSegundos = BackgroundLogConfig.obtenerTiempoEspera(intento);
-        _logger.i('⏳ Esperando ${esperaSegundos}s antes del siguiente intento...');
+        _logger.i(
+          '⏳ Esperando ${esperaSegundos}s antes del siguiente intento...',
+        );
         await Future.delayed(Duration(seconds: esperaSegundos));
       }
     }
@@ -302,7 +321,9 @@ class DeviceLogBackgroundExtension {
     _logger.w('Log ID: ${log.id}');
     _logger.w('Intentos realizados: ${BackgroundLogConfig.maxReintentos}');
     _logger.w('Estado: Quedará como PENDIENTE (sincronizado: 0)');
-    _logger.w('📋 El UploadService lo reintentará en la próxima sincronización');
+    _logger.w(
+      '📋 El UploadService lo reintentará en la próxima sincronización',
+    );
     _logger.w('═══════════════════════════════════════');
   }
 
@@ -380,7 +401,8 @@ class DeviceLogBackgroundExtension {
   }
 
   /// ℹ️ Verificar si el servicio está activo
-  static bool get estaActivo => _isInitialized && (_backgroundTimer?.isActive ?? false);
+  static bool get estaActivo =>
+      _isInitialized && (_backgroundTimer?.isActive ?? false);
 
   /// 📊 Obtener información completa del estado
   static Future<Map<String, dynamic>> obtenerEstado() async {
@@ -400,7 +422,8 @@ class DeviceLogBackgroundExtension {
       'dia_actual': now.weekday,
       'dia_nombre': _obtenerNombreDia(now.weekday),
       'intervalo_minutos': BackgroundLogConfig.intervalo.inMinutes,
-      'horario': '${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00',
+      'horario':
+          '${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00',
       'url_servidor': urlActual,
       'max_reintentos': BackgroundLogConfig.maxReintentos,
       'tiempos_backoff': BackgroundLogConfig.tiemposBackoff.join(', '),
@@ -418,20 +441,32 @@ class DeviceLogBackgroundExtension {
     _logger.i('📊 Estado General:');
     _logger.i('   • Activo: ${estado['activo'] ? "✅ SÍ" : "❌ NO"}');
     _logger.i('   • Inicializado: ${estado['inicializado'] ? "✅ SÍ" : "❌ NO"}');
-    _logger.i('   • Timer: ${estado['timer_activo'] ? "✅ ACTIVO" : "❌ INACTIVO"}');
-    _logger.i('   • Ejecutando: ${estado['ejecutando'] ? "🔄 SÍ" : "⏸️ NO"}'); // 🆕
-    _logger.i('   • Sesión activa: ${estado['sesion_activa'] ? "🔐 SÍ" : "❌ NO"}'); // 🆕
+    _logger.i(
+      '   • Timer: ${estado['timer_activo'] ? "✅ ACTIVO" : "❌ INACTIVO"}',
+    );
+    _logger.i(
+      '   • Ejecutando: ${estado['ejecutando'] ? "🔄 SÍ" : "⏸️ NO"}',
+    ); // 🆕
+    _logger.i(
+      '   • Sesión activa: ${estado['sesion_activa'] ? "🔐 SÍ" : "❌ NO"}',
+    ); // 🆕
     _logger.i('');
     _logger.i('🕐 Horario Actual:');
     _logger.i('   • Día: ${estado['dia_nombre']}');
-    _logger.i('   • Hora: ${estado['hora_actual']}:${estado['minuto_actual'].toString().padLeft(2, '0')}');
-    _logger.i('   • En horario laboral: ${estado['en_horario'] ? "✅ SÍ" : "❌ NO"}');
+    _logger.i(
+      '   • Hora: ${estado['hora_actual']}:${estado['minuto_actual'].toString().padLeft(2, '0')}',
+    );
+    _logger.i(
+      '   • En horario laboral: ${estado['en_horario'] ? "✅ SÍ" : "❌ NO"}',
+    );
     _logger.i('');
     _logger.i('⏰ Configuración de Horario:');
     _logger.i('   • Horario: ${estado['horario']}');
     _logger.i('   • Días: Lunes a Viernes');
     _logger.i('   • Intervalo: ${estado['intervalo_minutos']} minutos');
-    _logger.i('   • Mínimo entre logs: ${estado['minutos_minimos_entre_logs']} min'); // 🆕
+    _logger.i(
+      '   • Mínimo entre logs: ${estado['minutos_minimos_entre_logs']} min',
+    ); // 🆕
     _logger.i('');
     _logger.i('🌐 Configuración de Red:');
     _logger.i('   • URL Servidor: ${estado['url_servidor']}');
@@ -471,7 +506,9 @@ class DeviceLogBackgroundExtension {
         'logs_sincronizados': stats['sincronizados'] ?? 0,
         'logs_pendientes': stats['pendientes'] ?? 0,
         'porcentaje_sincronizado': stats['total'] > 0
-            ? ((stats['sincronizados'] / stats['total']) * 100).toStringAsFixed(1)
+            ? ((stats['sincronizados'] / stats['total']) * 100).toStringAsFixed(
+                1,
+              )
             : '0.0',
       };
     } catch (e) {

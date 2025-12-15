@@ -1,12 +1,12 @@
 import 'dart:convert';
-import 'package:ada_app/services/sync/operacion_comercial_sync_service.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:http/http.dart' as http;
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/sync/dynamic_form_sync_service.dart';
-import 'package:ada_app/services/censo/censo_upload_service.dart';
+
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:ada_app/services/app_services.dart';
 import 'package:ada_app/services/device_log/device_log_background_extension.dart';
@@ -50,24 +50,25 @@ class AuthService {
 
   // ✅ MÉTODO HELPER PARA CONSTRUIR EL NOMBRE DEL VENDEDOR
   String _buildVendorDisplayName(Usuario usuario) {
-    if (usuario.edfVendedorNombre != null && usuario.edfVendedorNombre!.trim().isNotEmpty) {
+    if (usuario.edfVendedorNombre != null &&
+        usuario.edfVendedorNombre!.trim().isNotEmpty) {
       return '${usuario.username} - ${usuario.edfVendedorNombre}';
     }
     return usuario.username;
   }
 
   Future<SyncValidationResult> validateSyncRequirement(
-      String currentEdfVendedorId,
-      String currentEdfVendedorNombre,
-      ) async {
+    String currentEdfVendedorId,
+    String currentEdfVendedorNombre,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastSyncedVendedorId = prefs.getString(_keyLastSyncedVendedor);
 
       final lastSyncedVendedorName =
           prefs.getString(_keyLastSyncedVendedorName) ??
-              lastSyncedVendedorId ??
-              'Anterior';
+          lastSyncedVendedorId ??
+          'Anterior';
 
       if (lastSyncedVendedorId == null) {
         return SyncValidationResult(
@@ -112,9 +113,9 @@ class AuthService {
   }
 
   Future<void> markSyncCompleted(
-      String edfVendedorId,
-      String edfVendedorNombre,
-      ) async {
+    String edfVendedorId,
+    String edfVendedorNombre,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyLastSyncedVendedor, edfVendedorId);
@@ -123,10 +124,8 @@ class AuthService {
 
       try {
         await DeviceLogBackgroundExtension.inicializarDespuesDeLogin();
-      } catch (e) {
-      }
-    } catch (e) {
-    }
+      } catch (e) {}
+    } catch (e) {}
   }
 
   Future<void> clearSyncData() async {
@@ -137,8 +136,7 @@ class AuthService {
       await prefs.remove('last_sync_date');
 
       await _dbHelper.eliminar('clientes');
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   static Future<SyncResult> sincronizarSoloUsuarios() async {
@@ -147,9 +145,9 @@ class AuthService {
 
       final response = await http
           .get(
-        Uri.parse('$baseUrl/api/getUsers'),
-        headers: BaseSyncService.headers,
-      )
+            Uri.parse('$baseUrl/api/getUsers'),
+            headers: BaseSyncService.headers,
+          )
           .timeout(BaseSyncService.timeout);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -219,8 +217,8 @@ class AuthService {
   }
 
   static Future<SyncResult> sincronizarClientesDelVendedor(
-      String edfVendedorId,
-      ) async {
+    String edfVendedorId,
+  ) async {
     try {
       final baseUrl = await BaseSyncService.getBaseUrl();
       final url = '$baseUrl/api/getEdfClientes?edfvendedorId=$edfVendedorId';
@@ -309,8 +307,8 @@ class AuthService {
   }
 
   static Future<SyncResult> sincronizarRespuestasDelVendedor(
-      String edfVendedorId,
-      ) async {
+    String edfVendedorId,
+  ) async {
     try {
       return await DynamicFormSyncService.obtenerRespuestasPorVendedor(
         edfVendedorId,
@@ -348,8 +346,7 @@ class AuthService {
 
       try {
         await AppServices().inicializarEnLogin();
-      } catch (e) {
-      }
+      } catch (e) {}
 
       return AuthResult(
         exitoso: true,
@@ -388,8 +385,7 @@ class AuthService {
         if (!syncValidation.requiereSincronizacion) {
           try {
             await DeviceLogBackgroundExtension.inicializarDespuesDeLogin();
-          } catch (e) {
-          }
+          } catch (e) {}
         }
       }
 
@@ -410,15 +406,13 @@ class AuthService {
     try {
       try {
         await DeviceLogBackgroundExtension.detener();
-      } catch (e) {
-      }
+      } catch (e) {}
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_keyHasLoggedIn);
       await prefs.remove(_keyCurrentUser);
       await prefs.remove(_keyCurrentUserRole);
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   Future<void> clearAllData() async {
@@ -433,8 +427,7 @@ class AuthService {
       await prefs.remove(_keyLastSyncedVendedor);
       await prefs.remove(_keyLastSyncedVendedorName);
       await prefs.remove('last_sync_date');
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   Future<bool> hasUserLoggedInBefore() async {
@@ -520,9 +513,9 @@ class UsuarioAuth {
   UsuarioAuth({this.id, required this.username, required this.fullname});
 
   UsuarioAuth.fromUsuario(Usuario usuario)
-      : id = usuario.id,
-        username = usuario.username,
-        fullname = usuario.fullname;
+    : id = usuario.id,
+      username = usuario.username,
+      fullname = usuario.fullname;
 
   String get rol =>
       (username == 'admin' || username == 'useradmin') ? 'admin' : 'user';

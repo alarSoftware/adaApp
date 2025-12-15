@@ -4,9 +4,9 @@ import '../repositories/censo_activo_repository.dart';
 import 'package:ada_app/services/post/censo_activo_post_service.dart';
 import '../repositories/equipo_repository.dart';
 import '../models/censo_activo.dart';
-import '../services/location_service.dart';
+import 'package:ada_app/services/device/location_service.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
 
 // ========== EVENTOS PARA LA UI ==========
 abstract class EquiposClienteDetailUIEvent {}
@@ -39,7 +39,7 @@ class EquiposClienteDetailState {
     this.historialCambios = const [],
     this.historialUltimos5 = const [],
   }) : equipoEnLocal =
-      equipoEnLocal ?? (equipoCliente['tipo_estado'] == 'asignado');
+           equipoEnLocal ?? (equipoCliente['tipo_estado'] == 'asignado');
 
   EquiposClienteDetailState copyWith({
     dynamic equipoCliente,
@@ -74,16 +74,16 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
   // ========== STREAMS PARA EVENTOS ==========
   final StreamController<EquiposClienteDetailUIEvent> _eventController =
-  StreamController<EquiposClienteDetailUIEvent>.broadcast();
+      StreamController<EquiposClienteDetailUIEvent>.broadcast();
   Stream<EquiposClienteDetailUIEvent> get uiEvents => _eventController.stream;
 
   // ========== CONSTRUCTOR ==========
   EquiposClienteDetailScreenViewModel(
-      dynamic equipoCliente,
-      this._estadoEquipoRepository,
-      this._equipoRepository,
-      ) : _state = EquiposClienteDetailState(equipoCliente: equipoCliente),
-        _estadoLocalActual = _determinarEstadoInicial(equipoCliente) {
+    dynamic equipoCliente,
+    this._estadoEquipoRepository,
+    this._equipoRepository,
+  ) : _state = EquiposClienteDetailState(equipoCliente: equipoCliente),
+      _estadoLocalActual = _determinarEstadoInicial(equipoCliente) {
     _initializeState();
     _loadInitialState();
   }
@@ -101,7 +101,15 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   // ========== MÉTODOS PARA VALIDACIÓN DE DÍA DE RUTA ==========
 
   String _getDiaActual() {
-    final diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    final diasSemana = [
+      'Lunes',
+      'Martes',
+      'Miércoles',
+      'Jueves',
+      'Viernes',
+      'Sábado',
+      'Domingo',
+    ];
     final now = DateTime.now();
     return diasSemana[now.weekday - 1];
   }
@@ -158,16 +166,16 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       try {
         historialCompleto = await _estadoEquipoRepository
             .obtenerHistorialDirectoPorEquipoCliente(
-          codigoBarras,
-          int.parse(clienteId.toString()),
-        );
+              codigoBarras,
+              int.parse(clienteId.toString()),
+            );
       } catch (e) {
         try {
           historialCompleto = await _estadoEquipoRepository
               .obtenerHistorialCompleto(
-            codigoBarras,
-            int.parse(clienteId.toString()),
-          );
+                codigoBarras,
+                int.parse(clienteId.toString()),
+              );
         } catch (e2) {
           historialCompleto = [];
         }
@@ -256,10 +264,9 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   void cambiarUbicacionEquipo(bool? nuevaUbicacion) {
     // VALIDAR DÍA DE RUTA ANTES DE PERMITIR CAMBIOS
     if (!_validarDiaRuta()) {
-      _eventController.add(ShowMessageEvent(
-        obtenerMensajeRestriccionDia(),
-        MessageType.error,
-      ));
+      _eventController.add(
+        ShowMessageEvent(obtenerMensajeRestriccionDia(), MessageType.error),
+      );
       return;
     }
 
@@ -286,9 +293,9 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
       historialCompleto = await _estadoEquipoRepository
           .obtenerHistorialCompleto(
-        equipoId.toString(),
-        int.parse(clienteId.toString()),
-      );
+            equipoId.toString(),
+            int.parse(clienteId.toString()),
+          );
 
       final ultimos5 = historialCompleto.take(5).toList();
 
@@ -307,10 +314,9 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   Future<void> saveAllChanges() async {
     // VALIDAR DÍA DE RUTA ANTES DE GUARDAR
     if (!_validarDiaRuta()) {
-      _eventController.add(ShowMessageEvent(
-        obtenerMensajeRestriccionDia(),
-        MessageType.error,
-      ));
+      _eventController.add(
+        ShowMessageEvent(obtenerMensajeRestriccionDia(), MessageType.error),
+      );
       return;
     }
 
@@ -534,7 +540,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       'equipoNombre': getNombreCompletoEquipo(),
       'equipoCodigo': equipoCliente['cod_barras'] ?? 'Sin código',
       'clienteNombre':
-      'Cliente ID: ${equipoCliente['cliente_id'] ?? "No asignado"}',
+          'Cliente ID: ${equipoCliente['cliente_id'] ?? "No asignado"}',
     };
   }
 

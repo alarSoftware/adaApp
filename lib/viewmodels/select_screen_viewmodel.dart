@@ -2,15 +2,15 @@ import 'package:flutter/foundation.dart';
 import 'package:ada_app/repositories/cliente_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import '../services/sync/sync_service.dart';
-import '../services/database_helper.dart';
-import '../services/auth_service.dart';
+import 'package:ada_app/services/data/database_helper.dart';
+import 'package:ada_app/services/api/auth_service.dart';
 
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:ada_app/services/sync/full_sync_service.dart';
 
 import 'package:ada_app/models/usuario.dart';
-import 'package:ada_app/services/database_validation_service.dart';
+import 'package:ada_app/services/data/database_validation_service.dart';
 
 // ========== CLASES DE VALIDACIÓN ==========
 class SyncValidationResult {
@@ -164,7 +164,7 @@ class SelectScreenViewModel extends ChangeNotifier {
 
   // ========== STREAMS PARA COMUNICACIÓN ==========
   final StreamController<UIEvent> _eventController =
-  StreamController<UIEvent>.broadcast();
+      StreamController<UIEvent>.broadcast();
   Stream<UIEvent> get uiEvents => _eventController.stream;
 
   // ========== SUBSCRIPTIONS ==========
@@ -237,7 +237,8 @@ class SelectScreenViewModel extends ChangeNotifier {
       String displayName;
       if (_currentUser!.edfVendedorNombre != null &&
           _currentUser!.edfVendedorNombre!.trim().isNotEmpty) {
-        displayName = '${_currentUser!.username} - ${_currentUser!.edfVendedorNombre}';
+        displayName =
+            '${_currentUser!.username} - ${_currentUser!.edfVendedorNombre}';
       } else {
         displayName = _currentUser!.username;
       }
@@ -287,7 +288,7 @@ class SelectScreenViewModel extends ChangeNotifier {
   void _startApiMonitoring() {
     _apiMonitorTimer = Timer.periodic(
       Duration(minutes: 10),
-          (_) => _checkApiConnectionSilently(),
+      (_) => _checkApiConnectionSilently(),
     );
   }
 
@@ -309,7 +310,7 @@ class SelectScreenViewModel extends ChangeNotifier {
   Future<void> _checkInitialConnection() async {
     final connectivityResults = await Connectivity().checkConnectivity();
     final hasInternet = connectivityResults.any(
-          (r) => r != ConnectivityResult.none,
+      (r) => r != ConnectivityResult.none,
     );
 
     if (hasInternet) {
@@ -441,27 +442,28 @@ class SelectScreenViewModel extends ChangeNotifier {
         edfVendedorNombre: edfVendedorNombre,
         previousVendedorId: previousVendedorId,
         forceClear: forceClear,
-        onProgress: ({
-          required double progress,
-          required String currentStep,
-          required List<String> completedSteps,
-        }) {
-          // Actualizar estado interno
-          _syncProgress = progress;
-          _syncCurrentStep = currentStep;
-          _syncCompletedSteps = List.from(completedSteps);
+        onProgress:
+            ({
+              required double progress,
+              required String currentStep,
+              required List<String> completedSteps,
+            }) {
+              // Actualizar estado interno
+              _syncProgress = progress;
+              _syncCurrentStep = currentStep;
+              _syncCompletedSteps = List.from(completedSteps);
 
-          // Emitir evento para la UI
-          _eventController.add(
-            SyncProgressEvent(
-              progress: progress,
-              currentStep: currentStep,
-              completedSteps: completedSteps,
-            ),
-          );
+              // Emitir evento para la UI
+              _eventController.add(
+                SyncProgressEvent(
+                  progress: progress,
+                  currentStep: currentStep,
+                  completedSteps: completedSteps,
+                ),
+              );
 
-          notifyListeners();
-        },
+              notifyListeners();
+            },
       );
 
       if (!result.exito) {
@@ -520,7 +522,7 @@ class SelectScreenViewModel extends ChangeNotifier {
       if (_currentUser!.edfVendedorNombre != null &&
           _currentUser!.edfVendedorNombre!.trim().isNotEmpty) {
         nombreVendedor =
-        '${_currentUser!.username} - ${_currentUser!.edfVendedorNombre}';
+            '${_currentUser!.username} - ${_currentUser!.edfVendedorNombre}';
       } else {
         nombreVendedor = _currentUser!.username;
       }
@@ -557,7 +559,7 @@ class SelectScreenViewModel extends ChangeNotifier {
     if (_currentUser!.edfVendedorNombre != null &&
         _currentUser!.edfVendedorNombre!.trim().isNotEmpty) {
       nombreVendedor =
-      '${_currentUser!.username} - ${_currentUser!.edfVendedorNombre}';
+          '${_currentUser!.username} - ${_currentUser!.edfVendedorNombre}';
     } else {
       nombreVendedor = _currentUser!.username;
     }

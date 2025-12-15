@@ -2,19 +2,20 @@
 
 import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/post/base_post_service.dart';
-import 'package:ada_app/services/api_config_service.dart';
+import 'package:ada_app/services/api/api_config_service.dart';
 import 'package:logger/logger.dart';
 
 class DeviceLogPostService {
   static final Logger _logger = Logger();
-  static const String _endpoint = '/appDeviceLog/insertAppDeviceLog';  // 🔥 ENDPOINT CORRECTO
+  static const String _endpoint =
+      '/appDeviceLog/insertAppDeviceLog'; // 🔥 ENDPOINT CORRECTO
   static const String _tableName = 'device_log';
 
   /// Enviar un device log individual
   static Future<Map<String, dynamic>> enviarDeviceLog(
-      DeviceLog log, {
-        String? userId,
-      }) async {
+    DeviceLog log, {
+    String? userId,
+  }) async {
     try {
       // 🔍 MOSTRAR URL COMPLETA para debugging
       final fullUrl = await ApiConfigService.getFullUrl(_endpoint);
@@ -24,9 +25,9 @@ class DeviceLogPostService {
       final resultado = await BasePostService.post(
         endpoint: _endpoint,
         body: log.toMap(),
-        tableName: _tableName,                           // ✅ Activa el logging de errores
-        registroId: log.id,                              // ✅ Para tracking
-        userId: userId ?? log.edfVendedorId,             // ✅ Para logging
+        tableName: _tableName, // ✅ Activa el logging de errores
+        registroId: log.id, // ✅ Para tracking
+        userId: userId ?? log.edfVendedorId, // ✅ Para logging
       );
 
       if (resultado['exito'] == true) {
@@ -38,19 +39,15 @@ class DeviceLogPostService {
       return resultado;
     } catch (e) {
       _logger.e('❌ Error en enviarDeviceLog: $e');
-      return {
-        'exito': false,
-        'success': false,
-        'mensaje': 'Error: $e',
-      };
+      return {'exito': false, 'success': false, 'mensaje': 'Error: $e'};
     }
   }
 
   /// Enviar múltiples device logs en batch
   static Future<Map<String, int>> enviarDeviceLogsBatch(
-      List<DeviceLog> logs, {
-        String? userId,
-      }) async {
+    List<DeviceLog> logs, {
+    String? userId,
+  }) async {
     int exitosos = 0;
     int fallidos = 0;
 
@@ -82,11 +79,7 @@ class DeviceLogPostService {
 
     _logger.i('✅ Batch completado - Exitosos: $exitosos, Fallidos: $fallidos');
 
-    return {
-      'exitosos': exitosos,
-      'fallidos': fallidos,
-      'total': logs.length,
-    };
+    return {'exitosos': exitosos, 'fallidos': fallidos, 'total': logs.length};
   }
 
   /// Verificar configuración actual del servicio

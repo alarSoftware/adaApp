@@ -11,7 +11,7 @@ import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detal
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
-import 'package:ada_app/services/database_helper.dart';
+
 import '../post/operaciones_comerciales_post_service.dart';
 
 class OperacionComercialSyncService extends BaseSyncService {

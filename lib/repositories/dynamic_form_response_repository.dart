@@ -6,7 +6,7 @@ import '../models/dynamic_form/dynamic_form_response.dart';
 import '../models/dynamic_form/dynamic_form_response_detail.dart';
 import '../models/dynamic_form/dynamic_form_response_image.dart';
 import 'package:path_provider/path_provider.dart';
-import '../services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 
 class DynamicFormResponseRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper();

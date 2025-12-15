@@ -2,7 +2,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/sync/sync_service.dart';
 import 'package:ada_app/services/sync/sync_tables_config.dart';
 

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:ada_app/ui/theme/colors.dart';
-import 'package:ada_app/services/image_service.dart'; // TU SERVICE EXISTENTE
+import 'package:ada_app/services/device/image_service.dart'; // TU SERVICE EXISTENTE
 
 class ImageCaptureWidget extends StatefulWidget {
   final Function(String imagePath, String base64Data)? onImageCaptured;

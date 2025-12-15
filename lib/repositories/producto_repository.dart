@@ -1,5 +1,5 @@
 import 'package:ada_app/models/producto.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
 abstract class ProductoRepository {
@@ -12,15 +12,15 @@ abstract class ProductoRepository {
   Future<Producto?> obtenerProductoPorId(int id);
 
   Future<List<Producto>> obtenerProductosPorCategoria(
-      String categoria, {
-        int? excluirId,
-      });
+    String categoria, {
+    int? excluirId,
+  });
 
   Future<int> contarProductos();
 
   Future<int> guardarProductosDesdeServidor(
-      List<Map<String, dynamic>> productos,
-      );
+    List<Map<String, dynamic>> productos,
+  );
 
   Future<void> limpiarProductosLocales();
 }
@@ -29,7 +29,7 @@ class ProductoRepositoryImpl implements ProductoRepository {
   final DatabaseHelper _dbHelper;
 
   ProductoRepositoryImpl({DatabaseHelper? dbHelper})
-      : _dbHelper = dbHelper ?? DatabaseHelper();
+    : _dbHelper = dbHelper ?? DatabaseHelper();
 
   @override
   Future<List<Producto>> obtenerProductosDisponibles() async {
@@ -153,9 +153,9 @@ class ProductoRepositoryImpl implements ProductoRepository {
 
   @override
   Future<List<Producto>> obtenerProductosPorCategoria(
-      String categoria, {
-        int? excluirId,
-      }) async {
+    String categoria, {
+    int? excluirId,
+  }) async {
     try {
       final db = await _dbHelper.database;
 
@@ -182,7 +182,7 @@ class ProductoRepositoryImpl implements ProductoRepository {
         tableName: 'productos',
         operation: 'obtener_por_categoria',
         errorMessage:
-        'Error obteniendo productos de categoría "$categoria": $e',
+            'Error obteniendo productos de categoría "$categoria": $e',
       );
 
       return [];
@@ -214,8 +214,8 @@ class ProductoRepositoryImpl implements ProductoRepository {
 
   @override
   Future<int> guardarProductosDesdeServidor(
-      List<Map<String, dynamic>> productos,
-      ) async {
+    List<Map<String, dynamic>> productos,
+  ) async {
     if (productos.isEmpty) {
       return 0;
     }
@@ -229,7 +229,7 @@ class ProductoRepositoryImpl implements ProductoRepository {
         tableName: 'productos',
         operation: 'guardar_desde_servidor',
         errorMessage:
-        'Error guardando ${productos.length} productos desde servidor: $e',
+            'Error guardando ${productos.length} productos desde servidor: $e',
       );
 
       throw Exception('Error guardando productos: $e');
@@ -284,7 +284,7 @@ class ProductoRepositoryImpl implements ProductoRepository {
         tableName: 'productos',
         operation: 'obtener_por_codigo_barras',
         errorMessage:
-        'Error obteniendo producto por código de barras "$codigoBarras": $e',
+            'Error obteniendo producto por código de barras "$codigoBarras": $e',
       );
 
       return null;
@@ -292,8 +292,8 @@ class ProductoRepositoryImpl implements ProductoRepository {
   }
 
   Future<List<Producto>> obtenerProductosPorCodigos(
-      List<String> codigos,
-      ) async {
+    List<String> codigos,
+  ) async {
     if (codigos.isEmpty) return [];
 
     try {

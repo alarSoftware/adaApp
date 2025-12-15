@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:ada_app/services/auth_service.dart';
-import 'package:ada_app/services/database_helper.dart';
-import 'package:ada_app/services/database_validation_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
+import 'package:ada_app/services/data/database_helper.dart';
+import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/sync/full_sync_service.dart';
 import 'package:ada_app/models/usuario.dart';
 import 'dart:async';
@@ -78,7 +78,7 @@ class LoginScreenViewModel extends ChangeNotifier {
   List<String> _syncCompletedSteps = [];
 
   final StreamController<LoginUIEvent> _eventController =
-  StreamController<LoginUIEvent>.broadcast();
+      StreamController<LoginUIEvent>.broadcast();
   Stream<LoginUIEvent> get uiEvents => _eventController.stream;
 
   bool get isLoading => _isLoading;
@@ -144,8 +144,7 @@ class LoginScreenViewModel extends ChangeNotifier {
     try {
       final bool isAvailable = await _localAuth.canCheckBiometrics;
       final bool isDeviceSupported = await _localAuth.isDeviceSupported();
-      final bool hasLoggedInBefore =
-      await _authService.hasUserLoggedInBefore();
+      final bool hasLoggedInBefore = await _authService.hasUserLoggedInBefore();
 
       _biometricAvailable =
           isAvailable && isDeviceSupported && hasLoggedInBefore;
@@ -232,16 +231,19 @@ class LoginScreenViewModel extends ChangeNotifier {
 
       if (syncValidation.requiereSincronizacion) {
         _syncValidationResult = syncValidation;
-        _eventController
-            .add(ShowSyncRequiredDialogEvent(syncValidation, _currentUser!));
+        _eventController.add(
+          ShowSyncRequiredDialogEvent(syncValidation, _currentUser!),
+        );
         return;
       }
 
       await _checkBiometricAvailability();
-      _eventController.add(ShowSuccessEvent(
-        'Bienvenido ${_currentUser!.fullname}',
-        Icons.check_circle_outline,
-      ));
+      _eventController.add(
+        ShowSuccessEvent(
+          'Bienvenido ${_currentUser!.fullname}',
+          Icons.check_circle_outline,
+        ),
+      );
       _eventController.add(NavigateToHomeEvent());
     } catch (e) {
       HapticFeedback.heavyImpact();
@@ -283,8 +285,9 @@ class LoginScreenViewModel extends ChangeNotifier {
       _currentUser = await _authService.getCurrentUser();
 
       if (_currentUser == null) {
-        _eventController
-            .add(ShowErrorEvent('Error obteniendo información del usuario'));
+        _eventController.add(
+          ShowErrorEvent('Error obteniendo información del usuario'),
+        );
         return;
       }
 
@@ -295,20 +298,23 @@ class LoginScreenViewModel extends ChangeNotifier {
 
       if (syncValidation.requiereSincronizacion) {
         _syncValidationResult = syncValidation;
-        _eventController
-            .add(ShowSyncRequiredDialogEvent(syncValidation, _currentUser!));
+        _eventController.add(
+          ShowSyncRequiredDialogEvent(syncValidation, _currentUser!),
+        );
         return;
       }
 
-      _eventController.add(ShowSuccessEvent(
-        'Bienvenido ${_currentUser!.fullname}',
-        Icons.fingerprint,
-      ));
+      _eventController.add(
+        ShowSuccessEvent(
+          'Bienvenido ${_currentUser!.fullname}',
+          Icons.fingerprint,
+        ),
+      );
       _eventController.add(NavigateToHomeEvent());
     } on PlatformException catch (e) {
-      _eventController.add(ShowErrorEvent(
-        'Error: ${e.message ?? 'Error desconocido'}',
-      ));
+      _eventController.add(
+        ShowErrorEvent('Error: ${e.message ?? 'Error desconocido'}'),
+      );
     } catch (e) {
       _eventController.add(ShowErrorEvent('Error de autenticación'));
     }
@@ -318,7 +324,8 @@ class LoginScreenViewModel extends ChangeNotifier {
     try {
       if (_currentUser?.edfVendedorId == null ||
           _currentUser!.edfVendedorId!.trim().isEmpty) {
-        final errorMsg = 'Su usuario no tiene vendedor asociado.\n\n'
+        final errorMsg =
+            'Su usuario no tiene vendedor asociado.\n\n'
             'Comuníquese con el administrador del sistema para obtener acceso a los clientes.\n\n'
             'Si es un usuario nuevo, es posible que su cuenta aún no haya sido configurada completamente.';
 
@@ -396,24 +403,28 @@ class LoginScreenViewModel extends ChangeNotifier {
 
       final result = await FullSyncService.syncAllDataWithProgress(
         edfVendedorId: _currentUser!.edfVendedorId!,
-        edfVendedorNombre: displayName, // ← Nombre completo "username - Nombre Vendedor"
+        edfVendedorNombre:
+            displayName, // ← Nombre completo "username - Nombre Vendedor"
         previousVendedorId: _syncValidationResult?.vendedorAnteriorId,
-        onProgress: ({
-          required double progress,
-          required String currentStep,
-          required List<String> completedSteps,
-        }) {
-          _syncProgress = progress;
-          _syncCurrentStep = currentStep;
-          _syncCompletedSteps = List.from(completedSteps);
+        onProgress:
+            ({
+              required double progress,
+              required String currentStep,
+              required List<String> completedSteps,
+            }) {
+              _syncProgress = progress;
+              _syncCurrentStep = currentStep;
+              _syncCompletedSteps = List.from(completedSteps);
 
-          _eventController.add(SyncProgressEvent(
-            progress: progress,
-            currentStep: currentStep,
-            completedSteps: completedSteps,
-          ));
-          notifyListeners();
-        },
+              _eventController.add(
+                SyncProgressEvent(
+                  progress: progress,
+                  currentStep: currentStep,
+                  completedSteps: completedSteps,
+                ),
+              );
+              notifyListeners();
+            },
       );
 
       if (!result.exito) {
@@ -423,15 +434,16 @@ class LoginScreenViewModel extends ChangeNotifier {
       // FullSyncService ya marca la sincronización como completada internamente
       // por lo que no necesitamos llamar a markSyncCompleted aquí
 
-      _eventController.add(SyncCompletedEvent(
-        result.mensaje,
-        result.itemsSincronizados,
-      ));
+      _eventController.add(
+        SyncCompletedEvent(result.mensaje, result.itemsSincronizados),
+      );
 
-      _eventController.add(ShowSuccessEvent(
-        '${result.itemsSincronizados} registros sincronizados',
-        Icons.cloud_done,
-      ));
+      _eventController.add(
+        ShowSuccessEvent(
+          '${result.itemsSincronizados} registros sincronizados',
+          Icons.cloud_done,
+        ),
+      );
 
       _eventController.add(NavigateToHomeEvent());
     } catch (e) {
@@ -451,8 +463,9 @@ class LoginScreenViewModel extends ChangeNotifier {
       final resultado = await AuthService.sincronizarSoloUsuarios();
 
       if (resultado.exito) {
-        _eventController
-            .add(ShowSuccessEvent('Usuarios sincronizados', Icons.cloud_done));
+        _eventController.add(
+          ShowSuccessEvent('Usuarios sincronizados', Icons.cloud_done),
+        );
       } else {
         _eventController.add(ShowErrorEvent(resultado.mensaje));
       }
@@ -470,8 +483,12 @@ class LoginScreenViewModel extends ChangeNotifier {
 
     try {
       await _dbHelper.eliminar('Users');
-      _eventController.add(ShowSuccessEvent(
-          'Tabla de usuarios eliminada correctamente', Icons.delete_sweep));
+      _eventController.add(
+        ShowSuccessEvent(
+          'Tabla de usuarios eliminada correctamente',
+          Icons.delete_sweep,
+        ),
+      );
     } catch (e) {
       _eventController.add(ShowErrorEvent('Error al eliminar usuarios: $e'));
     } finally {

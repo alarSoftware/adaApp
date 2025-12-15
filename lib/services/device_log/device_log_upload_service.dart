@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'package:logger/logger.dart';
-import 'package:sqflite/sqflite.dart';
+
 import 'package:ada_app/repositories/device_log_repository.dart';
 import 'package:ada_app/services/post/device_log_post_service.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
-import 'package:ada_app/services/api_config_service.dart'; // 🆕 AGREGAR
+import 'package:ada_app/services/api/api_config_service.dart'; // 🆕 AGREGAR
 
 class DeviceLogUploadService {
   final Logger _logger = Logger();

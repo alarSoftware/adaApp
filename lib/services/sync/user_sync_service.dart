@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
@@ -17,10 +17,9 @@ class UserSyncService {
       final baseUrl = await BaseSyncService.getBaseUrl();
       currentEndpoint = '$baseUrl/api/getUsers';
 
-      final response = await http.get(
-        Uri.parse(currentEndpoint),
-        headers: BaseSyncService.headers,
-      ).timeout(BaseSyncService.timeout);
+      final response = await http
+          .get(Uri.parse(currentEndpoint), headers: BaseSyncService.headers)
+          .timeout(BaseSyncService.timeout);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final responseData = jsonDecode(response.body);
@@ -73,7 +72,9 @@ class UserSyncService {
 
         BaseSyncService.logger.i('=== DATOS PROCESADOS PARA DB ===');
         for (int i = 0; i < usuariosProcesados.length; i++) {
-          BaseSyncService.logger.i('Usuario ${i + 1}: ${usuariosProcesados[i]}');
+          BaseSyncService.logger.i(
+            'Usuario ${i + 1}: ${usuariosProcesados[i]}',
+          );
         }
 
         try {
@@ -113,9 +114,10 @@ class UserSyncService {
           itemsSincronizados: 0,
         );
       }
-
     } on TimeoutException catch (timeoutError) {
-      BaseSyncService.logger.e('⏰ Timeout sincronizando usuarios: $timeoutError');
+      BaseSyncService.logger.e(
+        '⏰ Timeout sincronizando usuarios: $timeoutError',
+      );
 
       await ErrorLogService.logNetworkError(
         tableName: 'Users',
@@ -129,7 +131,6 @@ class UserSyncService {
         mensaje: 'Timeout de conexión al servidor',
         itemsSincronizados: 0,
       );
-
     } on SocketException catch (socketError) {
       BaseSyncService.logger.e('📡 Error de red: $socketError');
 
@@ -145,7 +146,6 @@ class UserSyncService {
         mensaje: 'Sin conexión de red',
         itemsSincronizados: 0,
       );
-
     } catch (e) {
       BaseSyncService.logger.e('💥 Error en sincronizarUsuarios: $e');
 
@@ -211,7 +211,9 @@ class UserSyncService {
         return null;
       }
 
-      BaseSyncService.logger.i('Buscando edf_vendedor_id para usuario: $username');
+      BaseSyncService.logger.i(
+        'Buscando edf_vendedor_id para usuario: $username',
+      );
 
       final db = await _dbHelper.database;
       final result = await db.query(
@@ -223,11 +225,14 @@ class UserSyncService {
       );
 
       if (result.isEmpty) {
-        BaseSyncService.logger.e('Usuario $username no encontrado en base de datos local');
+        BaseSyncService.logger.e(
+          'Usuario $username no encontrado en base de datos local',
+        );
         await ErrorLogService.logDatabaseError(
           tableName: 'Users',
           operation: 'query_user',
-          errorMessage: 'Usuario $username no encontrado en base de datos local',
+          errorMessage:
+              'Usuario $username no encontrado en base de datos local',
         );
         return null;
       }
@@ -247,7 +252,6 @@ class UserSyncService {
       }
 
       return edfVendedorId;
-
     } catch (e) {
       BaseSyncService.logger.e('Error obteniendo edf_vendedor_id: $e');
       await ErrorLogService.logError(
@@ -264,8 +268,8 @@ class UserSyncService {
     try {
       final db = await _dbHelper.database;
       final result = await db.rawQuery(
-          'SELECT edf_vendedor_id FROM Users WHERE LOWER(username) = ? LIMIT 1',
-          [username.toLowerCase()]
+        'SELECT edf_vendedor_id FROM Users WHERE LOWER(username) = ? LIMIT 1',
+        [username.toLowerCase()],
       );
 
       if (result.isNotEmpty && result.first['edf_vendedor_id'] != null) {
@@ -279,7 +283,6 @@ class UserSyncService {
       );
 
       return null;
-
     } catch (e) {
       BaseSyncService.logger.e('Error en obtenerEdfVendedorIdDirecto: $e');
       await ErrorLogService.logError(

@@ -7,13 +7,13 @@ import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
-import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/services/censo/censo_log_service.dart';
 import 'package:ada_app/services/censo/censo_upload_service.dart';
 import 'package:ada_app/services/censo/censo_foto_service.dart';
 import 'package:ada_app/services/sync/sync_service.dart';
-import 'package:ada_app/services/error_log/error_log_service.dart';
-import 'package:ada_app/services/database_helper.dart';
+
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 
 final Uuid _uuid = const Uuid();
@@ -28,7 +28,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   final CensoActivoRepository _estadoEquipoRepository = CensoActivoRepository();
   final CensoActivoFotoRepository _fotoRepository = CensoActivoFotoRepository();
   final EquipoPendienteRepository _equipoPendienteRepository =
-  EquipoPendienteRepository();
+      EquipoPendienteRepository();
 
   final AuthService _authService = AuthService();
 
@@ -76,13 +76,13 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> confirmarRegistro(
-      Map<String, dynamic> datos,
-      ) async {
+    Map<String, dynamic> datos,
+  ) async {
     if (_isProcessing) {
       return {
         'success': false,
         'error':
-        'Ya hay un proceso de confirmación en curso. Por favor espere.',
+            'Ya hay un proceso de confirmación en curso. Por favor espere.',
       };
     }
 
@@ -101,9 +101,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> _insertarEnviarCensoActivo(
-      Map<String, dynamic> datos,
-      String processId,
-      ) async {
+    Map<String, dynamic> datos,
+    String processId,
+  ) async {
     _setSaving(true);
     String? censoActivoId;
     String? equipoId;
@@ -250,11 +250,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<String> _crearEquipoNuevo(
-      Map<String, dynamic> datos,
-      int? clienteId,
-      String processId,
-      String? userId,
-      ) async {
+    Map<String, dynamic> datos,
+    int? clienteId,
+    String processId,
+    String? userId,
+  ) async {
     _setStatusMessage('Registrando equipo nuevo...');
 
     if (_currentProcessId != processId) throw 'Proceso cancelado';
@@ -369,8 +369,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> verificarSincronizacionPendiente(
-      String? estadoId,
-      ) async {
+    String? estadoId,
+  ) async {
     if (estadoId == null) return {'pendiente': false};
 
     try {
@@ -389,7 +389,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       return {
         'pendiente':
-        (estadoCenso == 'creado' || estadoCenso == 'error') &&
+            (estadoCenso == 'creado' || estadoCenso == 'error') &&
             sincronizado == 0,
       };
     } catch (e) {
@@ -398,8 +398,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> obtenerInfoSincronizacion(
-      String? censoActivoId,
-      ) async {
+    String? censoActivoId,
+  ) async {
     if (censoActivoId == null) {
       return {
         'estado': 'desconocido',
@@ -479,7 +479,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
                 final endpoint = errorLog.first['endpoint'] as String?;
 
                 errorDetalle =
-                'Sincronizado después de ${retryCount + 1} intento(s)\n\nÚltimo error encontrado:\n$errorMessage';
+                    'Sincronizado después de ${retryCount + 1} intento(s)\n\nÚltimo error encontrado:\n$errorMessage';
 
                 if (errorCode != null) {
                   errorDetalle += '\n\nCódigo: $errorCode';
@@ -540,7 +540,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
               if (timestamp != null) {
                 try {
                   errorDetalle +=
-                  '\n\nOcurrió el: ${_formatTimestamp(DateTime.parse(timestamp))}';
+                      '\n\nOcurrió el: ${_formatTimestamp(DateTime.parse(timestamp))}';
                 } catch (_) {}
               }
             } else {
@@ -556,7 +556,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
               'icono': Icons.error,
               'color': AppColors.error,
               'error_detalle':
-              errorDetalle ?? 'No se encontró detalle del error',
+                  errorDetalle ?? 'No se encontró detalle del error',
               'envioFallido': envioFallido,
             };
           }

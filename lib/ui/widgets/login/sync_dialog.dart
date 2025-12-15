@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/viewmodels/login_screen_viewmodel.dart';
-import 'package:ada_app/services/auth_service.dart';
-import 'package:ada_app/services/database_helper.dart';
-import 'package:ada_app/services/database_validation_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
+import 'package:ada_app/services/data/database_helper.dart';
+import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/sync/full_sync_service.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/ui/common/snackbar_helper.dart';

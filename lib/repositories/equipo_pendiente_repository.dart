@@ -2,7 +2,7 @@ import 'package:ada_app/models/equipos_pendientes.dart';
 import 'base_repository.dart';
 import 'package:uuid/uuid.dart';
 
-import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
 import 'package:sqflite/sqflite.dart';
 
 class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {

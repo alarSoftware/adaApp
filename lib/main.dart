@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:ada_app/services/app_services.dart';
-import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
 import 'ui/screens/login_screen.dart';
 import 'ui/screens/clients_screen.dart';

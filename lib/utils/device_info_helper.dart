@@ -5,7 +5,7 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:uuid/uuid.dart';
 import 'package:ada_app/models/device_log.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:logger/logger.dart';
 
 /// 🔧 Helper para obtener información del dispositivo
@@ -188,7 +188,9 @@ class DeviceInfoHelper {
     _logger.i('═══════════════════════════════════════');
     disponibilidad.forEach((servicio, disponible) {
       final icono = disponible ? '✅' : '❌';
-      _logger.i('$icono $servicio: ${disponible ? "DISPONIBLE" : "NO DISPONIBLE"}');
+      _logger.i(
+        '$icono $servicio: ${disponible ? "DISPONIBLE" : "NO DISPONIBLE"}',
+      );
     });
     _logger.i('═══════════════════════════════════════');
   }

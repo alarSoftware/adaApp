@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 import 'package:ada_app/config/constants/server_response.dart';
-import 'package:ada_app/repositories/operacion_comercial_repository.dart';
+
 import 'package:ada_app/repositories/producto_repository.dart';
 import 'package:http/http.dart' as http;
 
-import 'package:ada_app/services/api_config_service.dart';
+import 'package:ada_app/services/api/api_config_service.dart';
 import 'package:ada_app/config/constants/server_constants.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
@@ -18,10 +18,10 @@ class OperacionesComercialesPostService {
       '/operacionComercial/insertOperacionComercial';
 
   static Future<void> enviarOperacion(
-      OperacionComercial operacion, {
-        int timeoutSegundos = 60,
-        ProductoRepository? productoRepository,
-      }) async {
+    OperacionComercial operacion, {
+    int timeoutSegundos = 60,
+    ProductoRepository? productoRepository,
+  }) async {
     String? fullUrl;
     try {
       if (operacion.id == null || operacion.id!.isEmpty) {
@@ -42,14 +42,14 @@ class OperacionesComercialesPostService {
 
       final response = await http
           .post(
-        Uri.parse(fullUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-        },
-        body: jsonEncode(payload),
-      )
+            Uri.parse(fullUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'ngrok-skip-browser-warning': 'true',
+            },
+            body: jsonEncode(payload),
+          )
           .timeout(Duration(seconds: timeoutSegundos));
 
       ServerResponse resultObject = ServerResponse.fromHttp(response);
@@ -59,7 +59,6 @@ class OperacionesComercialesPostService {
           throw Exception(resultObject.message);
         }
       }
-
     } catch (e) {
       await ErrorLogService.manejarExcepcion(
         e,
@@ -73,9 +72,9 @@ class OperacionesComercialesPostService {
   }
 
   static Future<Map<String, dynamic>> _construirPayload(
-      OperacionComercial operacion,
-      ProductoRepository productoRepository,
-      ) async {
+    OperacionComercial operacion,
+    ProductoRepository productoRepository,
+  ) async {
     final operacionComercialData = {
       'id': operacion.id,
       'clienteId': operacion.clienteId,
@@ -88,11 +87,10 @@ class OperacionesComercialesPostService {
     };
 
     final detalles = await Future.wait(
-      operacion.detalles.map((d) => _construirDetalle(
-        d,
-        operacion.tipoOperacion,
-        productoRepository,
-      )),
+      operacion.detalles.map(
+        (d) =>
+            _construirDetalle(d, operacion.tipoOperacion, productoRepository),
+      ),
     );
 
     return {
@@ -103,11 +101,13 @@ class OperacionesComercialesPostService {
   }
 
   static Future<Map<String, dynamic>> _construirDetalle(
-      OperacionComercialDetalle detalle,
-      TipoOperacion tipoOperacion,
-      ProductoRepository productoRepository,
-      ) async {
-    final producto = await productoRepository.obtenerProductoPorId(detalle.productoId!);
+    OperacionComercialDetalle detalle,
+    TipoOperacion tipoOperacion,
+    ProductoRepository productoRepository,
+  ) async {
+    final producto = await productoRepository.obtenerProductoPorId(
+      detalle.productoId!,
+    );
 
     if (producto == null) {
       throw Exception('Producto con ID ${detalle.productoId} no encontrado');
@@ -124,7 +124,6 @@ class OperacionesComercialesPostService {
 
     if (tipoOperacion == TipoOperacion.notaRetiroDiscontinuos &&
         detalle.productoReemplazoId != null) {
-
       final productoReemplazo = await productoRepository.obtenerProductoPorId(
         detalle.productoReemplazoId!,
       );

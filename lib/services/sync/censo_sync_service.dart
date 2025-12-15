@@ -3,13 +3,12 @@ import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
 /// Servicio de sincronización de censos activos
 /// Formato del API: {"data": "[{...}]", "status": "OK"}
 class CensusSyncService extends BaseSyncService {
-
   // Variables estáticas para almacenar los últimos censos obtenidos
   static List<dynamic> _ultimosCensos = [];
   static Map<String, dynamic>? _ultimoCenso;
@@ -76,7 +75,6 @@ class CensusSyncService extends BaseSyncService {
         itemsSincronizados: processedResult.length,
         totalEnAPI: processedResult.length,
       );
-
     } on TimeoutException catch (timeoutError) {
       BaseSyncService.logger.e('⏰ Timeout obteniendo censos: $timeoutError');
 
@@ -95,7 +93,6 @@ class CensusSyncService extends BaseSyncService {
         mensaje: 'Timeout de conexión al servidor',
         itemsSincronizados: 0,
       );
-
     } on SocketException catch (socketError) {
       BaseSyncService.logger.e('📡 Error de red: $socketError');
 
@@ -114,7 +111,6 @@ class CensusSyncService extends BaseSyncService {
         mensaje: 'Sin conexión de red',
         itemsSincronizados: 0,
       );
-
     } catch (e) {
       BaseSyncService.logger.e('💥 Error obteniendo censos activos: $e');
 
@@ -147,10 +143,9 @@ class CensusSyncService extends BaseSyncService {
       final uri = Uri.parse('$baseUrl/api/getCensoActivo/$censoId');
       currentEndpoint = uri.toString();
 
-      final response = await http.get(
-        uri,
-        headers: BaseSyncService.headers,
-      ).timeout(BaseSyncService.timeout);
+      final response = await http
+          .get(uri, headers: BaseSyncService.headers)
+          .timeout(BaseSyncService.timeout);
 
       if (!_isSuccessStatusCode(response.statusCode)) {
         // 🚨 LOG ERROR: Error del servidor
@@ -213,7 +208,6 @@ class CensusSyncService extends BaseSyncService {
           itemsSincronizados: 0,
         );
       }
-
     } on TimeoutException catch (timeoutError) {
       await ErrorLogService.logNetworkError(
         tableName: 'censo_activo',
@@ -229,7 +223,6 @@ class CensusSyncService extends BaseSyncService {
         mensaje: 'Timeout de conexión',
         itemsSincronizados: 0,
       );
-
     } on SocketException catch (socketError) {
       await ErrorLogService.logNetworkError(
         tableName: 'censo_activo',
@@ -245,7 +238,6 @@ class CensusSyncService extends BaseSyncService {
         mensaje: 'Sin conexión de red',
         itemsSincronizados: 0,
       );
-
     } catch (e) {
       BaseSyncService.logger.e('Error obteniendo censo por ID: $e');
 
@@ -273,14 +265,14 @@ class CensusSyncService extends BaseSyncService {
 
     try {
       final baseUrl = await BaseSyncService.getBaseUrl();
-      final uri = Uri.parse('$baseUrl/api/getCensoActivo')
-          .replace(queryParameters: {'codigoBarras': codigoBarras});
+      final uri = Uri.parse(
+        '$baseUrl/api/getCensoActivo',
+      ).replace(queryParameters: {'codigoBarras': codigoBarras});
       currentEndpoint = uri.toString();
 
-      final response = await http.get(
-        uri,
-        headers: BaseSyncService.headers,
-      ).timeout(BaseSyncService.timeout);
+      final response = await http
+          .get(uri, headers: BaseSyncService.headers)
+          .timeout(BaseSyncService.timeout);
 
       if (_isSuccessStatusCode(response.statusCode)) {
         final censosData = await _parseCensusResponse(response);
@@ -304,11 +296,11 @@ class CensusSyncService extends BaseSyncService {
         _ultimosCensos = [];
         return SyncResult(
           exito: false,
-          mensaje: 'Error en búsqueda: ${BaseSyncService.extractErrorMessage(response)}',
+          mensaje:
+              'Error en búsqueda: ${BaseSyncService.extractErrorMessage(response)}',
           itemsSincronizados: 0,
         );
       }
-
     } on TimeoutException catch (timeoutError) {
       await ErrorLogService.logNetworkError(
         tableName: 'censo_activo',
@@ -323,7 +315,6 @@ class CensusSyncService extends BaseSyncService {
         mensaje: 'Timeout de conexión',
         itemsSincronizados: 0,
       );
-
     } on SocketException catch (socketError) {
       await ErrorLogService.logNetworkError(
         tableName: 'censo_activo',
@@ -338,7 +329,6 @@ class CensusSyncService extends BaseSyncService {
         mensaje: 'Sin conexión de red',
         itemsSincronizados: 0,
       );
-
     } catch (e) {
       BaseSyncService.logger.e('Error buscando por código: $e');
 
@@ -469,15 +459,17 @@ class CensusSyncService extends BaseSyncService {
   }
 
   /// Realizar petición HTTP
-  static Future<http.Response> _makeHttpRequest(Map<String, String> queryParams) async {
+  static Future<http.Response> _makeHttpRequest(
+    Map<String, String> queryParams,
+  ) async {
     final baseUrl = await BaseSyncService.getBaseUrl();
-    final uri = Uri.parse('$baseUrl/api/getCensoActivo')
-        .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+    final uri = Uri.parse(
+      '$baseUrl/api/getCensoActivo',
+    ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
-    return await http.get(
-      uri,
-      headers: BaseSyncService.headers,
-    ).timeout(BaseSyncService.timeout);
+    return await http
+        .get(uri, headers: BaseSyncService.headers)
+        .timeout(BaseSyncService.timeout);
   }
 
   /// Verificar si el código de estado es exitoso
@@ -496,7 +488,9 @@ class CensusSyncService extends BaseSyncService {
   }
 
   /// Parsear respuesta de censos
-  static Future<List<dynamic>> _parseCensusResponse(http.Response response) async {
+  static Future<List<dynamic>> _parseCensusResponse(
+    http.Response response,
+  ) async {
     try {
       final responseBody = jsonDecode(response.body);
 
@@ -555,8 +549,8 @@ class CensusSyncService extends BaseSyncService {
 
   /// Procesar y guardar censos usando vaciarEInsertar
   static Future<List<Map<String, dynamic>>> _processAndSaveCensus(
-      List<dynamic> censosData,
-      ) async {
+    List<dynamic> censosData,
+  ) async {
     if (censosData.isEmpty) return [];
 
     // Convertir datos del API al formato local
@@ -569,7 +563,9 @@ class CensusSyncService extends BaseSyncService {
           final censoParaGuardar = _mapApiToLocalFormat(censoMap);
           censosParaGuardar.add(censoParaGuardar);
         } catch (e) {
-          BaseSyncService.logger.e('Error procesando censo ID ${censo['id']}: $e');
+          BaseSyncService.logger.e(
+            'Error procesando censo ID ${censo['id']}: $e',
+          );
 
           await ErrorLogService.logError(
             tableName: 'censo_activo',
@@ -602,7 +598,9 @@ class CensusSyncService extends BaseSyncService {
   }
 
   /// Mapear campos del API al formato de la tabla local censo_activo
-  static Map<String, dynamic> _mapApiToLocalFormat(Map<String, dynamic> apiCensus) {
+  static Map<String, dynamic> _mapApiToLocalFormat(
+    Map<String, dynamic> apiCensus,
+  ) {
     return {
       'id': apiCensus['id']?.toString(),
       'equipo_id': apiCensus['edfEquipoId']?.toString(),
@@ -615,7 +613,7 @@ class CensusSyncService extends BaseSyncService {
       'fecha_creacion': apiCensus['creationDate'],
       'fecha_actualizacion': DateTime.now().toIso8601String(),
       'observaciones': apiCensus['observaciones']?.toString(),
-      'estado_censo':  'migrado',
+      'estado_censo': 'migrado',
     };
   }
 
@@ -653,7 +651,9 @@ class CensusSyncService extends BaseSyncService {
       final dbHelper = DatabaseHelper();
       await dbHelper.vaciarEInsertar('censo_activo', [censo]);
     } catch (e) {
-      BaseSyncService.logger.e('Error guardando censo ID ${censo['id']} en BD: $e');
+      BaseSyncService.logger.e(
+        'Error guardando censo ID ${censo['id']} en BD: $e',
+      );
 
       await ErrorLogService.logDatabaseError(
         tableName: 'censo_activo',

@@ -1,7 +1,7 @@
 import 'package:ada_app/ui/screens/pending_data_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
-import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
 import 'package:ada_app/ui/widgets/app_connection_indicator.dart';
 import 'package:ada_app/ui/screens/equipos_screen.dart';
@@ -10,8 +10,8 @@ import 'package:ada_app/ui/screens/logo_screen.dart';
 import 'package:ada_app/ui/screens/marca_screen.dart';
 import 'package:ada_app/viewmodels/select_screen_viewmodel.dart';
 import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
-import 'package:ada_app/services/database_validation_service.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_validation_service.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/ui/screens/productos_screen.dart';
 import 'dart:async';
 
@@ -94,8 +94,7 @@ class _SelectScreenState extends State<SelectScreen> {
           _pendingDataCount = totalPendientes;
         });
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   Future<void> _checkBatteryOptimizationOnFirstLoad() async {
@@ -106,8 +105,7 @@ class _SelectScreenState extends State<SelectScreen> {
       await BatteryOptimizationDialog.checkAndRequestBatteryOptimization(
         context,
       );
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   Future<void> _handleLogout() async {
@@ -141,11 +139,7 @@ class _SelectScreenState extends State<SelectScreen> {
       if (mounted) Navigator.of(context).pop();
 
       if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/login',
-              (route) => false,
-        );
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
       }
     } catch (e) {
       if (mounted) Navigator.of(context).pop();
@@ -405,8 +399,8 @@ class _SelectScreenState extends State<SelectScreen> {
   }
 
   Future<void> _handleDeleteValidationFailed(
-      DatabaseValidationResult validation,
-      ) async {
+    DatabaseValidationResult validation,
+  ) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -771,8 +765,8 @@ class _SelectScreenState extends State<SelectScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap:
-        onTap ??
-                () {
+            onTap ??
+            () {
               if (routeName != null) {
                 Navigator.pushNamed(context, routeName);
               } else if (page != null) {
@@ -912,15 +906,15 @@ class _SelectScreenState extends State<SelectScreen> {
                 onPressed: _viewModel.isSyncing ? null : _viewModel.requestSync,
                 icon: _viewModel.isSyncing
                     ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppColors.onPrimary,
-                    ),
-                  ),
-                )
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.onPrimary,
+                          ),
+                        ),
+                      )
                     : Icon(Icons.sync, color: AppColors.onPrimary),
                 tooltip: _viewModel.isSyncing
                     ? 'Sincronizando...'
@@ -948,21 +942,21 @@ class _SelectScreenState extends State<SelectScreen> {
                   PopupMenuItem<String>(
                     value: 'probar_conexion',
                     enabled:
-                    !_viewModel.isTestingConnection &&
+                        !_viewModel.isTestingConnection &&
                         !_viewModel.isSyncing,
                     child: Row(
                       children: [
                         _viewModel.isTestingConnection
                             ? SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              AppColors.success,
-                            ),
-                          ),
-                        )
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.success,
+                                  ),
+                                ),
+                              )
                             : Icon(Icons.wifi_find, color: AppColors.success),
                         SizedBox(width: 8),
                         Text(
@@ -977,7 +971,7 @@ class _SelectScreenState extends State<SelectScreen> {
                   PopupMenuItem<String>(
                     value: 'borrar_bd',
                     enabled:
-                    !_viewModel.isSyncing &&
+                        !_viewModel.isSyncing &&
                         !_viewModel.isTestingConnection,
                     child: Row(
                       children: [
@@ -1159,8 +1153,8 @@ class _SelectScreenState extends State<SelectScreen> {
   }
 
   Future<void> _mostrarDialogoSincronizacionObligatoria(
-      RequiredSyncEvent event,
-      ) async {
+    RequiredSyncEvent event,
+  ) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,

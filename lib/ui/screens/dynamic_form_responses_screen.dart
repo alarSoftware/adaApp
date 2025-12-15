@@ -7,7 +7,7 @@ import 'package:ada_app/ui/widgets/client_info_card.dart';
 import 'package:ada_app/ui/screens/dynamic_form_template_list_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:ada_app/ui/screens/dynamic_form_fill_screen.dart';
-import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
 
 /// Pantalla principal que muestra las respuestas guardadas
 class DynamicFormResponsesScreen extends StatefulWidget {

@@ -1,6 +1,6 @@
 import '../models/dynamic_form/dynamic_form_template.dart';
 import '../services/sync/dynamic_form_sync_service.dart';
-import '../services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 
 class DynamicFormTemplateRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper();

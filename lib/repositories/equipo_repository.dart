@@ -1,12 +1,10 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:ada_app/models/equipos.dart';
-import 'package:ada_app/services/auth_service.dart';
+
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import '../repositories/base_repository.dart';
 
 class EquipoRepository extends BaseRepository<Equipo> {
-  final AuthService _authService = AuthService();
-
   @override
   String get tableName => 'equipos';
 

@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/services/sync/sync_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
 /// Callback para reportar progreso de sincronización
-typedef SyncProgressCallback = void Function({
-required double progress,
-required String currentStep,
-required List<String> completedSteps,
-});
+typedef SyncProgressCallback =
+    void Function({
+      required double progress,
+      required String currentStep,
+      required List<String> completedSteps,
+    });
 
 /// Servicio centralizado para sincronización completa
 class FullSyncService {
-
   /// Sincronizar todos los datos con reporte de progreso
   static Future<SyncResult> syncAllDataWithProgress({
     required String edfVendedorId,
@@ -29,7 +29,8 @@ class FullSyncService {
       // =================================================================
       // 1. Limpiar datos anteriores si es necesario
       // =================================================================
-      if (forceClear || (previousVendedorId != null && previousVendedorId != edfVendedorId)) {
+      if (forceClear ||
+          (previousVendedorId != null && previousVendedorId != edfVendedorId)) {
         try {
           onProgress(
             progress: 0.05,
@@ -117,7 +118,6 @@ class FullSyncService {
         if (currentProgress < 0.80) {
           currentProgress = 0.80;
         }
-
       } catch (e) {
         throw Exception('Error en descarga masiva: $e');
       }
@@ -132,11 +132,14 @@ class FullSyncService {
           completedSteps: completedSteps,
         );
 
-        final responsesResult = await AuthService.sincronizarRespuestasDelVendedor(edfVendedorId);
+        final responsesResult =
+            await AuthService.sincronizarRespuestasDelVendedor(edfVendedorId);
 
         if (responsesResult.exito) {
           if (responsesResult.itemsSincronizados > 0) {
-            completedSteps.add('${responsesResult.itemsSincronizados} respuestas');
+            completedSteps.add(
+              '${responsesResult.itemsSincronizados} respuestas',
+            );
             totalItemsSincronizados += responsesResult.itemsSincronizados;
           }
           onProgress(
@@ -145,7 +148,9 @@ class FullSyncService {
             completedSteps: completedSteps,
           );
         } else {
-          throw Exception('Error sincronizando respuestas: ${responsesResult.mensaje}');
+          throw Exception(
+            'Error sincronizando respuestas: ${responsesResult.mensaje}',
+          );
         }
       } catch (e) {
         debugPrint('⚠️ Excepción al descargar respuestas: $e');
@@ -165,13 +170,12 @@ class FullSyncService {
 
         final authService = AuthService();
         await authService.markSyncCompleted(
-            edfVendedorId,
-            edfVendedorNombre ?? 'Vendedor'
+          edfVendedorId,
+          edfVendedorNombre ?? 'Vendedor',
         );
 
         completedSteps.add('Sincronización registrada');
         await Future.delayed(const Duration(milliseconds: 300));
-
       } catch (e) {
         await ErrorLogService.logDatabaseError(
           tableName: 'N/A',
@@ -198,7 +202,6 @@ class FullSyncService {
         mensaje: 'Sincronización completada exitosamente',
         itemsSincronizados: totalItemsSincronizados,
       );
-
     } catch (e) {
       debugPrint('❌ Error en sincronización completa: $e');
 

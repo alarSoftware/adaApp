@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
-import 'package:ada_app/repositories/censo_activo_repository.dart';
+
 import 'package:http/http.dart' as http;
 
 import 'package:uuid/uuid.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:ada_app/services/api_config_service.dart';
+import 'package:ada_app/services/api/api_config_service.dart';
 
 import '../../config/constants/server_response.dart';
 import '../censo/censo_upload_service.dart';

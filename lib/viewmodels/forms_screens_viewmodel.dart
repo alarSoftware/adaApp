@@ -7,8 +7,8 @@ import 'package:ada_app/repositories/logo_repository.dart';
 import 'package:ada_app/repositories/models_repository.dart';
 import 'package:ada_app/repositories/marca_repository.dart';
 import 'package:barcode_scan2/barcode_scan2.dart';
-import 'package:ada_app/services/image_service.dart';
-import 'package:ada_app/services/location_service.dart';
+import 'package:ada_app/services/device/image_service.dart';
+import 'package:ada_app/services/device/location_service.dart';
 import 'dart:io';
 
 abstract class FormsUIEvent {}
@@ -90,22 +90,25 @@ class FormsScreenViewModel extends ChangeNotifier {
   List<Map<String, dynamic>> get marcas => _marcas;
   int? get marcaSeleccionada => _marcaSeleccionada;
 
-  List<String> get marcasParaUI => _marcas.map((m) => m['nombre'] as String).toList();
+  List<String> get marcasParaUI =>
+      _marcas.map((m) => m['nombre'] as String).toList();
 
   List<Map<String, dynamic>> get modelos => _modelos;
   int? get modeloSeleccionado => _modeloSeleccionado;
 
-  List<String> get modelosParaUI => _modelos.map((m) => m['nombre'] as String).toList();
+  List<String> get modelosParaUI =>
+      _modelos.map((m) => m['nombre'] as String).toList();
 
   List<Map<String, dynamic>> get logos => _logos;
   int? get logoSeleccionado => _logoSeleccionado;
 
-  List<String> get logosParaUI => _logos.map((l) => l['nombre'] as String).toList();
+  List<String> get logosParaUI =>
+      _logos.map((l) => l['nombre'] as String).toList();
 
   String? get marcaSeleccionadaNombre {
     if (_marcaSeleccionada == null) return null;
     final marca = _marcas.firstWhere(
-          (m) => m['id'] == _marcaSeleccionada,
+      (m) => m['id'] == _marcaSeleccionada,
       orElse: () => {'nombre': null},
     );
     return marca['nombre'] as String?;
@@ -114,7 +117,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   String? get modeloSeleccionadoNombre {
     if (_modeloSeleccionado == null) return null;
     final modelo = _modelos.firstWhere(
-          (m) => m['id'] == _modeloSeleccionado,
+      (m) => m['id'] == _modeloSeleccionado,
       orElse: () => {'nombre': null},
     );
     return modelo['nombre'] as String?;
@@ -123,7 +126,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   String? get logoSeleccionadoNombre {
     if (_logoSeleccionado == null) return null;
     final logo = _logos.firstWhere(
-          (l) => l['id'] == _logoSeleccionado,
+      (l) => l['id'] == _logoSeleccionado,
       orElse: () => {'nombre': null},
     );
     return logo['nombre'] as String?;
@@ -143,11 +146,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   Future<void> initialize(Cliente cliente) async {
     _cliente = cliente;
 
-    await Future.wait([
-      _cargarMarcas(),
-      _cargarLogos(),
-      _cargarModelos(),
-    ]);
+    await Future.wait([_cargarMarcas(), _cargarLogos(), _cargarModelos()]);
   }
 
   @override
@@ -180,10 +179,9 @@ class FormsScreenViewModel extends ChangeNotifier {
       final marcaRepo = MarcaRepository();
       final marcas = await marcaRepo.obtenerTodos();
 
-      _marcas = marcas.map((marca) => {
-        'id': marca.id,
-        'nombre': marca.nombre,
-      }).toList();
+      _marcas = marcas
+          .map((marca) => {'id': marca.id, 'nombre': marca.nombre})
+          .toList();
 
       notifyListeners();
     } catch (e) {
@@ -201,10 +199,9 @@ class FormsScreenViewModel extends ChangeNotifier {
       final logoRepo = LogoRepository();
       final logos = await logoRepo.obtenerTodos();
 
-      _logos = logos.map((logo) => {
-        'id': logo.id,
-        'nombre': logo.nombre,
-      }).toList();
+      _logos = logos
+          .map((logo) => {'id': logo.id, 'nombre': logo.nombre})
+          .toList();
       notifyListeners();
     } catch (e) {
       _showError('No se pudieron cargar los logos disponibles');
@@ -221,10 +218,9 @@ class FormsScreenViewModel extends ChangeNotifier {
       final modeloRepo = ModeloRepository();
       final modelos = await modeloRepo.obtenerTodos();
 
-      _modelos = modelos.map((modelo) => {
-        'id': modelo.id,
-        'nombre': modelo.nombre,
-      }).toList();
+      _modelos = modelos
+          .map((modelo) => {'id': modelo.id, 'nombre': modelo.nombre})
+          .toList();
 
       notifyListeners();
     } catch (e) {
@@ -255,7 +251,6 @@ class FormsScreenViewModel extends ChangeNotifier {
         codigoBarrasController.text = result.rawContent;
         await buscarEquipoPorCodigo(result.rawContent);
       }
-
     } on PlatformException catch (e) {
       if (e.code == BarcodeScanner.cameraAccessDenied) {
         _showError('Se requieren permisos de cámara para escanear códigos');
@@ -310,14 +305,15 @@ class FormsScreenViewModel extends ChangeNotifier {
       } else {
         _procesarEquipoNoEncontrado(codigo);
       }
-
     } catch (e, stackTrace) {
       _limpiarDatosAutocompletados();
       _showError('No se pudo buscar el equipo. Verifique su conexión');
     }
   }
 
-  Future<void> _procesarEquipoEncontrado(Map<String, dynamic> equipoCompleto) async {
+  Future<void> _procesarEquipoEncontrado(
+    Map<String, dynamic> equipoCompleto,
+  ) async {
     try {
       await _verificarAsignacionEquipo(equipoCompleto);
       _llenarCamposFormulario(equipoCompleto);
@@ -325,7 +321,6 @@ class FormsScreenViewModel extends ChangeNotifier {
       _mostrarEstadoEquipo(equipoCompleto);
 
       notifyListeners();
-
     } catch (e) {
       _showError('Error procesando equipo: $e');
     }
@@ -338,13 +333,10 @@ class FormsScreenViewModel extends ChangeNotifier {
           ? _cliente!.id!
           : int.parse(_cliente!.id!.toString());
 
-      final yaAsignado = await _equipoRepository.verificarAsignacionEquipoCliente(
-        equipoId,
-        clienteId,
-      );
+      final yaAsignado = await _equipoRepository
+          .verificarAsignacionEquipoCliente(equipoId, clienteId);
 
       _equipoYaAsignado = yaAsignado;
-
     } catch (e) {
       _equipoYaAsignado = false;
       throw 'Error verificando asignación del equipo';
@@ -368,7 +360,9 @@ class FormsScreenViewModel extends ChangeNotifier {
     if (_equipoYaAsignado) {
       _showSuccess('¡Equipo encontrado!');
     } else {
-      _showWarning('Equipo encontrado pero no asignado al cliente, se censara como pendiente');
+      _showWarning(
+        'Equipo encontrado pero no asignado al cliente, se censara como pendiente',
+      );
     }
   }
 
@@ -388,12 +382,14 @@ class FormsScreenViewModel extends ChangeNotifier {
       ),
     ];
 
-    _eventController.add(ShowDialogEvent(
-      'Equipo no encontrado',
-      'No existe un equipo registrado con el código "$codigo".\n\n'
-          '¿Desea registrarlo como un equipo nuevo?',
-      actions,
-    ));
+    _eventController.add(
+      ShowDialogEvent(
+        'Equipo no encontrado',
+        'No existe un equipo registrado con el código "$codigo".\n\n'
+            '¿Desea registrarlo como un equipo nuevo?',
+        actions,
+      ),
+    );
   }
 
   Future<void> tomarFoto({required bool esPrimeraFoto}) async {
@@ -419,7 +415,10 @@ class FormsScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> _procesarImagenSeleccionada(File imagen, {required bool esPrimeraFoto}) async {
+  Future<void> _procesarImagenSeleccionada(
+    File imagen, {
+    required bool esPrimeraFoto,
+  }) async {
     try {
       if (!_imageService.esImagenValida(imagen)) {
         _showError('El archivo seleccionado no es válido');
@@ -428,7 +427,9 @@ class FormsScreenViewModel extends ChangeNotifier {
 
       final double tamanoMB = await _imageService.obtenerTamanoImagen(imagen);
       if (tamanoMB > 15.0) {
-        _showError('La imagen es muy grande (${tamanoMB.toStringAsFixed(1)}MB). Máximo: 15MB');
+        _showError(
+          'La imagen es muy grande (${tamanoMB.toStringAsFixed(1)}MB). Máximo: 15MB',
+        );
         return;
       }
 
@@ -438,8 +439,8 @@ class FormsScreenViewModel extends ChangeNotifier {
 
       final String sufijo = esPrimeraFoto ? '_foto1' : '_foto2';
       final File imagenGuardada = await _imageService.guardarImagenEnApp(
-          imagen,
-          '$codigoEquipo$sufijo'
+        imagen,
+        '$codigoEquipo$sufijo',
       );
 
       if (esPrimeraFoto) {
@@ -454,9 +455,10 @@ class FormsScreenViewModel extends ChangeNotifier {
         _imagenSeleccionada2 = imagenGuardada;
       }
 
-      _showSuccess('Foto ${esPrimeraFoto ? "1" : "2"} capturada correctamente (${tamanoMB.toStringAsFixed(1)}MB)');
+      _showSuccess(
+        'Foto ${esPrimeraFoto ? "1" : "2"} capturada correctamente (${tamanoMB.toStringAsFixed(1)}MB)',
+      );
       notifyListeners();
-
     } catch (e) {
       _showError('No se pudo procesar la foto capturada');
     }
@@ -509,7 +511,9 @@ class FormsScreenViewModel extends ChangeNotifier {
 
     _ultimoCodigoBuscado = '';
 
-    _showInfo('Ahora puede registrar un equipo nuevo completando todos los campos');
+    _showInfo(
+      'Ahora puede registrar un equipo nuevo completando todos los campos',
+    );
     notifyListeners();
   }
 
@@ -535,7 +539,11 @@ class FormsScreenViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  String? _validarCampo(String? value, String nombreCampo, {int minLength = 1}) {
+  String? _validarCampo(
+    String? value,
+    String nombreCampo, {
+    int minLength = 1,
+  }) {
     if (value == null || value.trim().isEmpty) {
       return '$nombreCampo es requerido';
     }
@@ -545,7 +553,8 @@ class FormsScreenViewModel extends ChangeNotifier {
     return null;
   }
 
-  String? validarCodigoBarras(String? value) => _validarCampo(value, 'El código de barras', minLength: 3);
+  String? validarCodigoBarras(String? value) =>
+      _validarCampo(value, 'El código de barras', minLength: 3);
 
   String? validarMarca(int? value) {
     if (value == null) {
@@ -561,7 +570,8 @@ class FormsScreenViewModel extends ChangeNotifier {
     return null;
   }
 
-  String? validarNumeroSerie(String? value) => _validarCampo(value, 'El número de serie');
+  String? validarNumeroSerie(String? value) =>
+      _validarCampo(value, 'El número de serie');
 
   String? validarLogo(int? value) {
     if (value == null) {
@@ -602,7 +612,6 @@ class FormsScreenViewModel extends ChangeNotifier {
 
       final datosCompletos = _construirDatosCompletos(ubicacion);
       _eventController.add(NavigateToPreviewEvent(datosCompletos));
-
     } catch (e) {
       _mostrarDialogoErrorGPS(e.toString());
     } finally {
@@ -612,18 +621,18 @@ class FormsScreenViewModel extends ChangeNotifier {
 
   Map<String, dynamic> _construirDatosCompletos(Map<String, double> ubicacion) {
     final marcaSeleccionadaData = _marcas.firstWhere(
-            (marca) => marca['id'] == _marcaSeleccionada,
-        orElse: () => {'nombre': ''}
+      (marca) => marca['id'] == _marcaSeleccionada,
+      orElse: () => {'nombre': ''},
     );
 
     final logoSeleccionado = _logos.firstWhere(
-            (logo) => logo['id'] == _logoSeleccionado,
-        orElse: () => {'nombre': ''}
+      (logo) => logo['id'] == _logoSeleccionado,
+      orElse: () => {'nombre': ''},
     );
 
     final modeloSeleccionadoData = _modelos.firstWhere(
-            (modelo) => modelo['id'] == _modeloSeleccionado,
-        orElse: () => {'nombre': ''}
+      (modelo) => modelo['id'] == _modeloSeleccionado,
+      orElse: () => {'nombre': ''},
     );
 
     return {
@@ -680,10 +689,7 @@ class FormsScreenViewModel extends ChangeNotifier {
 
   void _mostrarDialogoErrorGPS(String error) {
     final actions = [
-      DialogAction(
-        text: 'Cancelar',
-        onPressed: () {},
-      ),
+      DialogAction(text: 'Cancelar', onPressed: () {}),
       DialogAction(
         text: 'Reintentar GPS',
         onPressed: () => continuarAPreview(GlobalKey<FormState>()),
@@ -691,16 +697,20 @@ class FormsScreenViewModel extends ChangeNotifier {
       ),
     ];
 
-    _eventController.add(ShowDialogEvent(
-      'Error de Ubicación',
-      'No se pudo obtener la ubicación GPS del equipo.\n\nError: $error\n\nLa ubicación GPS es obligatoria. Asegúrese de tener el GPS activado y estar en la ubicación exacta del equipo.',
-      actions,
-    ));
+    _eventController.add(
+      ShowDialogEvent(
+        'Error de Ubicación',
+        'No se pudo obtener la ubicación GPS del equipo.\n\nError: $error\n\nLa ubicación GPS es obligatoria. Asegúrese de tener el GPS activado y estar en la ubicación exacta del equipo.',
+        actions,
+      ),
+    );
   }
 
-  String get titleText => _isCensoMode ? 'Censo de Equipos' : 'Agregar Nuevo Equipo';
+  String get titleText =>
+      _isCensoMode ? 'Censo de Equipos' : 'Agregar Nuevo Equipo';
 
-  String get modeTitle => _isCensoMode ? 'Modo: Censo de Equipos' : 'Modo: Registro Nuevo Equipo';
+  String get modeTitle =>
+      _isCensoMode ? 'Modo: Censo de Equipos' : 'Modo: Registro Nuevo Equipo';
 
   String get modeSubtitle => _isCensoMode
       ? 'Escanee o ingrese un código para buscar equipos existentes'
@@ -712,25 +722,21 @@ class FormsScreenViewModel extends ChangeNotifier {
       ? 'Escanea o ingresa y presiona Enter'
       : 'Código del nuevo equipo';
 
-  String get marcaHint => _isCensoMode
-      ? 'Se completará automáticamente'
-      : 'Seleccionar marca';
+  String get marcaHint =>
+      _isCensoMode ? 'Se completará automáticamente' : 'Seleccionar marca';
 
-  String get modeloHint => _isCensoMode
-      ? 'Se completará automáticamente'
-      : 'Seleccionar modelo';
+  String get modeloHint =>
+      _isCensoMode ? 'Se completará automáticamente' : 'Seleccionar modelo';
 
   String get serieHint => _isCensoMode
       ? 'Se completará automáticamente...'
       : 'Ingrese el número de serie';
 
-  String get logoHint => _isCensoMode
-      ? 'Se completará automáticamente'
-      : 'Seleccionar logo';
+  String get logoHint =>
+      _isCensoMode ? 'Se completará automáticamente' : 'Seleccionar logo';
 
-  String get fotoRequerimiento => _equipoYaAsignado
-      ? 'Fotos (Opcional)'
-      : 'Fotos (Requerida al menos 1)';
+  String get fotoRequerimiento =>
+      _equipoYaAsignado ? 'Fotos (Opcional)' : 'Fotos (Requerida al menos 1)';
 
   String get observacionesHint => _isCensoMode
       ? 'Comentarios u observaciones...'
