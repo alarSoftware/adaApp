@@ -31,7 +31,7 @@ class OperacionComercialSyncService extends BaseSyncService {
   OperacionComercialSyncService({
     OperacionComercialRepositoryImpl? operacionRepository,
   }) : _operacionRepository =
-      operacionRepository ?? OperacionComercialRepositoryImpl();
+           operacionRepository ?? OperacionComercialRepositoryImpl();
 
   static List<dynamic> get ultimasOperacionesObtenidas =>
       List.from(_ultimasOperaciones);
@@ -99,7 +99,6 @@ class OperacionComercialSyncService extends BaseSyncService {
         itemsSincronizados: processedResult.length,
         totalEnAPI: processedResult.length,
       );
-
     } on TimeoutException catch (timeoutError) {
       _ultimasOperaciones = [];
       return SyncResult(
@@ -107,7 +106,6 @@ class OperacionComercialSyncService extends BaseSyncService {
         mensaje: 'Timeout de conexión al servidor',
         itemsSincronizados: 0,
       );
-
     } on SocketException catch (socketError) {
       _ultimasOperaciones = [];
       return SyncResult(
@@ -115,7 +113,6 @@ class OperacionComercialSyncService extends BaseSyncService {
         mensaje: 'Sin conexión de red',
         itemsSincronizados: 0,
       );
-
     } catch (e) {
       _ultimasOperaciones = [];
       return SyncResult(
@@ -126,7 +123,9 @@ class OperacionComercialSyncService extends BaseSyncService {
     }
   }
 
-  static Future<SyncResult> obtenerOperacionesPorVendedor(String edfVendedorId) {
+  static Future<SyncResult> obtenerOperacionesPorVendedor(
+    String edfVendedorId,
+  ) {
     return obtenerOperaciones(edfVendedorId: edfVendedorId);
   }
 
@@ -153,17 +152,17 @@ class OperacionComercialSyncService extends BaseSyncService {
   }
 
   static Future<http.Response> _makeHttpRequest(
-      String endpoint,
-      Map<String, String> queryParams,
-      ) async {
+    String endpoint,
+    Map<String, String> queryParams,
+  ) async {
     final baseUrl = await BaseSyncService.getBaseUrl();
-    final uri = Uri.parse('$baseUrl$endpoint')
-        .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+    final uri = Uri.parse(
+      '$baseUrl$endpoint',
+    ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
-    return await http.get(
-      uri,
-      headers: BaseSyncService.headers,
-    ).timeout(BaseSyncService.timeout);
+    return await http
+        .get(uri, headers: BaseSyncService.headers)
+        .timeout(BaseSyncService.timeout);
   }
 
   static bool _isSuccessStatusCode(int statusCode) {
@@ -212,9 +211,9 @@ class OperacionComercialSyncService extends BaseSyncService {
   }
 
   static Future<List<Map<String, dynamic>>> _vincularOperacionesConDetalles(
-      List<dynamic> operacionesData,
-      List<dynamic> detallesData,
-      ) async {
+    List<dynamic> operacionesData,
+    List<dynamic> detallesData,
+  ) async {
     final operacionesConDetalles = <Map<String, dynamic>>[];
 
     final todosLosDetalles = detallesData
@@ -224,7 +223,30 @@ class OperacionComercialSyncService extends BaseSyncService {
 
     final detallesPorOperacion = <int, List<Map<String, dynamic>>>{};
     for (final detalleMap in todosLosDetalles) {
-      final operacionId = detalleMap['operacionComercial']?['id'];
+      // Intentar obtener el ID de la operación de varias formas
+      dynamic operacionIdRaw;
+
+      // 1. Estructura anidada: operacionComercial: { id: 1 }
+      if (detalleMap['operacionComercial'] is Map) {
+        operacionIdRaw = detalleMap['operacionComercial']['id'];
+      }
+
+      // 2. ID directo camelCase: operacionComercialId: 1
+      if (operacionIdRaw == null) {
+        operacionIdRaw = detalleMap['operacionComercialId'];
+      }
+
+      // 3. ID directo snake_case: operacion_comercial_id: 1
+      if (operacionIdRaw == null) {
+        operacionIdRaw = detalleMap['operacion_comercial_id'];
+      }
+
+      // 4. ID directo simple: operacionComercial: 1
+      if (operacionIdRaw == null && detalleMap['operacionComercial'] is! Map) {
+        operacionIdRaw = detalleMap['operacionComercial'];
+      }
+
+      final operacionId = _parseIntSafely(operacionIdRaw);
       final tieneParent = detalleMap['parentDetalle'] != null;
 
       if (operacionId != null && !tieneParent) {
@@ -251,8 +273,8 @@ class OperacionComercialSyncService extends BaseSyncService {
   }
 
   static Future<List<Map<String, dynamic>>> _processAndSaveOperaciones(
-      List<Map<String, dynamic>> operacionesData,
-      ) async {
+    List<Map<String, dynamic>> operacionesData,
+  ) async {
     if (operacionesData.isEmpty) return [];
 
     final operacionesParaGuardar = <Map<String, dynamic>>[];
@@ -283,15 +305,17 @@ class OperacionComercialSyncService extends BaseSyncService {
     }
 
     if (operacionesInvalidas > 0) {
-      print('Se saltaron $operacionesInvalidas operaciones con datos incompletos');
+      print(
+        'Se saltaron $operacionesInvalidas operaciones con datos incompletos',
+      );
     }
 
     return operacionesParaGuardar;
   }
 
   static Future<Map<String, dynamic>> _mapApiToLocalFormat(
-      Map<String, dynamic> apiOperacion,
-      ) async {
+    Map<String, dynamic> apiOperacion,
+  ) async {
     final partnerId = _parseIntSafely(apiOperacion['partnerId']);
     final tipo = apiOperacion['tipo']?.toString();
 
@@ -308,7 +332,8 @@ class OperacionComercialSyncService extends BaseSyncService {
       'id': operacionServerId.toString(),
       'cliente_id': partnerId,
       'tipo_operacion': tipo,
-      'fecha_creacion': apiOperacion['creationDate']?.toString() ??
+      'fecha_creacion':
+          apiOperacion['creationDate']?.toString() ??
           DateTime.now().toIso8601String(),
       'fecha_retiro': apiOperacion['fechaRetiro']?.toString(),
       'observaciones': null,
@@ -321,10 +346,12 @@ class OperacionComercialSyncService extends BaseSyncService {
       'sync_retry_count': 0,
     };
 
-    final todosLosDetalles = apiOperacion['todosLosDetalles'] as List<Map<String, dynamic>>? ?? [];
+    final todosLosDetalles =
+        apiOperacion['todosLosDetalles'] as List<Map<String, dynamic>>? ?? [];
 
     final detalles = <Map<String, dynamic>>[];
-    if (apiOperacion.containsKey('detalles') && apiOperacion['detalles'] is List) {
+    if (apiOperacion.containsKey('detalles') &&
+        apiOperacion['detalles'] is List) {
       final detallesApi = apiOperacion['detalles'] as List;
 
       for (int i = 0; i < detallesApi.length; i++) {
@@ -348,12 +375,19 @@ class OperacionComercialSyncService extends BaseSyncService {
   }
 
   static Future<Map<String, dynamic>> _mapDetalleToLocalFormat(
-      Map<String, dynamic> apiDetalle,
-      String operacionId,
-      int orden,
-      List<Map<String, dynamic>> todosLosDetalles,
-      ) async {
-    final productId = _parseIntSafely(apiDetalle['productId']);
+    Map<String, dynamic> apiDetalle,
+    String operacionId,
+    int orden,
+    List<Map<String, dynamic>> todosLosDetalles,
+  ) async {
+    // Intentar obtener productId (camelCase, snake_case o español)
+    dynamic productIdRaw = apiDetalle['productId'];
+    if (productIdRaw == null) productIdRaw = apiDetalle['product_id'];
+    if (productIdRaw == null) productIdRaw = apiDetalle['productoId'];
+    if (productIdRaw == null)
+      productIdRaw = apiDetalle['producto_id']; // Por si acaso
+
+    final productId = _parseIntSafely(productIdRaw);
 
     int? productoReemplazoId;
 
@@ -363,7 +397,8 @@ class OperacionComercialSyncService extends BaseSyncService {
     }
 
     final detalleReemplazo = todosLosDetalles.firstWhere(
-          (d) => d['parentDetalle'] != null &&
+      (d) =>
+          d['parentDetalle'] != null &&
           _parseIntSafely(d['parentDetalle']['id']) == detalleServerId,
       orElse: () => <String, dynamic>{},
     );
@@ -414,8 +449,8 @@ class OperacionComercialSyncService extends BaseSyncService {
   }
 
   Future<Map<String, int>> sincronizarOperacionesPendientes(
-      int usuarioId,
-      ) async {
+    int usuarioId,
+  ) async {
     int operacionesExitosas = 0;
     int totalFallidas = 0;
 
@@ -425,7 +460,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       final operacionesError = await _operacionRepository
           .obtenerOperacionesConError();
       final operacionesErrorListas =
-      await _filtrarOperacionesListasParaReintento(operacionesError);
+          await _filtrarOperacionesListasParaReintento(operacionesError);
 
       final todasLasOperaciones = [
         ...operacionesCreadas,
@@ -468,9 +503,9 @@ class OperacionComercialSyncService extends BaseSyncService {
   }
 
   Future<void> _sincronizarOperacionIndividual(
-      OperacionComercial operacion,
-      int usuarioId,
-      ) async {
+    OperacionComercial operacion,
+    int usuarioId,
+  ) async {
     try {
       final operacionId = operacion.id;
       if (operacionId == null) {
@@ -492,8 +527,8 @@ class OperacionComercialSyncService extends BaseSyncService {
   }
 
   Future<List<OperacionComercial>> _filtrarOperacionesListasParaReintento(
-      List<OperacionComercial> operacionesError,
-      ) async {
+    List<OperacionComercial> operacionesError,
+  ) async {
     final operacionesListas = <OperacionComercial>[];
     final ahora = DateTime.now();
 
@@ -550,9 +585,9 @@ class OperacionComercialSyncService extends BaseSyncService {
   }
 
   Future<void> _actualizarIntentoSincronizacion(
-      String operacionId,
-      int numeroIntento,
-      ) async {
+    String operacionId,
+    int numeroIntento,
+  ) async {
     try {
       await _operacionRepository.actualizarIntentoSync(
         operacionId,
@@ -605,7 +640,6 @@ class OperacionComercialSyncService extends BaseSyncService {
 
       final service = OperacionComercialSyncService();
       await service.sincronizarOperacionesPendientes(_usuarioActual!);
-
     } catch (e) {
     } finally {
       _syncEnProgreso = false;

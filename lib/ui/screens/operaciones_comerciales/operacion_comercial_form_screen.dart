@@ -150,23 +150,6 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                           ],
 
                           if (itemCount > 0)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'DETALLE DEL PEDIDO ($itemCount)',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.grey[500],
-                                      letterSpacing: 1.2,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
 
                           _buildProductListDirect(viewModel),
 

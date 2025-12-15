@@ -16,18 +16,19 @@ abstract class OperacionComercialRepository {
   Future<OperacionComercial?> obtenerOperacionPorId(String id);
   Future<List<OperacionComercial>> obtenerOperacionesPorCliente(int clienteId);
   Future<List<OperacionComercial>> obtenerOperacionesPorTipo(
-      TipoOperacion tipo,
-      );
+    TipoOperacion tipo,
+  );
   Future<List<OperacionComercial>> obtenerOperacionesPorClienteYTipo(
-      int clienteId,
-      TipoOperacion tipo,
-      );
+    int clienteId,
+    TipoOperacion tipo,
+  );
   Future<void> eliminarOperacion(String id);
 
   Future<void> marcarPendienteSincronizacion(String operacionId);
   Future<List<OperacionComercial>> obtenerOperacionesPendientes();
   Future<void> guardarOperacionesDesdeServidor(
-      List<Map<String, dynamic>> operacionesData);
+    List<Map<String, dynamic>> operacionesData,
+  );
 }
 
 class OperacionComercialRepositoryImpl
@@ -62,30 +63,24 @@ class OperacionComercialRepositoryImpl
   String getEntityName() => 'OperacionComercial';
 
   Future<List<OperacionComercialDetalle>> _obtenerDetallesConCodigoBarras(
-      String operacionId,
-      ) async {
+    String operacionId,
+  ) async {
     try {
       final db = await dbHelper.database;
 
-      final resultado = await db.rawQuery('''
+      final resultado = await db.rawQuery(
+        '''
         SELECT 
           ocd.id,
           ocd.operacion_comercial_id,
-          ocd.producto_codigo,
-          ocd.producto_descripcion,
-          ocd.producto_categoria,
           ocd.producto_id,
           ocd.cantidad,
-          ocd.unidad_medida,
           ocd.ticket,
           ocd.precio_unitario,
           ocd.subtotal,
           ocd.orden,
           ocd.fecha_creacion,
           ocd.producto_reemplazo_id,
-          ocd.producto_reemplazo_codigo,
-          ocd.producto_reemplazo_descripcion,
-          ocd.producto_reemplazo_categoria,
           p.codigo_barras AS producto_codigo_barras,
           pr.codigo_barras AS producto_reemplazo_codigo_barras
         FROM operacion_comercial_detalle ocd
@@ -93,7 +88,9 @@ class OperacionComercialRepositoryImpl
         LEFT JOIN productos pr ON ocd.producto_reemplazo_id = pr.id
         WHERE ocd.operacion_comercial_id = ?
         ORDER BY ocd.orden ASC
-      ''', [operacionId]);
+      ''',
+        [operacionId],
+      );
 
       return resultado
           .map((map) => OperacionComercialDetalle.fromMap(map))
@@ -173,8 +170,8 @@ class OperacionComercialRepositoryImpl
 
   @override
   Future<List<OperacionComercial>> obtenerOperacionesPorCliente(
-      int clienteId,
-      ) async {
+    int clienteId,
+  ) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -202,8 +199,8 @@ class OperacionComercialRepositoryImpl
 
   @override
   Future<List<OperacionComercial>> obtenerOperacionesPorTipo(
-      TipoOperacion tipo,
-      ) async {
+    TipoOperacion tipo,
+  ) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -220,9 +217,9 @@ class OperacionComercialRepositoryImpl
 
   @override
   Future<List<OperacionComercial>> obtenerOperacionesPorClienteYTipo(
-      int clienteId,
-      TipoOperacion tipo,
-      ) async {
+    int clienteId,
+    TipoOperacion tipo,
+  ) async {
     try {
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -342,9 +339,9 @@ class OperacionComercialRepositoryImpl
   }
 
   Future<void> actualizarIntentoSync(
-      String operacionId,
-      int numeroIntento,
-      ) async {
+    String operacionId,
+    int numeroIntento,
+  ) async {
     try {
       await dbHelper.actualizar(
         tableName,
@@ -394,15 +391,16 @@ class OperacionComercialRepositoryImpl
 
   @override
   Future<void> guardarOperacionesDesdeServidor(
-      List<Map<String, dynamic>> operacionesData,
-      ) async {
+    List<Map<String, dynamic>> operacionesData,
+  ) async {
     try {
       final db = await dbHelper.database;
 
       await db.transaction((txn) async {
         for (final operacionData in operacionesData) {
           // Extraer detalles
-          final detalles = operacionData['detalles'] as List<Map<String, dynamic>>?;
+          final detalles =
+              operacionData['detalles'] as List<Map<String, dynamic>>?;
 
           // Remover detalles del mapa principal
           final operacionMap = Map<String, dynamic>.from(operacionData);
@@ -462,10 +460,10 @@ class OperacionComercialRepositoryImpl
   }
 
   Future<bool> _operacionExisteEnTransaccion(
-      Transaction txn,
-      String? uuid,
-      int? serverId,
-      ) async {
+    Transaction txn,
+    String? uuid,
+    int? serverId,
+  ) async {
     if (uuid != null) {
       final result = await txn.query(
         tableName,
