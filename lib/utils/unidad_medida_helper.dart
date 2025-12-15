@@ -1,18 +1,33 @@
 class UnidadMedidaHelper {
   /// Normaliza la unidad que viene de la API
   /// "Units" → "UN"
-  /// "X 6" → "X 6" (sin cambios)
+  /// "X 6" o "X6" → "X 6" (normalizado con espacio)
   static String normalizarDesdeAPI(String? unidadAPI) {
     if (unidadAPI == null || unidadAPI.isEmpty) return 'UN';
 
-    final limpia = unidadAPI.trim();
+    final limpia = unidadAPI.trim().toUpperCase();
 
-    // Si es "Units" → unidades simples
-    if (limpia.toLowerCase() == 'units') return 'UN';
+    // Si es "Units" o variaciones → unidades simples
+    if (limpia == 'UNITS' ||
+        limpia == 'UN' ||
+        limpia == 'UNIDAD' ||
+        limpia == 'UNIDADES') {
+      return 'UN';
+    }
 
-    // Si empieza con "X " es un pack/caja, lo dejamos tal cual pero en mayúsculas
-    if (limpia.toUpperCase().startsWith('X ')) {
-      return limpia.toUpperCase();
+    // Detectar patrón de pack: empieza con X seguido de número (con o sin espacio)
+    // Ejemplo: X6, X 6, x12, X  24
+    final packRegex = RegExp(r'^X\s*(\d+)$');
+    final match = packRegex.firstMatch(limpia);
+
+    if (match != null) {
+      final cantidad = match.group(1);
+      return 'X $cantidad'; // Normalizar siempre con un espacio: "X 6"
+    }
+
+    // Mantener compatibilidad con startWith si no machea regex estricta pero parece pack
+    if (limpia.startsWith('X')) {
+      return limpia;
     }
 
     // Por defecto, retornar unidades
@@ -22,12 +37,15 @@ class UnidadMedidaHelper {
   /// Verifica si la unidad es "unidades simples"
   static bool esUnidadSimple(String unidad) {
     final normalizada = unidad.trim().toUpperCase();
-    return normalizada == 'UN' || normalizada == 'UNITS';
+    return normalizada == 'UN' ||
+        normalizada == 'UNITS' ||
+        normalizada == 'UNIDAD';
   }
 
   /// Verifica si es un pack/caja (X 6, X 12, etc)
   static bool esPack(String unidad) {
-    return unidad.trim().toUpperCase().startsWith('X ');
+    final normalizada = unidad.trim().toUpperCase();
+    return normalizada.startsWith('X');
   }
 
   /// Obtiene el nombre para mostrar al usuario

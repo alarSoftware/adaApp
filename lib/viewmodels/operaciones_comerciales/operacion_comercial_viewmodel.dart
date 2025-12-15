@@ -49,8 +49,8 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     OperacionComercialRepository? operacionRepository,
     ProductoRepository? productoRepository,
   }) : _operacionRepository =
-      operacionRepository ?? OperacionComercialRepositoryImpl(),
-        _productoRepository = productoRepository ?? ProductoRepositoryImpl() {
+           operacionRepository ?? OperacionComercialRepositoryImpl(),
+       _productoRepository = productoRepository ?? ProductoRepositoryImpl() {
     _initializeForm();
   }
 
@@ -91,8 +91,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   }
 
   Future<void> _cargarProductosIniciales() async {
-    try {
-    } catch (e) {}
+    try {} catch (e) {}
   }
 
   void setFechaRetiro(DateTime? fecha) {
@@ -133,16 +132,17 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       return;
     }
 
-    try{
+    try {
       final todosLosProductos = await _productoRepository.buscarProductos(
         _searchQuery,
       );
-      _productosFiltrados = todosLosProductos.where((producto){
-        final errorUnidad = tipoOperacion.validarUnidadMedida(producto.unidadMedida);
+      _productosFiltrados = todosLosProductos.where((producto) {
+        final errorUnidad = tipoOperacion.validarUnidadMedida(
+          producto.unidadMedida,
+        );
         return errorUnidad == null;
       }).toList();
-
-    } catch (e){
+    } catch (e) {
       _productosFiltrados = [];
     }
   }
@@ -150,7 +150,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   bool isProductoSeleccionado(int? productoId) {
     if (productoId == null) return false;
     return _productosSeleccionados.any(
-          (detalle) => detalle.productoId == productoId,
+      (detalle) => detalle.productoId == productoId,
     );
   }
 
@@ -167,15 +167,19 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       return false;
     }
 
-    final errorUnidad = tipoOperacion.validarUnidadMedida(producto.unidadMedida);
+    final errorUnidad = tipoOperacion.validarUnidadMedida(
+      producto.unidadMedida,
+    );
     if (errorUnidad != null) {
       print('Error de unidad: $errorUnidad');
       String mensajeEspecifico;
 
       if (tipoOperacion.esNotaRetiro) {
-        mensajeEspecifico = 'Este producto viene en "${UnidadMedidaHelper.obtenerNombreDisplay(producto.unidadMedida)}".\n\nPara notas de retiro solo puedes usar productos en "Unidades".';
+        mensajeEspecifico =
+            'Este producto viene en "${UnidadMedidaHelper.obtenerNombreDisplay(producto.unidadMedida)}".\n\nPara notas de retiro solo puedes usar productos en "Unidades".';
       } else if (tipoOperacion.esNotaReposicion) {
-        mensajeEspecifico = 'Este producto viene en "${UnidadMedidaHelper.obtenerNombreDisplay(producto.unidadMedida)}".\n\nPara notas de reposición solo puedes usar productos en packs/cajas (X 6, X 12, X 24, etc.).';
+        mensajeEspecifico =
+            'Este producto viene en "${UnidadMedidaHelper.obtenerNombreDisplay(producto.unidadMedida)}".\n\nPara notas de reposición solo puedes usar productos en packs/cajas (X 6, X 12, X 24, etc.).';
       } else {
         mensajeEspecifico = errorUnidad;
       }
@@ -196,7 +200,9 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
     _productosSeleccionados.add(detalle);
 
-    print('Producto agregado a la lista: ${_productosSeleccionados.length} productos');
+    print(
+      'Producto agregado a la lista: ${_productosSeleccionados.length} productos',
+    );
     print('Limpiando búsqueda...');
 
     clearSearch();
@@ -235,26 +241,32 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   }
 
   Future<List<Producto>> obtenerProductosReemplazo(
-      Producto productoOriginal,
-      ) async {
+    Producto productoOriginal,
+  ) async {
     if (productoOriginal.categoria == null) {
       return [];
     }
 
     try {
-      return await _productoRepository.obtenerProductosPorCategoria(
+      final productos = await _productoRepository.obtenerProductosPorCategoria(
         productoOriginal.categoria!,
         excluirId: productoOriginal.id,
       );
+
+      // Filtrar por unidad de medida según el tipo de operación
+      return productos.where((p) {
+        final error = tipoOperacion.validarUnidadMedida(p.unidadMedida);
+        return error == null;
+      }).toList();
     } catch (e) {
       return [];
     }
   }
 
   Future<List<Producto>> getProductosReemplazo(
-      String? categoriaOriginal,
-      int? idProductoActual,
-      ) async {
+    String? categoriaOriginal,
+    int? idProductoActual,
+  ) async {
     if (categoriaOriginal == null) return [];
 
     try {
@@ -301,9 +313,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         .toList();
 
     if (productosSinCantidad.isNotEmpty) {
-      return ValidationResult.error(
-        'Hay productos con cantidad 0',
-      );
+      return ValidationResult.error('Hay productos con cantidad 0');
     }
 
     if (tipoOperacion == TipoOperacion.notaRetiroDiscontinuos) {
@@ -363,7 +373,8 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       final operacionId = await _operacionRepository.crearOperacion(operacion);
 
       // ✅ SOLUCIÓN: Recargar la operación completa desde la DB con sus detalles
-      final operacionCompleta = await _operacionRepository.obtenerOperacionPorId(operacionId);
+      final operacionCompleta = await _operacionRepository
+          .obtenerOperacionPorId(operacionId);
 
       _setFormState(FormState.idle);
 

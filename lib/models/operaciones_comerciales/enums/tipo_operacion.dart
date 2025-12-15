@@ -1,3 +1,5 @@
+import 'package:ada_app/utils/unidad_medida_helper.dart';
+
 enum TipoOperacion {
   pedidoVenta,
   notaReposicion,
@@ -34,7 +36,8 @@ extension TipoOperacionExtension on TipoOperacion {
 
   bool get necesitaFechaRetiro {
     return this == TipoOperacion.notaRetiro ||
-        this == TipoOperacion.notaRetiroDiscontinuos;
+        this == TipoOperacion.notaRetiroDiscontinuos ||
+        this == TipoOperacion.notaReposicion;
   }
 
   bool get esNotaRetiro {
@@ -52,24 +55,16 @@ extension TipoOperacionExtension on TipoOperacion {
 
   /// Valida si la unidad de medida es correcta para este tipo de operación
   /// Retorna null si es válido, o un mensaje de error si no lo es
+  /// Valida si la unidad de medida es correcta para este tipo de operación
+  /// Retorna null si es válido, o un mensaje de error si no lo es
   String? validarUnidadMedida(String unidadMedida) {
-    // Normalizar la unidad
-    final unidadNormalizada = unidadMedida.trim().toUpperCase();
-
-    // Verificar si es unidad simple
-    final esUnidadSimple = unidadNormalizada == 'UN' ||
-        unidadNormalizada == 'UNITS';
-
-    // Verificar si es pack/caja
-    final esPack = unidadNormalizada.startsWith('X ');
-
     // REGLA 1: Las notas de retiro SOLO pueden ser en unidades simples
-    if (esNotaRetiro && !esUnidadSimple) {
+    if (esNotaRetiro && !UnidadMedidaHelper.esUnidadSimple(unidadMedida)) {
       return 'Las notas de retiro solo pueden ser en unidades simples (Units)';
     }
 
     // REGLA 2: Las notas de reposición DEBEN ser en packs/cajas (no unidades simples)
-    if (esNotaReposicion && !esPack) {
+    if (esNotaReposicion && !UnidadMedidaHelper.esPack(unidadMedida)) {
       return 'Las notas de reposición deben ser en packs/cajas (X 6, X 12, X 24, etc.)';
     }
 
