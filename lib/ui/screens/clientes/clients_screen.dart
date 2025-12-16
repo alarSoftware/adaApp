@@ -8,6 +8,7 @@ import 'package:ada_app/ui/widgets/app_empty_state.dart';
 import 'package:ada_app/ui/widgets/app_search_bar.dart';
 import 'package:ada_app/ui/screens/clientes/client_options_screen.dart';
 import 'package:ada_app/ui/widgets/client_status_icon.dart';
+import 'package:ada_app/ui/widgets/iconography_dialog.dart';
 import 'package:ada_app/services/sync/client_sync_service.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -63,8 +64,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
           MaterialPageRoute(
             builder: (context) => ClientOptionsScreen(cliente: event.cliente),
           ),
-        ).then((_) {
-        });
+        ).then((_) {});
       }
     });
   }
@@ -393,6 +393,29 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                 icon: Icon(Icons.refresh, color: AppColors.appBarForeground),
                 tooltip: 'Actualizar lista',
               ),
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, color: AppColors.appBarForeground),
+                onSelected: (value) {
+                  if (value == 'simbologia') {
+                    showDialog(
+                      context: context,
+                      builder: (context) => const IconographyDialog(),
+                    );
+                  }
+                },
+                itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                  const PopupMenuItem<String>(
+                    value: 'simbologia',
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: AppColors.textPrimary),
+                        SizedBox(width: 12),
+                        Text('Simbología de iconos'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ],
           );
         },
@@ -460,6 +483,8 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
                     ClientStatusIcons(
                       tieneCensoHoy: cliente.tieneCensoHoy,
                       tieneFormularioCompleto: cliente.tieneFormularioCompleto,
+                      tieneOperacionComercialHoy:
+                          cliente.tieneOperacionComercialHoy,
                       iconSize: 14,
                     ),
                   ],

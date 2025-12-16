@@ -9,6 +9,7 @@ class Cliente {
   final String? condicionVenta;
   final bool tieneCensoHoy;
   final bool tieneFormularioCompleto;
+  final bool tieneOperacionComercialHoy;
 
   const Cliente({
     this.id,
@@ -21,6 +22,7 @@ class Cliente {
     this.condicionVenta,
     this.tieneCensoHoy = false,
     this.tieneFormularioCompleto = false,
+    this.tieneOperacionComercialHoy = false,
   });
 
   String get displayName {
@@ -33,7 +35,8 @@ class Cliente {
   bool get esCredito => condicionVenta?.toUpperCase().trim() == 'CREDITO';
   bool get esContado => condicionVenta?.toUpperCase().trim() == 'CONTADO';
   String get displayCondicionVenta {
-    if (condicionVenta == null || condicionVenta!.isEmpty) return 'No especificado';
+    if (condicionVenta == null || condicionVenta!.isEmpty)
+      return 'No especificado';
     return condicionVenta!.toUpperCase();
   }
 
@@ -46,9 +49,17 @@ class Cliente {
       direccion: _parseString(json['direccion']) ?? '',
       rucCi: _parseString(json['ruc'] ?? json['cedula']) ?? '',
       propietario: _parseString(json['propietario']) ?? '',
-      condicionVenta: _parseString(json['terminoPago'] ?? json['condicionVenta']),
-      tieneCensoHoy: json['tiene_censo_hoy'] == 1 || json['tiene_censo_hoy'] == true,
-      tieneFormularioCompleto: json['tiene_formulario_completo'] == 1 || json['tiene_formulario_completo'] == true,
+      condicionVenta: _parseString(
+        json['terminoPago'] ?? json['condicionVenta'],
+      ),
+      tieneCensoHoy:
+          json['tiene_censo_hoy'] == 1 || json['tiene_censo_hoy'] == true,
+      tieneFormularioCompleto:
+          json['tiene_formulario_completo'] == 1 ||
+          json['tiene_formulario_completo'] == true,
+      tieneOperacionComercialHoy:
+          json['tiene_operacion_comercial_hoy'] == 1 ||
+          json['tiene_operacion_comercial_hoy'] == true,
     );
   }
 
@@ -70,8 +81,14 @@ class Cliente {
       propietario: map['propietario']?.toString() ?? '',
       condicionVenta: map['condicion_venta']?.toString(),
 
-      tieneCensoHoy: map['tiene_censo_hoy'] == 1 || map['tiene_censo_hoy'] == true,
-      tieneFormularioCompleto: map['tiene_formulario_completo'] == 1 || map['tiene_formulario_completo'] == true,
+      tieneCensoHoy:
+          map['tiene_censo_hoy'] == 1 || map['tiene_censo_hoy'] == true,
+      tieneFormularioCompleto:
+          map['tiene_formulario_completo'] == 1 ||
+          map['tiene_formulario_completo'] == true,
+      tieneOperacionComercialHoy:
+          map['tiene_operacion_comercial_hoy'] == 1 ||
+          map['tiene_operacion_comercial_hoy'] == true,
     );
   }
 
@@ -114,6 +131,7 @@ class Cliente {
     String? condicionVenta,
     bool? tieneCensoHoy,
     bool? tieneFormularioCompleto,
+    bool? tieneOperacionComercialHoy,
   }) {
     return Cliente(
       id: id ?? this.id,
@@ -125,15 +143,18 @@ class Cliente {
       propietario: propietario ?? this.propietario,
       condicionVenta: condicionVenta ?? this.condicionVenta,
       tieneCensoHoy: tieneCensoHoy ?? this.tieneCensoHoy,
-      tieneFormularioCompleto: tieneFormularioCompleto ?? this.tieneFormularioCompleto,
+      tieneFormularioCompleto:
+          tieneFormularioCompleto ?? this.tieneFormularioCompleto,
+      tieneOperacionComercialHoy:
+          tieneOperacionComercialHoy ?? this.tieneOperacionComercialHoy,
     );
   }
 
   bool get isValid =>
       nombre.isNotEmpty &&
-          direccion.isNotEmpty &&
-          rucCi.isNotEmpty &&
-          propietario.isNotEmpty;
+      direccion.isNotEmpty &&
+      rucCi.isNotEmpty &&
+      propietario.isNotEmpty;
 
   String get tipoDocumento {
     if (rucCi.isEmpty) return 'Documento';
@@ -152,7 +173,8 @@ class Cliente {
 
   bool get esRuc => tipoDocumento == 'RUC';
   bool get esCi => tipoDocumento == 'CI';
-  bool get hasValidPhone => telefono.isNotEmpty && _isValidParaguayanPhone(telefono);
+  bool get hasValidPhone =>
+      telefono.isNotEmpty && _isValidParaguayanPhone(telefono);
 
   static String? _parseString(dynamic value) {
     if (value == null) return null;
@@ -182,18 +204,19 @@ class Cliente {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-          other is Cliente &&
-              runtimeType == other.runtimeType &&
-              id == other.id &&
-              nombre == other.nombre &&
-              codigo == other.codigo &&
-              telefono == other.telefono &&
-              direccion == other.direccion &&
-              rucCi == other.rucCi &&
-              propietario == other.propietario &&
-              condicionVenta == other.condicionVenta &&
-              tieneCensoHoy == other.tieneCensoHoy &&
-              tieneFormularioCompleto == other.tieneFormularioCompleto;
+      other is Cliente &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          nombre == other.nombre &&
+          codigo == other.codigo &&
+          telefono == other.telefono &&
+          direccion == other.direccion &&
+          rucCi == other.rucCi &&
+          propietario == other.propietario &&
+          condicionVenta == other.condicionVenta &&
+          tieneCensoHoy == other.tieneCensoHoy &&
+          tieneFormularioCompleto == other.tieneFormularioCompleto &&
+          tieneOperacionComercialHoy == other.tieneOperacionComercialHoy;
 
   @override
   int get hashCode =>
@@ -206,10 +229,11 @@ class Cliente {
       propietario.hashCode ^
       condicionVenta.hashCode ^
       tieneCensoHoy.hashCode ^
-      tieneFormularioCompleto.hashCode;
+      tieneFormularioCompleto.hashCode ^
+      tieneOperacionComercialHoy.hashCode;
 
   @override
   String toString() {
-    return 'Cliente{id: $id, nombre: $nombre, codigo: $codigo, tipo: $tipoDocumento, ruc_ci: $rucCi, condicion: $condicionVenta, censo: $tieneCensoHoy, form: $tieneFormularioCompleto}';
+    return 'Cliente{id: $id, nombre: $nombre, codigo: $codigo, tipo: $tipoDocumento, ruc_ci: $rucCi, condicion: $condicionVenta, censo: $tieneCensoHoy, form: $tieneFormularioCompleto, opCom: $tieneOperacionComercialHoy}';
   }
 }
