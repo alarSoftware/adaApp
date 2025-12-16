@@ -6,7 +6,7 @@ import 'package:logger/logger.dart';
 import 'package:ada_app/services/api/api_config_service.dart';
 
 abstract class BaseSyncService {
-  static const Duration timeout = Duration(minutes: 5);
+  static const Duration timeout = Duration(minutes: 1);
 
   static final Logger logger = Logger();
 

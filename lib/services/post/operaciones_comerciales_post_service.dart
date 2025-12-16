@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:ada_app/services/api/api_config_service.dart';
 import 'package:ada_app/config/constants/server_constants.dart';
-import 'package:ada_app/services/error_log/error_log_service.dart';
+
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
@@ -60,13 +60,6 @@ class OperacionesComercialesPostService {
         }
       }
     } catch (e) {
-      await ErrorLogService.manejarExcepcion(
-        e,
-        operacion.id,
-        fullUrl,
-        operacion.usuarioId,
-        'operacion_comercial',
-      );
       rethrow;
     }
   }

@@ -111,7 +111,9 @@ class SyncService {
     });
   }
 
-  static Future<SyncResultUnificado> sincronizarTodosLosDatos() async {
+  static Future<SyncResultUnificado> sincronizarTodosLosDatos({
+    Function(double progress, String message)? onProgress,
+  }) async {
     final resultado = SyncResultUnificado();
 
     try {
@@ -141,11 +143,15 @@ class SyncService {
         return resultado;
       }
 
+      onProgress?.call(0.1, 'Sincronizando marcas...');
       await EquipmentSyncService.sincronizarMarcas();
+      onProgress?.call(0.15, 'Sincronizando modelos...');
       await EquipmentSyncService.sincronizarModelos();
+      onProgress?.call(0.2, 'Sincronizando logos...');
       await EquipmentSyncService.sincronizarLogos();
 
       try {
+        onProgress?.call(0.25, 'Sincronizando clientes...');
         final resultadoClientes =
             await ClientSyncService.sincronizarClientesDelUsuario();
         resultado.clientesSincronizados = resultadoClientes.itemsSincronizados;
@@ -161,6 +167,7 @@ class SyncService {
       }
 
       try {
+        onProgress?.call(0.35, 'Sincronizando equipos...');
         final resultadoEquipos =
             await EquipmentSyncService.sincronizarEquipos();
         resultado.equiposSincronizados = resultadoEquipos.itemsSincronizados;
@@ -176,6 +183,7 @@ class SyncService {
       }
 
       try {
+        onProgress?.call(0.45, 'Sincronizando productos...');
         final resultadoProductos = await ProductoSyncService.obtenerProductos();
         resultado.productosSincronizados =
             resultadoProductos.itemsSincronizados;
@@ -191,6 +199,7 @@ class SyncService {
       }
 
       try {
+        onProgress?.call(0.55, 'Sincronizando censos...');
         final resultadoCensos = await CensusSyncService.obtenerCensosActivos(
           edfVendedorId: edfVendedorId,
         );
@@ -208,6 +217,7 @@ class SyncService {
 
       if (resultado.censosExito && resultado.censosSincronizados > 0) {
         try {
+          onProgress?.call(0.60, 'Descargando imágenes de censos...');
           final resultadoImagenes =
               await CensusImageSyncService.obtenerFotosCensos(
                 edfVendedorId: edfVendedorId,
@@ -232,6 +242,7 @@ class SyncService {
       }
 
       try {
+        onProgress?.call(0.65, 'Sincronizando equipos pendientes...');
         final resultadoPendientes =
             await EquiposPendientesSyncService.obtenerEquiposPendientes(
               edfVendedorId: edfVendedorId,
@@ -251,6 +262,7 @@ class SyncService {
       }
 
       try {
+        onProgress?.call(0.70, 'Sincronizando formularios...');
         final resultadoFormularios =
             await DynamicFormSyncService.obtenerFormulariosDinamicos();
         resultado.formulariosSincronizados =
@@ -270,6 +282,7 @@ class SyncService {
       resultado.detallesFormulariosExito = true;
 
       try {
+        onProgress?.call(0.75, 'Sincronizando respuestas...');
         final resultadoRespuestas =
             await DynamicFormSyncService.obtenerRespuestasPorVendedor(
               edfVendedorId,
@@ -291,6 +304,7 @@ class SyncService {
       if (resultado.respuestasFormulariosExito &&
           resultado.respuestasFormulariosSincronizadas > 0) {
         try {
+          onProgress?.call(0.80, 'Descargando imágenes de formularios...');
           final resultadoImagenesFormularios =
               await DynamicFormSyncService.obtenerImagenesFormularios(
                 edfVendedorId: edfVendedorId,

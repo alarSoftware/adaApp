@@ -82,11 +82,22 @@ class FullSyncService {
       try {
         onProgress(
           progress: 0.2,
-          currentStep: 'Descargando datos...',
+          currentStep: 'Iniciando descarga de datos...',
           completedSteps: completedSteps,
         );
 
-        final syncResult = await SyncService.sincronizarTodosLosDatos();
+        final syncResult = await SyncService.sincronizarTodosLosDatos(
+          onProgress: (progress, message) {
+            // Mapeamos el progreso interno (0.0 - 1.0) al rango global (0.2 - 0.8)
+            // Range = 0.6
+            final globalProgress = 0.2 + (progress * 0.6);
+            onProgress(
+              progress: globalProgress,
+              currentStep: message,
+              completedSteps: completedSteps,
+            );
+          },
+        );
 
         if (!syncResult.exito) {
           throw Exception(syncResult.mensaje);
@@ -95,28 +106,11 @@ class FullSyncService {
         // ✅ Suma dinámica usando el getter
         totalItemsSincronizados += syncResult.totalItemsSincronizados;
 
-        // ✅ Reporte dinámico de progreso
-        double currentProgress = 0.25;
-        final steps = syncResult.syncSteps;
-
-        // Calcular el incremento de progreso por paso
-        // Del 0.25 al 0.80 hay 0.55 de espacio para los pasos de datos
-        final progressStep = steps.isEmpty ? 0 : 0.55 / steps.length;
-
-        for (var step in steps) {
-          completedSteps.add(step.summary);
-          currentProgress += progressStep;
-          onProgress(
-            progress: currentProgress,
-            currentStep: step.description,
-            completedSteps: completedSteps,
-          );
-          await Future.delayed(const Duration(milliseconds: 200));
-        }
-
-        // Asegurar que llegamos al 0.80 después de todos los pasos
-        if (currentProgress < 0.80) {
-          currentProgress = 0.80;
+        // Agregamos steps al historial
+        for (var step in syncResult.syncSteps) {
+          if (!completedSteps.contains(step.summary)) {
+            completedSteps.add(step.summary);
+          }
         }
       } catch (e) {
         throw Exception('Error en descarga masiva: $e');
