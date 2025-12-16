@@ -24,8 +24,8 @@ class PreviewScreen extends StatefulWidget {
 
 class _PreviewScreenState extends State<PreviewScreen> {
   late PreviewScreenViewModel viewModel;
-  bool _yaConfirmado = false; // Bandera para bloquear después del primer tap
-  bool _yaReintentando = false; // 🔴 NUEVA bandera para el reintento
+  bool _yaConfirmado = false;
+  bool _yaReintentando = false;
 
   String? _imagePath;
   String? _imageBase64;
@@ -37,6 +37,17 @@ class _PreviewScreenState extends State<PreviewScreen> {
     super.initState();
     viewModel = PreviewScreenViewModel();
     _cargarImagenInicial();
+
+    if (widget.datos['es_historial'] == true) {
+      final estadoId = widget.datos['id'] as String?;
+      if (estadoId != null) {
+        Future.delayed(Duration(milliseconds: 100), () {
+          if (mounted) {
+            viewModel.iniciarMonitoreoSincronizacion(estadoId);
+          }
+        });
+      }
+    }
   }
 
   Future<void> _cargarImagenInicial() async {
@@ -58,19 +69,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
             _imageBase64 = base64Data;
           });
 
-          debugPrint('✅ Imagen 1 cargada desde archivo: $imagenPath');
-          debugPrint(
-            '📊 Tamaño: ${bytes.length} bytes (${(bytes.length / 1024).toStringAsFixed(2)} KB)',
-          );
-
-          // ⚠️ ADVERTENCIA si es muy pequeña
-          if (bytes.length < 10240) {
-            debugPrint('⚠️ ADVERTENCIA: Imagen 1 muy pequeña (< 10 KB)');
-          }
-
           return;
-        } else {
-          debugPrint('⚠️ Archivo de imagen 1 no encontrado: $imagenPath');
         }
       }
 
@@ -84,25 +83,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
               _imageBase64 = imagenBase64DB;
             });
 
-            debugPrint(
-              '✅ Imagen 1 cargada desde base64 (${bytes.length} bytes)',
-            );
-
-            // ⚠️ ADVERTENCIA si es muy pequeña
-            if (bytes.length < 10240) {
-              debugPrint('⚠️ ADVERTENCIA: Imagen 1 muy pequeña (< 10 KB)');
-            }
-
             return;
           }
         } catch (e) {
-          debugPrint('⚠️ Error decodificando base64 imagen 1: $e');
         }
       }
-
-      debugPrint('ℹ️ No se encontró imagen 1 válida');
     } catch (e) {
-      debugPrint('❌ Error cargando imagen 1: $e');
     }
   }
 
@@ -120,19 +106,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
             _imageBase64_2 = base64Data;
           });
 
-          debugPrint('✅ Imagen 2 cargada desde archivo: $imagenPath2');
-          debugPrint(
-            '📊 Tamaño: ${bytes.length} bytes (${(bytes.length / 1024).toStringAsFixed(2)} KB)',
-          );
-
-          // ⚠️ ADVERTENCIA si es muy pequeña
-          if (bytes.length < 10240) {
-            debugPrint('⚠️ ADVERTENCIA: Imagen 2 muy pequeña (< 10 KB)');
-          }
-
           return;
-        } else {
-          debugPrint('⚠️ Archivo de imagen 2 no encontrado: $imagenPath2');
         }
       }
 
@@ -146,42 +120,28 @@ class _PreviewScreenState extends State<PreviewScreen> {
               _imageBase64_2 = imagenBase64DB_2;
             });
 
-            debugPrint(
-              '✅ Imagen 2 cargada desde base64 (${bytes.length} bytes)',
-            );
-
-            // ⚠️ ADVERTENCIA si es muy pequeña
-            if (bytes.length < 10240) {
-              debugPrint('⚠️ ADVERTENCIA: Imagen 2 muy pequeña (< 10 KB)');
-            }
-
             return;
           }
         } catch (e) {
-          debugPrint('⚠️ Error decodificando base64 imagen 2: $e');
         }
       }
-
-      debugPrint('ℹ️ No se encontró imagen 2 válida');
     } catch (e) {
-      debugPrint('❌ Error cargando imagen 2: $e');
     }
   }
 
   @override
   void dispose() {
+    viewModel.detenerMonitoreoSincronizacion();
     viewModel.cancelarProcesoActual();
     viewModel.dispose();
     super.dispose();
   }
 
   Future<void> _confirmarRegistro() async {
-    // Verificar si ya se confirmó antes
     if (_yaConfirmado) {
-      return; // Ignorar silenciosamente
+      return;
     }
 
-    // CRÍTICO: Marcar como confirmado INMEDIATAMENTE, antes de cualquier otra cosa
     setState(() {
       _yaConfirmado = true;
     });
@@ -196,15 +156,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
     final bool? confirmado = await PreviewDialogs.mostrarConfirmacion(context);
 
-    // Si cancela el diálogo, rehabilitar el botón
     if (confirmado != true) {
       setState(() {
         _yaConfirmado = false;
       });
       return;
     }
-
-    // Ya no necesitamos volver a marcar _yaConfirmado aquí porque ya lo hicimos arriba
 
     if (!viewModel.canConfirm) {
       _mostrarSnackBar(
@@ -219,34 +176,20 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
     final datosCompletos = Map<String, dynamic>.from(widget.datos);
 
-    // Preparar imagen 1 con logging mejorado
     if (_imagePath != null && _imageBase64 != null) {
       final bytes = base64Decode(_imageBase64!);
-
-      debugPrint('📸 IMAGEN 1 PREPARADA:');
-      debugPrint('   Path: $_imagePath');
-      debugPrint(
-        '   Tamaño: ${bytes.length} bytes (${(bytes.length / 1024).toStringAsFixed(2)} KB)',
-      );
 
       datosCompletos['imagen_path'] = _imagePath;
       datosCompletos['imagen_base64'] = _imageBase64;
       datosCompletos['tiene_imagen'] = true;
       datosCompletos['imagen_tamano'] = bytes.length;
-
-      debugPrint(' datosCompletos actualizado con imagen 1');
     } else {
-      debugPrint('⚠️ IMAGEN 1 NO DISPONIBLE');
-      debugPrint('   _imagePath: $_imagePath');
-      debugPrint('   _imageBase64 != null: ${_imageBase64 != null}');
-
       datosCompletos['tiene_imagen'] = false;
       datosCompletos['imagen_path'] = null;
       datosCompletos['imagen_base64'] = null;
       datosCompletos['imagen_tamano'] = null;
     }
 
-    // Preparar imagen 2 con logging mejorado
     if (_imagePath2 != null && _imageBase64_2 != null) {
       final bytes2 = base64Decode(_imageBase64_2!);
 
@@ -254,8 +197,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
       datosCompletos['imagen_base64_2'] = _imageBase64_2;
       datosCompletos['tiene_imagen2'] = true;
       datosCompletos['imagen_tamano2'] = bytes2.length;
-
-      debugPrint(' datosCompletos actualizado con imagen 2');
     } else {
       datosCompletos['tiene_imagen2'] = false;
       datosCompletos['imagen_path2'] = null;
@@ -263,17 +204,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
       datosCompletos['imagen_tamano2'] = null;
     }
 
-    // 🔥 CORREGIDO: Usar confirmarRegistro (método que SÍ existe en el ViewModel actual)
     final resultado = await viewModel.confirmarRegistro(datosCompletos);
 
     if (mounted) {
       if (resultado['success']) {
-        // Navegar INMEDIATAMENTE sin delays
         if (mounted) {
-          await _navegarAEquipoClienteDetail(resultado); // ✅ PASAR resultado
+          await _navegarAEquipoClienteDetail(resultado);
         }
       } else {
-        // Si hay error, desbloquear para permitir reintentar
         setState(() {
           _yaConfirmado = false;
         });
@@ -288,77 +226,31 @@ class _PreviewScreenState extends State<PreviewScreen> {
   }
 
   Future<void> _navegarAEquipoClienteDetail(
-    Map<String, dynamic> resultado,
-  ) async {
+      Map<String, dynamic> resultado,
+      ) async {
     try {
-      final cliente = widget.datos['cliente'] as Cliente;
+      final estadoId = resultado['estado_id'] as String?;
 
-      final equipoCompleto =
-          resultado['equipo_completo'] ?? widget.datos['equipo_completo'];
-
-      if (cliente.id == null) {
-        debugPrint('❌ FALLA: cliente.id es NULL');
+      if (estadoId == null) {
         Navigator.of(context).pop(true);
         return;
       }
 
-      if (equipoCompleto == null) {
-        debugPrint('❌ FALLA: equipoCompleto es NULL');
-        debugPrint(
-          '   resultado["equipo_completo"]: ${resultado['equipo_completo']}',
+      final datosHistorial = Map<String, dynamic>.from(widget.datos);
+      datosHistorial['es_historial'] = true;
+      datosHistorial['id'] = estadoId;
+
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => PreviewScreen(
+              datos: datosHistorial,
+              historialItem: null,
+            ),
+          ),
         );
-        debugPrint(
-          '   widget.datos["equipo_completo"]: ${widget.datos['equipo_completo']}',
-        );
-        Navigator.of(context).pop(true);
-        return;
       }
-
-      debugPrint('✅ Datos válidos, construyendo equipoCliente...');
-
-      final equipoCliente = {
-        'id': equipoCompleto['id'],
-        'cod_barras': equipoCompleto['cod_barras'],
-        'numero_serie': equipoCompleto['numero_serie'],
-        'marca_id': equipoCompleto['marca_id'],
-        'modelo_id': equipoCompleto['modelo_id'],
-        'logo_id': equipoCompleto['logo_id'],
-        'cliente_id': cliente.id,
-        'marca_nombre': equipoCompleto['marca_nombre'],
-        'modelo_nombre': equipoCompleto['modelo_nombre'],
-        'logo_nombre': equipoCompleto['logo_nombre'],
-        'cliente_nombre': cliente.nombre,
-        'cliente_telefono': cliente.telefono,
-        'cliente_direccion': cliente.direccion,
-        'tipo_estado':
-            resultado['ya_asignado'] ?? widget.datos['ya_asignado'] == true
-            ? 'asignado'
-            : 'pendiente',
-      };
-
-      debugPrint('✅ equipoCliente construido: $equipoCliente');
-      debugPrint('🚀 Ejecutando navegación...');
-
-      // Esto te deja en ClienteDetailScreen
-      Navigator.of(context).pop(); // Cierra PreviewScreen
-      debugPrint('✅ Pop 1 ejecutado');
-
-      Navigator.of(context).pop(); // Cierra FormsScreen
-      debugPrint('✅ Pop 2 ejecutado');
-
-      // Ahora navega a EquiposClientesDetailScreen
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              EquiposClientesDetailScreen(equipoCliente: equipoCliente),
-        ),
-      );
-
-      debugPrint('✅ Push ejecutado - navegación completada');
     } catch (e, stackTrace) {
-      debugPrint('❌ EXCEPCIÓN en navegación: $e');
-      debugPrint('📍 StackTrace: $stackTrace');
       if (mounted) {
         Navigator.of(context).pop(true);
       }
@@ -425,6 +317,49 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
   }
 
+  void _volverDesdeHistorial() {
+    try {
+      final cliente = widget.datos['cliente'] as Cliente;
+      final equipoCompleto = widget.datos['equipo_completo'];
+
+      if (cliente.id == null || equipoCompleto == null) {
+        Navigator.of(context).pop();
+        return;
+      }
+
+      final equipoCliente = {
+        'id': equipoCompleto['id'],
+        'cod_barras': equipoCompleto['cod_barras'],
+        'numero_serie': equipoCompleto['numero_serie'],
+        'marca_id': equipoCompleto['marca_id'],
+        'modelo_id': equipoCompleto['modelo_id'],
+        'logo_id': equipoCompleto['logo_id'],
+        'cliente_id': cliente.id,
+        'marca_nombre': equipoCompleto['marca_nombre'],
+        'modelo_nombre': equipoCompleto['modelo_nombre'],
+        'logo_nombre': equipoCompleto['logo_nombre'],
+        'cliente_nombre': cliente.nombre,
+        'cliente_telefono': cliente.telefono,
+        'cliente_direccion': cliente.direccion,
+        'tipo_estado': widget.datos['ya_asignado'] == true ? 'asignado' : 'pendiente',
+      };
+
+      Navigator.of(context).pop();
+      Navigator.of(context).pop();
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => EquiposClientesDetailScreen(
+            equipoCliente: equipoCliente,
+          ),
+        ),
+      );
+    } catch (e) {
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final Cliente cliente = widget.datos['cliente'];
@@ -434,10 +369,19 @@ class _PreviewScreenState extends State<PreviewScreen> {
       child: Consumer<PreviewScreenViewModel>(
         builder: (context, vm, child) {
           return PopScope(
-            canPop: vm.canConfirm,
-            onPopInvokedWithResult: (didPop, result) {
-              if (!didPop && !vm.canConfirm) {
+            canPop: false,
+            onPopInvokedWithResult: (didPop, result) async {
+              if (didPop) return;
+
+              if (!vm.canConfirm) {
                 PreviewDialogs.mostrarProcesoEnCurso(context);
+                return;
+              }
+
+              if (widget.datos['es_historial'] == true) {
+                _volverDesdeHistorial();
+              } else {
+                Navigator.of(context).pop();
               }
             },
             child: Stack(
@@ -466,16 +410,16 @@ class _PreviewScreenState extends State<PreviewScreen> {
       foregroundColor: AppColors.onPrimary,
       elevation: 2,
       shadowColor: AppColors.shadowLight,
-      automaticallyImplyLeading: vm.canConfirm,
+      automaticallyImplyLeading: true,
       leading: vm.canConfirm
           ? null
           : Container(
-              margin: const EdgeInsets.all(12),
-              child: CircularProgressIndicator(
-                color: AppColors.onPrimary,
-                strokeWidth: 2,
-              ),
-            ),
+        margin: const EdgeInsets.all(12),
+        child: CircularProgressIndicator(
+          color: AppColors.onPrimary,
+          strokeWidth: 2,
+        ),
+      ),
     );
   }
 
@@ -529,8 +473,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
     if (esHistorial) {
       final estadoId = widget.datos['id'] as String?;
 
-      return FutureBuilder<Map<String, dynamic>>(
-        future: vm.obtenerInfoSincronizacion(estadoId),
+      return StreamBuilder<Map<String, dynamic>>(
+        stream: vm.syncStatusStream,
+        initialData: null,
         builder: (context, snapshot) {
           final info = snapshot.data;
           final envioFallido = info?['envioFallido'] == true;
@@ -540,11 +485,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
             isSaving: vm.isSaving,
             statusMessage: vm.statusMessage,
             cantidadImagenes: cantidadImagenes,
-            onVolver: () => Navigator.of(context).pop(),
-            onConfirmar: null, // No mostrar confirmar en historial
-            // 🔴 Deshabilitar si ya está reintentando
+            onVolver: () => _volverDesdeHistorial(),
+            onConfirmar: null,
             onReintentarEnvio:
-                (envioFallido && estadoId != null && !_yaReintentando)
+            (envioFallido && estadoId != null && !_yaReintentando)
                 ? () => _reintentarEnvioHistorial(estadoId)
                 : null,
           );
@@ -618,21 +562,47 @@ class _PreviewScreenState extends State<PreviewScreen> {
       return const SizedBox.shrink();
     }
 
-    return FutureBuilder<Map<String, dynamic>>(
-      future: viewModel.obtenerInfoSincronizacion(estadoId),
+    return StreamBuilder<Map<String, dynamic>>(
+      stream: viewModel.syncStatusStream,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const SizedBox.shrink();
+        if (snapshot.connectionState == ConnectionState.waiting || !snapshot.hasData) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Verificando estado...',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
         final info = snapshot.data!;
-
         final mensaje = info['mensaje'] as String;
         final icono = info['icono'] as IconData;
         final color = info['color'] as Color;
         final errorDetalle = info['error_detalle'] as String?;
 
-        // ✅ SIEMPRE MOSTRAR el indicador
         return SyncStatusIndicator(
           mensaje: mensaje,
           icono: icono,
