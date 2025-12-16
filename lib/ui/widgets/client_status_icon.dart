@@ -35,9 +35,9 @@ class ClientStatusIcons extends StatelessWidget {
         if (tieneCensoHoy) ...[
           _buildStatusIcon(
             context: context,
-            icon: Icons.fact_check,
+            icon: Icons.kitchen,
             color: AppColors.success,
-            tooltip: 'Cliente ya recibió censo hoy',
+            tooltip: 'Censo de Visicooler realizado hoy',
           ),
           if (tieneFormularioCompleto) const SizedBox(width: 6),
         ],

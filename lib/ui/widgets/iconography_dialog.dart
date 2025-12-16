@@ -31,17 +31,17 @@ class IconographyDialog extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             _buildLegendItem(
-              icon: Icons.fact_check,
+              icon: Icons.kitchen,
               color: AppColors.success,
               title: 'Censo realizado',
-              description: 'El cliente ya fue censado hoy.',
+              description: 'El visicooler fue censado hoy.',
             ),
             const SizedBox(height: 12),
             _buildLegendItem(
               icon: Icons.assignment_turned_in,
               color: AppColors.primary,
               title: 'Formulario completado',
-              description: 'Se completó un formulario dinámico hoy.',
+              description: 'Se completó un formulario hoy.',
             ),
             const SizedBox(height: 12),
             _buildLegendItem(
