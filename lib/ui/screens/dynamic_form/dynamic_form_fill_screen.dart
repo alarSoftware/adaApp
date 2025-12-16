@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/dynamic_form_viewmodel.dart';
 import 'package:ada_app/ui/widgets/dynamic_form/dynamic_form_field_widget.dart';
-import 'package:ada_app/ui/widgets/exit_confimation_dialog.dart'; // ✅ NUEVO
+import 'package:ada_app/ui/widgets/exit_confimation_dialog.dart';
 
 class DynamicFormFillScreen extends StatefulWidget {
   final DynamicFormViewModel viewModel;
@@ -144,60 +144,10 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
 
     return Column(
       children: [
-        if (!widget.isReadOnly) _buildProgressBar(),
         if (widget.isReadOnly) _buildReadOnlyBanner(),
         Expanded(child: _buildFormContent(template)),
         widget.isReadOnly ? _buildCloseButton() : _buildCompleteButton(),
       ],
-    );
-  }
-
-  Widget _buildProgressBar() {
-    final progress = widget.viewModel.getFormProgress();
-    final percentage = (progress * 100).toInt();
-
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Progreso del formulario',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              Text(
-                '$percentage%',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              backgroundColor: AppColors.neutral200,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-              minHeight: 6,
-            ),
-          ),
-        ],
-      ),
     );
   }
 

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/dynamic_form_viewmodel.dart';
 import 'package:ada_app/models/dynamic_form/dynamic_form_template.dart';
-import 'package:ada_app/ui/screens/dynamic_form_fill_screen.dart';
+import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_fill_screen.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../models/cliente.dart';
+import '../../../models/cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/preview_screen_viewmodel.dart';
 import 'package:ada_app/ui/widgets/preview/preview_dialogs.dart';
 import 'package:ada_app/ui/widgets/preview/preview_image_section.dart';
 import 'package:ada_app/ui/widgets/preview/preview_bottom_bar.dart';
 import 'package:ada_app/ui/widgets/preview/preview_cards.dart';
-import 'package:ada_app/ui/screens/equipos_clientes_detail_screen.dart';
+import 'package:ada_app/ui/screens/menu_principal/equipos_clientes_detail_screen.dart';
 
 import 'dart:io';
 import 'dart:convert';

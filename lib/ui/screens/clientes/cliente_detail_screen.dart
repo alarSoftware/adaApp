@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/viewmodels/cliente_detail_screen_viewmodel.dart';
-import 'package:ada_app/ui/screens/equipos_clientes_detail_screen.dart';
+import 'package:ada_app/ui/screens/menu_principal/equipos_clientes_detail_screen.dart';
 import 'package:ada_app/ui/widgets/client_info_card.dart';
-import 'forms_screen.dart';
+import '../censo_activo/forms_screen.dart';
 import 'dart:async';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/main.dart';

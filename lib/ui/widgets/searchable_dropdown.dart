@@ -8,7 +8,7 @@ import 'package:ada_app/viewmodels/forms_screens_viewmodel.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/ui/widgets/app_notification.dart';
 import 'package:ada_app/ui/widgets/inline_notification.dart';
-import '../screens/preview_screen.dart';
+import '../screens/censo_activo/preview_screen.dart';
 
 class FormsScreen extends StatefulWidget {
   final Cliente cliente;

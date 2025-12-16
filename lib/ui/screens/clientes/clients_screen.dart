@@ -6,7 +6,7 @@ import 'package:ada_app/ui/widgets/app_loading.dart';
 import 'package:ada_app/ui/widgets/app_loading_more.dart';
 import 'package:ada_app/ui/widgets/app_empty_state.dart';
 import 'package:ada_app/ui/widgets/app_search_bar.dart';
-import 'package:ada_app/ui/screens/client_options_screen.dart';
+import 'package:ada_app/ui/screens/clientes/client_options_screen.dart';
 import 'package:ada_app/ui/widgets/client_status_icon.dart';
 import 'package:ada_app/services/sync/client_sync_service.dart';
 import 'package:intl/intl.dart';

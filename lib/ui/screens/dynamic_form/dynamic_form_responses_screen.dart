@@ -4,9 +4,9 @@ import 'package:ada_app/viewmodels/dynamic_form_viewmodel.dart';
 import 'package:ada_app/models/dynamic_form/dynamic_form_response.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/ui/widgets/client_info_card.dart';
-import 'package:ada_app/ui/screens/dynamic_form_template_list_screen.dart';
+import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_template_list_screen.dart';
 import 'package:intl/intl.dart';
-import 'package:ada_app/ui/screens/dynamic_form_fill_screen.dart';
+import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_fill_screen.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 
 /// Pantalla principal que muestra las respuestas guardadas

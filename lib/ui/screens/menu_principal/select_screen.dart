@@ -1,18 +1,18 @@
-import 'package:ada_app/ui/screens/pending_data_screen.dart';
+import 'package:ada_app/ui/screens/menu_principal/pending_data_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
 import 'package:ada_app/ui/widgets/app_connection_indicator.dart';
-import 'package:ada_app/ui/screens/equipos_screen.dart';
-import 'package:ada_app/ui/screens/modelos_screen.dart';
-import 'package:ada_app/ui/screens/logo_screen.dart';
-import 'package:ada_app/ui/screens/marca_screen.dart';
+import 'package:ada_app/ui/screens/menu_principal/equipos_screen.dart';
+import 'package:ada_app/ui/screens/menu_principal/modelos_screen.dart';
+import 'package:ada_app/ui/screens/menu_principal/logo_screen.dart';
+import 'package:ada_app/ui/screens/menu_principal/marca_screen.dart';
 import 'package:ada_app/viewmodels/select_screen_viewmodel.dart';
 import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
 import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
-import 'package:ada_app/ui/screens/productos_screen.dart';
+import 'package:ada_app/ui/screens/menu_principal/productos_screen.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {

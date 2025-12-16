@@ -5,7 +5,7 @@ import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
-import 'package:ada_app/ui/screens/preview_screen.dart';
+import 'package:ada_app/ui/screens/censo_activo/preview_screen.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/repositories/cliente_repository.dart';
 
