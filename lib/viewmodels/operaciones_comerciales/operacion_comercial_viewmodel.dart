@@ -91,7 +91,10 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   }
 
   Future<void> _cargarProductosIniciales() async {
-    try {} catch (e) {}
+    try {} catch (e) {
+      _errorMessage = 'Error cargando productos iniciales: $e';
+      notifyListeners();
+    }
   }
 
   void setFechaRetiro(DateTime? fecha) {
@@ -142,8 +145,11 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         );
         return errorUnidad == null;
       }).toList();
-    } catch (e) {
       _productosFiltrados = [];
+    } catch (e) {
+      _errorMessage = 'Error buscando productos: $e';
+      _productosFiltrados = [];
+      notifyListeners();
     }
   }
 
@@ -163,7 +169,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     }
 
     if (isProductoSeleccionado(producto.id)) {
-      print('Producto ya seleccionado');
+      _setError('El producto ya está seleccionado');
       return false;
     }
 
@@ -171,7 +177,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       producto.unidadMedida,
     );
     if (errorUnidad != null) {
-      print('Error de unidad: $errorUnidad');
       String mensajeEspecifico;
 
       if (tipoOperacion.esNotaRetiro) {
@@ -188,8 +193,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       return false;
     }
 
-    print('Producto válido, agregando...');
-
     final detalle = OperacionComercialDetalle(
       operacionComercialId: '',
       productoId: producto.id!,
@@ -200,15 +203,8 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
     _productosSeleccionados.add(detalle);
 
-    print(
-      'Producto agregado a la lista: ${_productosSeleccionados.length} productos',
-    );
-    print('Limpiando búsqueda...');
-
     clearSearch();
     notifyListeners();
-
-    print('notifyListeners() llamado');
 
     return true;
   }

@@ -40,7 +40,9 @@ class Usuario {
       edfVendedorId: ParsingHelpers.parseString(json['edfVendedorId']),
       // Asumiendo que el JSON de la API trae la misma clave
       edfVendedorNombre: ParsingHelpers.parseString(json['edfVendedorNombre']),
-      code: ParsingHelpers.parseInt(json['id']), // code usa el mismo ID según tu lógica original
+      code: ParsingHelpers.parseInt(
+        json['id'],
+      ), // code usa el mismo ID según tu lógica original
       username: ParsingHelpers.parseString(json['username']) ?? '',
       password: ParsingHelpers.parseString(json['password']) ?? '',
       fullname: ParsingHelpers.parseString(json['fullname']) ?? '',
@@ -54,7 +56,7 @@ class Usuario {
     return {
       'id': id,
       'edf_vendedor_id': edfVendedorId,
-      'edf_vendedor_nommbre': edfVendedorNombre,
+      'edf_vendedor_nombre': edfVendedorNombre,
       'code': code,
       'username': username,
       'password': password,
@@ -89,7 +91,8 @@ class Usuario {
     return Usuario(
       id: id ?? this.id,
       edfVendedorId: edfVendedorId ?? this.edfVendedorId,
-      edfVendedorNombre: edfVendedorNombre ?? this.edfVendedorNombre, // <--- Lógica de copia
+      edfVendedorNombre:
+          edfVendedorNombre ?? this.edfVendedorNombre, // <--- Lógica de copia
       code: code ?? this.code,
       username: username ?? this.username,
       password: password ?? this.password,
@@ -104,10 +107,10 @@ class Usuario {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-          other is Usuario &&
-              runtimeType == other.runtimeType &&
-              id == other.id &&
-              code == other.code;
+      other is Usuario &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          code == other.code;
 
   @override
   int get hashCode => id.hashCode ^ code.hashCode;

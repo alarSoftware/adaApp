@@ -15,6 +15,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logger/logger.dart';
 import 'dart:async';
 
+import 'package:ada_app/main.dart';
+
 final _logger = Logger();
 
 class ClienteListScreen extends StatefulWidget {
@@ -24,7 +26,7 @@ class ClienteListScreen extends StatefulWidget {
   State<ClienteListScreen> createState() => _ClienteListScreenState();
 }
 
-class _ClienteListScreenState extends State<ClienteListScreen> {
+class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
   late ClienteListScreenViewModel _viewModel;
   late StreamSubscription<ClienteListUIEvent> _eventSubscription;
   final TextEditingController _searchController = TextEditingController();
@@ -45,7 +47,23 @@ class _ClienteListScreenState extends State<ClienteListScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final ModalRoute? modalRoute = ModalRoute.of(context);
+    if (modalRoute is PageRoute) {
+      MyApp.routeObserver.subscribe(this, modalRoute);
+    }
+  }
+
+  @override
+  void didPopNext() {
+    // Auto-refresh when returning to this screen
+    _viewModel.refresh();
+  }
+
+  @override
   void dispose() {
+    MyApp.routeObserver.unsubscribe(this);
     _eventSubscription.cancel();
     _searchController.dispose();
     _viewModel.dispose();

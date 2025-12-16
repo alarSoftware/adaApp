@@ -34,7 +34,7 @@ class IconographyDialog extends StatelessWidget {
               icon: Icons.kitchen,
               color: AppColors.success,
               title: 'Censo realizado',
-              description: 'El visicooler fue censado hoy.',
+              description: 'Un equipo de frio fue censado hoy.',
             ),
             const SizedBox(height: 12),
             _buildLegendItem(

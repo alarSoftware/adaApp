@@ -1080,7 +1080,7 @@ class _SelectScreenState extends State<SelectScreen> {
                         _buildMenuCard(
                           label: 'Modelos',
                           description: 'Catálogo de modelos de equipos',
-                          icon: Icons.branding_watermark,
+                          icon: Icons.widgets,
                           color: AppColors.primary,
                           page: const ModelosScreen(),
                         ),
@@ -1088,7 +1088,7 @@ class _SelectScreenState extends State<SelectScreen> {
                         _buildMenuCard(
                           label: 'Logos',
                           description: 'Lista de los logos de la empresa',
-                          icon: Icons.newspaper,
+                          icon: Icons.local_offer,
                           color: AppColors.primary,
                           page: const LogosScreen(),
                         ),
