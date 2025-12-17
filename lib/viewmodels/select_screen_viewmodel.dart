@@ -8,6 +8,7 @@ import 'package:ada_app/services/api/auth_service.dart';
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:ada_app/services/sync/full_sync_service.dart';
+import 'package:ada_app/services/sync/base_sync_service.dart';
 
 import 'package:ada_app/models/usuario.dart';
 import 'package:ada_app/services/data/database_validation_service.dart';
@@ -394,13 +395,9 @@ class SelectScreenViewModel extends ChangeNotifier {
     }
 
     try {
-      final conexion = await SyncService.probarConexion();
-      if (!conexion.exito) {
-        _eventController.add(
-          ShowErrorEvent('Sin conexión al servidor: ${conexion.mensaje}'),
-        );
-        return;
-      }
+      // Optimización: No probar conexión aquí para evitar 'loading' antes del diálogo.
+      // Se probará al confirmar.
+      final serverUrl = await BaseSyncService.getBaseUrl();
 
       final db = await _dbHelper.database;
       final validationService = DatabaseValidationService(db);
@@ -418,7 +415,7 @@ class SelectScreenViewModel extends ChangeNotifier {
         estimatedClients: await _getEstimatedClients(),
         estimatedEquipments: await _getEstimatedEquipments(),
         estimatedImages: await _getEstimatedImages(),
-        serverUrl: conexion.mensaje,
+        serverUrl: serverUrl,
       );
 
       _eventController.add(RequestSyncConfirmationEvent(syncInfo));

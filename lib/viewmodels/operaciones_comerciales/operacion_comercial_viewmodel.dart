@@ -145,7 +145,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         );
         return errorUnidad == null;
       }).toList();
-      _productosFiltrados = [];
+      notifyListeners(); // linea cambiada porque no funcionaba el buscador
     } catch (e) {
       _errorMessage = 'Error buscando productos: $e';
       _productosFiltrados = [];
@@ -359,7 +359,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         snc: tipoOperacion == TipoOperacion.notaRetiro ? _snc : null,
         observaciones: _observaciones.isEmpty ? null : _observaciones,
         totalProductos: _productosSeleccionados.length,
-        usuarioId: 1,
+        usuarioId: 1, // TODO: Obtener usuario real
         syncStatus: 'creado',
         detalles: _productosSeleccionados,
       );

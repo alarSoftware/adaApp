@@ -13,6 +13,7 @@ import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
 import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/ui/screens/menu_principal/productos_screen.dart';
+import 'package:ada_app/ui/screens/menu_principal/about_screen.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -936,6 +937,12 @@ class _SelectScreenState extends State<SelectScreen> {
                     case 'borrar_bd':
                       _viewModel.requestDeleteDatabase();
                       break;
+                    case 'acerca_de':
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => AboutScreen()),
+                      );
+                      break;
                   }
                 },
                 itemBuilder: (BuildContext context) => [
@@ -979,6 +986,19 @@ class _SelectScreenState extends State<SelectScreen> {
                         SizedBox(width: 8),
                         Text(
                           'Borrar Base de Datos',
+                          style: TextStyle(color: AppColors.textPrimary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem<String>(
+                    value: 'acerca_de',
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: AppColors.primary),
+                        SizedBox(width: 8),
+                        Text(
+                          'Acerca de',
                           style: TextStyle(color: AppColors.textPrimary),
                         ),
                       ],
