@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:ada_app/services/api/api_config_service.dart';
+import 'package:ada_app/config/app_config.dart';
 
 import '../../config/constants/server_response.dart';
 import '../censo/censo_upload_service.dart';
@@ -551,7 +552,7 @@ class CensoActivoPostService {
       'enLocal': enLocal,
       'dispositivo': 'android',
       'esCenso': true,
-      'versionApp': '1.0.0',
+      'versionApp': AppConfig.currentAppVersion,
     };
 
     if (fotos != null && fotos.isNotEmpty) {

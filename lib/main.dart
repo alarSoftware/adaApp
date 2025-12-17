@@ -11,6 +11,7 @@ import 'ui/screens/clientes/cliente_detail_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'ui/screens/api_settings_screen.dart';
 import 'models/cliente.dart';
+import 'package:ada_app/config/app_config.dart';
 //IMPORTS PARA EL RESET TEMPORAL - COMENTADOS PARA PRODUCCIÓN
 // import 'package:ada_app/services/database_helper.dart';
 
@@ -251,7 +252,7 @@ class _InitializationScreenState extends State<InitializationScreen> {
             const SizedBox(height: 60),
 
             Text(
-              'Versión 1.0.0',
+              'Versión ${AppConfig.currentAppVersion}',
               style: TextStyle(fontSize: 12, color: Colors.grey[400]),
             ),
           ],
