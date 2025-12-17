@@ -53,11 +53,11 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
       'pendiente' as estado,
       'pendiente' as tipo_estado
     FROM equipos_pendientes ep
-    INNER JOIN equipos e ON ep.equipo_id = e.id
-    INNER JOIN marcas m ON e.marca_id = m.id
-    INNER JOIN modelos mo ON e.modelo_id = mo.id
-    INNER JOIN logo l ON e.logo_id = l.id
-    INNER JOIN clientes c ON ep.cliente_id = c.id
+    LEFT JOIN equipos e ON ep.equipo_id = e.id
+    LEFT JOIN marcas m ON e.marca_id = m.id
+    LEFT JOIN modelos mo ON e.modelo_id = mo.id
+    LEFT JOIN logo l ON e.logo_id = l.id
+    LEFT JOIN clientes c ON ep.cliente_id = c.id
     WHERE ep.cliente_id = ?
     ORDER BY ep.fecha_creacion DESC
   ''';
@@ -356,8 +356,8 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
 
             // --- CORRECCIÓN AQUÍ: Guardar edf_vendedor_id ---
             'edf_vendedor_id':
-                equipoAPI['edfVendedorSucursalId'] ??
-                equipoAPI['edfVendedorId'],
+                equipoAPI['edfVendedorId']?.toString() ??
+                equipoAPI['edfVendedorSucursalId']?.toString(),
 
             // ------------------------------------------------
             'sincronizado': 1,
