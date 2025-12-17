@@ -8,7 +8,6 @@ class OperacionComercial {
   final DateTime fechaCreacion;
   final DateTime? fechaRetiro;
   final String? snc;
-  final String? observaciones;
   final int totalProductos;
   final int? usuarioId;
   final int? serverId;
@@ -19,6 +18,8 @@ class OperacionComercial {
   final String? edfVendedorId;
   final double? latitud;
   final double? longitud;
+  final String? odooName;
+  final String? adaSequence;
 
   final List<OperacionComercialDetalle> detalles;
 
@@ -29,7 +30,6 @@ class OperacionComercial {
     required this.fechaCreacion,
     this.fechaRetiro,
     this.snc,
-    this.observaciones,
     this.totalProductos = 0,
     this.usuarioId,
     this.serverId,
@@ -40,6 +40,8 @@ class OperacionComercial {
     this.edfVendedorId,
     this.latitud,
     this.longitud,
+    this.odooName,
+    this.adaSequence,
     this.detalles = const [],
   });
 
@@ -57,7 +59,6 @@ class OperacionComercial {
           ? DateTime.parse(map['fecha_retiro'] as String)
           : null,
       snc: map['snc'] as String?,
-      observaciones: map['observaciones'] as String?,
       totalProductos: map['total_productos'] as int? ?? 0,
       usuarioId: map['usuario_id'] as int?,
       serverId: map['server_id'] as int?,
@@ -70,6 +71,8 @@ class OperacionComercial {
       edfVendedorId: map['edf_vendedor_id'] as String?,
       latitud: map['latitud'] as double?,
       longitud: map['longitud'] as double?,
+      odooName: map['odoo_name'] as String?,
+      adaSequence: map['ada_sequence'] as String?,
     );
   }
 
@@ -81,7 +84,6 @@ class OperacionComercial {
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_retiro': fechaRetiro?.toIso8601String(),
       if (snc != null) 'snc': snc,
-      'observaciones': observaciones,
       'total_productos': totalProductos,
       'usuario_id': usuarioId,
       'server_id': serverId,
@@ -92,6 +94,8 @@ class OperacionComercial {
       'edf_vendedor_id': edfVendedorId,
       'latitud': latitud,
       'longitud': longitud,
+      'odoo_name': odooName,
+      'ada_sequence': adaSequence,
     };
   }
 
@@ -103,10 +107,11 @@ class OperacionComercial {
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_retiro': fechaRetiro?.toIso8601String(),
       if (snc != null) 'snc': snc,
-      'observaciones': observaciones,
       'edf_vendedor_id': edfVendedorId,
       'latitud': latitud,
       'longitud': longitud,
+      'odoo_name': odooName,
+      'ada_sequence': adaSequence,
       'detalles': detalles.map((d) => d.toJson()).toList(),
     };
   }
@@ -118,7 +123,6 @@ class OperacionComercial {
     DateTime? fechaCreacion,
     DateTime? fechaRetiro,
     String? snc,
-    String? observaciones,
     int? totalProductos,
     int? usuarioId,
     int? serverId,
@@ -129,6 +133,8 @@ class OperacionComercial {
     String? edfVendedorId,
     double? latitud,
     double? longitud,
+    String? odooName,
+    String? adaSequence,
     List<OperacionComercialDetalle>? detalles,
   }) {
     return OperacionComercial(
@@ -138,7 +144,6 @@ class OperacionComercial {
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       fechaRetiro: fechaRetiro ?? this.fechaRetiro,
       snc: snc ?? this.snc,
-      observaciones: observaciones ?? this.observaciones,
       totalProductos: totalProductos ?? this.totalProductos,
       usuarioId: usuarioId ?? this.usuarioId,
       serverId: serverId ?? this.serverId,
@@ -149,6 +154,8 @@ class OperacionComercial {
       edfVendedorId: edfVendedorId ?? this.edfVendedorId,
       latitud: latitud ?? this.latitud,
       longitud: longitud ?? this.longitud,
+      odooName: odooName ?? this.odooName,
+      adaSequence: adaSequence ?? this.adaSequence,
       detalles: detalles ?? this.detalles,
     );
   }

@@ -111,6 +111,7 @@ class CensoActivo {
       'intentos_sync': intentosSync,
       'ultimo_intento': ultimoIntento?.toIso8601String(),
       'error_mensaje': errorMensaje,
+      'edf_vendedor_id': edfVendedorId,
     };
 
     if (estadoCenso != null) {

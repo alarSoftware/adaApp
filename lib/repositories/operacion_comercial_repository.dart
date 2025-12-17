@@ -50,13 +50,12 @@ class OperacionComercialRepositoryImpl
   String getDefaultOrderBy() => 'fecha_creacion DESC';
 
   @override
-  String getBuscarWhere() => 'cliente_id = ? OR observaciones LIKE ?';
+  String getBuscarWhere() => 'cliente_id = ?';
 
   @override
   List<dynamic> getBuscarArgs(String query) {
-    final searchTerm = '%${query.toLowerCase()}%';
     final clienteId = int.tryParse(query) ?? 0;
-    return [clienteId, searchTerm];
+    return [clienteId];
   }
 
   @override
@@ -405,6 +404,9 @@ class OperacionComercialRepositoryImpl
           // Remover detalles del mapa principal
           final operacionMap = Map<String, dynamic>.from(operacionData);
           operacionMap.remove('detalles');
+          operacionMap.remove(
+            'observaciones',
+          ); // Explicitly remove just in case
 
           // Verificar si la operación ya existe por ID o server_id
           final existente = await _operacionExisteEnTransaccion(

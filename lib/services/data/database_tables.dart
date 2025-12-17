@@ -303,6 +303,8 @@ class DatabaseTables {
     sync_error TEXT,
     synced_at TEXT,
     sync_retry_count INTEGER DEFAULT 0,
+    odoo_name TEXT,
+    ada_sequence TEXT,
     FOREIGN KEY (cliente_id) REFERENCES clientes (id),
     FOREIGN KEY (usuario_id) REFERENCES Users (id)
   )

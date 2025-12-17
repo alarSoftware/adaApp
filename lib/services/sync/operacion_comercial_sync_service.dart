@@ -334,7 +334,6 @@ class OperacionComercialSyncService extends BaseSyncService {
       'tipo_operacion': tipo,
       'fecha_creacion': _parseFechaServerToLocal(apiOperacion['creationDate']),
       'fecha_retiro': apiOperacion['fechaRetiro']?.toString(),
-      'observaciones': null,
       'total_productos': 0,
       'usuario_id': _parseIntSafely(apiOperacion['creationUser']),
       'server_id': operacionServerId,
@@ -342,6 +341,8 @@ class OperacionComercialSyncService extends BaseSyncService {
       'sync_error': apiOperacion['errorText']?.toString(),
       'synced_at': DateTime.now().toIso8601String(),
       'sync_retry_count': 0,
+      'odoo_name': apiOperacion['odooName']?.toString(),
+      'ada_sequence': apiOperacion['adaSequence']?.toString(),
     };
 
     final todosLosDetalles =

@@ -37,7 +37,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   DateTime? _fechaRetiro;
   String? _snc;
   List<OperacionComercialDetalle> _productosSeleccionados = [];
-  String _observaciones = '';
 
   String _searchQuery = '';
   List<Producto> _productosFiltrados = [];
@@ -62,7 +61,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   String? get snc => _snc;
   List<OperacionComercialDetalle> get productosSeleccionados =>
       List.unmodifiable(_productosSeleccionados);
-  String get observaciones => _observaciones;
   String get searchQuery => _searchQuery;
   List<Producto> get productosFiltrados =>
       List.unmodifiable(_productosFiltrados);
@@ -85,7 +83,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
   void _cargarOperacionExistente() {
     final operacion = operacionExistente!;
-    _observaciones = operacion.observaciones ?? '';
     _fechaRetiro = operacion.fechaRetiro;
     _snc = operacion.snc;
     _productosSeleccionados = List.from(operacion.detalles);
@@ -108,12 +105,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   void setSnc(String value) {
     if (isViewOnly) return;
     _snc = value.trim().isEmpty ? null : value.trim();
-    notifyListeners();
-  }
-
-  void setObservaciones(String observaciones) {
-    if (isViewOnly) return;
-    _observaciones = observaciones;
     notifyListeners();
   }
 
@@ -373,7 +364,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         fechaCreacion: operacionExistente?.fechaCreacion ?? DateTime.now(),
         fechaRetiro: _fechaRetiro,
         snc: tipoOperacion == TipoOperacion.notaRetiro ? _snc : null,
-        observaciones: _observaciones.isEmpty ? null : _observaciones,
         totalProductos: _productosSeleccionados.length,
         usuarioId: currentUser?.id ?? 1,
         edfVendedorId: currentUser?.edfVendedorId,
@@ -386,7 +376,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       // Guardar la operación en la base de datos
       final operacionId = await _operacionRepository.crearOperacion(operacion);
 
-      // SOLUCIÓN: Recargar la operación completa desde la DB con sus detalles
+      // Recargar la operación completa desde la DB con sus detalles
       final operacionCompleta = await _operacionRepository
           .obtenerOperacionPorId(operacionId);
 
@@ -429,15 +419,37 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
     if (operacionExistente == null) {
       return _productosSeleccionados.isNotEmpty ||
-          _observaciones.isNotEmpty ||
           _fechaRetiro != null ||
           _snc != null;
     }
 
-    return _observaciones != (operacionExistente!.observaciones ?? '') ||
-        _fechaRetiro != operacionExistente!.fechaRetiro ||
-        _snc != operacionExistente!.snc ||
-        _productosSeleccionados.length != operacionExistente!.detalles.length;
+    // Check for changes in main operation fields
+    if (_fechaRetiro != operacionExistente!.fechaRetiro ||
+        _snc != operacionExistente!.snc) {
+      return true;
+    }
+
+    // Check for changes in product details
+    if (_productosSeleccionados.length != operacionExistente!.detalles.length) {
+      return true;
+    }
+
+    // Compare each product detail
+    for (int i = 0; i < _productosSeleccionados.length; i++) {
+      final currentDetail = _productosSeleccionados[i];
+      final originalDetail = operacionExistente!.detalles[i];
+
+      // Assuming details are ordered or can be matched by product ID
+      // For simplicity, we'll compare by index. A more robust solution might match by product ID.
+      if (currentDetail.productoId != originalDetail.productoId ||
+          currentDetail.cantidad != originalDetail.cantidad ||
+          currentDetail.productoReemplazoId !=
+              originalDetail.productoReemplazoId) {
+        return true;
+      }
+    }
+
+    return false; // No changes found
   }
 
   Future<Producto?> obtenerProductoPorId(int productoId) async {
