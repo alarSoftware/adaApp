@@ -118,12 +118,12 @@ class DatabaseValidationService {
   }
 
   /// Verifica tablas que usan el campo 'sincronizado' (0 o 1)
+  /// Se ha eliminado la verificación de 'censo_activo' ya que se valida por estado
   Future<void> _checkSincronizadoTables(
     List<PendingSyncInfo> pendingItems,
   ) async {
     final tables = {
       'equipos_pendientes': 'Equipos Pendientes',
-      'censo_activo': 'Censos Activos',
       'censo_activo_foto': 'Fotos de Censo',
       // 'device_log': 'Logs de Dispositivo',
     };
@@ -133,9 +133,12 @@ class DatabaseValidationService {
       final displayName = entry.value;
 
       try {
-        final result = await db.rawQuery(
-          // 'SELECT COUNT(*) as count FROM $tableName WHERE estado_censo != "migrado" ',
-          "SELECT COUNT(*) as count FROM $tableName WHERE estado_censo != 'migrado' ",
+        // Consultamos si hay registros con sincronizado = 0
+        final result = await db.query(
+          tableName,
+          columns: ['COUNT(*) as count'],
+          where: 'sincronizado = ?',
+          whereArgs: [0],
         );
 
         final count = Sqflite.firstIntValue(result) ?? 0;
@@ -149,7 +152,9 @@ class DatabaseValidationService {
             ),
           );
         }
-      } catch (e) {}
+      } catch (e) {
+        // Ignorar si la columna no existe
+      }
     }
   }
 

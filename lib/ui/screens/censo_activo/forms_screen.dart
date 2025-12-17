@@ -807,6 +807,7 @@ class _FormsScreenState extends State<FormsScreen> {
                   imagen,
                   height: 200,
                   width: double.infinity,
+                  cacheHeight: 200, // Optimización de memoria
                   fit: BoxFit.cover,
                 ),
               ),

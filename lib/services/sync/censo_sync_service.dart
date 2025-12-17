@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
@@ -49,22 +50,26 @@ class CensusSyncService extends BaseSyncService {
 
       if (!_isSuccessStatusCode(response.statusCode)) {
         final errorMessage = BaseSyncService.extractErrorMessage(response);
-
-        // 🚨 LOG ERROR: Error del servidor
-        // await ErrorLogService.logServerError(
-        //   tableName: 'censo_activo',
-        //   operation: 'sync_from_server',
-        //   errorMessage: errorMessage,
-        //   errorCode: response.statusCode.toString(),
-        //   endpoint: currentEndpoint,
-        //   userId: edfVendedorId,
-        // );
-
         return _handleErrorResponse(response);
       }
 
-      final censosData = await _parseCensusResponse(response);
-      final processedResult = await _processAndSaveCensus(censosData);
+      // Procesar JSON en Isolate
+      final processedResult = await _procesarCensosEnIsolate(response.body);
+
+      // Guardar en BD (hilo principal)
+      if (processedResult.isNotEmpty) {
+        try {
+          final dbHelper = DatabaseHelper();
+          await dbHelper.vaciarEInsertar('censo_activo', processedResult);
+        } catch (e) {
+          BaseSyncService.logger.e('Error guardando censos en BD: $e');
+          await ErrorLogService.logDatabaseError(
+            tableName: 'censo_activo',
+            operation: 'bulk_insert',
+            errorMessage: 'Error en vaciarEInsertar: $e',
+          );
+        }
+      }
 
       // Guardar los datos para acceso posterior
       _ultimosCensos = processedResult;
@@ -275,7 +280,7 @@ class CensusSyncService extends BaseSyncService {
           .timeout(BaseSyncService.timeout);
 
       if (_isSuccessStatusCode(response.statusCode)) {
-        final censosData = await _parseCensusResponse(response);
+        final censosData = await _procesarCensosEnIsolate(response.body);
         _ultimosCensos = censosData;
 
         return SyncResult(
@@ -488,114 +493,6 @@ class CensusSyncService extends BaseSyncService {
   }
 
   /// Parsear respuesta de censos
-  static Future<List<dynamic>> _parseCensusResponse(
-    http.Response response,
-  ) async {
-    try {
-      final responseBody = jsonDecode(response.body);
-
-      if (responseBody is Map) {
-        final responseMap = Map<String, dynamic>.from(responseBody);
-
-        final status = responseMap['status'];
-        if (status != 'OK') {
-          return [];
-        }
-
-        final dataValue = responseMap['data'];
-        if (dataValue == null) return [];
-
-        if (dataValue is String) {
-          try {
-            final parsed = jsonDecode(dataValue) as List;
-            return parsed;
-          } catch (e) {
-            BaseSyncService.logger.e('Error parseando data como JSON: $e');
-
-            await ErrorLogService.logError(
-              tableName: 'censo_activo',
-              operation: 'parse_response',
-              errorMessage: 'Error parseando data string: $e',
-              errorType: 'server',
-              errorCode: 'PARSE_ERROR',
-            );
-
-            return [];
-          }
-        } else if (dataValue is List) {
-          return dataValue;
-        }
-
-        return [];
-      } else if (responseBody is List) {
-        return responseBody;
-      }
-
-      return [];
-    } catch (e) {
-      BaseSyncService.logger.e('Error parseando respuesta: $e');
-
-      await ErrorLogService.logError(
-        tableName: 'censo_activo',
-        operation: 'parse_response',
-        errorMessage: 'Error parseando respuesta del servidor: $e',
-        errorType: 'server',
-        errorCode: 'PARSE_ERROR',
-      );
-
-      throw Exception('Error parseando respuesta del servidor: $e');
-    }
-  }
-
-  /// Procesar y guardar censos usando vaciarEInsertar
-  static Future<List<Map<String, dynamic>>> _processAndSaveCensus(
-    List<dynamic> censosData,
-  ) async {
-    if (censosData.isEmpty) return [];
-
-    // Convertir datos del API al formato local
-    final censosParaGuardar = <Map<String, dynamic>>[];
-
-    for (final censo in censosData) {
-      if (censo is Map) {
-        try {
-          final censoMap = Map<String, dynamic>.from(censo);
-          final censoParaGuardar = _mapApiToLocalFormat(censoMap);
-          censosParaGuardar.add(censoParaGuardar);
-        } catch (e) {
-          BaseSyncService.logger.e(
-            'Error procesando censo ID ${censo['id']}: $e',
-          );
-
-          await ErrorLogService.logError(
-            tableName: 'censo_activo',
-            operation: 'process_item',
-            errorMessage: 'Error procesando censo: $e',
-            errorType: 'database',
-            registroFailId: censo['id']?.toString(),
-          );
-        }
-      }
-    }
-
-    // Vaciar tabla e insertar todos los censos
-    try {
-      final dbHelper = DatabaseHelper();
-      await dbHelper.vaciarEInsertar('censo_activo', censosParaGuardar);
-    } catch (e) {
-      BaseSyncService.logger.e('Error guardando censos en BD: $e');
-
-      await ErrorLogService.logDatabaseError(
-        tableName: 'censo_activo',
-        operation: 'bulk_insert',
-        errorMessage: 'Error en vaciarEInsertar: $e',
-      );
-
-      // No lanzar excepción, los datos se obtuvieron correctamente del servidor
-    }
-
-    return censosParaGuardar;
-  }
 
   /// Mapear campos del API al formato de la tabla local censo_activo
   static Map<String, dynamic> _mapApiToLocalFormat(
@@ -663,6 +560,57 @@ class CensusSyncService extends BaseSyncService {
       );
 
       rethrow;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> _procesarCensosEnIsolate(
+    String responseBody,
+  ) async {
+    return await Isolate.run(() => _procesarCensosJSON(responseBody));
+  }
+
+  static List<Map<String, dynamic>> _procesarCensosJSON(String responseBody) {
+    try {
+      final decoded = jsonDecode(responseBody);
+      List<dynamic> censosData = [];
+
+      if (decoded is Map) {
+        final responseMap = Map<String, dynamic>.from(decoded);
+        if (responseMap['status'] != 'OK') return [];
+
+        final dataValue = responseMap['data'];
+        if (dataValue == null) return [];
+
+        if (dataValue is String) {
+          try {
+            censosData = jsonDecode(dataValue) as List;
+          } catch (e) {
+            return [];
+          }
+        } else if (dataValue is List) {
+          censosData = dataValue;
+        }
+      } else if (decoded is List) {
+        censosData = decoded;
+      }
+
+      final censosParaGuardar = <Map<String, dynamic>>[];
+
+      for (final censo in censosData) {
+        if (censo is Map) {
+          try {
+            final censoMap = Map<String, dynamic>.from(censo);
+            final censoParaGuardar = _mapApiToLocalFormat(censoMap);
+            censosParaGuardar.add(censoParaGuardar);
+          } catch (e) {
+            // Error procesando censo
+          }
+        }
+      }
+
+      return censosParaGuardar;
+    } catch (e) {
+      return [];
     }
   }
 }

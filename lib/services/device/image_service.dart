@@ -11,8 +11,8 @@ class ImageService {
 
   /// Toma una foto usando la cámara
   Future<File?> tomarFoto({
-    int maxWidth = 1920,
-    int maxHeight = 1080,
+    int maxWidth = 1600,
+    int maxHeight = 900,
     int imageQuality = 85,
   }) async {
     try {
@@ -35,8 +35,8 @@ class ImageService {
 
   /// Selecciona una imagen de la galería
   Future<File?> seleccionarImagen({
-    int maxWidth = 1920,
-    int maxHeight = 1080,
+    int maxWidth = 1600,
+    int maxHeight = 900,
     int imageQuality = 85,
   }) async {
     try {
@@ -62,7 +62,9 @@ class ImageService {
     try {
       // Crear directorio para imágenes de equipos si no existe
       final Directory appDir = await getApplicationDocumentsDirectory();
-      final Directory imageDir = Directory(path.join(appDir.path, 'equipos_images'));
+      final Directory imageDir = Directory(
+        path.join(appDir.path, 'equipos_images'),
+      );
 
       if (!await imageDir.exists()) {
         await imageDir.create(recursive: true);
@@ -70,9 +72,13 @@ class ImageService {
 
       // Generar nombre único para la imagen
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-      final String codigoLimpio = codigoEquipo.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+      final String codigoLimpio = codigoEquipo.replaceAll(
+        RegExp(r'[^a-zA-Z0-9]'),
+        '_',
+      );
       final String extension = path.extension(imagen.path);
-      final String nombreArchivo = 'equipo_${codigoLimpio}_$timestamp$extension';
+      final String nombreArchivo =
+          'equipo_${codigoLimpio}_$timestamp$extension';
 
       // Copiar imagen al directorio de la app
       final String rutaDestino = path.join(imageDir.path, nombreArchivo);
@@ -80,7 +86,6 @@ class ImageService {
 
       _logger.i('Imagen guardada: $rutaDestino');
       return archivoDestino;
-
     } catch (e) {
       _logger.e('Error guardando imagen: $e');
       rethrow;
@@ -107,7 +112,13 @@ class ImageService {
     if (imagen == null) return false;
 
     final String extension = path.extension(imagen.path).toLowerCase();
-    final List<String> extensionesPermitidas = ['.jpg', '.jpeg', '.png', '.bmp', '.gif'];
+    final List<String> extensionesPermitidas = [
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.bmp',
+      '.gif',
+    ];
 
     return extensionesPermitidas.contains(extension);
   }

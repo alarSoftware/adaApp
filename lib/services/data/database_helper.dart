@@ -45,6 +45,7 @@ class DatabaseHelper {
       return await openDatabase(
         path,
         version: _databaseVersion,
+        onConfigure: _onConfigure,
         onCreate: _tables.onCreate,
         onUpgrade: _tables.onUpgrade,
       );
@@ -53,14 +54,19 @@ class DatabaseHelper {
     }
   }
 
+  Future<void> _onConfigure(Database db) async {
+    await db.rawQuery('PRAGMA journal_mode = WAL');
+    await db.execute('PRAGMA synchronous = NORMAL');
+  }
+
   Future<List<Map<String, dynamic>>> consultar(
-      String tableName, {
-        String? where,
-        List<dynamic>? whereArgs,
-        String? orderBy,
-        int? limit,
-        int? offset,
-      }) async {
+    String tableName, {
+    String? where,
+    List<dynamic>? whereArgs,
+    String? orderBy,
+    int? limit,
+    int? offset,
+  }) async {
     try {
       final db = await database;
       final result = await db.query(
@@ -77,7 +83,10 @@ class DatabaseHelper {
     }
   }
 
-  Future<List<Map<String, dynamic>>> consultarPersonalizada(String sql, [List<dynamic>? arguments]) async {
+  Future<List<Map<String, dynamic>>> consultarPersonalizada(
+    String sql, [
+    List<dynamic>? arguments,
+  ]) async {
     try {
       final db = await database;
       final result = await db.rawQuery(sql, arguments);
@@ -93,10 +102,10 @@ class DatabaseHelper {
   }
 
   Future<int> insertar(
-      String tableName,
-      Map<String, dynamic> values, {
-        ConflictAlgorithm? conflictAlgorithm,
-      }) async {
+    String tableName,
+    Map<String, dynamic> values, {
+    ConflictAlgorithm? conflictAlgorithm,
+  }) async {
     _validateValues(values);
     _addTimestamps(tableName, values);
 
@@ -109,15 +118,32 @@ class DatabaseHelper {
     return id;
   }
 
-  Future<int> insertarOIgnorar(String tableName, Map<String, dynamic> values) async {
-    return insertar(tableName, values, conflictAlgorithm: ConflictAlgorithm.ignore);
+  Future<int> insertarOIgnorar(
+    String tableName,
+    Map<String, dynamic> values,
+  ) async {
+    return insertar(
+      tableName,
+      values,
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
   }
 
-  Future<int> insertarOReemplazar(String tableName, Map<String, dynamic> values) async {
-    return insertar(tableName, values, conflictAlgorithm: ConflictAlgorithm.replace);
+  Future<int> insertarOReemplazar(
+    String tableName,
+    Map<String, dynamic> values,
+  ) async {
+    return insertar(
+      tableName,
+      values,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
-  Future<int> vaciarEInsertar(String tableName, List<Map<String, dynamic>> nuevosRegistros) async {
+  Future<int> vaciarEInsertar(
+    String tableName,
+    List<Map<String, dynamic>> nuevosRegistros,
+  ) async {
     final db = await database;
 
     return await db.transaction<int>((txn) async {
@@ -134,22 +160,35 @@ class DatabaseHelper {
   }
 
   Future<int> actualizar(
-      String tableName,
-      Map<String, dynamic> values, {
-        String? where,
-        List<dynamic>? whereArgs,
-      }) async {
+    String tableName,
+    Map<String, dynamic> values, {
+    String? where,
+    List<dynamic>? whereArgs,
+  }) async {
     _validateValues(values);
     _addTimestamps(tableName, values, isUpdate: true);
 
     final db = await database;
-    final count = await db.update(tableName, values, where: where, whereArgs: whereArgs);
+    final count = await db.update(
+      tableName,
+      values,
+      where: where,
+      whereArgs: whereArgs,
+    );
     return count;
   }
 
-  Future<int> eliminar(String tableName, {String? where, List<dynamic>? whereArgs}) async {
+  Future<int> eliminar(
+    String tableName, {
+    String? where,
+    List<dynamic>? whereArgs,
+  }) async {
     final db = await database;
-    final count = await db.delete(tableName, where: where, whereArgs: whereArgs);
+    final count = await db.delete(
+      tableName,
+      where: where,
+      whereArgs: whereArgs,
+    );
     return count;
   }
 
@@ -162,7 +201,9 @@ class DatabaseHelper {
     return _sync.sincronizarClientes(db, clientesAPI);
   }
 
-  Future<void> sincronizarUsuarios(List<Map<String, dynamic>> usuariosMapas) async {
+  Future<void> sincronizarUsuarios(
+    List<Map<String, dynamic>> usuariosMapas,
+  ) async {
     final db = await database;
     return _sync.sincronizarUsuarios(db, usuariosMapas);
   }
@@ -182,7 +223,9 @@ class DatabaseHelper {
     return _sync.sincronizarLogos(db, logosAPI);
   }
 
-  Future<void> sincronizarUsuarioCliente(List<dynamic> usuarioClienteAPI) async {
+  Future<void> sincronizarUsuarioCliente(
+    List<dynamic> usuarioClienteAPI,
+  ) async {
     final db = await database;
     return _sync.sincronizarUsuarioCliente(db, usuarioClienteAPI);
   }
@@ -202,7 +245,9 @@ class DatabaseHelper {
     return _queries.obtenerEquiposConDetalles(db);
   }
 
-  Future<List<Map<String, dynamic>>> obtenerHistorialEquipo(int equipoId) async {
+  Future<List<Map<String, dynamic>>> obtenerHistorialEquipo(
+    int equipoId,
+  ) async {
     final db = await database;
     return _queries.obtenerHistorialEquipo(db, equipoId);
   }
@@ -213,19 +258,28 @@ class DatabaseHelper {
     return maps.map((map) => Usuario.fromMap(map)).toList();
   }
 
-  Future<Map<String, List<Map<String, dynamic>>>> obtenerMarcasModelosYLogos() async {
-    final marcas = await consultar('marcas', where: 'activo = ?', whereArgs: [1], orderBy: 'nombre');
+  Future<Map<String, List<Map<String, dynamic>>>>
+  obtenerMarcasModelosYLogos() async {
+    final marcas = await consultar(
+      'marcas',
+      where: 'activo = ?',
+      whereArgs: [1],
+      orderBy: 'nombre',
+    );
     final modelos = await consultar('modelos', orderBy: 'nombre');
-    final logos = await consultar('logo', where: 'activo = ?', whereArgs: [1], orderBy: 'nombre');
+    final logos = await consultar(
+      'logo',
+      where: 'activo = ?',
+      whereArgs: [1],
+      orderBy: 'nombre',
+    );
 
-    return {
-      'marcas': marcas,
-      'modelos': modelos,
-      'logos': logos,
-    };
+    return {'marcas': marcas, 'modelos': modelos, 'logos': logos};
   }
 
-  Future<T> ejecutarTransaccion<T>(Future<T> Function(Transaction) operaciones) async {
+  Future<T> ejecutarTransaccion<T>(
+    Future<T> Function(Transaction) operaciones,
+  ) async {
     final db = await database;
     return await db.transaction<T>((txn) async {
       final result = await operaciones(txn);
@@ -233,12 +287,24 @@ class DatabaseHelper {
     });
   }
 
-  Future<bool> existeRegistro(String tableName, String where, List<dynamic> whereArgs) async {
-    final count = await contarRegistros(tableName, where: where, whereArgs: whereArgs);
+  Future<bool> existeRegistro(
+    String tableName,
+    String where,
+    List<dynamic> whereArgs,
+  ) async {
+    final count = await contarRegistros(
+      tableName,
+      where: where,
+      whereArgs: whereArgs,
+    );
     return count > 0;
   }
 
-  Future<int> contarRegistros(String tableName, {String? where, List<dynamic>? whereArgs}) async {
+  Future<int> contarRegistros(
+    String tableName, {
+    String? where,
+    List<dynamic>? whereArgs,
+  }) async {
     final db = await database;
     final result = await db.query(
       tableName,
@@ -272,7 +338,7 @@ class DatabaseHelper {
     try {
       final db = await database;
       final result = await db.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
       );
       return result.map((row) => row['name'] as String).toList();
     } catch (e) {
@@ -296,7 +362,9 @@ class DatabaseHelper {
     }
   }
 
-  Future<List<Map<String, dynamic>>> obtenerEsquemaTabla(String tableName) async {
+  Future<List<Map<String, dynamic>>> obtenerEsquemaTabla(
+    String tableName,
+  ) async {
     try {
       final db = await database;
       return await db.rawQuery('PRAGMA table_info($tableName)');
@@ -330,13 +398,15 @@ class DatabaseHelper {
           'marcas': marcas,
           'modelos': modelos,
           'logos': logos,
-        }
+        },
       };
 
       final jsonString = jsonEncode(backup);
 
       final dbPath = await getDatabasesPath();
-      final file = File('$dbPath/backup_${DateTime.now().millisecondsSinceEpoch}.json');
+      final file = File(
+        '$dbPath/backup_${DateTime.now().millisecondsSinceEpoch}.json',
+      );
       await file.writeAsString(jsonString);
 
       return file.path;
@@ -375,7 +445,6 @@ class DatabaseHelper {
       } catch (e) {
         // Continue anyway
       }
-
     } catch (e, stackTrace) {
       rethrow;
     }
@@ -403,11 +472,8 @@ class DatabaseHelper {
         'estadisticas': stats,
         'tablas': tables,
       };
-
     } catch (e) {
-      return {
-        'error': e.toString(),
-      };
+      return {'error': e.toString()};
     }
   }
 
@@ -417,7 +483,11 @@ class DatabaseHelper {
     }
   }
 
-  void _addTimestamps(String tableName, Map<String, dynamic> values, {bool isUpdate = false}) {
+  void _addTimestamps(
+    String tableName,
+    Map<String, dynamic> values, {
+    bool isUpdate = false,
+  }) {
     if (!_requiresTimestamps(tableName)) return;
 
     final now = DateTime.now().toIso8601String();
