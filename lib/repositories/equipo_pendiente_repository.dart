@@ -35,8 +35,8 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
 
   /// Obtener equipos PENDIENTES de un cliente
   Future<List<Map<String, dynamic>>> obtenerEquiposPendientesPorCliente(
-    int clienteId,
-  ) async {
+      int clienteId,
+      ) async {
     try {
       final sql = '''
     SELECT DISTINCT
@@ -53,11 +53,11 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
       'pendiente' as estado,
       'pendiente' as tipo_estado
     FROM equipos_pendientes ep
-    LEFT JOIN equipos e ON ep.equipo_id = e.id
-    LEFT JOIN marcas m ON e.marca_id = m.id
-    LEFT JOIN modelos mo ON e.modelo_id = mo.id
-    LEFT JOIN logo l ON e.logo_id = l.id
-    LEFT JOIN clientes c ON ep.cliente_id = c.id
+    INNER JOIN equipos e ON ep.equipo_id = e.id
+    INNER JOIN marcas m ON e.marca_id = m.id
+    INNER JOIN modelos mo ON e.modelo_id = mo.id
+    INNER JOIN logo l ON e.logo_id = l.id
+    INNER JOIN clientes c ON ep.cliente_id = c.id
     WHERE ep.cliente_id = ?
     ORDER BY ep.fecha_creacion DESC
   ''';
@@ -97,7 +97,6 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
   }
 
   /// Procesar escaneo de censo - crear registro pendiente
-  /// ✅ COMPATIBLE con nuevo sistema unificado
   Future<String> procesarEscaneoCenso({
     required dynamic equipoId,
     required int clienteId,
@@ -108,40 +107,16 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
       final now = DateTime.now();
       final equipoIdString = equipoId.toString();
 
-      // ✅ Obtener usuario actual si no se proporcionó
       final authService = AuthService();
       final usuario = await authService.getCurrentUser();
       final usuarioCensoId = usuarioId ?? usuario?.id ?? 1;
 
-      // Verificar si ya existe por equipo_id + cliente_id
-      final existente = await dbHelper.consultar(
+      await dbHelper.eliminar(
         tableName,
         where: 'equipo_id = ? AND cliente_id = ?',
         whereArgs: [equipoIdString, clienteId],
-        limit: 1,
       );
 
-      if (existente.isNotEmpty) {
-        final registroId = existente.first['id'].toString();
-
-        // ✅ Actualizar con usuario correcto
-        await dbHelper.actualizar(
-          tableName,
-          {
-            'fecha_censo': now.toIso8601String(),
-            'fecha_actualizacion': now.toIso8601String(),
-            'usuario_censo_id': usuarioCensoId,
-            'sincronizado':
-                0, // Marcar para sincronización por CensoActivoPostService
-          },
-          where: 'id = ?',
-          whereArgs: [registroId],
-        );
-
-        return registroId;
-      }
-
-      // Crear nuevo registro con UUID
       final uuid = Uuid().v4();
       final datos = {
         'id': uuid,
@@ -152,6 +127,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
         'fecha_creacion': now.toIso8601String(),
         'fecha_actualizacion': now.toIso8601String(),
         'edf_vendedor_id': edfVendedorId,
+        'sincronizado': 0,
       };
 
       await dbHelper.insertar(tableName, datos);
@@ -165,9 +141,9 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
   /// Marcar equipos pendientes como sincronizados
   /// ✅ Llamado desde CensoActivoPostService cuando la sincronización unificada es exitosa
   Future<int> marcarSincronizadosPorCenso(
-    String equipoId,
-    int clienteId,
-  ) async {
+      String equipoId,
+      int clienteId,
+      ) async {
     try {
       final actualizados = await dbHelper.actualizar(
         tableName,
@@ -333,8 +309,8 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
   }
 
   Future<int> guardarEquiposPendientesDesdeServidor(
-    List<Map<String, dynamic>> equiposAPI,
-  ) async {
+      List<Map<String, dynamic>> equiposAPI,
+      ) async {
     final db = await dbHelper.database;
     int guardados = 0;
 
@@ -352,12 +328,12 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
             'fecha_actualizacion': DateTime.now().toIso8601String(),
             'fecha_censo': equipoAPI['creationDate'],
             'usuario_censo_id':
-                equipoAPI['usuarioId'] ?? equipoAPI['usuario']?['id'] ?? 1,
+            equipoAPI['usuarioId'] ?? equipoAPI['usuario']?['id'] ?? 1,
 
             // --- CORRECCIÓN AQUÍ: Guardar edf_vendedor_id ---
             'edf_vendedor_id':
-                equipoAPI['edfVendedorId']?.toString() ??
-                equipoAPI['edfVendedorSucursalId']?.toString(),
+            equipoAPI['edfVendedorSucursalId'] ??
+                equipoAPI['edfVendedorId'],
 
             // ------------------------------------------------
             'sincronizado': 1,
@@ -378,7 +354,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
     return guardados;
   }
 
-  // ================================
-  // MÉTODOS DE DEBUG Y VERIFICACIÓN
-  // ================================
+// ================================
+// MÉTODOS DE DEBUG Y VERIFICACIÓN
+// ================================
 }
