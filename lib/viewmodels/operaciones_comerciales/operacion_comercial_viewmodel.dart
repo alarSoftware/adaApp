@@ -4,9 +4,11 @@ import 'package:ada_app/models/producto.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
-import 'package:ada_app/services/post/operaciones_comerciales_post_service.dart';
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 import 'package:ada_app/repositories/producto_repository.dart';
+import 'package:ada_app/services/api/auth_service.dart';
+import 'package:ada_app/services/device/location_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../utils/unidad_medida_helper.dart';
 
@@ -350,6 +352,20 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     _setFormState(FormState.saving);
 
     try {
+      // Obtener usuario actual
+      final authService = AuthService();
+      final currentUser = await authService.getCurrentUser();
+
+      // Obtener ubicación
+      final locationService = LocationService();
+      Position? position;
+      try {
+        position = await locationService.getCurrentLocation();
+      } catch (e) {
+        // Si falla la ubicación, continuamos sin ella
+        print('Error obteniendo ubicación: $e');
+      }
+
       final operacion = OperacionComercial(
         id: operacionExistente?.id,
         clienteId: cliente.id!,
@@ -359,7 +375,10 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         snc: tipoOperacion == TipoOperacion.notaRetiro ? _snc : null,
         observaciones: _observaciones.isEmpty ? null : _observaciones,
         totalProductos: _productosSeleccionados.length,
-        usuarioId: 1, // TODO: Obtener usuario real
+        usuarioId: currentUser?.id ?? 1,
+        edfVendedorId: currentUser?.edfVendedorId,
+        latitud: position?.latitude,
+        longitud: position?.longitude,
         syncStatus: 'creado',
         detalles: _productosSeleccionados,
       );

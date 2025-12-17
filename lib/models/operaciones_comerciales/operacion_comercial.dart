@@ -16,6 +16,9 @@ class OperacionComercial {
   final String? syncError;
   final DateTime? syncedAt;
   final int syncRetryCount;
+  final String? edfVendedorId;
+  final double? latitud;
+  final double? longitud;
 
   final List<OperacionComercialDetalle> detalles;
 
@@ -34,6 +37,9 @@ class OperacionComercial {
     this.syncError,
     this.syncedAt,
     this.syncRetryCount = 0,
+    this.edfVendedorId,
+    this.latitud,
+    this.longitud,
     this.detalles = const [],
   });
 
@@ -41,7 +47,9 @@ class OperacionComercial {
     return OperacionComercial(
       id: map['id'] as String?,
       clienteId: map['cliente_id'] as int? ?? 0,
-      tipoOperacion: TipoOperacionExtension.fromString(map['tipo_operacion'] as String?),
+      tipoOperacion: TipoOperacionExtension.fromString(
+        map['tipo_operacion'] as String?,
+      ),
       fechaCreacion: map['fecha_creacion'] != null
           ? DateTime.parse(map['fecha_creacion'] as String)
           : DateTime.now(),
@@ -59,6 +67,9 @@ class OperacionComercial {
           ? DateTime.parse(map['synced_at'] as String)
           : null,
       syncRetryCount: map['sync_retry_count'] as int? ?? 0,
+      edfVendedorId: map['edf_vendedor_id'] as String?,
+      latitud: map['latitud'] as double?,
+      longitud: map['longitud'] as double?,
     );
   }
 
@@ -78,6 +89,9 @@ class OperacionComercial {
       'sync_error': syncError,
       'synced_at': syncedAt?.toIso8601String(),
       'sync_retry_count': syncRetryCount,
+      'edf_vendedor_id': edfVendedorId,
+      'latitud': latitud,
+      'longitud': longitud,
     };
   }
 
@@ -90,6 +104,9 @@ class OperacionComercial {
       'fecha_retiro': fechaRetiro?.toIso8601String(),
       if (snc != null) 'snc': snc,
       'observaciones': observaciones,
+      'edf_vendedor_id': edfVendedorId,
+      'latitud': latitud,
+      'longitud': longitud,
       'detalles': detalles.map((d) => d.toJson()).toList(),
     };
   }
@@ -100,7 +117,7 @@ class OperacionComercial {
     TipoOperacion? tipoOperacion,
     DateTime? fechaCreacion,
     DateTime? fechaRetiro,
-    String? snc, // 👈 NUEVO PARÁMETRO EN COPYWITH
+    String? snc,
     String? observaciones,
     int? totalProductos,
     int? usuarioId,
@@ -109,6 +126,9 @@ class OperacionComercial {
     String? syncError,
     DateTime? syncedAt,
     int? syncRetryCount,
+    String? edfVendedorId,
+    double? latitud,
+    double? longitud,
     List<OperacionComercialDetalle>? detalles,
   }) {
     return OperacionComercial(
@@ -126,6 +146,9 @@ class OperacionComercial {
       syncError: syncError ?? this.syncError,
       syncedAt: syncedAt ?? this.syncedAt,
       syncRetryCount: syncRetryCount ?? this.syncRetryCount,
+      edfVendedorId: edfVendedorId ?? this.edfVendedorId,
+      latitud: latitud ?? this.latitud,
+      longitud: longitud ?? this.longitud,
       detalles: detalles ?? this.detalles,
     );
   }
@@ -137,7 +160,7 @@ class OperacionComercial {
   bool get tieneDetalles => detalles.isNotEmpty;
   bool get necesitaFechaRetiro =>
       tipoOperacion == TipoOperacion.notaRetiro ||
-          tipoOperacion == TipoOperacion.notaRetiroDiscontinuos;
+      tipoOperacion == TipoOperacion.notaRetiroDiscontinuos;
 
   String get displayTipo => tipoOperacion.displayName;
   String get displaySyncStatus {
@@ -156,11 +179,11 @@ class OperacionComercial {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-          other is OperacionComercial &&
-              runtimeType == other.runtimeType &&
-              id == other.id &&
-              clienteId == other.clienteId &&
-              tipoOperacion == other.tipoOperacion;
+      other is OperacionComercial &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          clienteId == other.clienteId &&
+          tipoOperacion == other.tipoOperacion;
 
   @override
   int get hashCode => id.hashCode ^ clienteId.hashCode ^ tipoOperacion.hashCode;

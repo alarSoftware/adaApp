@@ -77,6 +77,9 @@ class OperacionesComercialesPostService {
       if (operacion.snc != null) 'snc': operacion.snc,
       'usuarioId': operacion.usuarioId,
       'totalProductos': operacion.totalProductos,
+      'edfVendedorId': operacion.edfVendedorId,
+      'latitud': operacion.latitud,
+      'longitud': operacion.longitud,
     };
 
     final detalles = await Future.wait(
