@@ -465,6 +465,33 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     _setFormState(FormState.loading);
 
     try {
+      // 1. Si tiene adaSequence, intentar obtener odooName específicamente
+      if (_operacionActual!.adaSequence != null &&
+          _operacionActual!.adaSequence!.isNotEmpty) {
+        final odooName = await OperacionComercialSyncService.obtenerOdooName(
+          _operacionActual!.adaSequence!,
+        );
+
+        if (odooName != null && odooName.isNotEmpty) {
+          await _operacionRepository.marcarComoMigrado(
+            _operacionActual!.id!,
+            _operacionActual!.serverId,
+            odooName: odooName,
+          );
+
+          final operacionActualizada = await _operacionRepository
+              .obtenerOperacionPorId(_operacionActual!.id!);
+
+          if (operacionActualizada != null) {
+            _operacionActual = operacionActualizada;
+            _cargarOperacionExistente();
+            _setFormState(FormState.idle);
+            return true;
+          }
+        }
+      }
+
+      // 2. Fallback: Sincronización general por cliente
       await OperacionComercialSyncService.obtenerOperacionesPorCliente(
         cliente.id!,
       );

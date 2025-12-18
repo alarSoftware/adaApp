@@ -137,6 +137,37 @@ class OperacionComercialSyncService extends BaseSyncService {
     return obtenerOperaciones(tipo: tipo);
   }
 
+  static Future<String?> obtenerOdooName(String adaSequence) async {
+    try {
+      final queryParams = {'adaSequence': adaSequence};
+
+      final response = await _makeHttpRequest('/api/getOdooName', queryParams);
+
+      if (!_isSuccessStatusCode(response.statusCode)) {
+        return null;
+      }
+
+      final body = jsonDecode(response.body);
+
+      // Si recibimos un mapa, buscamos la key 'odooName' o 'name'
+      if (body is Map) {
+        if (body.containsKey('odooName')) return body['odooName']?.toString();
+        if (body.containsKey('name')) return body['name']?.toString();
+        if (body.containsKey('data'))
+          return body['data']?.toString(); // A veces viene en data
+      }
+      // Si es un string simple, asumimos que es el nombre
+      else if (body is String) {
+        return body;
+      }
+
+      return null;
+    } catch (e) {
+      print('Error obteniendo odooName: $e');
+      return null;
+    }
+  }
+
   static Map<String, String> _buildQueryParams({
     String? edfVendedorId,
     int? partnerId,

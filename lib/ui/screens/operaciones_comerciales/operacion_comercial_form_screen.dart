@@ -246,7 +246,6 @@ class _OperacionComercialFormViewState
               child: _buildSncField(viewModel),
             ),
           ],
-          _buildOdooAdaInfo(viewModel),
         ],
       ),
     );
@@ -341,6 +340,10 @@ class _OperacionComercialFormViewState
     vm.OperacionComercialFormViewModel viewModel,
   ) {
     final isError = !viewModel.isViewOnly && viewModel.fechaRetiro == null;
+    final operacion = viewModel.operacionExistente;
+    final hasInfo =
+        operacion != null &&
+        (operacion.odooName != null || operacion.adaSequence != null);
 
     return InkWell(
       onTap: viewModel.isViewOnly
@@ -360,173 +363,173 @@ class _OperacionComercialFormViewState
                 : Colors.transparent,
           ),
         ),
-        child: Row(
+        child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.calendar_today_rounded,
-                size: 14,
-                color: isError ? AppColors.error : Colors.grey[600],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
               children: [
-                Text(
-                  'Fecha de Entrega / Retiro',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey[500],
-                    fontWeight: FontWeight.bold,
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.calendar_today_rounded,
+                    size: 14,
+                    color: isError ? AppColors.error : Colors.grey[600],
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  viewModel.fechaRetiro == null
-                      ? 'Seleccionar fecha...'
-                      : DateFormat(
-                          'EEEE d, MMMM yyyy',
-                          'es_ES',
-                        ).format(viewModel.fechaRetiro!),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: isError ? AppColors.error : const Color(0xFF334155),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Fecha de Entrega / Retiro',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey[500],
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        viewModel.fechaRetiro == null
+                            ? 'Seleccionar fecha...'
+                            : DateFormat(
+                                'EEEE d, MMMM yyyy',
+                                'es_ES',
+                              ).format(viewModel.fechaRetiro!),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: isError
+                              ? AppColors.error
+                              : const Color(0xFF334155),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                if (!viewModel.isViewOnly)
+                  Icon(Icons.edit, size: 16, color: Colors.grey[400]),
               ],
             ),
-            const Spacer(),
-            if (!viewModel.isViewOnly)
-              Icon(Icons.edit, size: 16, color: Colors.grey[400]),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOdooAdaInfo(vm.OperacionComercialFormViewModel viewModel) {
-    if (!viewModel.isViewOnly) return const SizedBox.shrink();
-
-    final operacion = viewModel.operacionExistente;
-    if (operacion == null) return const SizedBox.shrink();
-
-    final hasOdoo =
-        operacion.odooName != null && operacion.odooName!.isNotEmpty;
-    final hasAda =
-        operacion.adaSequence != null && operacion.adaSequence!.isNotEmpty;
-
-    // Si no tiene OdooName, igual mostramos el botón para intentar obtenerlo.
-    // Si no tiene ni adaSequence ni odooName, el contenedor se mostrará
-    // principalmente por el botón de descarga.
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (hasAda) ...[
-            _buildInfoChip(
-              'adaSequence',
-              operacion.adaSequence!,
-              Colors.grey.shade700,
-            ),
-            const SizedBox(height: 8),
-          ],
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (hasOdoo)
-                _buildInfoChip(
-                  'odooName',
-                  operacion.odooName!,
-                  AppColors.primary,
-                )
-              else
-                Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: Text(
-                    'Sin Odoo Name',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[400],
-                      fontStyle: FontStyle.italic,
+            if (hasInfo || viewModel.isViewOnly) ...[
+              const SizedBox(height: 12),
+              Divider(height: 1, color: Colors.grey.withValues(alpha: 0.1)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (operacion?.adaSequence != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: RichText(
+                              text: TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: 'Ada Sequence: ',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: operacion!.adaSequence!,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        Row(
+                          children: [
+                            if (operacion?.odooName != null &&
+                                operacion!.odooName!.isNotEmpty)
+                              Flexible(
+                                child: RichText(
+                                  overflow: TextOverflow.ellipsis,
+                                  text: TextSpan(
+                                    children: [
+                                      TextSpan(
+                                        text: 'Odoo Name: ',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                      TextSpan(
+                                        text: operacion!.odooName!,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            else
+                              Text(
+                                'Sin Odoo Name',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[400],
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              const SizedBox(width: 8),
-
-              // Botón de descarga vinculado a Odoo Name
-              SizedBox(
-                width: 24,
-                height: 24,
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  iconSize: 16,
-                  icon: viewModel.isLoading
-                      ? const SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(Icons.download_rounded, color: AppColors.primary),
-                  onPressed: viewModel.isLoading
-                      ? null
-                      : () async {
-                          await viewModel.sincronizarOperacionActual();
-                        },
-                  tooltip: 'Obtener Odoo Name',
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
+                  SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      iconSize: 18,
+                      icon: viewModel.isLoading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              Icons.download_rounded,
+                              color: AppColors.primary,
+                            ),
+                      onPressed: viewModel.isLoading
+                          ? null
+                          : () async {
+                              await viewModel.sincronizarOperacionActual();
+                            },
+                      tooltip: 'Obtener Odoo Name',
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoChip(String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '$label: ',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: color.withValues(alpha: 0.9),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

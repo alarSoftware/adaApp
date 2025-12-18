@@ -355,7 +355,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         throw Exception('Código de barras o cliente no disponible');
       }
 
-      final nuevoEstado = await _estadoEquipoRepository.crearCensoActivo(
+      final newCensoActivo = await _estadoEquipoRepository.crearCensoActivo(
         equipoId: codigoBarras,
         clienteId: int.parse(clienteId.toString()),
         enLocal: _estadoUbicacionEquipo!,
@@ -363,7 +363,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         latitud: position.latitude,
         longitud: position.longitude,
       );
-
       // 2. Sincronizar con el servidor
       try {
         final currentUser = await AuthService().getCurrentUser();
@@ -375,7 +374,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
             clienteId: int.parse(clienteId.toString()),
             enLocal: _estadoUbicacionEquipo!,
             position: position,
-            observaciones: nuevoEstado.observaciones,
+            observaciones: newCensoActivo.observaciones,
             equipoId: equipoCliente['equipo_id']?.toString() ?? codigoBarras,
             clienteNombre: equipoCliente['cliente_nombre']?.toString() ?? '',
             numeroSerie: equipoCliente['numero_serie']?.toString() ?? '',
@@ -387,8 +386,8 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
           );
 
           if (resultadoSync['exito']) {
-            if (nuevoEstado.id != null) {
-              await _estadoEquipoRepository.marcarComoMigrado(nuevoEstado.id!);
+            if (newCensoActivo.id != null) {
+              await _estadoEquipoRepository.marcarComoMigrado(newCensoActivo.id!);
             }
           }
         }
@@ -400,7 +399,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       _estadoUbicacionEquipo = null;
       _hasUnsavedChanges = false;
 
-      final historialActualizado = [nuevoEstado, ..._state.historialCambios];
+      final historialActualizado = [newCensoActivo, ..._state.historialCambios];
       final ultimos5Actualizado = historialActualizado.take(5).toList();
 
       _state = _state.copyWith(

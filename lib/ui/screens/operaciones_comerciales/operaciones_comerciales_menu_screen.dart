@@ -438,21 +438,6 @@ class _OperacionesComercialesMenuViewState
                         (operacion.adaSequence == null ||
                             operacion.adaSequence!.isEmpty)) ...[
                       // Fallback or just empty if no data
-                      Text(
-                        '${operacion.totalProductos}',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      Text(
-                        'items',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
                     ],
                   ],
                 ),

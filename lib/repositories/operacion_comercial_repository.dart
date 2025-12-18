@@ -30,6 +30,13 @@ abstract class OperacionComercialRepository {
   Future<void> guardarOperacionesDesdeServidor(
     List<Map<String, dynamic>> operacionesData,
   );
+
+  Future<void> marcarComoMigrado(
+    String operacionId,
+    dynamic serverId, {
+    String? odooName,
+    String? adaSequence,
+  });
 }
 
 class OperacionComercialRepositoryImpl

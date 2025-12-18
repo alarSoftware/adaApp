@@ -530,7 +530,6 @@ class CensoActivoPostService {
       'edfVendedorSucursalId': edfVendedorId,
       'edfEquipoId': equipoId,
       'usuarioId': usuarioId,
-      'edfClienteId': clienteId,
       'fechaRevision': formatearFechaLocal(now),
       'latitud': latitud,
       'longitud': longitud,
