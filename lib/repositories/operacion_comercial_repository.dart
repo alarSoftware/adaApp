@@ -1,4 +1,5 @@
 // lib/repositories/operacion_comercial_repository.dart
+import 'dart:convert';
 
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
@@ -131,8 +132,41 @@ class OperacionComercialRepositoryImpl
       await marcarPendienteSincronizacion(operacionId);
 
       try {
-        await OperacionesComercialesPostService.enviarOperacion(operacionConId);
-        await marcarComoMigrado(operacionId, null);
+        final serverResponse =
+            await OperacionesComercialesPostService.enviarOperacion(
+              operacionConId,
+            );
+
+        String? odooName;
+        String? adaSequence;
+
+        if (serverResponse.resultJson != null) {
+          print('DEBUG: ResultJson received: ${serverResponse.resultJson}');
+          try {
+            final jsonMap = jsonDecode(serverResponse.resultJson!);
+            odooName =
+                jsonMap['name'] as String? ?? jsonMap['odooName'] as String?;
+
+            // Intentar varias claves posibles para adaSequence
+            adaSequence =
+                jsonMap['sequence'] as String? ??
+                jsonMap['adaSequence'] as String? ??
+                jsonMap['ada_sequence'] as String?;
+
+            print(
+              'DEBUG: Parsed odooName: $odooName, adaSequence: $adaSequence',
+            );
+          } catch (e) {
+            print('DEBUG: Error parsing resultJson: $e');
+          }
+        }
+
+        await marcarComoMigrado(
+          operacionId,
+          null,
+          odooName: odooName,
+          adaSequence: adaSequence,
+        );
       } catch (syncError) {
         await marcarComoError(
           operacionId,
@@ -312,18 +346,32 @@ class OperacionComercialRepositoryImpl
     }
   }
 
-  Future<void> marcarComoMigrado(String operacionId, dynamic serverId) async {
+  Future<void> marcarComoMigrado(
+    String operacionId,
+    dynamic serverId, {
+    String? odooName,
+    String? adaSequence,
+  }) async {
     try {
       final now = DateTime.now();
 
+      final data = {
+        'sync_status': 'migrado',
+        'synced_at': now.toIso8601String(),
+        'server_id': serverId,
+        'sync_error': null,
+      };
+
+      if (odooName != null) {
+        data['odoo_name'] = odooName;
+      }
+      if (adaSequence != null) {
+        data['ada_sequence'] = adaSequence;
+      }
+
       await dbHelper.actualizar(
         tableName,
-        {
-          'sync_status': 'migrado',
-          'synced_at': now.toIso8601String(),
-          'server_id': serverId,
-          'sync_error': null,
-        },
+        data,
         where: 'id = ?',
         whereArgs: [operacionId],
       );

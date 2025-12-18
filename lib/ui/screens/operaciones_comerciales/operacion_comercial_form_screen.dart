@@ -16,7 +16,8 @@ import 'package:ada_app/ui/widgets/operaciones_comerciales/buscador_productos_wi
 import 'package:ada_app/ui/widgets/operaciones_comerciales/productos_seleccionados_widget.dart';
 import 'package:ada_app/ui/widgets/bottom_bar_widget.dart';
 
-import 'package:ada_app/viewmodels/operaciones_comerciales/operacion_comercial_viewmodel.dart' as vm;
+import 'package:ada_app/viewmodels/operaciones_comerciales/operacion_comercial_viewmodel.dart'
+    as vm;
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 
 class OperacionComercialFormScreen extends StatelessWidget {
@@ -35,9 +36,11 @@ class OperacionComercialFormScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final esVisualizacion = isViewOnly ||
+    final esVisualizacion =
+        isViewOnly ||
         (operacionExistente != null &&
-            (operacionExistente!.estaSincronizado || operacionExistente!.tieneError));
+            (operacionExistente!.estaSincronizado ||
+                operacionExistente!.tieneError));
 
     return ChangeNotifierProvider(
       create: (context) => vm.OperacionComercialFormViewModel(
@@ -55,17 +58,18 @@ class _OperacionComercialFormView extends StatefulWidget {
   const _OperacionComercialFormView();
 
   @override
-  State<_OperacionComercialFormView> createState() => _OperacionComercialFormViewState();
+  State<_OperacionComercialFormView> createState() =>
+      _OperacionComercialFormViewState();
 }
 
-class _OperacionComercialFormViewState extends State<_OperacionComercialFormView> {
+class _OperacionComercialFormViewState
+    extends State<_OperacionComercialFormView> {
   final _formKey = GlobalKey<FormState>();
 
   @override
   Widget build(BuildContext context) {
     return Consumer<vm.OperacionComercialFormViewModel>(
       builder: (context, viewModel, child) {
-
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (viewModel.hasError && viewModel.errorMessage != null) {
             AppNotification.show(
@@ -78,7 +82,8 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
         });
 
         final tieneError = viewModel.operacionExistente?.tieneError ?? false;
-        final estaPendiente = viewModel.operacionExistente?.estaPendiente ?? false;
+        final estaPendiente =
+            viewModel.operacionExistente?.estaPendiente ?? false;
         final necesitaReintento = tieneError || estaPendiente;
         final itemCount = viewModel.productosSeleccionados.length;
 
@@ -118,7 +123,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
 
                           if (!viewModel.isViewOnly) ...[
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -134,8 +141,10 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                                   const SizedBox(height: 8),
                                   BuscadorProductosWidget(
                                     searchQuery: viewModel.searchQuery,
-                                    productosFiltrados: viewModel.productosFiltrados,
-                                    productosSeleccionados: viewModel.productosSeleccionados,
+                                    productosFiltrados:
+                                        viewModel.productosFiltrados,
+                                    productosSeleccionados:
+                                        viewModel.productosSeleccionados,
                                     onSearchChanged: viewModel.setSearchQuery,
                                     onClearSearch: viewModel.clearSearch,
                                     onProductoSelected: (producto) {
@@ -149,11 +158,12 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                             const SizedBox(height: 24),
                           ],
 
-                          if (itemCount > 0)
+                          if (itemCount > 0) _buildProductListDirect(viewModel),
 
-                          _buildProductListDirect(viewModel),
-
-                          SizedBox(height: MediaQuery.of(context).viewInsets.bottom + 100),
+                          SizedBox(
+                            height:
+                                MediaQuery.of(context).viewInsets.bottom + 100,
+                          ),
                         ],
                       ),
                     ),
@@ -170,7 +180,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     );
   }
 
-  PreferredSizeWidget _buildStaticAppBar(vm.OperacionComercialFormViewModel viewModel) {
+  PreferredSizeWidget _buildStaticAppBar(
+    vm.OperacionComercialFormViewModel viewModel,
+  ) {
     return AppBar(
       title: Column(
         children: [
@@ -207,7 +219,10 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(
-          bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.15), width: 1),
+          bottom: BorderSide(
+            color: Colors.grey.withValues(alpha: 0.15),
+            width: 1,
+          ),
         ),
       ),
       padding: const EdgeInsets.only(bottom: 16),
@@ -230,7 +245,8 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: _buildSncField(viewModel),
             ),
-          ]
+          ],
+          _buildOdooAdaInfo(viewModel),
         ],
       ),
     );
@@ -321,19 +337,27 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     );
   }
 
-  Widget _buildFechaRetiroCompact(vm.OperacionComercialFormViewModel viewModel) {
+  Widget _buildFechaRetiroCompact(
+    vm.OperacionComercialFormViewModel viewModel,
+  ) {
     final isError = !viewModel.isViewOnly && viewModel.fechaRetiro == null;
 
     return InkWell(
-      onTap: viewModel.isViewOnly ? null : () => _seleccionarFechaRetiro(viewModel),
+      onTap: viewModel.isViewOnly
+          ? null
+          : () => _seleccionarFechaRetiro(viewModel),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: isError ? AppColors.error.withValues(alpha: 0.05) : const Color(0xFFF1F5F9),
+          color: isError
+              ? AppColors.error.withValues(alpha: 0.05)
+              : const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-              color: isError ? AppColors.error.withValues(alpha: 0.3) : Colors.transparent
+            color: isError
+                ? AppColors.error.withValues(alpha: 0.3)
+                : Colors.transparent,
           ),
         ),
         child: Row(
@@ -345,9 +369,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                  Icons.calendar_today_rounded,
-                  size: 14,
-                  color: isError ? AppColors.error : Colors.grey[600]
+                Icons.calendar_today_rounded,
+                size: 14,
+                color: isError ? AppColors.error : Colors.grey[600],
               ),
             ),
             const SizedBox(width: 12),
@@ -356,13 +380,20 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
               children: [
                 Text(
                   'Fecha de Entrega / Retiro',
-                  style: TextStyle(fontSize: 10, color: Colors.grey[500], fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey[500],
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   viewModel.fechaRetiro == null
                       ? 'Seleccionar fecha...'
-                      : DateFormat('EEEE d, MMMM yyyy', 'es_ES').format(viewModel.fechaRetiro!),
+                      : DateFormat(
+                          'EEEE d, MMMM yyyy',
+                          'es_ES',
+                        ).format(viewModel.fechaRetiro!),
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
@@ -372,10 +403,130 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
               ],
             ),
             const Spacer(),
-            if(!viewModel.isViewOnly)
+            if (!viewModel.isViewOnly)
               Icon(Icons.edit, size: 16, color: Colors.grey[400]),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildOdooAdaInfo(vm.OperacionComercialFormViewModel viewModel) {
+    if (!viewModel.isViewOnly) return const SizedBox.shrink();
+
+    final operacion = viewModel.operacionExistente;
+    if (operacion == null) return const SizedBox.shrink();
+
+    final hasOdoo =
+        operacion.odooName != null && operacion.odooName!.isNotEmpty;
+    final hasAda =
+        operacion.adaSequence != null && operacion.adaSequence!.isNotEmpty;
+
+    // Si no tiene OdooName, igual mostramos el botón para intentar obtenerlo.
+    // Si no tiene ni adaSequence ni odooName, el contenedor se mostrará
+    // principalmente por el botón de descarga.
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (hasAda) ...[
+            _buildInfoChip(
+              'adaSequence',
+              operacion.adaSequence!,
+              Colors.grey.shade700,
+            ),
+            const SizedBox(height: 8),
+          ],
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (hasOdoo)
+                _buildInfoChip(
+                  'odooName',
+                  operacion.odooName!,
+                  AppColors.primary,
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: Text(
+                    'Sin Odoo Name',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[400],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              const SizedBox(width: 8),
+
+              // Botón de descarga vinculado a Odoo Name
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  iconSize: 16,
+                  icon: viewModel.isLoading
+                      ? const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(Icons.download_rounded, color: AppColors.primary),
+                  onPressed: viewModel.isLoading
+                      ? null
+                      : () async {
+                          await viewModel.sincronizarOperacionActual();
+                        },
+                  tooltip: 'Obtener Odoo Name',
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoChip(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color.withValues(alpha: 0.9),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -395,11 +546,16 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
       child: ProductosSeleccionadosWidget(
         productosSeleccionados: viewModel.productosSeleccionados,
         tipoOperacion: viewModel.tipoOperacion,
-        onEliminarProducto: viewModel.isViewOnly ? (_) {} : viewModel.eliminarProducto,
-        onActualizarCantidad: viewModel.isViewOnly ? (_, __) {} : viewModel.actualizarCantidadProducto,
+        onEliminarProducto: viewModel.isViewOnly
+            ? (_) {}
+            : viewModel.eliminarProducto,
+        onActualizarCantidad: viewModel.isViewOnly
+            ? (_, __) {}
+            : viewModel.actualizarCantidadProducto,
         onSeleccionarReemplazo: viewModel.isViewOnly
             ? (_, __) {}
-            : (index, detalle) => _seleccionarProductoReemplazo(viewModel, index, detalle),
+            : (index, detalle) =>
+                  _seleccionarProductoReemplazo(viewModel, index, detalle),
         isReadOnly: viewModel.isViewOnly,
       ),
     );
@@ -410,11 +566,7 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.post_add_rounded,
-            size: 48,
-            color: Colors.grey[300],
-          ),
+          Icon(Icons.post_add_rounded, size: 48, color: Colors.grey[300]),
           const SizedBox(height: 12),
           Text(
             "Sin productos",
@@ -429,7 +581,10 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     );
   }
 
-  Widget _buildBottomArea(vm.OperacionComercialFormViewModel viewModel, bool necesitaReintento) {
+  Widget _buildBottomArea(
+    vm.OperacionComercialFormViewModel viewModel,
+    bool necesitaReintento,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -446,11 +601,11 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
         child: necesitaReintento
             ? _buildRetryButton(viewModel)
             : BottomBarWidget(
-          totalProductos: viewModel.totalProductos,
-          isSaving: viewModel.isSaving,
-          isEditing: false,
-          onGuardar: () => _guardarOperacion(viewModel),
-        ),
+                totalProductos: viewModel.totalProductos,
+                isSaving: viewModel.isSaving,
+                isEditing: false,
+                onGuardar: () => _guardarOperacion(viewModel),
+              ),
       ),
     );
   }
@@ -468,8 +623,12 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
               const SizedBox(width: 8),
               Text(
                 'Error de sincronización',
-                style: TextStyle(color: AppColors.error, fontSize: 12, fontWeight: FontWeight.bold),
-              )
+                style: TextStyle(
+                  color: AppColors.error,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -481,11 +640,16 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.warning,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 elevation: 0,
               ),
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Reintentar Sincronización', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              label: const Text(
+                'Reintentar Sincronización',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
@@ -493,7 +657,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     );
   }
 
-  Widget _buildModernStatusBanner(vm.OperacionComercialFormViewModel viewModel) {
+  Widget _buildModernStatusBanner(
+    vm.OperacionComercialFormViewModel viewModel,
+  ) {
     final operacion = viewModel.operacionExistente;
     final tieneError = operacion?.syncStatus == 'error';
     final colorBase = tieneError ? AppColors.error : const Color(0xFF64748B);
@@ -508,7 +674,10 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
       ),
       child: Row(
         children: [
-          Icon(tieneError ? Icons.cloud_off_rounded : Icons.lock_clock_rounded, color: colorBase),
+          Icon(
+            tieneError ? Icons.cloud_off_rounded : Icons.lock_clock_rounded,
+            color: colorBase,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -516,12 +685,19 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
               children: [
                 Text(
                   tieneError ? 'Sincronización Fallida' : 'Modo Solo Lectura',
-                  style: TextStyle(color: colorBase, fontWeight: FontWeight.bold, fontSize: 14),
+                  style: TextStyle(
+                    color: colorBase,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
                 if (tieneError)
                   Text(
                     operacion?.syncError ?? 'Error desconocido',
-                    style: TextStyle(color: colorBase.withValues(alpha: 0.8), fontSize: 12),
+                    style: TextStyle(
+                      color: colorBase.withValues(alpha: 0.8),
+                      fontSize: 12,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -539,12 +715,12 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     Color color = Colors.orange;
     String tooltip = 'Pendiente';
 
-    if(status == 'migrado') {
+    if (status == 'migrado') {
       icon = Icons.check_circle_rounded;
       color = Colors.green;
       tooltip = 'Sincronizado';
     }
-    if(status == 'error') {
+    if (status == 'error') {
       icon = Icons.error_rounded;
       color = Colors.red;
       tooltip = 'Error';
@@ -573,9 +749,7 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(
-                      color: AppColors.primary,
-                    ),
+                    CircularProgressIndicator(color: AppColors.primary),
                     const SizedBox(height: 16),
                     Text(
                       message,
@@ -600,7 +774,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     }
   }
 
-  Future<void> _reintentarSincronizacion(vm.OperacionComercialFormViewModel viewModel) async {
+  Future<void> _reintentarSincronizacion(
+    vm.OperacionComercialFormViewModel viewModel,
+  ) async {
     final operacion = viewModel.operacionExistente;
     if (operacion == null) return;
 
@@ -636,13 +812,16 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
 
       AppNotification.show(
         context,
-        message: 'Error al reintentar: ${e.toString().replaceAll('Exception: ', '')}',
+        message:
+            'Error al reintentar: ${e.toString().replaceAll('Exception: ', '')}',
         type: NotificationType.error,
       );
     }
   }
 
-  Future<void> _seleccionarFechaRetiro(vm.OperacionComercialFormViewModel viewModel) async {
+  Future<void> _seleccionarFechaRetiro(
+    vm.OperacionComercialFormViewModel viewModel,
+  ) async {
     if (viewModel.isViewOnly) return;
     HapticFeedback.selectionClick();
 
@@ -679,7 +858,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     }
   }
 
-  Future<void> _guardarOperacion(vm.OperacionComercialFormViewModel viewModel) async {
+  Future<void> _guardarOperacion(
+    vm.OperacionComercialFormViewModel viewModel,
+  ) async {
     if (!_formKey.currentState!.validate()) {
       HapticFeedback.heavyImpact();
       AppNotification.show(
@@ -723,7 +904,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
     }
   }
 
-  Future<bool> _handleBackNavigation(vm.OperacionComercialFormViewModel viewModel) async {
+  Future<bool> _handleBackNavigation(
+    vm.OperacionComercialFormViewModel viewModel,
+  ) async {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -762,14 +945,16 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
   }
 
   Future<void> _seleccionarProductoReemplazo(
-      vm.OperacionComercialFormViewModel viewModel,
-      int index,
-      dynamic detalle,
-      ) async {
+    vm.OperacionComercialFormViewModel viewModel,
+    int index,
+    dynamic detalle,
+  ) async {
     if (viewModel.isViewOnly) return;
 
     // Obtener el producto original desde el repository usando el productoId
-    final productoOriginal = await viewModel.obtenerProductoPorId(detalle.productoId);
+    final productoOriginal = await viewModel.obtenerProductoPorId(
+      detalle.productoId,
+    );
 
     if (productoOriginal == null) {
       if (!mounted) return;
@@ -781,7 +966,9 @@ class _OperacionComercialFormViewState extends State<_OperacionComercialFormView
       return;
     }
 
-    final productosReemplazo = await viewModel.obtenerProductosReemplazo(productoOriginal);
+    final productosReemplazo = await viewModel.obtenerProductosReemplazo(
+      productoOriginal,
+    );
 
     if (!mounted) return;
 
@@ -820,7 +1007,8 @@ class _ReemplazoProductoModal extends StatefulWidget {
   });
 
   @override
-  State<_ReemplazoProductoModal> createState() => _ReemplazoProductoModalState();
+  State<_ReemplazoProductoModal> createState() =>
+      _ReemplazoProductoModalState();
 }
 
 class _ReemplazoProductoModalState extends State<_ReemplazoProductoModal> {
@@ -952,9 +1140,9 @@ class _ReemplazoProductoModalState extends State<_ReemplazoProductoModal> {
                   prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                    icon: Icon(Icons.clear, color: Colors.grey[400]),
-                    onPressed: _limpiarBusqueda,
-                  )
+                          icon: Icon(Icons.clear, color: Colors.grey[400]),
+                          onPressed: _limpiarBusqueda,
+                        )
                       : null,
                   filled: true,
                   fillColor: const Color(0xFFF1F5F9),
@@ -989,15 +1177,16 @@ class _ReemplazoProductoModalState extends State<_ReemplazoProductoModal> {
               child: _productosFiltrados.isEmpty
                   ? _buildEmptyState()
                   : ListView.separated(
-                controller: scrollController,
-                padding: const EdgeInsets.all(16),
-                itemCount: _productosFiltrados.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final producto = _productosFiltrados[index];
-                  return _buildProductoItem(producto);
-                },
-              ),
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _productosFiltrados.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final producto = _productosFiltrados[index];
+                        return _buildProductoItem(producto);
+                      },
+                    ),
             ),
           ],
         ),
@@ -1052,14 +1241,21 @@ class _ReemplazoProductoModalState extends State<_ReemplazoProductoModal> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.grey.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           producto.codigo ?? 'S/C',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.grey[600]),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -1090,7 +1286,11 @@ class _ReemplazoProductoModalState extends State<_ReemplazoProductoModal> {
             const SizedBox(height: 16),
             Text(
               'No se encontraron resultados',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.grey[600]),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[600],
+              ),
             ),
           ],
         ),

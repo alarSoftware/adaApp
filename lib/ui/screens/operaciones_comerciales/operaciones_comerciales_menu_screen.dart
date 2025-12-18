@@ -40,7 +40,6 @@ class _OperacionesComercialesMenuView extends StatefulWidget {
 class _OperacionesComercialesMenuViewState
     extends State<_OperacionesComercialesMenuView>
     with TickerProviderStateMixin, RouteAware {
-
   late TabController _tabController;
   late List<_TabConfig> _availableTabs;
 
@@ -88,35 +87,41 @@ class _OperacionesComercialesMenuViewState
   List<_TabConfig> _getAvailableTabs() {
     final List<_TabConfig> tabs = [];
 
-    tabs.add(_TabConfig(
-      tipo: TipoOperacion.notaReposicion,
-      label: 'Reposición',
-      icon: Icons.add_shopping_cart,
-      color: AppColors.success,
-      title: 'Nota de Reposición',
-      description: 'Solicita productos para reponer en el cliente',
-    ));
+    tabs.add(
+      _TabConfig(
+        tipo: TipoOperacion.notaReposicion,
+        label: 'Reposición',
+        icon: Icons.add_shopping_cart,
+        color: AppColors.success,
+        title: 'Nota de Reposición',
+        description: 'Solicita productos para reponer en el cliente',
+      ),
+    );
 
     if (widget.cliente.esCredito) {
-      tabs.add(_TabConfig(
-        tipo: TipoOperacion.notaRetiro,
-        label: 'Retiro',
-        icon: Icons.remove_shopping_cart,
-        color: AppColors.warning,
-        title: 'Nota de Retiro',
-        description: 'Retira productos del cliente',
-      ));
+      tabs.add(
+        _TabConfig(
+          tipo: TipoOperacion.notaRetiro,
+          label: 'Retiro',
+          icon: Icons.remove_shopping_cart,
+          color: AppColors.warning,
+          title: 'Nota de Retiro',
+          description: 'Retira productos del cliente',
+        ),
+      );
     }
 
     if (widget.cliente.esContado) {
-      tabs.add(_TabConfig(
-        tipo: TipoOperacion.notaRetiroDiscontinuos,
-        label: 'Discontinuos',
-        icon: Icons.inventory_2_outlined,
-        color: AppColors.error,
-        title: 'Retiro de Discontinuos',
-        description: 'Retira productos discontinuados (misma categoría)',
-      ));
+      tabs.add(
+        _TabConfig(
+          tipo: TipoOperacion.notaRetiroDiscontinuos,
+          label: 'Discontinuos',
+          icon: Icons.inventory_2_outlined,
+          color: AppColors.error,
+          title: 'Retiro de Discontinuos',
+          description: 'Retira productos discontinuados (misma categoría)',
+        ),
+      );
     }
 
     return tabs;
@@ -159,13 +164,13 @@ class _OperacionesComercialesMenuViewState
             return IconButton(
               icon: viewModel.isSyncing
                   ? SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.appBarForeground,
-                ),
-              )
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.appBarForeground,
+                      ),
+                    )
                   : const Icon(Icons.refresh_rounded),
               onPressed: viewModel.isLoading || viewModel.isSyncing
                   ? null
@@ -179,7 +184,8 @@ class _OperacionesComercialesMenuViewState
   }
 
   Future<void> _sincronizarYCargar(
-      OperacionesComercialesMenuViewModel viewModel) async {
+    OperacionesComercialesMenuViewModel viewModel,
+  ) async {
     final resultado = await viewModel.sincronizarOperacionesDesdeServidor();
 
     if (!mounted) return;
@@ -218,19 +224,13 @@ class _OperacionesComercialesMenuViewState
         indicatorWeight: 3,
         isScrollable: true,
         tabAlignment: TabAlignment.start,
-        labelStyle: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
+        labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         unselectedLabelStyle: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.normal,
         ),
         tabs: _availableTabs
-            .map((tab) => Tab(
-          text: tab.label,
-          icon: Icon(tab.icon, size: 20),
-        ))
+            .map((tab) => Tab(text: tab.label, icon: Icon(tab.icon, size: 20)))
             .toList(),
       ),
     );
@@ -240,19 +240,16 @@ class _OperacionesComercialesMenuViewState
     return TabBarView(
       controller: _tabController,
       children: _availableTabs
-          .map((tab) => _buildOperacionTab(
-        tipoOperacion: tab.tipo,
-        color: tab.color,
-      ))
+          .map(
+            (tab) =>
+                _buildOperacionTab(tipoOperacion: tab.tipo, color: tab.color),
+          )
           .toList(),
     );
   }
 
   Widget _buildSingleTab(_TabConfig tab) {
-    return _buildOperacionTab(
-      tipoOperacion: tab.tipo,
-      color: tab.color,
-    );
+    return _buildOperacionTab(tipoOperacion: tab.tipo, color: tab.color);
   }
 
   Widget _buildOperacionTab({
@@ -275,10 +272,7 @@ class _OperacionesComercialesMenuViewState
                   icon: const Icon(Icons.add_circle_outline_rounded),
                   label: const Text(
                     'Nueva Solicitud',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: color,
@@ -318,10 +312,10 @@ class _OperacionesComercialesMenuViewState
   }
 
   Widget _buildOperacionesList(
-      OperacionesComercialesMenuViewModel viewModel,
-      TipoOperacion tipoOperacion,
-      Color color,
-      ) {
+    OperacionesComercialesMenuViewModel viewModel,
+    TipoOperacion tipoOperacion,
+    Color color,
+  ) {
     if (viewModel.isLoading) {
       return Center(child: CircularProgressIndicator(color: color));
     }
@@ -344,12 +338,13 @@ class _OperacionesComercialesMenuViewState
   }
 
   Widget _buildOperacionCard(
-      OperacionComercial operacion,
-      Color color,
-      OperacionesComercialesMenuViewModel viewModel,
-      ) {
-    final fechaStr =
-    DateFormat('dd/MM/yyyy HH:mm').format(operacion.fechaCreacion);
+    OperacionComercial operacion,
+    Color color,
+    OperacionesComercialesMenuViewModel viewModel,
+  ) {
+    final fechaStr = DateFormat(
+      'dd/MM/yyyy HH:mm',
+    ).format(operacion.fechaCreacion);
 
     return Container(
       decoration: BoxDecoration(
@@ -397,8 +392,9 @@ class _OperacionesComercialesMenuViewState
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: _getSyncStatusColor(operacion.syncStatus)
-                              .withValues(alpha: 0.1),
+                          color: _getSyncStatusColor(
+                            operacion.syncStatus,
+                          ).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -411,35 +407,53 @@ class _OperacionesComercialesMenuViewState
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        fechaStr,
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                      Text(fechaStr),
                     ],
                   ),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      '${operacion.totalProductos}',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                    if (operacion.odooName != null &&
+                        operacion.odooName!.isNotEmpty)
+                      Text(
+                        'Odoo: ${operacion.odooName}',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    Text(
-                      'items',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: AppColors.textSecondary,
+                    if (operacion.adaSequence != null &&
+                        operacion.adaSequence!.isNotEmpty)
+                      Text(
+                        '${operacion.adaSequence}',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                        ),
                       ),
-                    ),
+                    if ((operacion.odooName == null ||
+                            operacion.odooName!.isEmpty) &&
+                        (operacion.adaSequence == null ||
+                            operacion.adaSequence!.isEmpty)) ...[
+                      // Fallback or just empty if no data
+                      Text(
+                        '${operacion.totalProductos}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        'items',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(width: 8),
@@ -508,9 +522,9 @@ class _OperacionesComercialesMenuViewState
   }
 
   Future<void> _navigateToCreateOperacion(
-      TipoOperacion tipoOperacion,
-      OperacionesComercialesMenuViewModel viewModel,
-      ) async {
+    TipoOperacion tipoOperacion,
+    OperacionesComercialesMenuViewModel viewModel,
+  ) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -536,9 +550,9 @@ class _OperacionesComercialesMenuViewState
   }
 
   Future<void> _navigateToEditOperacion(
-      OperacionComercial operacion,
-      OperacionesComercialesMenuViewModel viewModel,
-      ) async {
+    OperacionComercial operacion,
+    OperacionesComercialesMenuViewModel viewModel,
+  ) async {
     await Navigator.push(
       context,
       MaterialPageRoute(

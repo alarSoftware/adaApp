@@ -11,6 +11,7 @@ import 'package:ada_app/services/device/location_service.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../utils/unidad_medida_helper.dart';
+import '../../services/sync/operacion_comercial_sync_service.dart';
 
 enum FormState { idle, loading, saving, error, retrying }
 
@@ -29,7 +30,8 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
 
   final Cliente cliente;
   final TipoOperacion tipoOperacion;
-  final OperacionComercial? operacionExistente;
+
+  OperacionComercial? _operacionActual;
 
   FormState _formState = FormState.idle;
   String? _errorMessage;
@@ -45,15 +47,18 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   OperacionComercialFormViewModel({
     required this.cliente,
     required this.tipoOperacion,
-    this.operacionExistente,
+    OperacionComercial? operacionExistente,
     this.isViewOnly = false,
     OperacionComercialRepository? operacionRepository,
     ProductoRepository? productoRepository,
   }) : _operacionRepository =
            operacionRepository ?? OperacionComercialRepositoryImpl(),
        _productoRepository = productoRepository ?? ProductoRepositoryImpl() {
+    _operacionActual = operacionExistente;
     _initializeForm();
   }
+
+  OperacionComercial? get operacionExistente => _operacionActual;
 
   FormState get formState => _formState;
   String? get errorMessage => _errorMessage;
@@ -101,6 +106,8 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     _fechaRetiro = fecha;
     notifyListeners();
   }
+
+  //TODO mostrar odooName y adaSequence
 
   void setSnc(String value) {
     if (isViewOnly) return;
@@ -450,6 +457,33 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     }
 
     return false; // No changes found
+  }
+
+  Future<bool> sincronizarOperacionActual() async {
+    if (_operacionActual == null || cliente.id == null) return false;
+
+    _setFormState(FormState.loading);
+
+    try {
+      await OperacionComercialSyncService.obtenerOperacionesPorCliente(
+        cliente.id!,
+      );
+
+      final operacionActualizada = await _operacionRepository
+          .obtenerOperacionPorId(_operacionActual!.id!);
+
+      if (operacionActualizada != null) {
+        _operacionActual = operacionActualizada;
+        _cargarOperacionExistente();
+      }
+
+      _setFormState(FormState.idle);
+      return true;
+    } catch (e) {
+      _setError('Error al descargar: $e');
+      _setFormState(FormState.idle);
+      return false;
+    }
   }
 
   Future<Producto?> obtenerProductoPorId(int productoId) async {

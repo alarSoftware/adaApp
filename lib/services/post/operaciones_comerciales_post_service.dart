@@ -17,7 +17,7 @@ class OperacionesComercialesPostService {
   static const String _endpoint =
       '/operacionComercial/insertOperacionComercial';
 
-  static Future<void> enviarOperacion(
+  static Future<ServerResponse> enviarOperacion(
     OperacionComercial operacion, {
     int timeoutSegundos = 60,
     ProductoRepository? productoRepository,
@@ -59,6 +59,8 @@ class OperacionesComercialesPostService {
           throw Exception(resultObject.message);
         }
       }
+
+      return resultObject;
     } catch (e) {
       rethrow;
     }
