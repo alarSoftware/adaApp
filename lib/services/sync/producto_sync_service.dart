@@ -46,6 +46,7 @@ class ProductoSyncService extends BaseSyncService {
       final processedResult = await _procesarProductosEnIsolate(response.body);
 
       // Guardar en BD (esto se hace en el hilo principal por sqflite)
+      // Guardar en BD (esto se hace en el hilo principal por sqflite)
       if (processedResult.isNotEmpty) {
         try {
           final repo = ProductoRepositoryImpl();
@@ -56,6 +57,14 @@ class ProductoSyncService extends BaseSyncService {
             operation: 'guardar_via_repository',
             errorMessage: 'Error guardando productos via repository: $e',
           );
+        }
+      } else {
+        // CORRECCIÓN: Si la lista procesada está vacía, limpiar la tabla local
+        try {
+          final repo = ProductoRepositoryImpl();
+          await repo.limpiarProductosLocales();
+        } catch (e) {
+          print('Error limpiando productos locales: $e');
         }
       }
 

@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'package:http/http.dart' as http;
 
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
@@ -238,35 +239,38 @@ class OperacionComercialSyncService extends BaseSyncService {
   }
 
   static Future<List<dynamic>> _parseResponse(http.Response response) async {
-    try {
-      final responseBody = jsonDecode(response.body);
+    final responseBody = response.body;
+    return await Isolate.run(() {
+      try {
+        final decoded = jsonDecode(responseBody);
 
-      if (responseBody is Map) {
-        final responseMap = Map<String, dynamic>.from(responseBody);
+        if (decoded is Map) {
+          final responseMap = Map<String, dynamic>.from(decoded);
 
-        final dataValue = responseMap['data'];
-        if (dataValue == null) return [];
+          final dataValue = responseMap['data'];
+          if (dataValue == null) return [];
 
-        if (dataValue is String) {
-          try {
-            final parsed = jsonDecode(dataValue) as List;
-            return parsed;
-          } catch (e) {
-            return [];
+          if (dataValue is String) {
+            try {
+              final parsed = jsonDecode(dataValue) as List;
+              return parsed;
+            } catch (e) {
+              return [];
+            }
+          } else if (dataValue is List) {
+            return dataValue;
           }
-        } else if (dataValue is List) {
-          return dataValue;
+
+          return [];
+        } else if (decoded is List) {
+          return decoded;
         }
 
         return [];
-      } else if (responseBody is List) {
-        return responseBody;
+      } catch (e) {
+        throw Exception('Error parseando respuesta del servidor: $e');
       }
-
-      return [];
-    } catch (e) {
-      throw Exception('Error parseando respuesta del servidor: $e');
-    }
+    });
   }
 
   static Future<List<Map<String, dynamic>>> _vincularOperacionesConDetalles(

@@ -85,11 +85,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
             return;
           }
-        } catch (e) {
-        }
+        } catch (e) {}
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   Future<void> _cargarImagen2() async {
@@ -122,11 +120,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
             return;
           }
-        } catch (e) {
-        }
+        } catch (e) {}
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   @override
@@ -226,8 +222,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
   }
 
   Future<void> _navegarAEquipoClienteDetail(
-      Map<String, dynamic> resultado,
-      ) async {
+    Map<String, dynamic> resultado,
+  ) async {
     try {
       final estadoId = resultado['estado_id'] as String?;
 
@@ -243,10 +239,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => PreviewScreen(
-              datos: datosHistorial,
-              historialItem: null,
-            ),
+            builder: (context) =>
+                PreviewScreen(datos: datosHistorial, historialItem: null),
           ),
         );
       }
@@ -319,44 +313,79 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   void _volverDesdeHistorial() {
     try {
-      final cliente = widget.datos['cliente'] as Cliente;
+      final cliente = widget.datos['cliente'];
+      // Para equipos nuevos, equipoCompleto será null.
+      // Construimos el objeto equipoCliente con los datos disponibles en widget.datos.
       final equipoCompleto = widget.datos['equipo_completo'];
 
-      if (cliente.id == null || equipoCompleto == null) {
-        Navigator.of(context).pop();
+      if (cliente == null || cliente is! Cliente) {
+        if (Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+        }
         return;
       }
 
-      final equipoCliente = {
-        'id': equipoCompleto['id'],
-        'cod_barras': equipoCompleto['cod_barras'],
-        'numero_serie': equipoCompleto['numero_serie'],
-        'marca_id': equipoCompleto['marca_id'],
-        'modelo_id': equipoCompleto['modelo_id'],
-        'logo_id': equipoCompleto['logo_id'],
-        'cliente_id': cliente.id,
-        'marca_nombre': equipoCompleto['marca_nombre'],
-        'modelo_nombre': equipoCompleto['modelo_nombre'],
-        'logo_nombre': equipoCompleto['logo_nombre'],
-        'cliente_nombre': cliente.nombre,
-        'cliente_telefono': cliente.telefono,
-        'cliente_direccion': cliente.direccion,
-        'tipo_estado': widget.datos['ya_asignado'] == true ? 'asignado' : 'pendiente',
-      };
+      final Map<String, dynamic> equipoCliente;
 
-      Navigator.of(context).pop();
-      Navigator.of(context).pop();
+      if (equipoCompleto != null) {
+        // Caso: Equipo existente (Censo)
+        equipoCliente = {
+          'id': equipoCompleto['id'],
+          'cod_barras': equipoCompleto['cod_barras'],
+          'numero_serie': equipoCompleto['numero_serie'],
+          'marca_id': equipoCompleto['marca_id'],
+          'modelo_id': equipoCompleto['modelo_id'],
+          'logo_id': equipoCompleto['logo_id'],
+          'cliente_id': cliente.id,
+          'marca_nombre': equipoCompleto['marca_nombre'],
+          'modelo_nombre': equipoCompleto['modelo_nombre'],
+          'logo_nombre': equipoCompleto['logo_nombre'],
+          'cliente_nombre': cliente.nombre,
+          'cliente_telefono': cliente.telefono,
+          'cliente_direccion': cliente.direccion,
+          'tipo_estado': widget.datos['ya_asignado'] == true
+              ? 'asignado'
+              : 'pendiente',
+        };
+      } else {
+        // Caso: Nuevo Equipo
+        equipoCliente = {
+          'id': null, // ID desconocido aún
+          'cod_barras': widget.datos['codigo_barras'],
+          'numero_serie': widget.datos['numero_serie'],
+          'marca_id': widget.datos['marca_id'],
+          'modelo_id': widget.datos['modelo_id'],
+          'logo_id': widget.datos['logo_id'],
+          'cliente_id': cliente.id,
+          'marca_nombre':
+              widget.datos['marca'], // Nota: keys diferentes en datos
+          'modelo_nombre': widget.datos['modelo'],
+          'logo_nombre': widget.datos['logo'],
+          'cliente_nombre': cliente.nombre,
+          'cliente_telefono': cliente.telefono,
+          'cliente_direccion': cliente.direccion,
+          'tipo_estado': 'pendiente', // Nuevo siempre es pendiente
+        };
+      }
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => EquiposClientesDetailScreen(
-            equipoCliente: equipoCliente,
+      if (mounted) {
+        // Usamos pushAndRemoveUntil para asegurar que salimos del FormScreen (y cualquier pantalla intermedia)
+        // Mantenemos solo la pantalla principal (Dashboard/Lista) debajo
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                EquiposClientesDetailScreen(equipoCliente: equipoCliente),
           ),
-        ),
-      );
+          (route) =>
+              route.isFirst, // Remueve hasta la raíz (o hasta donde sea seguro)
+        );
+      }
     } catch (e) {
-      Navigator.of(context).pop();
+      print('Error al volver desde historial: $e');
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
     }
   }
 
@@ -414,12 +443,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
       leading: vm.canConfirm
           ? null
           : Container(
-        margin: const EdgeInsets.all(12),
-        child: CircularProgressIndicator(
-          color: AppColors.onPrimary,
-          strokeWidth: 2,
-        ),
-      ),
+              margin: const EdgeInsets.all(12),
+              child: CircularProgressIndicator(
+                color: AppColors.onPrimary,
+                strokeWidth: 2,
+              ),
+            ),
     );
   }
 
@@ -488,7 +517,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
             onVolver: () => _volverDesdeHistorial(),
             onConfirmar: null,
             onReintentarEnvio:
-            (envioFallido && estadoId != null && !_yaReintentando)
+                (envioFallido && estadoId != null && !_yaReintentando)
                 ? () => _reintentarEnvioHistorial(estadoId)
                 : null,
           );
@@ -565,7 +594,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
     return StreamBuilder<Map<String, dynamic>>(
       stream: viewModel.syncStatusStream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting || !snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting ||
+            !snapshot.hasData) {
           return Container(
             margin: const EdgeInsets.only(bottom: 16),
             padding: const EdgeInsets.all(16),
@@ -581,7 +611,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),

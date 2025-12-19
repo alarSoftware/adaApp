@@ -56,19 +56,26 @@ class CensusSyncService extends BaseSyncService {
       // Procesar JSON en Isolate
       final processedResult = await _procesarCensosEnIsolate(response.body);
 
+      if (processedResult == null) {
+        return SyncResult(
+          exito: false,
+          mensaje: 'Error procesando datos del servidor',
+          itemsSincronizados: 0,
+        );
+      }
+
       // Guardar en BD (hilo principal)
-      if (processedResult.isNotEmpty) {
-        try {
-          final dbHelper = DatabaseHelper();
-          await dbHelper.vaciarEInsertar('censo_activo', processedResult);
-        } catch (e) {
-          BaseSyncService.logger.e('Error guardando censos en BD: $e');
-          await ErrorLogService.logDatabaseError(
-            tableName: 'censo_activo',
-            operation: 'bulk_insert',
-            errorMessage: 'Error en vaciarEInsertar: $e',
-          );
-        }
+      // Guardamos SIEMPRE, incluso si está vacío, para limpiar la tabla
+      try {
+        final dbHelper = DatabaseHelper();
+        await dbHelper.vaciarEInsertar('censo_activo', processedResult);
+      } catch (e) {
+        BaseSyncService.logger.e('Error guardando censos en BD: $e');
+        await ErrorLogService.logDatabaseError(
+          tableName: 'censo_activo',
+          operation: 'bulk_insert',
+          errorMessage: 'Error en vaciarEInsertar: $e',
+        );
       }
 
       // Guardar los datos para acceso posterior
@@ -281,6 +288,14 @@ class CensusSyncService extends BaseSyncService {
 
       if (_isSuccessStatusCode(response.statusCode)) {
         final censosData = await _procesarCensosEnIsolate(response.body);
+        if (censosData == null) {
+          _ultimosCensos = [];
+          return SyncResult(
+            exito: false,
+            mensaje: 'Error procesando respuesta del servidor',
+            itemsSincronizados: 0,
+          );
+        }
         _ultimosCensos = censosData;
 
         return SyncResult(
@@ -568,20 +583,20 @@ class CensusSyncService extends BaseSyncService {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> _procesarCensosEnIsolate(
+  static Future<List<Map<String, dynamic>>?> _procesarCensosEnIsolate(
     String responseBody,
   ) async {
     return await Isolate.run(() => _procesarCensosJSON(responseBody));
   }
 
-  static List<Map<String, dynamic>> _procesarCensosJSON(String responseBody) {
+  static List<Map<String, dynamic>>? _procesarCensosJSON(String responseBody) {
     try {
       final decoded = jsonDecode(responseBody);
       List<dynamic> censosData = [];
 
       if (decoded is Map) {
         final responseMap = Map<String, dynamic>.from(decoded);
-        if (responseMap['status'] != 'OK') return [];
+        if (responseMap['status'] != 'OK') return null;
 
         final dataValue = responseMap['data'];
         if (dataValue == null) return [];
@@ -590,7 +605,7 @@ class CensusSyncService extends BaseSyncService {
           try {
             censosData = jsonDecode(dataValue) as List;
           } catch (e) {
-            return [];
+            return null;
           }
         } else if (dataValue is List) {
           censosData = dataValue;
@@ -615,7 +630,7 @@ class CensusSyncService extends BaseSyncService {
 
       return censosParaGuardar;
     } catch (e) {
-      return [];
+      return null;
     }
   }
 }

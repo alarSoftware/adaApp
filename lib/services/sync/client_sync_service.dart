@@ -23,13 +23,13 @@ class ClientSyncService {
       if (employeeId == null || employeeId.trim().isEmpty) {
         return SyncResult(
           exito: true,
-          mensaje: 'Usuario sin clientes asignados - omitiendo sincronización de clientes',
+          mensaje:
+              'Usuario sin clientes asignados - omitiendo sincronización de clientes',
           itemsSincronizados: 0,
         );
       }
 
       return await sincronizarClientesPorVendedor(employeeId);
-
     } catch (e) {
       await ErrorLogService.logError(
         tableName: 'clientes',
@@ -46,25 +46,36 @@ class ClientSyncService {
     }
   }
 
-  static Future<SyncResult> sincronizarClientesPorVendedor(String employeeId) async {
+  static Future<SyncResult> sincronizarClientesPorVendedor(
+    String employeeId,
+  ) async {
     String? currentEndpoint;
 
     try {
       final url = await _getClientesUrl(employeeId);
       currentEndpoint = url;
 
-      final response = await http.get(
-        Uri.parse(url),
-        headers: BaseSyncService.headers,
-      ).timeout(BaseSyncService.timeout);
+      final response = await http
+          .get(Uri.parse(url), headers: BaseSyncService.headers)
+          .timeout(BaseSyncService.timeout);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        final List<dynamic> clientesData = BaseSyncService.parseResponse(response.body);
+        final List<dynamic> clientesData = BaseSyncService.parseResponse(
+          response.body,
+        );
 
         if (clientesData.isEmpty) {
+          // CORRECCIÓN: Si el servidor devuelve una lista vacía, debemos limpiar la tabla local
+          try {
+            await _clienteRepo.limpiarYSincronizar([]);
+          } catch (dbError) {
+            print('Error al limpiar clientes: $dbError');
+          }
+
           return SyncResult(
             exito: true,
-            mensaje: 'No se encontraron clientes para este vendedor',
+            mensaje:
+                'No se encontraron clientes para este vendedor (Tabla local limpiada)',
             itemsSincronizados: 0,
           );
         }
@@ -92,7 +103,9 @@ class ClientSyncService {
         }
 
         try {
-          final clientesMapas = clientes.map((cliente) => cliente.toMap()).toList();
+          final clientesMapas = clientes
+              .map((cliente) => cliente.toMap())
+              .toList();
           await _clienteRepo.limpiarYSincronizar(clientesMapas);
         } catch (dbError) {
           await ErrorLogService.logDatabaseError(
@@ -108,7 +121,6 @@ class ClientSyncService {
           itemsSincronizados: clientes.length,
           totalEnAPI: clientes.length,
         );
-
       } else {
         final mensaje = BaseSyncService.extractErrorMessage(response);
 
@@ -118,21 +130,18 @@ class ClientSyncService {
           itemsSincronizados: 0,
         );
       }
-
     } on TimeoutException catch (timeoutError) {
       return SyncResult(
         exito: false,
         mensaje: 'Timeout de conexión al servidor',
         itemsSincronizados: 0,
       );
-
     } on SocketException catch (socketError) {
       return SyncResult(
         exito: false,
         mensaje: 'Sin conexión de red',
         itemsSincronizados: 0,
       );
-
     } catch (e) {
       return SyncResult(
         exito: false,
@@ -150,14 +159,16 @@ class ClientSyncService {
 
       final data = clienteJson;
 
-      if (data['cliente'] == null || data['cliente'].toString().trim().isEmpty) {
+      if (data['cliente'] == null ||
+          data['cliente'].toString().trim().isEmpty) {
         return null;
       }
 
       String rucCi = '';
       if (data['ruc'] != null && data['ruc'].toString().trim().isNotEmpty) {
         rucCi = data['ruc'].toString().trim();
-      } else if (data['cedula'] != null && data['cedula'].toString().trim().isNotEmpty) {
+      } else if (data['cedula'] != null &&
+          data['cedula'].toString().trim().isNotEmpty) {
         rucCi = data['cedula'].toString().trim();
       }
 
