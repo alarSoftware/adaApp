@@ -462,7 +462,7 @@ class CensoActivoPostService {
   ) {
     var pendienteExistente = pendienteExistenteList[0];
     String id = pendienteExistente['id'];
-    var edfVendedorId = pendienteExistente['edf_vendedor_id'];
+    var edfVendedorId = pendienteExistente['employed_id'];
     var equipoId = pendienteExistente['equipo_id'];
     var codigoBarras = pendienteExistente['codigo_barras'];
     var clienteId = pendienteExistente['cliente_id'];

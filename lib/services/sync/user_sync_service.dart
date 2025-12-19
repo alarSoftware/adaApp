@@ -57,7 +57,7 @@ class UserSyncService {
           }
 
           return {
-            'edf_vendedor_id': usuario['edfVendedorId']?.toString(),
+            'employed_id': usuario['employedId']?.toString(),
             // 👇 NUEVA LÍNEA AGREGADA:
             'edfVendedorNombre': usuario['edfVendedorNombre']?.toString(),
             'code': usuarioId,
@@ -205,20 +205,20 @@ class UserSyncService {
         BaseSyncService.logger.e('No hay usuario logueado');
         await ErrorLogService.logValidationError(
           tableName: 'Users',
-          operation: 'get_edf_vendedor_id',
+          operation: 'get_employed_id',
           errorMessage: 'No hay usuario logueado',
         );
         return null;
       }
 
       BaseSyncService.logger.i(
-        'Buscando edf_vendedor_id para usuario: $username',
+        'Buscando employed_id para usuario: $username',
       );
 
       final db = await _dbHelper.database;
       final result = await db.query(
         'Users',
-        columns: ['edf_vendedor_id'],
+        columns: ['employed_id'],
         where: 'LOWER(username) = ?',
         whereArgs: [username.toLowerCase()],
         limit: 1,
@@ -237,10 +237,10 @@ class UserSyncService {
         return null;
       }
 
-      final edfVendedorId = result.first['edf_vendedor_id'] as String?;
+      final edfVendedorId = result.first['employed_id'] as String?;
 
       BaseSyncService.logger.i('Usuario encontrado: $username');
-      BaseSyncService.logger.i('edf_vendedor_id: $edfVendedorId');
+      BaseSyncService.logger.i('employed_id: $edfVendedorId');
 
       if (edfVendedorId == null || edfVendedorId.trim().isEmpty) {
         // await ErrorLogService.logValidationError(
@@ -253,11 +253,11 @@ class UserSyncService {
 
       return edfVendedorId;
     } catch (e) {
-      BaseSyncService.logger.e('Error obteniendo edf_vendedor_id: $e');
+      BaseSyncService.logger.e('Error obteniendo employed_id: $e');
       await ErrorLogService.logError(
         tableName: 'Users',
-        operation: 'get_edf_vendedor_id',
-        errorMessage: 'Error obteniendo edf_vendedor_id: $e',
+        operation: 'get_employed_id',
+        errorMessage: 'Error obteniendo employed_id: $e',
         errorType: 'database',
       );
       return null;
@@ -268,18 +268,18 @@ class UserSyncService {
     try {
       final db = await _dbHelper.database;
       final result = await db.rawQuery(
-        'SELECT edf_vendedor_id FROM Users WHERE LOWER(username) = ? LIMIT 1',
+        'SELECT employed_id FROM Users WHERE LOWER(username) = ? LIMIT 1',
         [username.toLowerCase()],
       );
 
-      if (result.isNotEmpty && result.first['edf_vendedor_id'] != null) {
-        return result.first['edf_vendedor_id'].toString();
+      if (result.isNotEmpty && result.first['employed_id'] != null) {
+        return result.first['employed_id'].toString();
       }
 
       await ErrorLogService.logDatabaseError(
         tableName: 'Users',
         operation: 'query_user_direct',
-        errorMessage: 'Usuario $username no encontrado o sin edf_vendedor_id',
+        errorMessage: 'Usuario $username no encontrado o sin employed_id',
       );
 
       return null;

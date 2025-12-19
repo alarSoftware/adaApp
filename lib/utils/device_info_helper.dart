@@ -69,18 +69,18 @@ class DeviceInfoHelper {
       final db = await DatabaseHelper().database;
       final result = await db.query(
         'Users',
-        columns: ['edf_vendedor_id'],
+        columns: ['employed_id'],
         limit: 1,
       );
 
       if (result.isNotEmpty) {
-        return result.first['edf_vendedor_id'] as String?;
+        return result.first['employed_id'] as String?;
       }
 
       _logger.w('⚠️ No se encontró usuario en la base de datos');
       return null;
     } catch (e) {
-      _logger.e('❌ Error al obtener edf_vendedor_id: $e');
+      _logger.e('❌ Error al obtener employed_id: $e');
       return null;
     }
   }

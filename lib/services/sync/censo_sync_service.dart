@@ -513,7 +513,7 @@ class CensusSyncService extends BaseSyncService {
       'fecha_actualizacion': DateTime.now().toIso8601String(),
       'observaciones': apiCensus['observaciones']?.toString(),
       'estado_censo': 'migrado',
-      'edf_vendedor_id':
+      'employed_id':
           apiCensus['edfVendedorId']?.toString() ??
           apiCensus['edfVendedorSucursalId']?.toString(),
     };

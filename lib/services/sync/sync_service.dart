@@ -506,7 +506,7 @@ class SyncService {
       if (currentUsername == null || currentUsername.isEmpty) {
         await ErrorLogService.logValidationError(
           tableName: 'Users',
-          operation: 'obtener_edf_vendedor_id',
+          operation: 'obtener_employed_id',
           errorMessage: 'No hay usuario logueado en el sistema',
         );
         throw 'No hay usuario logueado en el sistema';
@@ -514,34 +514,34 @@ class SyncService {
 
       final dbHelper = DatabaseHelper();
       final resultado = await dbHelper.consultarPersonalizada(
-        'SELECT edf_vendedor_id FROM Users WHERE username = ? LIMIT 1',
+        'SELECT employed_id FROM Users WHERE username = ? LIMIT 1',
         [currentUsername],
       );
 
       if (resultado.isEmpty) {
         await ErrorLogService.logDatabaseError(
           tableName: 'Users',
-          operation: 'obtener_edf_vendedor_id',
+          operation: 'obtener_employed_id',
           errorMessage:
               'Usuario $currentUsername no encontrado en la base de datos',
         );
         throw 'Usuario $currentUsername no encontrado en la base de datos';
       }
 
-      final edfVendedorId = resultado.first['edf_vendedor_id']?.toString();
+      final edfVendedorId = resultado.first['employed_id']?.toString();
 
       if (edfVendedorId == null || edfVendedorId.isEmpty) {
-        throw 'Usuario $currentUsername no tiene edf_vendedor_id configurado';
+        throw 'Usuario $currentUsername no tiene employed_id configurado';
       }
 
       return edfVendedorId;
     } catch (e) {
-      if (!e.toString().contains('no tiene edf_vendedor_id') &&
+      if (!e.toString().contains('no tiene employed_id') &&
           !e.toString().contains('no encontrado') &&
           !e.toString().contains('No hay usuario')) {
         await ErrorLogService.logError(
           tableName: 'Users',
-          operation: 'obtener_edf_vendedor_id',
+          operation: 'obtener_employed_id',
           errorMessage: e.toString(),
           errorType: 'unknown',
         );

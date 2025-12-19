@@ -36,7 +36,7 @@ class DeviceLog {
   Map<String, dynamic> toMapLocal() {
     return {
       'id': id,
-      'edf_vendedor_id': edfVendedorId,
+      'employed_id': edfVendedorId,
       'latitud_longitud': latitudLongitud,
       'bateria': bateria,
       'modelo': modelo,
@@ -48,7 +48,7 @@ class DeviceLog {
   factory DeviceLog.fromMap(Map<String, dynamic> map) {
     return DeviceLog(
       id: map['id'],
-      edfVendedorId: map['edf_vendedor_id'],
+      edfVendedorId: map['employed_id'],
       latitudLongitud: map['latitud_longitud'],
       bateria: map['bateria'],
       modelo: map['modelo'],

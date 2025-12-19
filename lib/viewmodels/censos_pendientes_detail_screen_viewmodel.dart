@@ -221,7 +221,7 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
         );
       }
 
-      // 3. Obtener edf_vendedor_id
+      // 3. Obtener employed_id
       final usuariosList = await db.query(
         'Users',
         where: 'id = ?',
@@ -237,12 +237,11 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
         );
       }
 
-      final edfVendedorId = usuariosList.first['edf_vendedor_id'] as String?;
+      final edfVendedorId = usuariosList.first['employed_id'] as String?;
       if (edfVendedorId == null || edfVendedorId.isEmpty) {
-        _logger.e('❌ edf_vendedor_id vacío');
         return SyncResult(
           success: false,
-          error: 'edf_vendedor_id no disponible',
+          error: 'employed_id no disponible',
         );
       }
 

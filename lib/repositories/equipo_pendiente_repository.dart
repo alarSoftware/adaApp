@@ -126,7 +126,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
         'usuario_censo_id': usuarioCensoId,
         'fecha_creacion': now.toIso8601String(),
         'fecha_actualizacion': now.toIso8601String(),
-        'edf_vendedor_id': edfVendedorId,
+        'employed_id': edfVendedorId,
         'sincronizado': 0,
       };
 
@@ -331,7 +331,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
             equipoAPI['usuarioId'] ?? equipoAPI['usuario']?['id'] ?? 1,
 
             // --- CORRECCIÓN AQUÍ: Guardar edf_vendedor_id ---
-            'edf_vendedor_id':
+            'employed_id':
             equipoAPI['edfVendedorSucursalId'] ??
                 equipoAPI['edfVendedorId'],
 

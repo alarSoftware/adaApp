@@ -50,7 +50,7 @@ class DeviceLogRepository {
       if (edfVendedorId != null) {
         maps = await db.query(
           'device_log',
-          where: 'edf_vendedor_id = ?',
+          where: 'employed_id = ?',
           whereArgs: [edfVendedorId],
           orderBy: 'fecha_registro DESC',
           limit: 1,
@@ -172,7 +172,7 @@ class DeviceLogRepository {
     try {
       final maps = await db.query(
         'device_log',
-        where: 'edf_vendedor_id = ?',
+        where: 'employed_id = ?',
         whereArgs: [edfVendedorId],
         orderBy: 'fecha_registro DESC',
       );

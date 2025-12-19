@@ -61,7 +61,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'fecha_actualizacion': now.toIso8601String(),
         'estado_censo': EstadoEquipoCenso.creado.valor,
         'observaciones': observaciones,
-        'edf_vendedor_id': edfVendedorId,
+        'employed_id': edfVendedorId,
       };
 
       // 1. Usar await y no castear el resultado

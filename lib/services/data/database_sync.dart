@@ -195,8 +195,8 @@ class DatabaseSync {
     }
 
     return {
-      'id': usuarioMapa['id'], // ✅ AGREGAR ESTA LÍNEA
-      'edf_vendedor_id': usuarioMapa['edf_vendedor_id'],
+      'id': usuarioMapa['id'],
+      'employed_id': usuarioMapa['employed_id'],
       'edf_vendedor_nombre': usuarioMapa['edfVendedorNombre']
           ?.toString(), // Corrected key
       'code': usuarioMapa['code'],

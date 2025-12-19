@@ -172,7 +172,7 @@ class AuthService {
 
           final usuarioProcesado = {
             'id': usuario['id'],
-            'edf_vendedor_id': usuario['edfVendedorId']?.toString(),
+            'employed_id': usuario['edfVendedorId']?.toString(),
             'edfVendedorNombre': usuario['edfVendedorNombre']?.toString(),
             'code': usuario['id'],
             'username': usuario['username'],

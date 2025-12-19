@@ -631,7 +631,7 @@ class CensoUploadService {
       );
 
       return usuarioEncontrado.isNotEmpty
-          ? usuarioEncontrado.first['edf_vendedor_id'] as String?
+          ? usuarioEncontrado.first['employed_id'] as String?
           : null;
     } catch (e) {
       _logger.e('Error resolviendo edfVendedorId: $e');

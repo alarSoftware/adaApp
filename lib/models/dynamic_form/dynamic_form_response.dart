@@ -93,7 +93,7 @@ class DynamicFormResponse {
       status: map['estado'] as String? ?? 'draft',
       userId: map['usuario_id']?.toString(),
       contactoId: map['contacto_id'] as String?,
-      edfVendedorId: map['edf_vendedor_id'] as String?,
+      edfVendedorId: map['employed_id'] as String?,
       // ✅ Y CAMBIAR ESTA LÍNEA:
       errorMessage: map['mensaje_error_sync'] as String?,
     );
@@ -105,7 +105,7 @@ class DynamicFormResponse {
       'id': id,
       'version': 1,
       'contacto_id': contactoId ?? '',
-      'edf_vendedor_id': edfVendedorId,
+      'employed_id': edfVendedorId,
       'last_update_user_id': null,
       'dynamic_form_id': formTemplateId,
       'usuario_id': userId != null ? int.tryParse(userId!) : null,

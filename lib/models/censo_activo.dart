@@ -68,7 +68,7 @@ class CensoActivo {
   factory CensoActivo.fromMap(Map<String, dynamic> map) {
     return CensoActivo(
       id: map['id'] as String?,
-      edfVendedorId: map['edf_vendedor_id'],
+      edfVendedorId: map['employed_id'],
       equipoId: map['equipo_id'] as String? ?? '0',
       clienteId: map['cliente_id'] as int? ?? 0,
       usuarioId: map['usuario_id'] as int?,
@@ -111,7 +111,7 @@ class CensoActivo {
       'intentos_sync': intentosSync,
       'ultimo_intento': ultimoIntento?.toIso8601String(),
       'error_mensaje': errorMensaje,
-      'edf_vendedor_id': edfVendedorId,
+      'employed_id': edfVendedorId,
     };
 
     if (estadoCenso != null) {

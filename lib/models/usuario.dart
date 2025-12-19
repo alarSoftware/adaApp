@@ -24,7 +24,7 @@ class Usuario {
   factory Usuario.fromMap(Map<String, dynamic> map) {
     return Usuario(
       id: ParsingHelpers.parseInt(map['id']),
-      edfVendedorId: ParsingHelpers.parseString(map['edf_vendedor_id']),
+      edfVendedorId: ParsingHelpers.parseString(map['employed_id']),
       // Asegúrate de que la clave coincida con tu CREATE TABLE ('edfVendedorNombre')
       edfVendedorNombre: ParsingHelpers.parseString(map['edf_vendedor_nombre']),
       code: ParsingHelpers.parseInt(map['code']),
@@ -55,7 +55,7 @@ class Usuario {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'edf_vendedor_id': edfVendedorId,
+      'employed_id': edfVendedorId,
       'edf_vendedor_nombre': edfVendedorNombre,
       'code': code,
       'username': username,

@@ -448,7 +448,7 @@ class DynamicFormUploadService {
         'id': respuesta['id'],
         'dynamicFormId': respuesta['dynamic_form_id'],
         'contactoId': respuesta['contacto_id'],
-        'edfvendedorId': respuesta['edf_vendedor_id'],
+        'edfvendedorId': respuesta['employed_id'],
         'usuarioId': respuesta['usuario_id'] != null
             ? int.tryParse(respuesta['usuario_id'].toString())
             : null,

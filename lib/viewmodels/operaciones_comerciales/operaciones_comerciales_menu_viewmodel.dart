@@ -106,12 +106,12 @@ class OperacionesComercialesMenuViewModel extends ChangeNotifier {
       final db = await DatabaseHelper().database;
       final result = await db.query(
         'Users',
-        columns: ['edf_vendedor_id'],
+        columns: ['employed_id'],
         limit: 1,
       );
 
       if (result.isNotEmpty) {
-        return result.first['edf_vendedor_id'] as String?;
+        return result.first['employed_id'] as String?;
       }
       return null;
     } catch (e) {
