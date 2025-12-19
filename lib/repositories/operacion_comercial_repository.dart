@@ -37,6 +37,13 @@ abstract class OperacionComercialRepository {
     String? odooName,
     String? adaSequence,
   });
+
+  Future<List<OperacionComercial>> obtenerOperacionesPendientesPorCliente(
+    int clienteId,
+  );
+
+  Future<void> eliminarOperacionesPorCliente(int clienteId);
+  Future<void> eliminarTodasLasOperaciones();
 }
 
 class OperacionComercialRepositoryImpl
@@ -511,6 +518,75 @@ class OperacionComercialRepositoryImpl
         tableName: tableName,
         operation: 'guardar_operaciones_desde_servidor',
         errorMessage: 'Error guardando operaciones desde servidor: $e',
+      );
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<OperacionComercial>> obtenerOperacionesPendientesPorCliente(
+    int clienteId,
+  ) async {
+    try {
+      final operacionesMaps = await dbHelper.consultar(
+        tableName,
+        where: 'cliente_id = ? AND sync_status != ?',
+        whereArgs: [clienteId, 'sincronizado'],
+        orderBy: getDefaultOrderBy(),
+      );
+
+      return operacionesMaps.map((map) => fromMap(map)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  @override
+  Future<void> eliminarOperacionesPorCliente(int clienteId) async {
+    try {
+      final db = await dbHelper.database;
+      await db.transaction((txn) async {
+        // Primero eliminar los detalles de las operaciones de este cliente
+        await txn.rawDelete(
+          '''
+          DELETE FROM operacion_comercial_detalle 
+          WHERE operacion_comercial_id IN (
+            SELECT id FROM operacion_comercial WHERE cliente_id = ?
+          )
+        ''',
+          [clienteId],
+        );
+
+        // Luego eliminar las operaciones
+        await txn.delete(
+          tableName,
+          where: 'cliente_id = ?',
+          whereArgs: [clienteId],
+        );
+      });
+    } catch (e) {
+      await ErrorLogService.logDatabaseError(
+        tableName: tableName,
+        operation: 'eliminar_operaciones_por_cliente',
+        errorMessage: 'Error eliminando operaciones por cliente $clienteId: $e',
+      );
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> eliminarTodasLasOperaciones() async {
+    try {
+      final db = await dbHelper.database;
+      await db.transaction((txn) async {
+        await txn.delete('operacion_comercial_detalle');
+        await txn.delete(tableName);
+      });
+    } catch (e) {
+      await ErrorLogService.logDatabaseError(
+        tableName: tableName,
+        operation: 'eliminar_todas_las_operaciones',
+        errorMessage: 'Error eliminando todas las operaciones: $e',
       );
       rethrow;
     }

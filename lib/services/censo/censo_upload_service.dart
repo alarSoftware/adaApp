@@ -132,7 +132,7 @@ class CensoUploadService {
         latitud: censoActivoMap['latitud']?.toDouble() ?? 0.0,
         longitud: censoActivoMap['longitud']?.toDouble() ?? 0.0,
         observaciones: censoActivoMap['observaciones']?.toString(),
-        enLocal: censoActivoMap['en_local'] == true,
+        enLocal: censoActivoMap['en_local'] == 1,
         estadoCenso: yaAsignado ? 'asignado' : 'pendiente',
         fotos: fotos,
         clienteNombre: censoActivoMap['cliente_nombre']?.toString(),
@@ -503,7 +503,6 @@ class CensoUploadService {
   //     _syncEnProgreso = false;
   //   }
   // }
-
 
   // static bool get esSincronizacionActiva => _syncActivo;
   // static bool get estaEnProgreso => _syncEnProgreso;

@@ -7,6 +7,7 @@ import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/sync/full_sync_service.dart';
 import 'package:ada_app/models/usuario.dart';
 import 'dart:async';
+import 'package:sqflite/sqflite.dart';
 
 abstract class LoginUIEvent {}
 
@@ -97,6 +98,7 @@ class LoginScreenViewModel extends ChangeNotifier {
   LoginScreenViewModel() {
     _setupValidationListeners();
     _checkBiometricAvailability();
+    _checkUsersTableEmpty();
   }
 
   @override
@@ -129,7 +131,7 @@ class LoginScreenViewModel extends ChangeNotifier {
 
   void _validatePassword() {
     final value = passwordController.text;
-    final isValid = value.isNotEmpty && value.length >= 6;
+    final isValid = value.isNotEmpty;
 
     if (_passwordValid != isValid) {
       _passwordValid = isValid;
@@ -154,6 +156,24 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> _checkUsersTableEmpty() async {
+    try {
+      final db = await _dbHelper.database;
+      final result = await db.rawQuery('SELECT count(*) as count FROM Users');
+      final count = Sqflite.firstIntValue(result) ?? 0;
+
+      if (count == 0) {
+        _errorMessage =
+            'No hay usuarios registrados.\nPor favor sincronice los usuarios (botón nube arriba a la derecha).';
+        // No enviamos evento ShowErrorEvent aquí para no mostrar un snackbar/dialog intrusivo al inicio,
+        // pero sí mostramos el mensaje en el formulario (que usa _errorMessage).
+        notifyListeners();
+      }
+    } catch (e) {
+      // Silently fail or log
+    }
+  }
+
   String? validateUsername(String? value) {
     if (value == null || value.trim().isEmpty) return 'El usuario es requerido';
     if (value.length < 3) return 'Usuario debe tener al menos 3 caracteres';
@@ -162,7 +182,6 @@ class LoginScreenViewModel extends ChangeNotifier {
 
   String? validatePassword(String? value) {
     if (value == null || value.isEmpty) return 'La contraseña es requerida';
-    if (value.length < 6) return 'Mínimo 6 caracteres';
     return null;
   }
 

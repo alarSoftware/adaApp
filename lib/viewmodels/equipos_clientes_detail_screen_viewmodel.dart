@@ -355,6 +355,9 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         throw Exception('Código de barras o cliente no disponible');
       }
 
+      // Obtener usuario actual antes de crear el registro
+      final currentUser = await AuthService().getCurrentUser();
+
       final newCensoActivo = await _estadoEquipoRepository.crearCensoActivo(
         equipoId: codigoBarras,
         clienteId: int.parse(clienteId.toString()),
@@ -362,10 +365,12 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         fechaRevision: DateTime.now(),
         latitud: position.latitude,
         longitud: position.longitude,
+        usuarioId: currentUser?.id,
+        edfVendedorId: currentUser?.edfVendedorId,
       );
+
       // 2. Sincronizar con el servidor
       try {
-        final currentUser = await AuthService().getCurrentUser();
         if (currentUser != null &&
             currentUser.id != null &&
             currentUser.edfVendedorId != null) {
@@ -383,16 +388,33 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
             logo: equipoCliente['logo_nombre']?.toString() ?? '',
             usuarioId: currentUser.id!,
             edfVendedorId: currentUser.edfVendedorId!,
+            censoId: newCensoActivo.id, // ✅ ID consistente
           );
 
           if (resultadoSync['exito']) {
             if (newCensoActivo.id != null) {
-              await _estadoEquipoRepository.marcarComoMigrado(newCensoActivo.id!);
+              await _estadoEquipoRepository.marcarComoMigrado(
+                newCensoActivo.id!,
+              );
+            }
+          } else {
+            // Si falla el servidor, marcamos como error para que se sepa
+            if (newCensoActivo.id != null) {
+              await _estadoEquipoRepository.marcarComoError(
+                newCensoActivo.id!,
+                resultadoSync['mensaje'] ?? 'Error desconocido del servidor',
+              );
             }
           }
         }
       } catch (syncError) {
-        // El guardado local ya se hizo, así que continuamos
+        // Si hay excepción de red o código, marcamos como error
+        if (newCensoActivo.id != null) {
+          await _estadoEquipoRepository.marcarComoError(
+            newCensoActivo.id!,
+            syncError.toString(),
+          );
+        }
       }
 
       _estadoLocalActual = _estadoUbicacionEquipo! ? 1 : 0;

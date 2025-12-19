@@ -1,3 +1,4 @@
+import 'package:ada_app/services/sync/operacion_comercial_sync_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/sync/producto_sync_service.dart';
 import 'package:ada_app/services/sync/user_sync_service.dart';
@@ -13,6 +14,8 @@ import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:sqflite/sqflite.dart';
 import '../data/database_helper.dart';
+import 'package:ada_app/services/censo/censo_upload_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
 
 class SyncService {
   static final _clienteRepo = ClienteRepository();
@@ -141,6 +144,24 @@ class SyncService {
         resultado.mensaje =
             'Error: No se pudo obtener información del usuario. $e';
         return resultado;
+      }
+
+      // 1. Intentar subir censos pendientes (REINTENTO)
+      try {
+        final currentUser = await AuthService().getCurrentUser();
+        if (currentUser != null && currentUser.id != null) {
+          onProgress?.call(0.05, 'Subiendo censos pendientes...');
+          final censoUploadService = CensoUploadService();
+          await censoUploadService.sincronizarCensosNoMigrados(currentUser.id!);
+        }
+      } catch (e) {
+        // No interrumpimos la sincronización general, pero logueamos
+        await ErrorLogService.logError(
+          tableName: 'censo_activo',
+          operation: 'retry_sync_upload',
+          errorMessage: 'Error subiendo pendientes: $e',
+          errorType: 'upload_error',
+        );
       }
 
       onProgress?.call(0.1, 'Sincronizando marcas...');
@@ -330,6 +351,27 @@ class SyncService {
         resultado.erroresImagenesFormularios = null;
       }
 
+      try {
+        onProgress?.call(0.85, 'Sincronizando operaciones comerciales...');
+        final resultadoOperaciones =
+            await OperacionComercialSyncService.obtenerOperacionesPorVendedor(
+              edfVendedorId,
+            );
+        resultado.operacionesComercialesSincronizadas =
+            resultadoOperaciones.itemsSincronizados;
+        resultado.operacionesComercialesExito = resultadoOperaciones.exito;
+
+        if (!resultadoOperaciones.exito) {
+          resultado.erroresOperacionesComerciales =
+              resultadoOperaciones.mensaje;
+        }
+      } catch (e) {
+        resultado.operacionesComercialesExito = false;
+        resultado.erroresOperacionesComerciales =
+            'Error al sincronizar operaciones comerciales: $e';
+        resultado.operacionesComercialesSincronizadas = 0;
+      }
+
       final exitosos = [
         resultado.clientesExito,
         resultado.equiposExito,
@@ -342,6 +384,7 @@ class SyncService {
         resultado.respuestasFormulariosExito,
         resultado.imagenesFormulariosExito,
         resultado.asignacionesExito,
+        resultado.operacionesComercialesExito,
       ];
       final totalExitosos = exitosos.where((e) => e).length;
 
@@ -599,6 +642,10 @@ class SyncResultUnificado {
   int asignacionesSincronizadas = 0;
   String? erroresAsignaciones;
 
+  bool operacionesComercialesExito = false;
+  int operacionesComercialesSincronizadas = 0;
+  String? erroresOperacionesComerciales;
+
   int get totalItemsSincronizados {
     return clientesSincronizados +
         equiposSincronizados +
@@ -610,7 +657,8 @@ class SyncResultUnificado {
         detallesFormulariosSincronizados +
         respuestasFormulariosSincronizadas +
         imagenesFormulariosSincronizadas +
-        asignacionesSincronizadas;
+        asignacionesSincronizadas +
+        operacionesComercialesSincronizadas;
   }
 
   List<SyncStep> get syncSteps {
@@ -653,10 +701,14 @@ class SyncResultUnificado {
           '$imagenesFormulariosSincronizadas imágenes de formularios',
           'Imágenes de formularios descargadas',
         ),
-      if (asignacionesSincronizadas > 0)
+      SyncStep(
+        '$asignacionesSincronizadas asignaciones',
+        'Asignaciones descargadas',
+      ),
+      if (operacionesComercialesSincronizadas > 0)
         SyncStep(
-          '$asignacionesSincronizadas asignaciones',
-          'Asignaciones descargadas',
+          '$operacionesComercialesSincronizadas operaciones comerciales',
+          'Operaciones comerciales descargadas',
         ),
     ];
   }
@@ -664,26 +716,44 @@ class SyncResultUnificado {
   /// Resumen compacto para mensajes
   String get resumenCompacto {
     final partes = <String>[];
-    if (clientesSincronizados > 0)
+    if (clientesSincronizados > 0) {
       partes.add('$clientesSincronizados clientes');
-    if (equiposSincronizados > 0) partes.add('$equiposSincronizados equipos');
-    if (productosSincronizados > 0)
+    }
+    if (equiposSincronizados > 0) {
+      partes.add('$equiposSincronizados equipos');
+    }
+    if (productosSincronizados > 0) {
       partes.add('$productosSincronizados productos');
-    if (censosSincronizados > 0) partes.add('$censosSincronizados censos');
-    if (imagenesCensosSincronizadas > 0)
+    }
+    if (censosSincronizados > 0) {
+      partes.add('$censosSincronizados censos');
+    }
+    if (imagenesCensosSincronizadas > 0) {
       partes.add('$imagenesCensosSincronizadas imágenes de censos');
-    if (equiposPendientesSincronizados > 0)
+    }
+    if (equiposPendientesSincronizados > 0) {
       partes.add('$equiposPendientesSincronizados equipos pendientes');
-    if (formulariosSincronizados > 0)
+    }
+    if (formulariosSincronizados > 0) {
       partes.add('$formulariosSincronizados formularios');
-    if (detallesFormulariosSincronizados > 0)
+    }
+    if (detallesFormulariosSincronizados > 0) {
       partes.add('$detallesFormulariosSincronizados detalles');
-    if (respuestasFormulariosSincronizadas > 0)
+    }
+    if (respuestasFormulariosSincronizadas > 0) {
       partes.add('$respuestasFormulariosSincronizadas respuestas');
-    if (imagenesFormulariosSincronizadas > 0)
+    }
+    if (imagenesFormulariosSincronizadas > 0) {
       partes.add('$imagenesFormulariosSincronizadas imágenes de formularios');
-    if (asignacionesSincronizadas > 0)
+    }
+    if (asignacionesSincronizadas > 0) {
       partes.add('$asignacionesSincronizadas asignaciones');
+    }
+    if (operacionesComercialesSincronizadas > 0) {
+      partes.add(
+        '$operacionesComercialesSincronizadas operaciones comerciales',
+      );
+    }
     return partes.join(', ');
   }
 

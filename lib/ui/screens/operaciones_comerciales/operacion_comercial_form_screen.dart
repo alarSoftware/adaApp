@@ -435,15 +435,15 @@ class _OperacionComercialFormViewState
                                     text: 'Ada Sequence: ',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey[700],
+                                      color: Colors.grey[600],
                                     ),
                                   ),
                                   TextSpan(
                                     text: operacion!.adaSequence!,
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[800],
                                     ),
                                   ),
                                 ],
@@ -463,14 +463,14 @@ class _OperacionComercialFormViewState
                                         text: 'Odoo Name: ',
                                         style: TextStyle(
                                           fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.primary,
+                                          color: Colors.grey[600],
                                         ),
                                       ),
                                       TextSpan(
                                         text: operacion!.odooName!,
                                         style: TextStyle(
                                           fontSize: 11,
+                                          fontWeight: FontWeight.bold,
                                           color: AppColors.primary,
                                         ),
                                       ),

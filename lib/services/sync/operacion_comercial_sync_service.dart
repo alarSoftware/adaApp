@@ -41,20 +41,58 @@ class OperacionComercialSyncService extends BaseSyncService {
     int? partnerId,
     String? tipo,
   }) async {
-    String? currentEndpoint;
-
     try {
-      final queryParams = _buildQueryParams(
-        edfVendedorId: edfVendedorId,
-        partnerId: partnerId,
-        tipo: tipo,
-      );
+      final queryParams = <String, String>{};
+
+      if (edfVendedorId != null) {
+        // SEGURIDAD: Verificar si hay pendientes
+        final pendientes = await OperacionComercialRepositoryImpl()
+            .obtenerOperacionesPendientes();
+
+        if (pendientes.isNotEmpty) {
+          return SyncResult(
+            exito: false,
+            mensaje:
+                'Hay ${pendientes.length} operaciones pendientes. Por favor sincronízalas antes de actualizar.',
+            itemsSincronizados: 0,
+          );
+        }
+
+        // LIMPIEZA: Si no hay pendientes, limpiar todo para evitar duplicados/stale data
+        await OperacionComercialRepositoryImpl().eliminarTodasLasOperaciones();
+
+        queryParams['edfVendedorId'] = edfVendedorId;
+      }
+      if (partnerId != null) {
+        // VALIDACIÓN DE SEGURIDAD:
+        // Antes de descargar y reemplazar, verificamos si hay pendientes locales.
+        final pendientes = await OperacionComercialRepositoryImpl()
+            .obtenerOperacionesPendientesPorCliente(partnerId);
+
+        if (pendientes.isNotEmpty) {
+          return SyncResult(
+            exito: false,
+            mensaje:
+                'Hay ${pendientes.length} operaciones pendientes de envío para este cliente. Por favor, incia la sincronización (botón nube) antes de descargar nuevas.',
+            itemsSincronizados: 0,
+          );
+        }
+
+        // Si no hay pendientes, es seguro limpiar para evitar duplicados.
+        await OperacionComercialRepositoryImpl().eliminarOperacionesPorCliente(
+          partnerId,
+        );
+
+        queryParams['partnerId'] = partnerId.toString();
+      }
+      if (tipo != null) {
+        queryParams['tipo'] = tipo;
+      }
 
       final operacionesResponse = await _makeHttpRequest(
         '/api/getOperacionComercial',
         queryParams,
       );
-      currentEndpoint = operacionesResponse.request?.url.toString();
 
       if (!_isSuccessStatusCode(operacionesResponse.statusCode)) {
         return _handleErrorResponse(operacionesResponse);
@@ -166,20 +204,6 @@ class OperacionComercialSyncService extends BaseSyncService {
       print('Error obteniendo odooName: $e');
       return null;
     }
-  }
-
-  static Map<String, String> _buildQueryParams({
-    String? edfVendedorId,
-    int? partnerId,
-    String? tipo,
-  }) {
-    final Map<String, String> queryParams = {};
-
-    if (edfVendedorId != null) queryParams['edfvendedorId'] = edfVendedorId;
-    if (partnerId != null) queryParams['partnerId'] = partnerId.toString();
-    if (tipo != null) queryParams['tipo'] = tipo;
-
-    return queryParams;
   }
 
   static Future<http.Response> _makeHttpRequest(
@@ -359,6 +383,11 @@ class OperacionComercialSyncService extends BaseSyncService {
       throw Exception('Operación sin ID del servidor');
     }
 
+    int? usuarioId = _parseIntSafely(apiOperacion['creationUser']);
+    if (usuarioId == null && apiOperacion['usuario'] is Map) {
+      usuarioId = _parseIntSafely(apiOperacion['usuario']['id']);
+    }
+
     final operacionLocal = {
       'id': operacionServerId.toString(),
       'cliente_id': partnerId,
@@ -366,7 +395,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       'fecha_creacion': _parseFechaServerToLocal(apiOperacion['creationDate']),
       'fecha_retiro': apiOperacion['fechaRetiro']?.toString(),
       'total_productos': 0,
-      'usuario_id': _parseIntSafely(apiOperacion['creationUser']),
+      'usuario_id': usuarioId,
       'server_id': operacionServerId,
       'sync_status': 'migrado',
       'sync_error': apiOperacion['errorText']?.toString(),
@@ -374,6 +403,8 @@ class OperacionComercialSyncService extends BaseSyncService {
       'sync_retry_count': 0,
       'odoo_name': apiOperacion['odooName']?.toString(),
       'ada_sequence': apiOperacion['adaSequence']?.toString(),
+      'latitud': _parseDoubleSafely(apiOperacion['latitud']),
+      'longitud': _parseDoubleSafely(apiOperacion['longitud']),
     };
 
     final todosLosDetalles =

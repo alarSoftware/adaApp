@@ -501,7 +501,9 @@ class CensusSyncService extends BaseSyncService {
     return {
       'id': apiCensus['id']?.toString(),
       'equipo_id': apiCensus['edfEquipoId']?.toString(),
-      'cliente_id': _parseIntSafely(apiCensus['edfClienteId']),
+      'cliente_id': _parseIntSafely(
+        apiCensus['clienteId'] ?? apiCensus['edfClienteId'],
+      ),
       'usuario_id': _parseIntSafely(apiCensus['usuarioId']),
       'en_local': apiCensus['enLocal'] == true ? 1 : 0,
       'latitud': _parseDoubleSafely(apiCensus['latitud']),
@@ -511,7 +513,9 @@ class CensusSyncService extends BaseSyncService {
       'fecha_actualizacion': DateTime.now().toIso8601String(),
       'observaciones': apiCensus['observaciones']?.toString(),
       'estado_censo': 'migrado',
-      'edf_vendedor_id': apiCensus['edfVendedorSucursalId']?.toString(),
+      'edf_vendedor_id':
+          apiCensus['edfVendedorId']?.toString() ??
+          apiCensus['edfVendedorSucursalId']?.toString(),
     };
   }
 

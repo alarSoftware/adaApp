@@ -49,7 +49,7 @@ class CensoActivoPostService {
 
     try {
       final now = DateTime.now().toLocal();
-      final censoIdFinal = censoId ?? now.millisecondsSinceEpoch.toString();
+      final censoIdFinal = censoId.toString();
 
       if (censoId != null) {}
 
@@ -528,6 +528,7 @@ class CensoActivoPostService {
     final censo = {
       'id': censoId,
       'edfVendedorSucursalId': edfVendedorId,
+      'edfVendedorId': edfVendedorId, // Añadido para consistencia
       'edfEquipoId': equipoId,
       'usuarioId': usuarioId,
       'fechaRevision': formatearFechaLocal(now),
@@ -594,10 +595,14 @@ class CensoActivoPostService {
     required String logo,
     required int usuarioId,
     required String edfVendedorId,
+    String? censoId, // Nuevo parámetro opcional
   }) async {
     try {
       await enviarCensoActivo(
-        censoId: DateTime.now().millisecondsSinceEpoch.toString(),
+        censoId:
+            censoId ??
+            DateTime.now().millisecondsSinceEpoch
+                .toString(), // Usa el ID pasado o genera uno nuevo
         equipoId: equipoId,
         codigoBarras: codigoBarras,
         clienteId: clienteId,
