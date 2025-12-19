@@ -35,9 +35,18 @@ class UserSyncService {
         BaseSyncService.logger.i('Usuarios API count: ${usuariosAPI.length}');
 
         if (usuariosAPI.isEmpty) {
+          // Si no hay usuarios en el servidor, limpiar la tabla local
+          try {
+            await _dbHelper.sincronizarUsuarios([]);
+          } catch (dbError) {
+            BaseSyncService.logger.e(
+              'Error limpiando usuarios en BD: $dbError',
+            );
+          }
+
           return SyncResult(
             exito: true,
-            mensaje: 'No hay usuarios en el servidor',
+            mensaje: 'No hay usuarios en el servidor (Tabla limpiada)',
             itemsSincronizados: 0,
           );
         }
@@ -211,9 +220,7 @@ class UserSyncService {
         return null;
       }
 
-      BaseSyncService.logger.i(
-        'Buscando employee_id para usuario: $username',
-      );
+      BaseSyncService.logger.i('Buscando employee_id para usuario: $username');
 
       final db = await _dbHelper.database;
       final result = await db.query(

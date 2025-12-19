@@ -233,39 +233,69 @@ class CensusImageSyncService extends BaseSyncService {
     List<dynamic> imagenesData,
     bool incluirBase64,
   ) async {
-    if (imagenesData.isEmpty) return [];
+    BaseSyncService.logger.i(
+      'Procesando ${imagenesData.length} imágenes del servidor',
+    );
 
     // Convertir datos del API al formato local
     final imagenesParaGuardar = <Map<String, dynamic>>[];
+    final idsProcesados = <String>{}; // Para evitar duplicados de ID
 
-    for (final imagen in imagenesData) {
-      if (imagen is Map<String, dynamic>) {
-        try {
-          final imagenParaGuardar = _mapApiToLocalFormat(imagen, incluirBase64);
-          imagenesParaGuardar.add(imagenParaGuardar);
-        } catch (e) {
-          BaseSyncService.logger.e(
-            'Error procesando imagen ID ${imagen['id']}: $e',
-          );
+    if (imagenesData.isNotEmpty) {
+      for (final imagen in imagenesData) {
+        if (imagen is Map<String, dynamic>) {
+          try {
+            final imagenParaGuardar = _mapApiToLocalFormat(
+              imagen,
+              incluirBase64,
+            );
 
-          // 🚨 LOG ERROR: Error procesando imagen individual
-          await ErrorLogService.logError(
-            tableName: 'censo_activo_foto',
-            operation: 'process_item',
-            errorMessage: 'Error procesando imagen: $e',
-            errorType: 'database',
-            registroFailId: imagen['id']?.toString(),
-          );
+            final id = imagenParaGuardar['id']?.toString();
+            if (id != null) {
+              if (idsProcesados.contains(id)) {
+                BaseSyncService.logger.w(
+                  '⚠️ ID de imagen duplicado detectado: $id. Se usará la primera ocurrencia.',
+                );
+                continue;
+              }
+              idsProcesados.add(id);
+            }
+
+            imagenesParaGuardar.add(imagenParaGuardar);
+          } catch (e) {
+            BaseSyncService.logger.e(
+              'Error procesando imagen ID ${imagen['id']}: $e',
+            );
+            // 🚨 LOG ERROR: Error procesando imagen individual
+            await ErrorLogService.logError(
+              tableName: 'censo_activo_foto',
+              operation: 'process_item',
+              errorMessage: 'Error procesando imagen: $e',
+              errorType: 'database',
+              registroFailId: imagen['id']?.toString(),
+            );
+          }
         }
       }
     }
 
-    // Vaciar tabla e insertar todas las imágenes
+    // Vaciar tabla e insertar todas las imágenes (incluso si está vacía, para limpiar)
     try {
       final dbHelper = DatabaseHelper();
-      await dbHelper.vaciarEInsertar('censo_activo_foto', imagenesParaGuardar);
+      BaseSyncService.logger.i(
+        'Intentando vaciar e insertar ${imagenesParaGuardar.length} imágenes en BD...',
+      );
+
+      final count = await dbHelper.vaciarEInsertar(
+        'censo_activo_foto',
+        imagenesParaGuardar,
+      );
+
+      BaseSyncService.logger.i(
+        '✅ Éxito: Se insertaron $count imágenes tras vaciar tabla.',
+      );
     } catch (e) {
-      BaseSyncService.logger.e('❌ Error guardando imágenes en BD: $e');
+      BaseSyncService.logger.e('❌ Error CRÍTICO guardando imágenes en BD: $e');
 
       // 🚨 LOG ERROR: Error de base de datos local
       await ErrorLogService.logDatabaseError(

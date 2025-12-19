@@ -230,15 +230,11 @@ class _OperacionComercialFormViewState
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: ClientInfoCard(cliente: viewModel.cliente),
+            child: ClientInfoCard(
+              cliente: viewModel.cliente,
+              bottomContent: _buildFechaRetiroCompact(viewModel),
+            ),
           ),
-
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: _buildFechaRetiroCompact(viewModel),
-          ),
-
           if (viewModel.tipoOperacion == TipoOperacion.notaRetiro) ...[
             const SizedBox(height: 12),
             Padding(
@@ -341,157 +337,136 @@ class _OperacionComercialFormViewState
   ) {
     final isError = !viewModel.isViewOnly && viewModel.fechaRetiro == null;
     final operacion = viewModel.operacionExistente;
-    final hasInfo =
-        operacion != null &&
-        (operacion.odooName != null || operacion.adaSequence != null);
+    final adaSequence = operacion?.adaSequence;
+    final odooName = operacion?.odooName;
+    final hasAdaSequence = adaSequence != null && adaSequence.isNotEmpty;
+    final hasOdooName = odooName != null && odooName.isNotEmpty;
 
-    return InkWell(
-      onTap: viewModel.isViewOnly
-          ? null
-          : () => _seleccionarFechaRetiro(viewModel),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: isError
-              ? AppColors.error.withValues(alpha: 0.05)
-              : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isError
-                ? AppColors.error.withValues(alpha: 0.3)
-                : Colors.transparent,
+    // Retornamos directamente la columna, sin decoración propia,
+    // para que se integre en el ClientInfoCard (fondo blanco).
+    // Usamos Material transparente para el InkWell.
+    return Column(
+      children: [
+        // 1. FECHA DE ENTREGA / RETIRO (Clickable)
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: viewModel.isViewOnly
+                ? null
+                : () => _seleccionarFechaRetiro(viewModel),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              child: Row(
+                children: [
+                  _buildIconContainer(
+                    Icons.calendar_today_rounded,
+                    isError ? AppColors.error : Colors.grey[600]!,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildLabelText('Fecha de Entrega / Retiro'),
+                        const SizedBox(height: 2),
+                        Text(
+                          viewModel.fechaRetiro == null
+                              ? 'Seleccionar fecha...'
+                              : DateFormat(
+                                  'EEEE d, MMMM yyyy',
+                                  'es_ES',
+                                ).format(viewModel.fechaRetiro!),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: isError
+                                ? AppColors.error
+                                : const Color(0xFF334155),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!viewModel.isViewOnly)
+                    Icon(Icons.edit, size: 16, color: Colors.grey[400]),
+                ],
+              ),
+            ),
           ),
         ),
-        child: Column(
-          children: [
-            Row(
+
+        // 2. ADA SEQUENCE
+        if (hasAdaSequence) ...[
+          _buildDivider(),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
+                _buildIconContainer(Icons.tag_rounded, Colors.grey[600]!),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabelText('Ada Sequence'),
+                      const SizedBox(height: 2),
+                      Text(
+                        adaSequence!,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF334155),
+                        ),
+                      ),
+                    ],
                   ),
-                  child: Icon(
-                    Icons.calendar_today_rounded,
-                    size: 14,
-                    color: isError ? AppColors.error : Colors.grey[600],
-                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        // 3. ODOO NAME (Condicional o placeholder "Sin Odoo Name")
+        if (hasOdooName || viewModel.isViewOnly) ...[
+          if (hasAdaSequence) _buildDivider(), // Divider solo si hubo AdaSeq
+          if (!hasAdaSequence) _buildDivider(), // Divider con Fecha
+
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Row(
+              children: [
+                _buildIconContainer(
+                  Icons.receipt_long_rounded,
+                  hasOdooName ? AppColors.primary : Colors.grey[400]!,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Fecha de Entrega / Retiro',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey[500],
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      _buildLabelText('Odoo Name'),
                       const SizedBox(height: 2),
                       Text(
-                        viewModel.fechaRetiro == null
-                            ? 'Seleccionar fecha...'
-                            : DateFormat(
-                                'EEEE d, MMMM yyyy',
-                                'es_ES',
-                              ).format(viewModel.fechaRetiro!),
+                        hasOdooName ? odooName! : 'Sin Odoo Name',
                         style: TextStyle(
-                          fontWeight: FontWeight.w600,
                           fontSize: 13,
-                          color: isError
-                              ? AppColors.error
-                              : const Color(0xFF334155),
+                          fontWeight: hasOdooName
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          fontStyle: hasOdooName
+                              ? FontStyle.normal
+                              : FontStyle.italic,
+                          color: hasOdooName
+                              ? AppColors.primary
+                              : Colors.grey[400],
                         ),
                       ),
                     ],
                   ),
                 ),
-                if (!viewModel.isViewOnly)
-                  Icon(Icons.edit, size: 16, color: Colors.grey[400]),
-              ],
-            ),
-            if (hasInfo || viewModel.isViewOnly) ...[
-              const SizedBox(height: 12),
-              Divider(height: 1, color: Colors.grey.withValues(alpha: 0.1)),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (operacion?.adaSequence != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: RichText(
-                              text: TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: 'Ada Sequence: ',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                  TextSpan(
-                                    text: operacion!.adaSequence!,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey[800],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        Row(
-                          children: [
-                            if (operacion?.odooName != null &&
-                                operacion!.odooName!.isNotEmpty)
-                              Flexible(
-                                child: RichText(
-                                  overflow: TextOverflow.ellipsis,
-                                  text: TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: 'Odoo Name: ',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey[600],
-                                        ),
-                                      ),
-                                      TextSpan(
-                                        text: operacion!.odooName!,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              )
-                            else
-                              Text(
-                                'Sin Odoo Name',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey[400],
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+                // Botón de descarga
+                if (!hasOdooName || viewModel.isLoading)
                   SizedBox(
                     width: 32,
                     height: 32,
@@ -525,12 +500,48 @@ class _OperacionComercialFormViewState
                       ),
                     ),
                   ),
-                ],
-              ),
-            ],
-          ],
-        ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildIconContainer(IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: AppColors.neutral300, // Match ClientInfoCard icon bg
+        borderRadius: BorderRadius.circular(6),
       ),
+      child: Icon(
+        icon,
+        size: 16, // Match ClientInfoCard icon size
+        color: color == AppColors.primary
+            ? AppColors.primary
+            : AppColors.textSecondary, // Match default textSecondary
+      ),
+    );
+  }
+
+  Widget _buildLabelText(String label) {
+    return Text(
+      label,
+      style: TextStyle(
+        fontSize: 10,
+        color: Colors.grey[500],
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      color: Colors.grey.withValues(alpha: 0.1),
+      indent: 40, // Alineado con el inicio del texto (28 icon + 12 gap)
     );
   }
 

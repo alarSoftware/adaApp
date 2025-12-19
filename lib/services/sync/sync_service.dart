@@ -236,7 +236,7 @@ class SyncService {
         resultado.censosSincronizados = 0;
       }
 
-      if (resultado.censosExito && resultado.censosSincronizados > 0) {
+      if (resultado.censosExito) {
         try {
           onProgress?.call(0.60, 'Descargando imágenes de censos...');
           final resultadoImagenes =
@@ -322,8 +322,7 @@ class SyncService {
         resultado.respuestasFormulariosSincronizadas = 0;
       }
 
-      if (resultado.respuestasFormulariosExito &&
-          resultado.respuestasFormulariosSincronizadas > 0) {
+      if (resultado.respuestasFormulariosExito) {
         try {
           onProgress?.call(0.80, 'Descargando imágenes de formularios...');
           final resultadoImagenesFormularios =
@@ -439,15 +438,13 @@ class SyncService {
     employeeId: employeeId,
   );
 
-  static Future<SyncResult> sincronizarImagenesCensos({
-    String? employeeId,
-  }) => CensusImageSyncService.obtenerFotosCensos(employeeId: employeeId);
+  static Future<SyncResult> sincronizarImagenesCensos({String? employeeId}) =>
+      CensusImageSyncService.obtenerFotosCensos(employeeId: employeeId);
 
   static Future<SyncResult> sincronizarImagenesFormularios({
     String? employeeId,
-  }) => DynamicFormSyncService.obtenerImagenesFormularios(
-    employeeId: employeeId,
-  );
+  }) =>
+      DynamicFormSyncService.obtenerImagenesFormularios(employeeId: employeeId);
 
   static Future<SyncResult> sincronizarFormulariosDinamicos() =>
       DynamicFormSyncService.obtenerFormulariosDinamicos();
