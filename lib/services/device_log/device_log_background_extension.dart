@@ -187,7 +187,7 @@ class DeviceLogBackgroundExtension {
 
       // Obtener vendedor actual (puede ser null en algunas situaciones)
       final log = await DeviceInfoHelper.crearDeviceLog();
-      final vendedorId = log?.edfVendedorId;
+      final vendedorId = log?.employeeId;
 
       if (log == null) {
         _logger.w(
@@ -251,7 +251,7 @@ class DeviceLogBackgroundExtension {
       final repository = DeviceLogRepository(db);
 
       await repository.guardarLog(
-        edfVendedorId: log.edfVendedorId,
+        employeeId: log.employeeId,
         latitud: double.parse(log.latitudLongitud.split(',')[0]),
         longitud: double.parse(log.latitudLongitud.split(',')[1]),
         bateria: log.bateria,
@@ -286,7 +286,7 @@ class DeviceLogBackgroundExtension {
         // Usar el servicio unificado
         final resultado = await DeviceLogPostService.enviarDeviceLog(
           log,
-          userId: log.edfVendedorId,
+          userId: log.employeeId,
         );
 
         if (resultado['exito'] == true) {

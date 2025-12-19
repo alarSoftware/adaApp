@@ -89,8 +89,8 @@ class AppServices {
       // }
 
       // Sincronización de Formularios Dinámicos (cada 2 minutos)
-      if (usuario.edfVendedorId != null && usuario.edfVendedorId!.isNotEmpty) {
-        // DynamicFormUploadService.iniciarSincronizacionAutomatica(usuario.edfVendedorId!);
+      if (usuario.employeeId != null && usuario.employeeId!.isNotEmpty) {
+        // DynamicFormUploadService.iniciarSincronizacionAutomatica(usuario.employeeId!);
         _logger.i('  ✅ Formularios: cada 2 minutos');
       }
 

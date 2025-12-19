@@ -84,7 +84,7 @@ class CensoApiMapper {
   // static Map<String, dynamic> prepararDatosParaApi({
   //   required Map<String, dynamic> datosLocales,
   //   required int usuarioId,
-  //   String? edfVendedorId,
+  //   String? employeeId,
   //   List<dynamic>? fotosConBase64,
   // }) {
   //   final now = DateTime.now().toLocal();

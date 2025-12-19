@@ -32,7 +32,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   final CensoActivoRepository _estadoEquipoRepository = CensoActivoRepository();
   final CensoActivoFotoRepository _fotoRepository = CensoActivoFotoRepository();
   final EquipoPendienteRepository _equipoPendienteRepository =
-  EquipoPendienteRepository();
+      EquipoPendienteRepository();
 
   final AuthService _authService = AuthService();
 
@@ -55,7 +55,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
   bool get isSaving => _isSaving;
   String? get statusMessage => _statusMessage;
   bool get canConfirm => !_isProcessing && !_isSaving;
-  Stream<Map<String, dynamic>>? get syncStatusStream => _syncStatusController?.stream;
+  Stream<Map<String, dynamic>>? get syncStatusStream =>
+      _syncStatusController?.stream;
 
   Future<int> get _getUsuarioId async {
     try {
@@ -70,18 +71,19 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<String?> get _getEdfVendedorId async {
+  Future<String?> get _getEmployeeId async {
     try {
-      if (_usuarioActual != null) return _usuarioActual!.edfVendedorId;
+      if (_usuarioActual != null) return _usuarioActual!.employeeId;
       _usuarioActual = await _authService.getCurrentUser();
-      return _usuarioActual?.edfVendedorId;
+      return _usuarioActual?.employeeId;
     } catch (e) {
       rethrow;
     }
   }
 
   void iniciarMonitoreoSincronizacion(String censoActivoId) async {
-    if (_currentMonitoringId == censoActivoId && _syncStatusController != null) {
+    if (_currentMonitoringId == censoActivoId &&
+        _syncStatusController != null) {
       return;
     }
 
@@ -118,9 +120,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final info = await obtenerInfoSincronizacion(censoActivoId);
 
       _syncStatusController!.add(info);
-
-    } catch (e, stackTrace) {
-    }
+    } catch (e, stackTrace) {}
   }
 
   void detenerMonitoreoSincronizacion() {
@@ -134,13 +134,13 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> confirmarRegistro(
-      Map<String, dynamic> datos,
-      ) async {
+    Map<String, dynamic> datos,
+  ) async {
     if (_isProcessing) {
       return {
         'success': false,
         'error':
-        'Ya hay un proceso de confirmación en curso. Por favor espere.',
+            'Ya hay un proceso de confirmación en curso. Por favor espere.',
       };
     }
 
@@ -159,9 +159,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> _insertarEnviarCensoActivo(
-      Map<String, dynamic> datos,
-      String processId,
-      ) async {
+    Map<String, dynamic> datos,
+    String processId,
+  ) async {
     _setSaving(true);
     String? censoActivoId;
     String? equipoId;
@@ -216,9 +216,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
         yaAsignado = await _verificarAsignacionLocal(equipoId, clienteId!);
       }
 
-      final edfVendedorId = await SyncService.obtenerEdfVendedorId();
-      if (edfVendedorId == null || edfVendedorId.isEmpty) {
-        throw Exception('edfVendedorId no encontrado');
+      final employeeId = await SyncService.obtenerEmployeeId();
+      if (employeeId == null || employeeId.isEmpty) {
+        throw Exception('employeeId no encontrado');
       }
 
       if (!yaAsignado) {
@@ -227,7 +227,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
           equipoId: equipoId,
           clienteId: clienteId!,
           usuarioId: usuarioId,
-          edfVendedorId: edfVendedorId,
+          employeeId: employeeId,
         );
       } else {}
 
@@ -239,7 +239,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         datos: datos,
         processId: processId,
         yaAsignado: yaAsignado,
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
       );
 
       if (censoActivoId == null) {
@@ -255,7 +255,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       await _uploadService.enviarCensoUnificado(
         censoActivoId: censoActivoId,
         usuarioId: usuarioId,
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
         guardarLog: true,
       );
 
@@ -308,11 +308,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<String> _crearEquipoNuevo(
-      Map<String, dynamic> datos,
-      int? clienteId,
-      String processId,
-      String? userId,
-      ) async {
+    Map<String, dynamic> datos,
+    int? clienteId,
+    String processId,
+    String? userId,
+  ) async {
     _setStatusMessage('Registrando equipo nuevo...');
 
     if (_currentProcessId != processId) throw 'Proceso cancelado';
@@ -354,7 +354,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     required Map<String, dynamic> datos,
     required String processId,
     required bool yaAsignado,
-    required String edfVendedorId,
+    required String employeeId,
   }) async {
     _setStatusMessage('Registrando censo...');
 
@@ -373,7 +373,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         enLocal: true,
         observaciones: datos['observaciones']?.toString(),
         estadoCenso: estadoCenso,
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
       );
 
       if (censoActivo.id != null) {
@@ -427,8 +427,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> verificarSincronizacionPendiente(
-      String? estadoId,
-      ) async {
+    String? estadoId,
+  ) async {
     if (estadoId == null) return {'pendiente': false};
 
     try {
@@ -447,7 +447,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
 
       return {
         'pendiente':
-        (estadoCenso == 'creado' || estadoCenso == 'error') &&
+            (estadoCenso == 'creado' || estadoCenso == 'error') &&
             sincronizado == 0,
       };
     } catch (e) {
@@ -456,8 +456,8 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> obtenerInfoSincronizacion(
-      String? censoActivoId,
-      ) async {
+    String? censoActivoId,
+  ) async {
     if (censoActivoId == null) {
       return {
         'estado': 'desconocido',
@@ -528,7 +528,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
                 final endpoint = errorLog.first['endpoint'] as String?;
 
                 errorDetalle =
-                'Sincronizado después de ${retryCount + 1} intento(s)\n\nÚltimo error encontrado:\n$errorMessage';
+                    'Sincronizado después de ${retryCount + 1} intento(s)\n\nÚltimo error encontrado:\n$errorMessage';
 
                 if (errorCode != null) {
                   errorDetalle += '\n\nCódigo: $errorCode';
@@ -589,7 +589,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
               if (timestamp != null) {
                 try {
                   errorDetalle +=
-                  '\n\nOcurrió el: ${_formatTimestamp(DateTime.parse(timestamp))}';
+                      '\n\nOcurrió el: ${_formatTimestamp(DateTime.parse(timestamp))}';
                 } catch (_) {}
               }
             } else {
@@ -605,7 +605,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
               'icono': Icons.error,
               'color': AppColors.error,
               'error_detalle':
-              errorDetalle ?? 'No se encontró detalle del error',
+                  errorDetalle ?? 'No se encontró detalle del error',
               'envioFallido': envioFallido,
             };
           }
@@ -680,12 +680,12 @@ class PreviewScreenViewModel extends ChangeNotifier {
       iniciarMonitoreoSincronizacion(estadoId);
 
       final usuarioId = await _getUsuarioId;
-      final edfVendedorId = await _getEdfVendedorId;
+      final employeeId = await _getEmployeeId;
 
       return await _uploadService.reintentarEnvioCenso(
         estadoId,
         usuarioId,
-        edfVendedorId,
+        employeeId,
       );
     } catch (e) {
       return {'success': false, 'error': 'Error al reintentar: $e'};

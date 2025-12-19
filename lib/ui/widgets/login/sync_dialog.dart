@@ -270,7 +270,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
     try {
       // ✅ AQUÍ USAMOS LOS ID PARA LA LÓGICA DE SINCRONIZACIÓN (LA API PIDE IDs)
       final result = await FullSyncService.syncAllDataWithProgress(
-        edfVendedorId: widget.validation.vendedorActualId, // Usamos ID
+        employeeId: widget.validation.vendedorActualId, // Usamos ID
         previousVendedorId: widget.validation.vendedorAnteriorId, // Usamos ID
         onProgress:
             ({

@@ -61,9 +61,7 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           nombreCompleto,
           style: TextStyle(
@@ -79,13 +77,25 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildDetalleRow('Código', equipo['cod_barras'] ?? 'N/A'),
-                _buildDetalleRow('Marca', equipo['marca_nombre'] ?? 'Sin marca'),
-                _buildDetalleRow('Modelo', equipo['modelo_nombre'] ?? 'Sin modelo'),
+                _buildDetalleRow(
+                  'Marca',
+                  equipo['marca_nombre'] ?? 'Sin marca',
+                ),
+                _buildDetalleRow(
+                  'Modelo',
+                  equipo['modelo_nombre'] ?? 'Sin modelo',
+                ),
                 _buildDetalleRow('Logo', equipo['logo_nombre'] ?? 'Sin logo'),
                 if (equipo['numero_serie'] != null)
                   _buildDetalleRow('Número de Serie', equipo['numero_serie']),
-                _buildDetalleRow('Estado Local', (equipo['estado_local'] == 1) ? "Activo" : "Inactivo"),
-                _buildDetalleRow('Estado Asignación', _viewModel.getEstadoAsignacion(equipo)),
+                _buildDetalleRow(
+                  'Estado Local',
+                  (equipo['estado_local'] == 1) ? "Activo" : "Inactivo",
+                ),
+                _buildDetalleRow(
+                  'Estado Asignación',
+                  _viewModel.getEstadoAsignacion(equipo),
+                ),
                 if (equipo['cliente_nombre'] != null)
                   _buildDetalleRow('Asignado a', equipo['cliente_nombre']),
               ],
@@ -95,9 +105,7 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.primary,
-            ),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
             child: const Text('Cerrar'),
           ),
         ],
@@ -122,10 +130,7 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
             ),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: TextStyle(color: AppColors.textPrimary),
-            ),
+            child: Text(value, style: TextStyle(color: AppColors.textPrimary)),
           ),
         ],
       ),
@@ -185,9 +190,9 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
               prefixIcon: Icon(Icons.search, color: AppColors.textSecondary),
               suffixIcon: _viewModel.shouldShowClearButton
                   ? IconButton(
-                icon: Icon(Icons.clear, color: AppColors.textSecondary),
-                onPressed: _viewModel.limpiarBusqueda,
-              )
+                      icon: Icon(Icons.clear, color: AppColors.textSecondary),
+                      onPressed: _viewModel.limpiarBusqueda,
+                    )
                   : null,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -258,10 +263,7 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
           Text(
             _viewModel.emptyStateTitle,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
           ),
           if (_viewModel.shouldShowRefreshButton) ...[
             const SizedBox(height: 16),
@@ -296,7 +298,9 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
             right: 8.0,
             bottom: MediaQuery.of(context).padding.bottom,
           ),
-          itemCount: _viewModel.equiposMostrados.length + (_viewModel.cargandoMas ? 1 : 0),
+          itemCount:
+              _viewModel.equiposMostrados.length +
+              (_viewModel.cargandoMas ? 1 : 0),
           itemBuilder: (context, index) {
             if (index == _viewModel.equiposMostrados.length) {
               return Padding(
@@ -327,13 +331,13 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
       shadowColor: AppColors.shadowLight,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: AppColors.border,
-          width: 0.5,
-        ),
+        side: BorderSide(color: AppColors.border, width: 0.5),
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16.0,
+          vertical: 8.0,
+        ),
         leading: CircleAvatar(
           backgroundColor: _viewModel.getColorByLogo(logoNombre),
           child: Icon(
@@ -356,31 +360,25 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
             const SizedBox(height: 4),
             Text(
               'Logo: ${logoNombre ?? 'Sin logo'}',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
             ),
             Text(
               'Código: ${equipo['cod_barras'] ?? 'N/A'}',
-              style: TextStyle(
-                color: AppColors.textTertiary,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
             ),
             if (equipo['numero_serie'] != null)
               Text(
                 'Serie: ${equipo['numero_serie']}',
-                style: TextStyle(
-                  color: AppColors.textTertiary,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
               ),
             const SizedBox(height: 4),
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: _viewModel.getEstadoColor(estadoAsignacion),
                     borderRadius: BorderRadius.circular(12),
@@ -398,11 +396,12 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      clienteNombre,
+                      'Cliente: $clienteNombre',
                       style: TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 11,
                         fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w500,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),

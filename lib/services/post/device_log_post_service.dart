@@ -27,7 +27,7 @@ class DeviceLogPostService {
         body: log.toMap(),
         tableName: _tableName, // ✅ Activa el logging de errores
         registroId: log.id, // ✅ Para tracking
-        userId: userId ?? log.edfVendedorId, // ✅ Para logging
+        userId: userId ?? log.employeeId, // ✅ Para logging
       );
 
       if (resultado['exito'] == true) {

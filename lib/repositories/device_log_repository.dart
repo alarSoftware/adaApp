@@ -13,7 +13,7 @@ class DeviceLogRepository {
   // ==================== MÉTODOS EXISTENTES ====================
 
   Future<String> guardarLog({
-    String? edfVendedorId,
+    String? employeeId,
     required double latitud,
     required double longitud,
     required int bateria,
@@ -21,7 +21,7 @@ class DeviceLogRepository {
   }) async {
     final log = DeviceLog(
       id: _uuid.v4(),
-      edfVendedorId: edfVendedorId,
+      employeeId: employeeId,
       latitudLongitud: '$latitud,$longitud',
       bateria: bateria,
       modelo: modelo,
@@ -42,16 +42,16 @@ class DeviceLogRepository {
   // ==================== 🆕 NUEVOS MÉTODOS ANTI-DUPLICADOS ====================
 
   /// 🆕 Obtener el último log de un vendedor
-  Future<DeviceLog?> obtenerUltimoLog(String? edfVendedorId) async {
+  Future<DeviceLog?> obtenerUltimoLog(String? employeeId) async {
     try {
       // Si no hay vendedor, buscar el último log sin filtro
       final List<Map<String, dynamic>> maps;
 
-      if (edfVendedorId != null) {
+      if (employeeId != null) {
         maps = await db.query(
           'device_log',
-          where: 'employed_id = ?',
-          whereArgs: [edfVendedorId],
+          where: 'employee_id = ?',
+          whereArgs: [employeeId],
           orderBy: 'fecha_registro DESC',
           limit: 1,
         );
@@ -72,11 +72,11 @@ class DeviceLogRepository {
 
   /// 🆕 Verificar si existe un log muy reciente (prevenir duplicados)
   Future<bool> existeLogReciente(
-    String? edfVendedorId, {
+    String? employeeId, {
     int minutos = 8,
   }) async {
     try {
-      final ultimoLog = await obtenerUltimoLog(edfVendedorId);
+      final ultimoLog = await obtenerUltimoLog(employeeId);
 
       if (ultimoLog == null) return false;
 
@@ -168,12 +168,12 @@ class DeviceLogRepository {
   }
 
   /// Obtener logs por vendedor
-  Future<List<DeviceLog>> obtenerPorVendedor(String edfVendedorId) async {
+  Future<List<DeviceLog>> obtenerPorVendedor(String employeeId) async {
     try {
       final maps = await db.query(
         'device_log',
-        where: 'employed_id = ?',
-        whereArgs: [edfVendedorId],
+        where: 'employee_id = ?',
+        whereArgs: [employeeId],
         orderBy: 'fecha_registro DESC',
       );
 

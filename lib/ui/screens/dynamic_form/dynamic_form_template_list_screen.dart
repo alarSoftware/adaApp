@@ -349,7 +349,7 @@ class _DynamicFormTemplateListScreenState
       template.id,
       contactoId: widget.cliente.id.toString(),
       userId: usuario?.id?.toString(),
-      edfVendedorId: usuario?.edfVendedorId,
+      employeeId: usuario?.employeeId,
     );
 
     // ✅ Guardar inmediatamente en la BD como borrador

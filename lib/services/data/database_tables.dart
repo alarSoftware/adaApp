@@ -102,7 +102,7 @@ class DatabaseTables {
   String _sqlEquiposPendientes() => '''
   CREATE TABLE equipos_pendientes (
     id TEXT PRIMARY KEY,
-    employed_id TEXT,
+    employee_id TEXT,
     equipo_id TEXT,
     cliente_id TEXT,
     fecha_censo DATETIME,
@@ -123,7 +123,7 @@ class DatabaseTables {
   String _sqlUsuarios() => '''
   CREATE TABLE Users (
     id INTEGER PRIMARY KEY,
-    employed_id TEXT,
+    employee_id TEXT,
     edf_vendedor_nombre TEXT,
     code INTEGER,
     username TEXT NOT NULL,
@@ -135,7 +135,7 @@ class DatabaseTables {
   String _sqlCensoActivo() => '''
   CREATE TABLE censo_activo (
     id TEXT PRIMARY KEY,
-    employed_id TEXT,
+    employee_id TEXT,
     equipo_id TEXT NOT NULL,
     cliente_id INTEGER NOT NULL,
     usuario_id INTEGER,
@@ -170,13 +170,13 @@ class DatabaseTables {
   String _sqlDeviceLog() => '''
   CREATE TABLE device_log (
     id TEXT PRIMARY KEY,
-    employed_id TEXT,
+    employee_id TEXT,
     latitud_longitud TEXT,
     bateria INTEGER,
     modelo TEXT,
     fecha_registro TEXT NOT NULL,
     sincronizado INTEGER DEFAULT 0,
-    FOREIGN KEY (employed_id) REFERENCES Users (employed_id)
+    FOREIGN KEY (employee_id) REFERENCES Users (employee_id)
   )
 ''';
 
@@ -240,7 +240,7 @@ class DatabaseTables {
       id TEXT PRIMARY KEY,
       version INTEGER,
       contacto_id TEXT,
-      employed_id TEXT,
+      employee_id TEXT,
       last_update_user_id INTEGER,
       dynamic_form_id TEXT,
       usuario_id INTEGER,
@@ -293,7 +293,7 @@ class DatabaseTables {
     tipo_operacion TEXT NOT NULL,
     fecha_creacion TEXT NOT NULL,
     fecha_retiro TEXT,
-    employed_id TEXT,
+    employee_id TEXT,
     latitud REAL,
     longitud REAL,
     total_productos INTEGER DEFAULT 0,

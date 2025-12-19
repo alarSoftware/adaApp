@@ -15,7 +15,7 @@ class OperacionComercial {
   final String? syncError;
   final DateTime? syncedAt;
   final int syncRetryCount;
-  final String? edfVendedorId;
+  final String? employeeId;
   final double? latitud;
   final double? longitud;
   final String? odooName;
@@ -37,7 +37,7 @@ class OperacionComercial {
     this.syncError,
     this.syncedAt,
     this.syncRetryCount = 0,
-    this.edfVendedorId,
+    this.employeeId,
     this.latitud,
     this.longitud,
     this.odooName,
@@ -68,7 +68,7 @@ class OperacionComercial {
           ? DateTime.parse(map['synced_at'] as String)
           : null,
       syncRetryCount: map['sync_retry_count'] as int? ?? 0,
-      edfVendedorId: map['employed_id'] as String?,
+      employeeId: map['employee_id'] as String?,
       latitud: map['latitud'] as double?,
       longitud: map['longitud'] as double?,
       odooName: map['odoo_name'] as String?,
@@ -91,7 +91,7 @@ class OperacionComercial {
       'sync_error': syncError,
       'synced_at': syncedAt?.toIso8601String(),
       'sync_retry_count': syncRetryCount,
-      'employed_id': edfVendedorId,
+      'employee_id': employeeId,
       'latitud': latitud,
       'longitud': longitud,
       'odoo_name': odooName,
@@ -107,7 +107,7 @@ class OperacionComercial {
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_retiro': fechaRetiro?.toIso8601String(),
       if (snc != null) 'snc': snc,
-      'employed_id': edfVendedorId,
+      'employee_id': employeeId,
       'latitud': latitud,
       'longitud': longitud,
       'odoo_name': odooName,
@@ -130,7 +130,7 @@ class OperacionComercial {
     String? syncError,
     DateTime? syncedAt,
     int? syncRetryCount,
-    String? edfVendedorId,
+    String? employeeId,
     double? latitud,
     double? longitud,
     String? odooName,
@@ -151,7 +151,7 @@ class OperacionComercial {
       syncError: syncError ?? this.syncError,
       syncedAt: syncedAt ?? this.syncedAt,
       syncRetryCount: syncRetryCount ?? this.syncRetryCount,
-      edfVendedorId: edfVendedorId ?? this.edfVendedorId,
+      employeeId: employeeId ?? this.employeeId,
       latitud: latitud ?? this.latitud,
       longitud: longitud ?? this.longitud,
       odooName: odooName ?? this.odooName,

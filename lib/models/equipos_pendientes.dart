@@ -1,6 +1,6 @@
 class EquiposPendientes {
   final String? id;
-  final String? edfVendedorid;
+  final String? employeeId;
   final String equipoId;
   final String clienteId;
   final DateTime fechaCenso;
@@ -22,7 +22,7 @@ class EquiposPendientes {
 
   EquiposPendientes({
     this.id,
-    required this.edfVendedorid,
+    required this.employeeId,
     required this.equipoId,
     required this.clienteId,
     required this.fechaCenso,
@@ -44,7 +44,7 @@ class EquiposPendientes {
   factory EquiposPendientes.fromMap(Map<String, dynamic> map) {
     return EquiposPendientes(
       id: map['id'] as String?,
-      edfVendedorid: map['employed_id' as String?],
+      employeeId: map['employee_id' as String?],
       equipoId: map['equipo_id'] as String,
       clienteId: map['cliente_id'] as String,
       fechaCenso: DateTime.parse(map['fecha_censo'] as String),

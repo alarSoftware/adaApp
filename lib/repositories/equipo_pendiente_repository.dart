@@ -101,7 +101,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
     required dynamic equipoId,
     required int clienteId,
     int? usuarioId,
-    String? edfVendedorId,
+    String? employeeId,
   }) async {
     try {
       final now = DateTime.now();
@@ -126,7 +126,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
         'usuario_censo_id': usuarioCensoId,
         'fecha_creacion': now.toIso8601String(),
         'fecha_actualizacion': now.toIso8601String(),
-        'employed_id': edfVendedorId,
+        'employee_id': employeeId,
         'sincronizado': 0,
       };
 
@@ -331,9 +331,9 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
             equipoAPI['usuarioId'] ?? equipoAPI['usuario']?['id'] ?? 1,
 
             // --- CORRECCIÓN AQUÍ: Guardar edf_vendedor_id ---
-            'employed_id':
+            'employee_id':
             equipoAPI['edfVendedorSucursalId'] ??
-                equipoAPI['edfVendedorId'],
+                equipoAPI['employeeId'],
 
             // ------------------------------------------------
             'sincronizado': 1,

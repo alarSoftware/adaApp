@@ -164,7 +164,7 @@ class LoginScreenViewModel extends ChangeNotifier {
 
       if (count == 0) {
         _errorMessage =
-            'No hay usuarios registrados.\nPor favor sincronice los usuarios (botón nube arriba a la derecha).';
+            'No hay usuarios registrados.\nPor favor sincronice los usuarios.';
         // No enviamos evento ShowErrorEvent aquí para no mostrar un snackbar/dialog intrusivo al inicio,
         // pero sí mostramos el mensaje en el formulario (que usa _errorMessage).
         notifyListeners();
@@ -341,8 +341,8 @@ class LoginScreenViewModel extends ChangeNotifier {
 
   Future<bool> _validateUserAssignment() async {
     try {
-      if (_currentUser?.edfVendedorId == null ||
-          _currentUser!.edfVendedorId!.trim().isEmpty) {
+      if (_currentUser?.employeeId == null ||
+          _currentUser!.employeeId!.trim().isEmpty) {
         final errorMsg =
             'Su usuario no tiene vendedor asociado.\n\n'
             'Comuníquese con el administrador del sistema para obtener acceso a los clientes.\n\n'
@@ -369,7 +369,7 @@ class LoginScreenViewModel extends ChangeNotifier {
 
       // ✅ Pasar el nombre completo construido a validateSyncRequirement
       return await _authService.validateSyncRequirement(
-        _currentUser!.edfVendedorId!,
+        _currentUser!.employeeId!,
         displayName, // ← Ahora incluye "username - Nombre Vendedor"
       );
     } catch (e) {
@@ -380,7 +380,7 @@ class LoginScreenViewModel extends ChangeNotifier {
         requiereSincronizacion: true,
         razon: 'Error en validación - sincronización por seguridad',
         vendedorAnteriorId: null,
-        vendedorActualId: _currentUser!.edfVendedorId ?? '',
+        vendedorActualId: _currentUser!.employeeId ?? '',
         vendedorAnteriorNombre: null,
         vendedorActualNombre: displayName, // ← Nombre completo
       );
@@ -421,7 +421,7 @@ class LoginScreenViewModel extends ChangeNotifier {
       final displayName = _buildVendorDisplayName(_currentUser!);
 
       final result = await FullSyncService.syncAllDataWithProgress(
-        edfVendedorId: _currentUser!.edfVendedorId!,
+        employeeId: _currentUser!.employeeId!,
         edfVendedorNombre:
             displayName, // ← Nombre completo "username - Nombre Vendedor"
         previousVendedorId: _syncValidationResult?.vendedorAnteriorId,

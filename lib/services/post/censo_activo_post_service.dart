@@ -27,7 +27,7 @@ class CensoActivoPostService {
     String? numeroSerie,
     bool esNuevoEquipo = false,
     required int clienteId,
-    required String edfVendedorId,
+    required String employeeId,
     bool crearPendiente = false,
     dynamic pendienteExistente,
     required int usuarioId,
@@ -65,7 +65,7 @@ class CensoActivoPostService {
         numeroSerie: numeroSerie,
         esNuevoEquipo: esNuevoEquipo,
         clienteId: clienteId,
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
         crearPendiente: crearPendiente,
         pendienteExistente: pendienteExistente,
         censoId: censoIdFinal,
@@ -370,7 +370,7 @@ class CensoActivoPostService {
     String? numeroSerie,
     required bool esNuevoEquipo,
     required int clienteId,
-    required String edfVendedorId,
+    required String employeeId,
     required bool crearPendiente,
     dynamic pendienteExistente,
     required String censoId,
@@ -413,7 +413,7 @@ class CensoActivoPostService {
         equipoId: equipoId,
         clienteId: clienteId,
         usuarioId: usuarioId,
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
         latitud: latitud,
         longitud: longitud,
         observaciones: observaciones,
@@ -462,7 +462,7 @@ class CensoActivoPostService {
   ) {
     var pendienteExistente = pendienteExistenteList[0];
     String id = pendienteExistente['id'];
-    var edfVendedorId = pendienteExistente['employed_id'];
+    var employeeId = pendienteExistente['employee_id'];
     var equipoId = pendienteExistente['equipo_id'];
     var codigoBarras = pendienteExistente['codigo_barras'];
     var clienteId = pendienteExistente['cliente_id'];
@@ -471,8 +471,8 @@ class CensoActivoPostService {
     var marcaId = pendienteExistente['marca_id'];
     var modeloId = pendienteExistente['modelo_id'];
     var logoId = pendienteExistente['logo_id'];
-    final partes = edfVendedorId.split('_');
-    final vendedorIdValue = partes.isNotEmpty ? partes[0] : edfVendedorId;
+    final partes = employeeId.split('_');
+    final vendedorIdValue = partes.isNotEmpty ? partes[0] : employeeId;
     int? sucursalIdValue;
     if (partes.length > 1) {
       sucursalIdValue = int.tryParse(partes[1]);
@@ -484,8 +484,8 @@ class CensoActivoPostService {
       'edfClienteId': clienteId.toString(),
       'id': id,
       'estado': estado,
-      'edfVendedorSucursalId': edfVendedorId,
-      'edfVendedorId': vendedorIdValue,
+      'edfVendedorSucursalId': employeeId,
+      'employeeId': vendedorIdValue,
       'edfSerie': numeroSerie,
       'edfMarcaId': marcaId?.toString(),
       'edfModeloId': modeloId,
@@ -504,7 +504,7 @@ class CensoActivoPostService {
     required String equipoId,
     required int clienteId,
     required int usuarioId,
-    required String edfVendedorId,
+    required String employeeId,
     required double latitud,
     required double longitud,
     String? observaciones,
@@ -527,8 +527,8 @@ class CensoActivoPostService {
 
     final censo = {
       'id': censoId,
-      'edfVendedorSucursalId': edfVendedorId,
-      'edfVendedorId': edfVendedorId, // Añadido para consistencia
+      'edfVendedorSucursalId': employeeId,
+      'employeeId': employeeId, // Añadido para consistencia
       'edfEquipoId': equipoId,
       'usuarioId': usuarioId,
       'fechaRevision': formatearFechaLocal(now),
@@ -594,7 +594,7 @@ class CensoActivoPostService {
     required String marca,
     required String logo,
     required int usuarioId,
-    required String edfVendedorId,
+    required String employeeId,
     String? censoId, // Nuevo parámetro opcional
   }) async {
     try {
@@ -607,7 +607,7 @@ class CensoActivoPostService {
         codigoBarras: codigoBarras,
         clienteId: clienteId,
         usuarioId: usuarioId,
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
         latitud: position.latitude,
         longitud: position.longitude,
         observaciones: observaciones,

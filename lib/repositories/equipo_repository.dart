@@ -32,8 +32,8 @@ class EquipoRepository extends BaseRepository<Equipo> {
   @override
   Future<void> limpiarYSincronizar(List<dynamic> items) async {
     try {
-      final List<Map<String, dynamic>> equipos =
-      items.cast<Map<String, dynamic>>();
+      final List<Map<String, dynamic>> equipos = items
+          .cast<Map<String, dynamic>>();
 
       final db = await dbHelper.database;
 
@@ -58,8 +58,9 @@ class EquipoRepository extends BaseRepository<Equipo> {
   }
 
   Future<void> limpiarYSincronizarEnChunks(
-      List<Map<String, dynamic>> equipos,
-      {int chunkSize = 500}) async {
+    List<Map<String, dynamic>> equipos, {
+    int chunkSize = 500,
+  }) async {
     try {
       final db = await dbHelper.database;
 
@@ -67,8 +68,9 @@ class EquipoRepository extends BaseRepository<Equipo> {
         await txn.delete(tableName);
 
         for (var i = 0; i < equipos.length; i += chunkSize) {
-          final end =
-          (i + chunkSize < equipos.length) ? i + chunkSize : equipos.length;
+          final end = (i + chunkSize < equipos.length)
+              ? i + chunkSize
+              : equipos.length;
           final chunk = equipos.sublist(i, end);
 
           final batch = txn.batch();
@@ -88,8 +90,8 @@ class EquipoRepository extends BaseRepository<Equipo> {
   }
 
   Future<List<Map<String, dynamic>>> obtenerEquiposAsignados(
-      int clienteId,
-      ) async {
+    int clienteId,
+  ) async {
     try {
       final sql = '''
     SELECT DISTINCT
@@ -154,8 +156,8 @@ class EquipoRepository extends BaseRepository<Equipo> {
   }
 
   Future<List<Map<String, dynamic>>> obtenerPorClienteCompleto(
-      int clienteId,
-      ) async {
+    int clienteId,
+  ) async {
     try {
       final sql = '''
       SELECT 
@@ -188,9 +190,9 @@ class EquipoRepository extends BaseRepository<Equipo> {
   }
 
   Future<bool> verificarAsignacionEquipoCliente(
-      String equipoId,
-      int clienteId,
-      ) async {
+    String equipoId,
+    int clienteId,
+  ) async {
     try {
       final resultPendientes = await dbHelper.consultar(
         'equipos_pendientes',
@@ -263,14 +265,14 @@ class EquipoRepository extends BaseRepository<Equipo> {
     LEFT JOIN marcas m ON e.marca_id = m.id
     LEFT JOIN modelos mo ON e.modelo_id = mo.id
     LEFT JOIN logo l ON e.logo_id = l.id
-    LEFT JOIN clientes c ON e.cliente_id = c.id
+    LEFT JOIN clientes c ON CAST(e.cliente_id AS INTEGER) = c.id
     WHERE LOWER(TRIM(e.cod_barras)) LIKE ? OR
           LOWER(TRIM(m.nombre)) LIKE ? OR
           LOWER(TRIM(mo.nombre)) LIKE ? OR
           LOWER(TRIM(l.nombre)) LIKE ? OR
           LOWER(TRIM(e.numero_serie)) LIKE ? OR
           LOWER(TRIM(c.nombre)) LIKE ?
-    ORDER BY e.id DESC
+    ORDER BY CASE WHEN c.nombre IS NOT NULL AND c.nombre != '' THEN 0 ELSE 1 END, e.id DESC
     ''';
 
     return await dbHelper.consultarPersonalizada(sql, [
@@ -298,8 +300,8 @@ class EquipoRepository extends BaseRepository<Equipo> {
       LEFT JOIN marcas m ON e.marca_id = m.id
       LEFT JOIN modelos mo ON e.modelo_id = mo.id
       LEFT JOIN logo l ON e.logo_id = l.id
-      LEFT JOIN clientes c ON e.cliente_id = c.id
-      ORDER BY e.id DESC
+      LEFT JOIN clientes c ON CAST(e.cliente_id AS INTEGER) = c.id
+      ORDER BY CASE WHEN c.nombre IS NOT NULL AND c.nombre != '' THEN 0 ELSE 1 END, e.id DESC
     ''';
 
     return await dbHelper.consultarPersonalizada(sql);
@@ -415,7 +417,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
       LEFT JOIN marcas m ON e.marca_id = m.id
       LEFT JOIN modelos mo ON e.modelo_id = mo.id
       LEFT JOIN logo l ON e.logo_id = l.id
-      LEFT JOIN clientes c ON e.cliente_id = c.id
+      LEFT JOIN clientes c ON CAST(e.cliente_id AS INTEGER) = c.id
       WHERE UPPER(e.cod_barras) = ?
       LIMIT 1
     ''';
@@ -450,8 +452,8 @@ class EquipoRepository extends BaseRepository<Equipo> {
   }
 
   Future<Map<String, dynamic>?> obtenerEquipoClientePorId(
-      dynamic equipoId,
-      ) async {
+    dynamic equipoId,
+  ) async {
     final result = await dbHelper.consultarPorId(
       tableName,
       int.tryParse(equipoId.toString()) ?? 0,

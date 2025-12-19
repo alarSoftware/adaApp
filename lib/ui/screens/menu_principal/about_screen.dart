@@ -149,7 +149,7 @@ class _AboutScreenState extends State<AboutScreen> {
             _buildInfoRow(
               icon: Icons.verified_user_outlined,
               label: 'ID Vendedor',
-              value: _currentUser?.edfVendedorId ?? 'No asignado',
+              value: _currentUser?.employeeId ?? 'No asignado',
             ),
           ],
         ),

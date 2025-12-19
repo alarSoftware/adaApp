@@ -248,7 +248,7 @@ class SelectScreenViewModel extends ChangeNotifier {
 
       // 3. ✅ USAR AuthService para validar sincronización (NO código duplicado)
       final authValidationResult = await _authService.validateSyncRequirement(
-        _currentUser!.edfVendedorId ?? '',
+        _currentUser!.employeeId ?? '',
         displayName,
       );
 
@@ -426,7 +426,7 @@ class SelectScreenViewModel extends ChangeNotifier {
 
   /// Ejecuta sincronización usando el servicio centralizado FullSyncService
   Future<void> _executeUnifiedSync({
-    required String edfVendedorId,
+    required String employeeId,
     String? edfVendedorNombre,
     String? previousVendedorId,
     bool forceClear = false,
@@ -436,7 +436,7 @@ class SelectScreenViewModel extends ChangeNotifier {
 
     try {
       final result = await FullSyncService.syncAllDataWithProgress(
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
         edfVendedorNombre: edfVendedorNombre,
         previousVendedorId: previousVendedorId,
         forceClear: forceClear,
@@ -527,7 +527,7 @@ class SelectScreenViewModel extends ChangeNotifier {
 
       // USAR MÉTODO UNIFICADO
       await _executeUnifiedSync(
-        edfVendedorId: _currentUser!.edfVendedorId ?? '',
+        employeeId: _currentUser!.employeeId ?? '',
         edfVendedorNombre: nombreVendedor,
         previousVendedorId: _syncValidationResult?.vendedorAnterior,
       );
@@ -564,7 +564,7 @@ class SelectScreenViewModel extends ChangeNotifier {
 
     // USAR MÉTODO UNIFICADO
     await _executeUnifiedSync(
-      edfVendedorId: _currentUser!.edfVendedorId ?? '',
+      employeeId: _currentUser!.employeeId ?? '',
       edfVendedorNombre: nombreVendedor,
       previousVendedorId: null,
       forceClear: true,

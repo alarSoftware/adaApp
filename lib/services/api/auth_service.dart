@@ -58,7 +58,7 @@ class AuthService {
   }
 
   Future<SyncValidationResult> validateSyncRequirement(
-    String currentEdfVendedorId,
+    String currentEmployeeId,
     String currentEdfVendedorNombre,
   ) async {
     try {
@@ -75,18 +75,18 @@ class AuthService {
           requiereSincronizacion: true,
           razon: 'Primera sincronización requerida',
           vendedorAnteriorId: null,
-          vendedorActualId: currentEdfVendedorId,
+          vendedorActualId: currentEmployeeId,
           vendedorAnteriorNombre: null,
           vendedorActualNombre: currentEdfVendedorNombre,
         );
       }
 
-      if (lastSyncedVendedorId != currentEdfVendedorId) {
+      if (lastSyncedVendedorId != currentEmployeeId) {
         return SyncValidationResult(
           requiereSincronizacion: true,
           razon: 'Cambio de vendedor detectado',
           vendedorAnteriorId: lastSyncedVendedorId,
-          vendedorActualId: currentEdfVendedorId,
+          vendedorActualId: currentEmployeeId,
           vendedorAnteriorNombre: lastSyncedVendedorName,
           vendedorActualNombre: currentEdfVendedorNombre,
         );
@@ -96,7 +96,7 @@ class AuthService {
         requiereSincronizacion: false,
         razon: 'Mismo vendedor que la sincronización anterior',
         vendedorAnteriorId: lastSyncedVendedorId,
-        vendedorActualId: currentEdfVendedorId,
+        vendedorActualId: currentEmployeeId,
         vendedorAnteriorNombre: lastSyncedVendedorName,
         vendedorActualNombre: currentEdfVendedorNombre,
       );
@@ -105,7 +105,7 @@ class AuthService {
         requiereSincronizacion: true,
         razon: 'Error en validación - sincronización por seguridad',
         vendedorAnteriorId: null,
-        vendedorActualId: currentEdfVendedorId,
+        vendedorActualId: currentEmployeeId,
         vendedorAnteriorNombre: null,
         vendedorActualNombre: currentEdfVendedorNombre,
       );
@@ -113,12 +113,12 @@ class AuthService {
   }
 
   Future<void> markSyncCompleted(
-    String edfVendedorId,
+    String employeeId,
     String edfVendedorNombre,
   ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_keyLastSyncedVendedor, edfVendedorId);
+      await prefs.setString(_keyLastSyncedVendedor, employeeId);
       await prefs.setString(_keyLastSyncedVendedorName, edfVendedorNombre);
       await prefs.setString('last_sync_date', DateTime.now().toIso8601String());
 
@@ -172,7 +172,7 @@ class AuthService {
 
           final usuarioProcesado = {
             'id': usuario['id'],
-            'employed_id': usuario['edfVendedorId']?.toString(),
+            'employee_id': usuario['employeeId']?.toString(),
             'edfVendedorNombre': usuario['edfVendedorNombre']?.toString(),
             'code': usuario['id'],
             'username': usuario['username'],
@@ -217,11 +217,11 @@ class AuthService {
   }
 
   static Future<SyncResult> sincronizarClientesDelVendedor(
-    String edfVendedorId,
+    String employeeId,
   ) async {
     try {
       final baseUrl = await BaseSyncService.getBaseUrl();
-      final url = '$baseUrl/api/getEdfClientes?edfvendedorId=$edfVendedorId';
+      final url = '$baseUrl/api/getEdfClientes?employeeId=$employeeId';
 
       final response = await http
           .get(Uri.parse(url), headers: BaseSyncService.headers)
@@ -307,11 +307,11 @@ class AuthService {
   }
 
   static Future<SyncResult> sincronizarRespuestasDelVendedor(
-    String edfVendedorId,
+    String employeeId,
   ) async {
     try {
       return await DynamicFormSyncService.obtenerRespuestasPorVendedor(
-        edfVendedorId,
+        employeeId,
       );
     } catch (e) {
       return SyncResult(
@@ -373,12 +373,12 @@ class AuthService {
 
       final usuarioAuth = UsuarioAuth.fromUsuario(currentUser);
 
-      if (currentUser.edfVendedorId != null) {
+      if (currentUser.employeeId != null) {
         // ✅ CORREGIDO: Usar el método helper para construir el nombre
         final nombreVendedor = _buildVendorDisplayName(currentUser);
 
         final syncValidation = await validateSyncRequirement(
-          currentUser.edfVendedorId!,
+          currentUser.employeeId!,
           nombreVendedor,
         );
 

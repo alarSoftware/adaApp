@@ -37,14 +37,15 @@ class OperacionComercialSyncService extends BaseSyncService {
       List.from(_ultimasOperaciones);
 
   static Future<SyncResult> obtenerOperaciones({
-    String? edfVendedorId,
+    String? employeeId,
     int? partnerId,
     String? tipo,
   }) async {
+    print('INICIO DESCARGA DE OPERACIONES');
     try {
       final queryParams = <String, String>{};
 
-      if (edfVendedorId != null) {
+      if (employeeId != null) {
         // SEGURIDAD: Verificar si hay pendientes
         final pendientes = await OperacionComercialRepositoryImpl()
             .obtenerOperacionesPendientes();
@@ -61,7 +62,7 @@ class OperacionComercialSyncService extends BaseSyncService {
         // LIMPIEZA: Si no hay pendientes, limpiar todo para evitar duplicados/stale data
         await OperacionComercialRepositoryImpl().eliminarTodasLasOperaciones();
 
-        queryParams['edfVendedorId'] = edfVendedorId;
+        queryParams['employeeId'] = employeeId;
       }
       if (partnerId != null) {
         // VALIDACIÓN DE SEGURIDAD:
@@ -73,7 +74,7 @@ class OperacionComercialSyncService extends BaseSyncService {
           return SyncResult(
             exito: false,
             mensaje:
-                'Hay ${pendientes.length} operaciones pendientes de envío para este cliente. Por favor, incia la sincronización (botón nube) antes de descargar nuevas.',
+                'Hay ${pendientes.length} operaciones pendientes de envío para este cliente. Por favor, incia la sincronización antes de descargar nuevas.',
             itemsSincronizados: 0,
           );
         }
@@ -101,6 +102,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       final operacionesData = await _parseResponse(operacionesResponse);
 
       if (operacionesData.isEmpty) {
+        print('FIN DE DESCARGA');
         return SyncResult(
           exito: true,
           mensaje: 'No hay operaciones para sincronizar',
@@ -131,6 +133,7 @@ class OperacionComercialSyncService extends BaseSyncService {
 
       _ultimasOperaciones = processedResult;
 
+      print('FIN DE DESCARGA');
       return SyncResult(
         exito: true,
         mensaje: 'Operaciones sincronizadas correctamente',
@@ -139,6 +142,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       );
     } on TimeoutException catch (timeoutError) {
       _ultimasOperaciones = [];
+      print('FIN DE DESCARGA');
       return SyncResult(
         exito: false,
         mensaje: 'Timeout de conexión al servidor',
@@ -146,6 +150,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       );
     } on SocketException catch (socketError) {
       _ultimasOperaciones = [];
+      print('FIN DE DESCARGA');
       return SyncResult(
         exito: false,
         mensaje: 'Sin conexión de red',
@@ -153,6 +158,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       );
     } catch (e) {
       _ultimasOperaciones = [];
+      print('FIN DE DESCARGA');
       return SyncResult(
         exito: false,
         mensaje: BaseSyncService.getErrorMessage(e),
@@ -161,10 +167,8 @@ class OperacionComercialSyncService extends BaseSyncService {
     }
   }
 
-  static Future<SyncResult> obtenerOperacionesPorVendedor(
-    String edfVendedorId,
-  ) {
-    return obtenerOperaciones(edfVendedorId: edfVendedorId);
+  static Future<SyncResult> obtenerOperacionesPorVendedor(String employeeId) {
+    return obtenerOperaciones(employeeId: employeeId);
   }
 
   static Future<SyncResult> obtenerOperacionesPorCliente(int partnerId) {
@@ -398,6 +402,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       'usuario_id': usuarioId,
       'server_id': operacionServerId,
       'sync_status': 'migrado',
+      'employee_id': apiOperacion['employeeId']?.toString(),
       'sync_error': apiOperacion['errorText']?.toString(),
       'synced_at': DateTime.now().toIso8601String(),
       'sync_retry_count': 0,

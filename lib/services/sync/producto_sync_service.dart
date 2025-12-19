@@ -19,7 +19,7 @@ class ProductoSyncService extends BaseSyncService {
     bool? activo,
     int? limit,
     int? offset,
-    String? edfVendedorId,
+    String? employeeId,
     String? codigoBarras,
   }) async {
     String? currentEndpoint;
@@ -31,7 +31,7 @@ class ProductoSyncService extends BaseSyncService {
         activo: activo,
         limit: limit,
         offset: offset,
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
         codigoBarras: codigoBarras,
       );
 
@@ -109,12 +109,12 @@ class ProductoSyncService extends BaseSyncService {
     bool? activo,
     int? limit,
     int? offset,
-    String? edfVendedorId,
+    String? employeeId,
     String? codigoBarras,
   }) {
     final Map<String, String> queryParams = {};
 
-    if (edfVendedorId != null) queryParams['edfvendedorId'] = edfVendedorId;
+    if (employeeId != null) queryParams['employeeId'] = employeeId;
     if (categoriaId != null)
       queryParams['categoriaId'] = categoriaId.toString();
     if (estado != null) queryParams['estado'] = estado;

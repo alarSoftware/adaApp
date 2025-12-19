@@ -43,7 +43,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
     double? longitud,
     String? estadoCenso,
     String? observaciones,
-    String? edfVendedorId,
+    String? employeeId,
   }) async {
     try {
       final now = DateTime.now();
@@ -61,7 +61,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'fecha_actualizacion': now.toIso8601String(),
         'estado_censo': EstadoEquipoCenso.creado.valor,
         'observaciones': observaciones,
-        'employed_id': edfVendedorId,
+        'employee_id': employeeId,
       };
 
       // 1. Usar await y no castear el resultado

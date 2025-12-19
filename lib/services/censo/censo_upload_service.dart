@@ -46,7 +46,7 @@ class CensoUploadService {
   Future<void> enviarCensoUnificado({
     required String censoActivoId,
     required int usuarioId,
-    required String edfVendedorId,
+    required String employeeId,
     required bool guardarLog,
   }) async {
     String? fullUrl;
@@ -125,7 +125,7 @@ class CensoUploadService {
         numeroSerie: censoActivoMap['numero_serie']?.toString(),
         esNuevoEquipo: esNuevoEquipo,
         clienteId: clienteId,
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
         crearPendiente: crearPendiente,
         pendienteExistente: pendienteExistente,
         usuarioId: usuarioId,
@@ -275,11 +275,11 @@ class CensoUploadService {
         'Sincronizando $censoActivoId (intento #$numeroIntento/$maxIntentos)',
       );
 
-      final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(
+      final employeeId = await _obtenerEmployeeIdDesdeUsuarioId(
         usuarioId,
       );
-      if (edfVendedorId == null || edfVendedorId.isEmpty) {
-        throw Exception('edfVendedorId no encontrado');
+      if (employeeId == null || employeeId.isEmpty) {
+        throw Exception('employeeId no encontrado');
       }
 
       await _actualizarUltimoIntento(censoActivoId, numeroIntento);
@@ -288,7 +288,7 @@ class CensoUploadService {
       await enviarCensoUnificado(
         censoActivoId: censoActivoId,
         usuarioId: usuarioId,
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
         guardarLog: false,
       );
     } catch (e) {
@@ -299,7 +299,7 @@ class CensoUploadService {
   Future<Map<String, dynamic>> reintentarEnvioCenso(
     String censoActivoId,
     int usuarioId,
-    String? edfVendedorId,
+    String? employeeId,
   ) async {
     bool success = false;
     String message = '';
@@ -307,14 +307,14 @@ class CensoUploadService {
     try {
       _logger.i('Reintento manual: $censoActivoId');
 
-      if (edfVendedorId == null || edfVendedorId.isEmpty) {
-        throw Exception('edfVendedorId es requerido');
+      if (employeeId == null || employeeId.isEmpty) {
+        throw Exception('employeeId es requerido');
       }
 
       await enviarCensoUnificado(
         censoActivoId: censoActivoId,
         usuarioId: usuarioId,
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
         guardarLog: true,
       );
 
@@ -619,7 +619,7 @@ class CensoUploadService {
     }
   }
 
-  Future<String?> _obtenerEdfVendedorIdDesdeUsuarioId(int? usuarioId) async {
+  Future<String?> _obtenerEmployeeIdDesdeUsuarioId(int? usuarioId) async {
     try {
       if (usuarioId == null) return null;
 
@@ -631,10 +631,10 @@ class CensoUploadService {
       );
 
       return usuarioEncontrado.isNotEmpty
-          ? usuarioEncontrado.first['employed_id'] as String?
+          ? usuarioEncontrado.first['employee_id'] as String?
           : null;
     } catch (e) {
-      _logger.e('Error resolviendo edfVendedorId: $e');
+      _logger.e('Error resolviendo employeeId: $e');
       rethrow;
     }
   }

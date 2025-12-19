@@ -11,16 +11,16 @@ import 'package:ada_app/services/error_log/error_log_service.dart';
 class ClientSyncService {
   static final _clienteRepo = ClienteRepository();
 
-  static Future<String> _getClientesUrl(String edfVendedorId) async {
+  static Future<String> _getClientesUrl(String employeeId) async {
     final baseUrl = await BaseSyncService.getBaseUrl();
-    return '$baseUrl/api/getEdfClientes?edfvendedorId=$edfVendedorId';
+    return '$baseUrl/api/getEdfClientes?employeeId=$employeeId';
   }
 
   static Future<SyncResult> sincronizarClientesDelUsuario() async {
     try {
-      final edfVendedorId = await UserSyncService.obtenerEdfVendedorIdUsuarioActual();
+      final employeeId = await UserSyncService.obtenerEmployeeIdUsuarioActual();
 
-      if (edfVendedorId == null || edfVendedorId.trim().isEmpty) {
+      if (employeeId == null || employeeId.trim().isEmpty) {
         return SyncResult(
           exito: true,
           mensaje: 'Usuario sin clientes asignados - omitiendo sincronización de clientes',
@@ -28,7 +28,7 @@ class ClientSyncService {
         );
       }
 
-      return await sincronizarClientesPorVendedor(edfVendedorId);
+      return await sincronizarClientesPorVendedor(employeeId);
 
     } catch (e) {
       await ErrorLogService.logError(
@@ -46,11 +46,11 @@ class ClientSyncService {
     }
   }
 
-  static Future<SyncResult> sincronizarClientesPorVendedor(String edfVendedorId) async {
+  static Future<SyncResult> sincronizarClientesPorVendedor(String employeeId) async {
     String? currentEndpoint;
 
     try {
-      final url = await _getClientesUrl(edfVendedorId);
+      final url = await _getClientesUrl(employeeId);
       currentEndpoint = url;
 
       final response = await http.get(

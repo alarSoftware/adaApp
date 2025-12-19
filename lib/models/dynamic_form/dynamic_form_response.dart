@@ -11,7 +11,7 @@ class DynamicFormResponse {
   final String status;
   final String? userId;
   final String? contactoId;
-  final String? edfVendedorId;
+  final String? employeeId;
   final String? errorMessage;
 
   DynamicFormResponse({
@@ -24,7 +24,7 @@ class DynamicFormResponse {
     this.status = 'draft',
     this.userId,
     this.contactoId,
-    this.edfVendedorId,
+    this.employeeId,
     this.errorMessage,
   });
 
@@ -44,7 +44,7 @@ class DynamicFormResponse {
       status: json['status'] as String? ?? 'draft',
       userId: json['userId'] as String?,
       contactoId: json['contactoId'] as String?,
-      edfVendedorId: json['edfVendedorId'] as String?,
+      employeeId: json['employeeId'] as String?,
       errorMessage: json['errorMessage'] as String?,
     );
   }
@@ -61,7 +61,7 @@ class DynamicFormResponse {
       'status': status,
       if (userId != null) 'userId': userId,
       if (contactoId != null) 'contactoId': contactoId,
-      if (edfVendedorId != null) 'edfVendedorId': edfVendedorId,
+      if (employeeId != null) 'employeeId': employeeId,
       if (errorMessage != null) 'errorMessage': errorMessage,
     };
   }
@@ -93,8 +93,7 @@ class DynamicFormResponse {
       status: map['estado'] as String? ?? 'draft',
       userId: map['usuario_id']?.toString(),
       contactoId: map['contacto_id'] as String?,
-      edfVendedorId: map['employed_id'] as String?,
-      // ✅ Y CAMBIAR ESTA LÍNEA:
+      employeeId: map['employee_id'] as String?,
       errorMessage: map['mensaje_error_sync'] as String?,
     );
   }
@@ -105,7 +104,7 @@ class DynamicFormResponse {
       'id': id,
       'version': 1,
       'contacto_id': contactoId ?? '',
-      'employed_id': edfVendedorId,
+      'employee_id': employeeId,
       'last_update_user_id': null,
       'dynamic_form_id': formTemplateId,
       'usuario_id': userId != null ? int.tryParse(userId!) : null,
@@ -163,7 +162,7 @@ class DynamicFormResponse {
     String? status,
     String? userId,
     String? contactoId,
-    String? edfVendedorId,
+    String? employeeId,
     String? equipoId,
     String? errorMessage,
   }) {
@@ -177,13 +176,13 @@ class DynamicFormResponse {
       status: status ?? this.status,
       userId: userId ?? this.userId,
       contactoId: contactoId ?? this.contactoId,
-      edfVendedorId: edfVendedorId ?? this.edfVendedorId,
+      employeeId: employeeId ?? this.employeeId,
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 
   @override
   String toString() {
-    return 'DynamicFormResponse(id: $id, formTemplateId: $formTemplateId, status: $status, edfVendedorId: $edfVendedorId)';
+    return 'DynamicFormResponse(id: $id, formTemplateId: $formTemplateId, status: $status, employeeId: $employeeId)';
   }
 }

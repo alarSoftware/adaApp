@@ -2,7 +2,7 @@
 
 class DeviceLog {
   final String id;
-  final String? edfVendedorId;
+  final String? employeeId;
   final String latitudLongitud;
   final int bateria;
   final String modelo;
@@ -11,7 +11,7 @@ class DeviceLog {
 
   DeviceLog({
     required this.id,
-    this.edfVendedorId,
+    this.employeeId,
     required this.latitudLongitud,
     required this.bateria,
     required this.modelo,
@@ -23,7 +23,7 @@ class DeviceLog {
   Map<String, dynamic> toMap() {
     return {
       'uuid': id,                           // ✅ Backend espera 'uuid'
-      'edfVendedorId': edfVendedorId,       // ✅ camelCase
+      'emplyedId': employeeId,       // ✅ camelCase
       'latitudLongitud': latitudLongitud,   // ✅ camelCase
       'bateria': bateria,                   // ✅ igual
       'modelo': modelo,                     // ✅ igual
@@ -36,7 +36,7 @@ class DeviceLog {
   Map<String, dynamic> toMapLocal() {
     return {
       'id': id,
-      'employed_id': edfVendedorId,
+      'employee_id': employeeId,
       'latitud_longitud': latitudLongitud,
       'bateria': bateria,
       'modelo': modelo,
@@ -48,7 +48,7 @@ class DeviceLog {
   factory DeviceLog.fromMap(Map<String, dynamic> map) {
     return DeviceLog(
       id: map['id'],
-      edfVendedorId: map['employed_id'],
+      employeeId: map['employee_id'],
       latitudLongitud: map['latitud_longitud'],
       bateria: map['bateria'],
       modelo: map['modelo'],
@@ -64,7 +64,7 @@ class DeviceLog {
 🎯 JSON QUE SE ENVÍA AL BACKEND GRAILS:
 {
   "uuid": "${map['uuid']}",
-  "edfVendedorId": "${map['edfVendedorId']}",
+  "employeeId": "${map['employeeId']}",
   "latitudLongitud": "${map['latitudLongitud']}",
   "bateria": ${map['bateria']},
   "modelo": "${map['modelo']}",

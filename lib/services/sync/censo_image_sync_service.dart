@@ -11,7 +11,7 @@ import 'package:ada_app/services/error_log/error_log_service.dart';
 class CensusImageSyncService extends BaseSyncService {
   /// Método principal: Obtiene y guarda fotos de censos
   static Future<SyncResult> obtenerFotosCensos({
-    String? edfVendedorId,
+    String? employeeId,
     int? censoActivoId,
     String? uuid,
     int? limit,
@@ -22,7 +22,7 @@ class CensusImageSyncService extends BaseSyncService {
 
     try {
       final queryParams = _buildQueryParams(
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
         censoActivoId: censoActivoId,
         uuid: uuid,
         limit: limit,
@@ -119,7 +119,7 @@ class CensusImageSyncService extends BaseSyncService {
 
   /// Construir parámetros de consulta
   static Map<String, String> _buildQueryParams({
-    String? edfVendedorId,
+    String? employeeId,
     int? censoActivoId,
     String? uuid,
     int? limit,
@@ -128,7 +128,7 @@ class CensusImageSyncService extends BaseSyncService {
   }) {
     final Map<String, String> queryParams = {};
 
-    if (edfVendedorId != null) queryParams['edfvendedorId'] = edfVendedorId;
+    if (employeeId != null) queryParams['employeeId'] = employeeId;
     if (censoActivoId != null)
       queryParams['censoActivoId'] = censoActivoId.toString();
     if (limit != null) queryParams['limit'] = limit.toString();

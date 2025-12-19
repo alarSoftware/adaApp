@@ -16,7 +16,7 @@ typedef SyncProgressCallback =
 class FullSyncService {
   /// Sincronizar todos los datos con reporte de progreso
   static Future<SyncResult> syncAllDataWithProgress({
-    required String edfVendedorId,
+    required String employeeId,
     String? edfVendedorNombre,
     String? previousVendedorId,
     bool forceClear = false,
@@ -30,7 +30,7 @@ class FullSyncService {
       // 1. Limpiar datos anteriores si es necesario
       // =================================================================
       if (forceClear ||
-          (previousVendedorId != null && previousVendedorId != edfVendedorId)) {
+          (previousVendedorId != null && previousVendedorId != employeeId)) {
         try {
           onProgress(
             progress: 0.05,
@@ -127,7 +127,7 @@ class FullSyncService {
         );
 
         final responsesResult =
-            await AuthService.sincronizarRespuestasDelVendedor(edfVendedorId);
+            await AuthService.sincronizarRespuestasDelVendedor(employeeId);
 
         if (responsesResult.exito) {
           if (responsesResult.itemsSincronizados > 0) {
@@ -164,7 +164,7 @@ class FullSyncService {
 
         final authService = AuthService();
         await authService.markSyncCompleted(
-          edfVendedorId,
+          employeeId,
           edfVendedorNombre ?? 'Vendedor',
         );
 
@@ -175,7 +175,7 @@ class FullSyncService {
           tableName: 'N/A',
           operation: 'mark_sync_completed',
           errorMessage: 'Error finalizando sync: $e',
-          registroFailId: edfVendedorId,
+          registroFailId: employeeId,
         );
         throw Exception('Error finalizando sync: $e');
       }

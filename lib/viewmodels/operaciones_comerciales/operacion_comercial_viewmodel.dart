@@ -373,7 +373,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         snc: tipoOperacion == TipoOperacion.notaRetiro ? _snc : null,
         totalProductos: _productosSeleccionados.length,
         usuarioId: currentUser?.id ?? 1,
-        edfVendedorId: currentUser?.edfVendedorId,
+        employeeId: currentUser?.employeeId,
         latitud: position?.latitude,
         longitud: position?.longitude,
         syncStatus: 'creado',

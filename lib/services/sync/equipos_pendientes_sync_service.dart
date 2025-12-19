@@ -11,7 +11,7 @@ class EquiposPendientesSyncService extends BaseSyncService {
   static final _repo = EquipoPendienteRepository();
 
   static Future<SyncResult> obtenerEquiposPendientes({
-    String? edfVendedorId,
+    String? employeeId,
   }) async {
     String? currentEndpoint;
 
@@ -19,8 +19,8 @@ class EquiposPendientesSyncService extends BaseSyncService {
       BaseSyncService.logger.i('🔄 Obteniendo equipos pendientes desde el servidor...');
 
       final Map<String, String> queryParams = {};
-      if (edfVendedorId != null) {
-        queryParams['edfvendedorId'] = edfVendedorId;
+      if (employeeId != null) {
+        queryParams['employeeId'] = employeeId;
       }
 
       final baseUrl = await BaseSyncService.getBaseUrl();
@@ -108,7 +108,7 @@ class EquiposPendientesSyncService extends BaseSyncService {
     } catch (e) {
       // --- MANEJO DE EXCEPCIONES GENERALES ---
       BaseSyncService.logger.e('💥 Error general: $e');
-      //await ErrorLogService.logError(tableName: 'equipos_pendientes', operation: 'sync_from_server', errorMessage: 'Error general: $e', errorType: 'unknown', endpoint: currentEndpoint, userId: edfVendedorId);
+      //await ErrorLogService.logError(tableName: 'equipos_pendientes', operation: 'sync_from_server', errorMessage: 'Error general: $e', errorType: 'unknown', endpoint: currentEndpoint, userId: employeeId);
       return SyncResult(exito: false, mensaje: BaseSyncService.getErrorMessage(e), itemsSincronizados: 0);
     }
   }

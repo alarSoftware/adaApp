@@ -2,7 +2,7 @@ import 'package:ada_app/utils/parsing_helpers.dart';
 
 class Usuario {
   final int? id;
-  final String? edfVendedorId;
+  final String? employeeId;
   final String? edfVendedorNombre; // <--- NUEVO CAMPO
   final int code;
   final String username;
@@ -11,7 +11,7 @@ class Usuario {
 
   const Usuario({
     this.id,
-    this.edfVendedorId,
+    this.employeeId,
     this.edfVendedorNombre, // <--- Añadido al constructor
     required this.code,
     required this.username,
@@ -24,7 +24,7 @@ class Usuario {
   factory Usuario.fromMap(Map<String, dynamic> map) {
     return Usuario(
       id: ParsingHelpers.parseInt(map['id']),
-      edfVendedorId: ParsingHelpers.parseString(map['employed_id']),
+      employeeId: ParsingHelpers.parseString(map['employee_id']),
       // Asegúrate de que la clave coincida con tu CREATE TABLE ('edfVendedorNombre')
       edfVendedorNombre: ParsingHelpers.parseString(map['edf_vendedor_nombre']),
       code: ParsingHelpers.parseInt(map['code']),
@@ -37,7 +37,7 @@ class Usuario {
   factory Usuario.fromJson(Map<String, dynamic> json) {
     return Usuario(
       id: ParsingHelpers.parseInt(json['id']),
-      edfVendedorId: ParsingHelpers.parseString(json['edfVendedorId']),
+      employeeId: ParsingHelpers.parseString(json['employeeId']),
       // Asumiendo que el JSON de la API trae la misma clave
       edfVendedorNombre: ParsingHelpers.parseString(json['edfVendedorNombre']),
       code: ParsingHelpers.parseInt(
@@ -55,7 +55,7 @@ class Usuario {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'employed_id': edfVendedorId,
+      'employee_id': employeeId,
       'edf_vendedor_nombre': edfVendedorNombre,
       'code': code,
       'username': username,
@@ -68,7 +68,7 @@ class Usuario {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'edfVendedorId': edfVendedorId,
+      'employeeId': employeeId,
       'edfVendedorNombre': edfVendedorNombre, // <--- Añadido
       'code': code,
       'username': username,
@@ -81,7 +81,7 @@ class Usuario {
 
   Usuario copyWith({
     int? id,
-    String? edfVendedorId,
+    String? employeeId,
     String? edfVendedorNombre, // <--- Añadido parámetro
     int? code,
     String? username,
@@ -90,7 +90,7 @@ class Usuario {
   }) {
     return Usuario(
       id: id ?? this.id,
-      edfVendedorId: edfVendedorId ?? this.edfVendedorId,
+      employeeId: employeeId ?? this.employeeId,
       edfVendedorNombre:
           edfVendedorNombre ?? this.edfVendedorNombre, // <--- Lógica de copia
       code: code ?? this.code,

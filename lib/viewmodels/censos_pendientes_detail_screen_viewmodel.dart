@@ -221,7 +221,7 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
         );
       }
 
-      // 3. Obtener employed_id
+      // 3. Obtener employee_id
       final usuariosList = await db.query(
         'Users',
         where: 'id = ?',
@@ -237,11 +237,11 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
         );
       }
 
-      final edfVendedorId = usuariosList.first['employed_id'] as String?;
-      if (edfVendedorId == null || edfVendedorId.isEmpty) {
+      final employeeId = usuariosList.first['employee_id'] as String?;
+      if (employeeId == null || employeeId.isEmpty) {
         return SyncResult(
           success: false,
-          error: 'employed_id no disponible',
+          error: 'employee_id no disponible',
         );
       }
 

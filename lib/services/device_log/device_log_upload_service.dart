@@ -43,7 +43,7 @@ class DeviceLogUploadService {
           // ✅ Usar el servicio unificado con logging automático
           final resultado = await DeviceLogPostService.enviarDeviceLog(
             log,
-            userId: log.edfVendedorId,
+            userId: log.employeeId,
           );
 
           if (resultado['exito'] == true) {
@@ -109,7 +109,7 @@ class DeviceLogUploadService {
       logger.i('🌐 URL destino: $urlCompleta');
 
       // Obtener userId del primer log (asumiendo que todos son del mismo usuario)
-      final userId = logs.isNotEmpty ? logs.first.edfVendedorId : null;
+      final userId = logs.isNotEmpty ? logs.first.employeeId : null;
 
       // ✅ Usar el servicio unificado
       final resultado = await DeviceLogPostService.enviarDeviceLogsBatch(

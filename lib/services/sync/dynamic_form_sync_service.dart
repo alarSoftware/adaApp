@@ -440,7 +440,7 @@ class DynamicFormSyncService extends BaseSyncService {
     String? contactoId,
     String? dynamicFormId,
     String? estado,
-    String? edfvendedorId,
+    String? employeeId,
   }) async {
     String? currentEndpoint;
 
@@ -449,7 +449,7 @@ class DynamicFormSyncService extends BaseSyncService {
         contactoId: contactoId,
         dynamicFormId: dynamicFormId,
         estado: estado,
-        edfvendedorId: edfvendedorId,
+        employeeId: employeeId,
       );
 
       final baseUrl = await BaseSyncService.getBaseUrl();
@@ -538,7 +538,7 @@ class DynamicFormSyncService extends BaseSyncService {
   }
 
   static Future<SyncResult> obtenerImagenesRespuestasFormularios({
-    String? edfvendedorId,
+    String? employeeId,
     String? contactoId,
     String? dynamicFormId,
     String? dynamicFormResponseId,
@@ -547,7 +547,7 @@ class DynamicFormSyncService extends BaseSyncService {
 
     try {
       final queryParams = _buildQueryParams(
-        edfvendedorId: edfvendedorId,
+        employeeId: employeeId,
         contactoId: contactoId,
         dynamicFormId: dynamicFormId,
         dynamicFormResponseId: dynamicFormResponseId,
@@ -638,23 +638,23 @@ class DynamicFormSyncService extends BaseSyncService {
     }
   }
 
-  static Future<SyncResult> obtenerRespuestasPorVendedor(String edfvendedorId) {
-    return obtenerRespuestasFormularios(edfvendedorId: edfvendedorId);
+  static Future<SyncResult> obtenerRespuestasPorVendedor(String employeeId) {
+    return obtenerRespuestasFormularios(employeeId: employeeId);
   }
 
-  static Future<SyncResult> obtenerImagenesPorVendedor(String edfvendedorId) {
-    return obtenerImagenesRespuestasFormularios(edfvendedorId: edfvendedorId);
+  static Future<SyncResult> obtenerImagenesPorVendedor(String employeeId) {
+    return obtenerImagenesRespuestasFormularios(employeeId: employeeId);
   }
 
   static Future<SyncResult> obtenerImagenesFormularios({
-    String? edfVendedorId,
+    String? employeeId,
   }) {
-    return obtenerImagenesRespuestasFormularios(edfvendedorId: edfVendedorId);
+    return obtenerImagenesRespuestasFormularios(employeeId: employeeId);
   }
 
-  static Future<SyncResult> obtenerRespuestasCompletadas({String? edfvendedorId}) {
+  static Future<SyncResult> obtenerRespuestasCompletadas({String? employeeId}) {
     return obtenerRespuestasFormularios(
-      edfvendedorId: edfvendedorId,
+      employeeId: employeeId,
       estado: 'completed',
     );
   }
@@ -842,7 +842,7 @@ class DynamicFormSyncService extends BaseSyncService {
     String? dynamicFormId,
     String? dynamicFormResponseId,
     String? estado,
-    String? edfvendedorId,
+    String? employeeId,
     String? limit,
     String? offset,
   }) {
@@ -852,7 +852,7 @@ class DynamicFormSyncService extends BaseSyncService {
     if (dynamicFormId != null) params['dynamicFormId'] = dynamicFormId;
     if (dynamicFormResponseId != null) params['dynamicFormResponseId'] = dynamicFormResponseId;
     if (estado != null) params['estado'] = estado;
-    if (edfvendedorId != null) params['edfvendedorId'] = edfvendedorId;
+    if (employeeId != null) params['employeeId'] = employeeId;
     if (limit != null) params['limit'] = limit;
     if (offset != null) params['offset'] = offset;
 

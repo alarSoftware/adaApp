@@ -366,14 +366,14 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         latitud: position.latitude,
         longitud: position.longitude,
         usuarioId: currentUser?.id,
-        edfVendedorId: currentUser?.edfVendedorId,
+        employeeId: currentUser?.employeeId,
       );
 
       // 2. Sincronizar con el servidor
       try {
         if (currentUser != null &&
             currentUser.id != null &&
-            currentUser.edfVendedorId != null) {
+            currentUser.employeeId != null) {
           final resultadoSync = await CensoActivoPostService.enviarCambioEstado(
             codigoBarras: codigoBarras,
             clienteId: int.parse(clienteId.toString()),
@@ -387,7 +387,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
             marca: equipoCliente['marca_nombre']?.toString() ?? '',
             logo: equipoCliente['logo_nombre']?.toString() ?? '',
             usuarioId: currentUser.id!,
-            edfVendedorId: currentUser.edfVendedorId!,
+            employeeId: currentUser.employeeId!,
             censoId: newCensoActivo.id, // ✅ ID consistente
           );
 

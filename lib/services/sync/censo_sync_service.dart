@@ -28,7 +28,7 @@ class CensusSyncService extends BaseSyncService {
     bool? enLocal,
     int? limit,
     int? offset,
-    String? edfVendedorId,
+    String? employeeId,
   }) async {
     String? currentEndpoint;
 
@@ -42,7 +42,7 @@ class CensusSyncService extends BaseSyncService {
         enLocal: enLocal,
         limit: limit,
         offset: offset,
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
       );
 
       final response = await _makeHttpRequest(queryParams);
@@ -446,11 +446,11 @@ class CensusSyncService extends BaseSyncService {
     bool? enLocal,
     int? limit,
     int? offset,
-    String? edfVendedorId,
+    String? employeeId,
   }) {
     final Map<String, String> queryParams = {};
 
-    if (edfVendedorId != null) queryParams['edfvendedorId'] = edfVendedorId;
+    if (employeeId != null) queryParams['employeeId'] = employeeId;
     if (clienteId != null) queryParams['clienteId'] = clienteId.toString();
     if (equipoId != null) queryParams['equipoId'] = equipoId.toString();
     if (fechaDesde != null) queryParams['fechaDesde'] = fechaDesde;
@@ -513,8 +513,8 @@ class CensusSyncService extends BaseSyncService {
       'fecha_actualizacion': DateTime.now().toIso8601String(),
       'observaciones': apiCensus['observaciones']?.toString(),
       'estado_censo': 'migrado',
-      'employed_id':
-          apiCensus['edfVendedorId']?.toString() ??
+      'employee_id':
+          apiCensus['employeeId']?.toString() ??
           apiCensus['edfVendedorSucursalId']?.toString(),
     };
   }

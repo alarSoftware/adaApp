@@ -473,7 +473,7 @@ class SyncTablesConfig {
       'dynamic_form_id': form['dynamic_form_id'],
       'usuario_id': form['usuario_id'],
       'contacto_id': form['contacto_id'],
-      'employed_id': form['employed_id'],
+      'employee_id': form['employee_id'],
       'creation_date': form['creation_date'],
       'last_update_date': form['last_update_date'],
       'estado': form['estado'],

@@ -79,7 +79,7 @@ class OperacionesComercialesPostService {
       if (operacion.snc != null) 'snc': operacion.snc,
       'usuarioId': operacion.usuarioId,
       'totalProductos': operacion.totalProductos,
-      'edfVendedorId': operacion.edfVendedorId,
+      'employeeId': operacion.employeeId,
       'latitud': operacion.latitud,
       'longitud': operacion.longitud,
     };

@@ -136,9 +136,9 @@ class SyncService {
 
       resultado.conexionOK = true;
 
-      String edfVendedorId;
+      String employeeId;
       try {
-        edfVendedorId = await obtenerEdfVendedorId();
+        employeeId = await obtenerEmployeeId();
       } catch (e) {
         resultado.exito = false;
         resultado.mensaje =
@@ -222,7 +222,7 @@ class SyncService {
       try {
         onProgress?.call(0.55, 'Sincronizando censos...');
         final resultadoCensos = await CensusSyncService.obtenerCensosActivos(
-          edfVendedorId: edfVendedorId,
+          employeeId: employeeId,
         );
         resultado.censosSincronizados = resultadoCensos.itemsSincronizados;
         resultado.censosExito = resultadoCensos.exito;
@@ -241,7 +241,7 @@ class SyncService {
           onProgress?.call(0.60, 'Descargando imágenes de censos...');
           final resultadoImagenes =
               await CensusImageSyncService.obtenerFotosCensos(
-                edfVendedorId: edfVendedorId,
+                employeeId: employeeId,
               );
           resultado.imagenesCensosSincronizadas =
               resultadoImagenes.itemsSincronizados;
@@ -266,7 +266,7 @@ class SyncService {
         onProgress?.call(0.65, 'Sincronizando equipos pendientes...');
         final resultadoPendientes =
             await EquiposPendientesSyncService.obtenerEquiposPendientes(
-              edfVendedorId: edfVendedorId,
+              employeeId: employeeId,
             );
         resultado.equiposPendientesSincronizados =
             resultadoPendientes.itemsSincronizados;
@@ -306,7 +306,7 @@ class SyncService {
         onProgress?.call(0.75, 'Sincronizando respuestas...');
         final resultadoRespuestas =
             await DynamicFormSyncService.obtenerRespuestasPorVendedor(
-              edfVendedorId,
+              employeeId,
             );
         resultado.respuestasFormulariosSincronizadas =
             resultadoRespuestas.itemsSincronizados;
@@ -328,7 +328,7 @@ class SyncService {
           onProgress?.call(0.80, 'Descargando imágenes de formularios...');
           final resultadoImagenesFormularios =
               await DynamicFormSyncService.obtenerImagenesFormularios(
-                edfVendedorId: edfVendedorId,
+                employeeId: employeeId,
               );
           resultado.imagenesFormulariosSincronizadas =
               resultadoImagenesFormularios.itemsSincronizados;
@@ -355,7 +355,7 @@ class SyncService {
         onProgress?.call(0.85, 'Sincronizando operaciones comerciales...');
         final resultadoOperaciones =
             await OperacionComercialSyncService.obtenerOperacionesPorVendedor(
-              edfVendedorId,
+              employeeId,
             );
         resultado.operacionesComercialesSincronizadas =
             resultadoOperaciones.itemsSincronizados;
@@ -420,9 +420,9 @@ class SyncService {
   static Future<SyncResult> sincronizarUsuarios() =>
       UserSyncService.sincronizarUsuarios();
 
-  static Future<SyncResult> sincronizarClientes({String? edfVendedorId}) {
-    if (edfVendedorId != null) {
-      return ClientSyncService.sincronizarClientesPorVendedor(edfVendedorId);
+  static Future<SyncResult> sincronizarClientes({String? employeeId}) {
+    if (employeeId != null) {
+      return ClientSyncService.sincronizarClientesPorVendedor(employeeId);
     }
     return ClientSyncService.sincronizarClientesDelUsuario();
   }
@@ -434,28 +434,28 @@ class SyncService {
       ProductoSyncService.obtenerProductos();
 
   static Future<SyncResult> sincronizarEquiposPendientes({
-    String? edfVendedorId,
+    String? employeeId,
   }) => EquiposPendientesSyncService.obtenerEquiposPendientes(
-    edfVendedorId: edfVendedorId,
+    employeeId: employeeId,
   );
 
   static Future<SyncResult> sincronizarImagenesCensos({
-    String? edfVendedorId,
-  }) => CensusImageSyncService.obtenerFotosCensos(edfVendedorId: edfVendedorId);
+    String? employeeId,
+  }) => CensusImageSyncService.obtenerFotosCensos(employeeId: employeeId);
 
   static Future<SyncResult> sincronizarImagenesFormularios({
-    String? edfVendedorId,
+    String? employeeId,
   }) => DynamicFormSyncService.obtenerImagenesFormularios(
-    edfVendedorId: edfVendedorId,
+    employeeId: employeeId,
   );
 
   static Future<SyncResult> sincronizarFormulariosDinamicos() =>
       DynamicFormSyncService.obtenerFormulariosDinamicos();
 
   static Future<SyncResult> sincronizarRespuestasFormularios({
-    String? edfVendedorId,
+    String? employeeId,
   }) => DynamicFormSyncService.obtenerRespuestasFormularios(
-    edfvendedorId: edfVendedorId,
+    employeeId: employeeId,
   );
 
   static Future<SyncResult> obtenerCensosActivos({
@@ -467,7 +467,7 @@ class SyncService {
     bool? enLocal,
     int? limit,
     int? offset,
-    String? edfVendedorId,
+    String? employeeId,
   }) => CensusSyncService.obtenerCensosActivos(
     clienteId: clienteId,
     equipoId: equipoId,
@@ -477,7 +477,7 @@ class SyncService {
     enLocal: enLocal,
     limit: limit,
     offset: offset,
-    edfVendedorId: edfVendedorId,
+    employeeId: employeeId,
   );
 
   static Future<SyncResult> obtenerCensoPorId(int censoId) =>
@@ -498,7 +498,7 @@ class SyncService {
   static Future<ApiResponse> probarConexion() =>
       BaseSyncService.testConnection();
 
-  static Future<String> obtenerEdfVendedorId() async {
+  static Future<String> obtenerEmployeeId() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final currentUsername = prefs.getString('current_user');
@@ -506,7 +506,7 @@ class SyncService {
       if (currentUsername == null || currentUsername.isEmpty) {
         await ErrorLogService.logValidationError(
           tableName: 'Users',
-          operation: 'obtener_employed_id',
+          operation: 'obtener_employee_id',
           errorMessage: 'No hay usuario logueado en el sistema',
         );
         throw 'No hay usuario logueado en el sistema';
@@ -514,34 +514,34 @@ class SyncService {
 
       final dbHelper = DatabaseHelper();
       final resultado = await dbHelper.consultarPersonalizada(
-        'SELECT employed_id FROM Users WHERE username = ? LIMIT 1',
+        'SELECT employee_id FROM Users WHERE username = ? LIMIT 1',
         [currentUsername],
       );
 
       if (resultado.isEmpty) {
         await ErrorLogService.logDatabaseError(
           tableName: 'Users',
-          operation: 'obtener_employed_id',
+          operation: 'obtener_employee_id',
           errorMessage:
               'Usuario $currentUsername no encontrado en la base de datos',
         );
         throw 'Usuario $currentUsername no encontrado en la base de datos';
       }
 
-      final edfVendedorId = resultado.first['employed_id']?.toString();
+      final employeeId = resultado.first['employee_id']?.toString();
 
-      if (edfVendedorId == null || edfVendedorId.isEmpty) {
-        throw 'Usuario $currentUsername no tiene employed_id configurado';
+      if (employeeId == null || employeeId.isEmpty) {
+        throw 'Usuario $currentUsername no tiene employee_id configurado';
       }
 
-      return edfVendedorId;
+      return employeeId;
     } catch (e) {
-      if (!e.toString().contains('no tiene employed_id') &&
+      if (!e.toString().contains('no tiene employee_id') &&
           !e.toString().contains('no encontrado') &&
           !e.toString().contains('No hay usuario')) {
         await ErrorLogService.logError(
           tableName: 'Users',
-          operation: 'obtener_employed_id',
+          operation: 'obtener_employee_id',
           errorMessage: e.toString(),
           errorType: 'unknown',
         );

@@ -57,7 +57,7 @@ class UserSyncService {
           }
 
           return {
-            'employed_id': usuario['employedId']?.toString(),
+            'employee_id': usuario['employeeId']?.toString(),
             // 👇 NUEVA LÍNEA AGREGADA:
             'edfVendedorNombre': usuario['edfVendedorNombre']?.toString(),
             'code': usuarioId,
@@ -196,7 +196,7 @@ class UserSyncService {
   }
 
   // MANTENEMOS TUS MÉTODOS EXISTENTES ABAJO
-  static Future<String?> obtenerEdfVendedorIdUsuarioActual() async {
+  static Future<String?> obtenerEmployeeIdUsuarioActual() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final username = prefs.getString('current_user');
@@ -205,20 +205,20 @@ class UserSyncService {
         BaseSyncService.logger.e('No hay usuario logueado');
         await ErrorLogService.logValidationError(
           tableName: 'Users',
-          operation: 'get_employed_id',
+          operation: 'get_employee_id',
           errorMessage: 'No hay usuario logueado',
         );
         return null;
       }
 
       BaseSyncService.logger.i(
-        'Buscando employed_id para usuario: $username',
+        'Buscando employee_id para usuario: $username',
       );
 
       final db = await _dbHelper.database;
       final result = await db.query(
         'Users',
-        columns: ['employed_id'],
+        columns: ['employee_id'],
         where: 'LOWER(username) = ?',
         whereArgs: [username.toLowerCase()],
         limit: 1,
@@ -237,12 +237,12 @@ class UserSyncService {
         return null;
       }
 
-      final edfVendedorId = result.first['employed_id'] as String?;
+      final employeeId = result.first['employee_id'] as String?;
 
       BaseSyncService.logger.i('Usuario encontrado: $username');
-      BaseSyncService.logger.i('employed_id: $edfVendedorId');
+      BaseSyncService.logger.i('employee_id: $employeeId');
 
-      if (edfVendedorId == null || edfVendedorId.trim().isEmpty) {
+      if (employeeId == null || employeeId.trim().isEmpty) {
         // await ErrorLogService.logValidationError(
         //   tableName: 'Users',
         //   operation: 'get_edf_vendedor_id',
@@ -251,40 +251,40 @@ class UserSyncService {
         // );
       }
 
-      return edfVendedorId;
+      return employeeId;
     } catch (e) {
-      BaseSyncService.logger.e('Error obteniendo employed_id: $e');
+      BaseSyncService.logger.e('Error obteniendo employee_id: $e');
       await ErrorLogService.logError(
         tableName: 'Users',
-        operation: 'get_employed_id',
-        errorMessage: 'Error obteniendo employed_id: $e',
+        operation: 'get_employee_id',
+        errorMessage: 'Error obteniendo employee_id: $e',
         errorType: 'database',
       );
       return null;
     }
   }
 
-  static Future<String?> obtenerEdfVendedorIdDirecto(String username) async {
+  static Future<String?> obtenerEmployeeIdIdDirecto(String username) async {
     try {
       final db = await _dbHelper.database;
       final result = await db.rawQuery(
-        'SELECT employed_id FROM Users WHERE LOWER(username) = ? LIMIT 1',
+        'SELECT employee_id FROM Users WHERE LOWER(username) = ? LIMIT 1',
         [username.toLowerCase()],
       );
 
-      if (result.isNotEmpty && result.first['employed_id'] != null) {
-        return result.first['employed_id'].toString();
+      if (result.isNotEmpty && result.first['employee_id'] != null) {
+        return result.first['employee_id'].toString();
       }
 
       await ErrorLogService.logDatabaseError(
         tableName: 'Users',
         operation: 'query_user_direct',
-        errorMessage: 'Usuario $username no encontrado o sin employed_id',
+        errorMessage: 'Usuario $username no encontrado o sin employee_id',
       );
 
       return null;
     } catch (e) {
-      BaseSyncService.logger.e('Error en obtenerEdfVendedorIdDirecto: $e');
+      BaseSyncService.logger.e('Error en obtenerEmployeeIdDirecto: $e');
       await ErrorLogService.logError(
         tableName: 'Users',
         operation: 'query_user_direct',

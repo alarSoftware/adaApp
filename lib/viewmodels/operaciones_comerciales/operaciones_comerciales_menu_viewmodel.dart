@@ -59,10 +59,10 @@ class OperacionesComercialesMenuViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Obtener edfVendedorId del usuario actual
-      final edfVendedorId = await _obtenerEdfVendedorId();
+      // Obtener employeeId del usuario actual
+      final employeeId = await _obtenerEmployeeId();
 
-      if (edfVendedorId == null) {
+      if (employeeId == null) {
         _errorMessage = 'No se pudo obtener el ID del vendedor';
         _isSyncing = false;
         notifyListeners();
@@ -72,7 +72,7 @@ class OperacionesComercialesMenuViewModel extends ChangeNotifier {
       // Sincronizar con el servidor
       final resultado =
           await OperacionComercialSyncService.obtenerOperacionesPorVendedor(
-            edfVendedorId,
+            employeeId,
           );
 
       if (resultado.exito) {
@@ -100,22 +100,21 @@ class OperacionesComercialesMenuViewModel extends ChangeNotifier {
     }
   }
 
-  // Obtener el edfVendedorId del usuario actual
-  Future<String?> _obtenerEdfVendedorId() async {
+  // Obtener el employeeId del usuario actual
+  Future<String?> _obtenerEmployeeId() async {
     try {
       final db = await DatabaseHelper().database;
       final result = await db.query(
         'Users',
-        columns: ['employed_id'],
+        columns: ['employee_id'],
         limit: 1,
       );
 
       if (result.isNotEmpty) {
-        return result.first['employed_id'] as String?;
+        return result.first['employee_id'] as String?;
       }
       return null;
     } catch (e) {
-      debugPrint('Error obteniendo edfVendedorId: $e');
       return null;
     }
   }

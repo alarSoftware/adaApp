@@ -71,7 +71,7 @@ class DynamicFormViewModel extends ChangeNotifier {
     String? contactoId,
     String? equipoId,
     String? userId,
-    String? edfVendedorId,
+    String? employeeId,
     DynamicFormResponse? existingResponse,
   }) {
     try {
@@ -83,7 +83,7 @@ class DynamicFormViewModel extends ChangeNotifier {
       if (existingResponse != null) {
         _loadExistingResponse(existingResponse);
       } else {
-        _createNewResponse(templateId, contactoId, userId, edfVendedorId);
+        _createNewResponse(templateId, contactoId, userId, employeeId);
       }
 
       _fieldErrors.clear();
@@ -103,7 +103,7 @@ class DynamicFormViewModel extends ChangeNotifier {
     String templateId,
     String? contactoId,
     String? userId,
-    String? edfVendedorId,
+    String? employeeId,
   ) {
     final responseId = _uuid.v4();
 
@@ -115,7 +115,7 @@ class DynamicFormViewModel extends ChangeNotifier {
       status: 'draft',
       contactoId: contactoId,
       userId: userId,
-      edfVendedorId: edfVendedorId,
+      employeeId: employeeId,
     );
 
     _fieldValues.clear();
@@ -471,11 +471,11 @@ class DynamicFormViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> downloadResponsesFromServer(String edfvendedorId) async {
+  Future<bool> downloadResponsesFromServer(String employeeId) async {
     return await _executeWithLoading(() async {
       final resultado =
           await DynamicFormSyncService.obtenerRespuestasPorVendedor(
-            edfvendedorId,
+            employeeId,
           );
 
       if (resultado.exito) {
