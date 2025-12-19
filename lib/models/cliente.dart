@@ -23,6 +23,7 @@ class Cliente {
     this.tieneCensoHoy = false,
     this.tieneFormularioCompleto = false,
     this.tieneOperacionComercialHoy = false,
+
   });
 
   String get displayName {
@@ -32,11 +33,14 @@ class Cliente {
     return nombre;
   }
 
-  bool get esCredito => condicionVenta?.toUpperCase().trim() == 'CREDITO';
+  bool get esCredito => condicionVenta?.toUpperCase().trim() == 'CRÉDITO';
   bool get esContado => condicionVenta?.toUpperCase().trim() == 'CONTADO';
+
+
   String get displayCondicionVenta {
-    if (condicionVenta == null || condicionVenta!.isEmpty)
+    if (condicionVenta == null || condicionVenta!.isEmpty || (condicionVenta?.toUpperCase() != 'CONTADO' && condicionVenta?.toUpperCase() != 'CRÉDITO')) {
       return 'No especificado';
+    }
     return condicionVenta!.toUpperCase();
   }
 

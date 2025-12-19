@@ -465,8 +465,16 @@ class _OperacionComercialFormViewState
                     ],
                   ),
                 ),
-                // Botón de descarga
-                if (!hasOdooName || viewModel.isLoading)
+                if (!hasOdooName || viewModel.isLoading) ...[
+                  Text(
+                    'Descargar OdooName',
+                    style: TextStyle(
+                      color: AppColors.warning,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   SizedBox(
                     width: 32,
                     height: 32,
@@ -500,6 +508,7 @@ class _OperacionComercialFormViewState
                       ),
                     ),
                   ),
+                ],
               ],
             ),
           ),
