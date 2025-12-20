@@ -495,7 +495,35 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                           fontFamily: 'monospace',
                         ),
                         overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
+                      ),
+                    ),
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cliente.esCredito
+                            ? AppColors.warning.withValues(alpha: 0.1)
+                            : AppColors.success.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: cliente.esCredito
+                              ? AppColors.warning.withValues(alpha: 0.5)
+                              : AppColors.success.withValues(alpha: 0.5),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Text(
+                        cliente.displayCondicionVenta,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: cliente.esCredito
+                              ? AppColors.warning
+                              : AppColors.success,
+                        ),
                       ),
                     ),
                     ClientStatusIcons(
