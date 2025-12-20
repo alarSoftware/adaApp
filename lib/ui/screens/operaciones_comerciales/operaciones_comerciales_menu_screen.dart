@@ -419,9 +419,8 @@ class _OperacionesComercialesMenuViewState
                       Text(
                         'Odoo: ${operacion.odooName}',
                         style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
                         ),
                       ),
                     if (operacion.adaSequence != null &&

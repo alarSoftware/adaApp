@@ -22,7 +22,8 @@ class BuscadorProductosWidget extends StatefulWidget {
   });
 
   @override
-  State<BuscadorProductosWidget> createState() => _BuscadorProductosWidgetState();
+  State<BuscadorProductosWidget> createState() =>
+      _BuscadorProductosWidgetState();
 }
 
 class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
@@ -88,9 +89,9 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
           prefixIcon: Icon(Icons.search, color: AppColors.primary),
           suffixIcon: widget.searchQuery.isNotEmpty
               ? IconButton(
-            icon: Icon(Icons.clear, color: AppColors.textSecondary),
-            onPressed: widget.onClearSearch,
-          )
+                  icon: Icon(Icons.clear, color: AppColors.textSecondary),
+                  onPressed: widget.onClearSearch,
+                )
               : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
@@ -141,9 +142,7 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  TextSpan(
-                    text: producto.nombre ?? 'Sin nombre',
-                  ),
+                  TextSpan(text: producto.nombre ?? 'Sin nombre'),
                 ],
               ),
             ),
@@ -168,6 +167,11 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
     // Agregar categoría si existe
     if (producto.tieneCategoria) {
       parts.add(producto.displayCategoria);
+    }
+
+    // Agregar unidad de medida si existe
+    if (producto.tieneUnidadMedida) {
+      parts.add(producto.displayUnidadMedida);
     }
 
     if (producto.tieneCodigoBarras) {
@@ -198,10 +202,7 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
           const SizedBox(width: 12),
           Text(
             'No se encontraron productos',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
-            ),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
         ],
       ),
@@ -210,7 +211,8 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
 
   bool _isProductoSeleccionado(int? productoId) {
     if (productoId == null) return false;
-    return widget.productosSeleccionados
-        .any((detalle) => detalle.productoId == productoId);
+    return widget.productosSeleccionados.any(
+      (detalle) => detalle.productoId == productoId,
+    );
   }
 }

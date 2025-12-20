@@ -195,12 +195,21 @@ class _OperacionComercialFormViewState
             ),
           ),
           if (!viewModel.isViewOnly)
-            Text(
-              viewModel.tipoOperacion.displayName,
-              style: TextStyle(
-                fontWeight: FontWeight.w400,
-                color: Colors.grey[500],
-                fontSize: 12,
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                viewModel.tipoOperacion.displayName.toUpperCase(),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                  fontSize: 14,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
         ],

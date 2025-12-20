@@ -24,56 +24,13 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     this.isReadOnly = false,
     ProductoRepository? productoRepository,
   }) : _productoRepository = productoRepository ?? ProductoRepositoryImpl(),
-        super(key: key);
+       super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(Icons.shopping_cart_outlined,
-              size: 20,
-              color: AppColors.primary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Productos Seleccionados',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(width: 8),
-            if (productosSeleccionados.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.3),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  '${productosSeleccionados.length}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
         if (productosSeleccionados.isEmpty)
           _buildEmptyState()
         else
@@ -122,10 +79,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'Busca productos arriba para agregarlos',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             textAlign: TextAlign.center,
           ),
         ],
@@ -147,10 +101,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           builder: (context, value, child) {
             return Transform.translate(
               offset: Offset(0, 20 * (1 - value)),
-              child: Opacity(
-                opacity: value,
-                child: child,
-              ),
+              child: Opacity(opacity: value, child: child),
             );
           },
           child: _buildProductCard(context, index),
@@ -161,7 +112,8 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
 
   Widget _buildProductCard(BuildContext context, int index) {
     final detalle = productosSeleccionados[index];
-    final esDiscontinuos = tipoOperacion == TipoOperacion.notaRetiroDiscontinuos;
+    final esDiscontinuos =
+        tipoOperacion == TipoOperacion.notaRetiroDiscontinuos;
 
     return Container(
       decoration: BoxDecoration(
@@ -190,9 +142,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
             if (esDiscontinuos)
               Container(
                 height: 4,
-                decoration: BoxDecoration(
-                  gradient: AppColors.errorGradient,
-                ),
+                decoration: BoxDecoration(gradient: AppColors.errorGradient),
               ),
 
             Padding(
@@ -200,7 +150,9 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
               child: Column(
                 children: [
                   FutureBuilder<Producto?>(
-                    future: _productoRepository.obtenerProductoPorId(detalle.productoId!),
+                    future: _productoRepository.obtenerProductoPorId(
+                      detalle.productoId!,
+                    ),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {
                         return const SizedBox(
@@ -293,9 +245,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              TextSpan(
-                text: producto.nombre ?? 'Sin nombre',
-              ),
+              TextSpan(text: producto.nombre ?? 'Sin nombre'),
             ],
           ),
         ),
@@ -303,7 +253,11 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
         if (producto.codigoBarras != null && producto.codigoBarras!.isNotEmpty)
           Row(
             children: [
-              Icon(Icons.barcode_reader, size: 12, color: AppColors.textSecondary),
+              Icon(
+                Icons.barcode_reader,
+                size: 12,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(width: 4),
               Text(
                 producto.codigoBarras!,
@@ -315,22 +269,51 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
               ),
             ],
           ),
-        if (producto.categoria != null) ...[
+        if (producto.tieneCategoria || producto.tieneUnidadMedida) ...[
           const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              producto.categoria!,
-              style: TextStyle(
-                fontSize: 10,
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+          Row(
+            children: [
+              if (producto.tieneCategoria)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    producto.categoria!,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              if (producto.tieneCategoria && producto.tieneUnidadMedida)
+                const SizedBox(width: 6),
+              if (producto.tieneUnidadMedida)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.textSecondary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    producto.displayUnidadMedida,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ],
@@ -349,16 +332,20 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
               : AppColors.primary.withValues(alpha: 0.3),
           width: 1.5,
         ),
-        boxShadow: isReadOnly ? [] : [
-          BoxShadow(
-            color: AppColors.shadow.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        boxShadow: isReadOnly
+            ? []
+            : [
+                BoxShadow(
+                  color: AppColors.shadow.withValues(alpha: 0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: TextFormField(
-        initialValue: detalle.cantidad > 0 ? detalle.cantidad.toInt().toString() : '',
+        initialValue: detalle.cantidad > 0
+            ? detalle.cantidad.toInt().toString()
+            : '',
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
         enabled: !isReadOnly,
@@ -425,7 +412,11 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildExchangeSection(BuildContext context, int index, OperacionComercialDetalle detalle) {
+  Widget _buildExchangeSection(
+    BuildContext context,
+    int index,
+    OperacionComercialDetalle detalle,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -453,10 +444,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                 tween: Tween(begin: 0.0, end: 1.0),
                 curve: Curves.easeInOut,
                 builder: (context, value, child) {
-                  return Transform.rotate(
-                    angle: value * 3.14159,
-                    child: child,
-                  );
+                  return Transform.rotate(angle: value * 3.14159, child: child);
                 },
               ),
               const SizedBox(width: 12),
@@ -482,25 +470,21 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildSelectReplacementButton(int index, OperacionComercialDetalle detalle) {
+  Widget _buildSelectReplacementButton(
+    int index,
+    OperacionComercialDetalle detalle,
+  ) {
     if (isReadOnly) {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.grey.shade100,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.grey.shade300,
-            width: 2,
-          ),
+          border: Border.all(color: Colors.grey.shade300, width: 2),
         ),
         child: Row(
           children: [
-            Icon(
-              Icons.info_outline,
-              color: AppColors.textSecondary,
-              size: 20,
-            ),
+            Icon(Icons.info_outline, color: AppColors.textSecondary, size: 20),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -598,7 +582,9 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
 
   Widget _buildReplacementInfo(int index, OperacionComercialDetalle detalle) {
     return FutureBuilder<Producto?>(
-      future: _productoRepository.obtenerProductoPorId(detalle.productoReemplazoId!),
+      future: _productoRepository.obtenerProductoPorId(
+        detalle.productoReemplazoId!,
+      ),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const SizedBox(
@@ -664,10 +650,15 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    if (productoReemplazo.codigoBarras != null && productoReemplazo.codigoBarras!.isNotEmpty)
+                    if (productoReemplazo.codigoBarras != null &&
+                        productoReemplazo.codigoBarras!.isNotEmpty)
                       Row(
                         children: [
-                          Icon(Icons.barcode_reader, size: 11, color: AppColors.textSecondary),
+                          Icon(
+                            Icons.barcode_reader,
+                            size: 11,
+                            color: AppColors.textSecondary,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             productoReemplazo.codigoBarras!,
