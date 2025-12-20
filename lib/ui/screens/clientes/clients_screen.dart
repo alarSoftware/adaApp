@@ -208,144 +208,149 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildReactiveAppBar(fechaString: fechaFormateada),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // A. Banner de Advertencia (Naranja)
-            if (_necesitaSincronizar && !_isSyncing)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  border: Border(
-                    bottom: BorderSide(color: Colors.orange.shade200),
+      body: GestureDetector(
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // A. Banner de Advertencia (Naranja)
+              if (_necesitaSincronizar && !_isSyncing)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    border: Border(
+                      bottom: BorderSide(color: Colors.orange.shade200),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.orange.shade800,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Ruta sin actualizar",
+                              style: TextStyle(
+                                color: Colors.orange.shade900,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              "No has descargado los clientes de hoy.",
+                              style: TextStyle(
+                                color: Colors.orange.shade800,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: _sincronizarClientes,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.orange.shade900,
+                          elevation: 0,
+                          side: BorderSide(color: Colors.orange.shade300),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        child: const Text("Descargar"),
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      color: Colors.orange.shade800,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Ruta sin actualizar",
-                            style: TextStyle(
-                              color: Colors.orange.shade900,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
+
+              // B. Banner de Carga (Azul)
+              if (_isSyncing)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  color: Colors.blue[50],
+                  child: Row(
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.blue,
                           ),
-                          Text(
-                            "No has descargado los clientes de hoy.",
-                            style: TextStyle(
-                              color: Colors.orange.shade800,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    ElevatedButton(
-                      onPressed: _sincronizarClientes,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.orange.shade900,
-                        elevation: 0,
-                        side: BorderSide(color: Colors.orange.shade300),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      child: const Text("Descargar"),
-                    ),
-                  ],
-                ),
-              ),
-
-            // B. Banner de Carga (Azul)
-            if (_isSyncing)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                color: Colors.blue[50],
-                child: Row(
-                  children: [
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Sincronizando clientes...',
-                      style: TextStyle(
-                        color: Colors.blue[700],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            AppSearchBar(
-              controller: _searchController,
-              hintText: 'Buscar por nombre, codigo o documento...',
-              onClear: _onClearSearch,
-            ),
-            Expanded(
-              child: ListenableBuilder(
-                listenable: _viewModel,
-                builder: (context, child) {
-                  if (_viewModel.isLoading) {
-                    return AppLoading(message: 'Cargando clientes...');
-                  }
-
-                  if (_viewModel.isEmpty) {
-                    return AppEmptyState(
-                      icon: Icons.people_outline,
-                      title: _viewModel.getEmptyStateTitle(),
-                      subtitle: _viewModel.getEmptyStateSubtitle(),
-                    );
-                  }
-
-                  return NotificationListener<ScrollNotification>(
-                    onNotification: _onScrollNotification,
-                    child: RefreshIndicator(
-                      onRefresh: _onRefresh,
-                      color: AppColors.buttonPrimary,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
                         ),
-                        itemCount:
-                            _viewModel.displayedClientes.length +
-                            (_viewModel.hasMoreData ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (index == _viewModel.displayedClientes.length) {
-                            return const AppLoadingMore();
-                          }
-
-                          final cliente = _viewModel.displayedClientes[index];
-                          return _buildClienteCard(cliente);
-                        },
                       ),
-                    ),
-                  );
-                },
+                      const SizedBox(width: 12),
+                      Text(
+                        'Sincronizando clientes...',
+                        style: TextStyle(
+                          color: Colors.blue[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              AppSearchBar(
+                controller: _searchController,
+                hintText: 'Buscar por nombre, codigo o documento...',
+                onClear: _onClearSearch,
               ),
-            ),
-          ],
+              Expanded(
+                child: ListenableBuilder(
+                  listenable: _viewModel,
+                  builder: (context, child) {
+                    if (_viewModel.isLoading) {
+                      return AppLoading(message: 'Cargando clientes...');
+                    }
+
+                    if (_viewModel.isEmpty) {
+                      return AppEmptyState(
+                        icon: Icons.people_outline,
+                        title: _viewModel.getEmptyStateTitle(),
+                        subtitle: _viewModel.getEmptyStateSubtitle(),
+                      );
+                    }
+
+                    return NotificationListener<ScrollNotification>(
+                      onNotification: _onScrollNotification,
+                      child: RefreshIndicator(
+                        onRefresh: _onRefresh,
+                        color: AppColors.buttonPrimary,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          itemCount:
+                              _viewModel.displayedClientes.length +
+                              (_viewModel.hasMoreData ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == _viewModel.displayedClientes.length) {
+                              return const AppLoadingMore();
+                            }
+
+                            final cliente = _viewModel.displayedClientes[index];
+                            return _buildClienteCard(cliente);
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

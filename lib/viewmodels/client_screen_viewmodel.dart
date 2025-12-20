@@ -65,7 +65,7 @@ class ClienteListScreenViewModel extends ChangeNotifier {
   final ClienteRepository _repository = ClienteRepository();
 
   static const int clientesPorPagina = 10;
-  static const Duration searchDelay = Duration(milliseconds: 500);
+  static const Duration searchDelay = Duration(milliseconds: 100);
 
   ClienteListState _state = ClienteListState();
   List<Cliente> _allClientes = [];
@@ -73,7 +73,7 @@ class ClienteListScreenViewModel extends ChangeNotifier {
   Timer? _searchTimer;
 
   final StreamController<ClienteListUIEvent> _eventController =
-  StreamController<ClienteListUIEvent>.broadcast();
+      StreamController<ClienteListUIEvent>.broadcast();
   Stream<ClienteListUIEvent> get uiEvents => _eventController.stream;
 
   ClienteListState get state => _state;
@@ -104,17 +104,36 @@ class ClienteListScreenViewModel extends ChangeNotifier {
 
   Future<void> _applyFilters() async {
     try {
-      final resultados = await _repository.buscarConFiltros(
-        query: _state.searchQuery,
-      );
+      // Optimizacion: Filtrado en memoria en lugar de DB
+      // final resultados = await _repository.buscarConFiltros(
+      //   query: _state.searchQuery,
+      // );
+
+      List<Cliente> resultados;
+      final query = _state.searchQuery.toLowerCase().trim();
+
+      if (query.isEmpty) {
+        resultados = List.from(_allClientes);
+      } else {
+        resultados = _allClientes.where((cliente) {
+          final nombreMatches = cliente.nombre.toLowerCase().contains(query);
+          final rucMatches = cliente.rucCi.toLowerCase().contains(query);
+          final codigoMatches = cliente.codigo.toString().contains(query);
+          final propMatches = cliente.propietario.toLowerCase().contains(query);
+
+          return nombreMatches || rucMatches || codigoMatches || propMatches;
+        }).toList();
+      }
 
       _filteredClientes = resultados;
-      _updateState(_state.copyWith(
-        currentPage: 0,
-        displayedClientes: [],
-        hasMoreData: true,
-        totalCount: resultados.length,
-      ));
+      _updateState(
+        _state.copyWith(
+          currentPage: 0,
+          displayedClientes: [],
+          hasMoreData: true,
+          totalCount: resultados.length,
+        ),
+      );
 
       await _loadNextPage();
     } catch (e) {
@@ -123,44 +142,50 @@ class ClienteListScreenViewModel extends ChangeNotifier {
   }
 
   Future<void> loadClientes() async {
-    _updateState(_state.copyWith(
-      isLoading: true,
-      currentPage: 0,
-      displayedClientes: [],
-      error: null,
-    ));
+    _updateState(
+      _state.copyWith(
+        isLoading: true,
+        currentPage: 0,
+        displayedClientes: [],
+        error: null,
+      ),
+    );
 
     try {
-      final clientesDB = await _repository.buscarConFiltros(
-        query: _state.searchQuery,
-      );
+      // Cargar TODOS los clientes una sola vez
+      final clientesDB = await _repository.buscarConFiltros(query: '');
 
       _allClientes = clientesDB;
       _filteredClientes = clientesDB;
 
-      _updateState(_state.copyWith(
-        isLoading: false,
-        totalCount: clientesDB.length,
-        hasMoreData: true,
-      ));
+      // Si hay un query pendiente (ej: recharge), aplicar filtro
+      if (_state.searchQuery.isNotEmpty) {
+        await _applyFilters();
+      }
+
+      _updateState(
+        _state.copyWith(
+          isLoading: false,
+          totalCount: _filteredClientes.length, // Usar filtrados, no total DB
+          hasMoreData: true,
+        ),
+      );
 
       await _loadNextPage();
     } catch (e, stackTrace) {
-      _updateState(_state.copyWith(
-        isLoading: false,
-        error: 'Error al cargar clientes: $e',
-      ));
+      _updateState(
+        _state.copyWith(
+          isLoading: false,
+          error: 'Error al cargar clientes: $e',
+        ),
+      );
 
       _eventController.add(ShowErrorEvent('Error al cargar clientes: $e'));
     }
   }
 
   Future<void> refresh() async {
-    if (_state.searchQuery.isNotEmpty) {
-      await _applyFilters();
-    } else {
-      await loadClientes();
-    }
+    await loadClientes();
   }
 
   Future<void> _loadNextPage() async {
@@ -181,23 +206,23 @@ class ClienteListScreenViewModel extends ChangeNotifier {
           .take(clientesPorPagina)
           .toList();
 
-      final updatedDisplayedClientes = List<Cliente>.from(_state.displayedClientes)
-        ..addAll(nuevosClientes);
+      final updatedDisplayedClientes = List<Cliente>.from(
+        _state.displayedClientes,
+      )..addAll(nuevosClientes);
 
       final newHasMoreData = endIndex < _filteredClientes.length;
       final newCurrentPage = _state.currentPage + 1;
 
-      _updateState(_state.copyWith(
-        displayedClientes: updatedDisplayedClientes,
-        currentPage: newCurrentPage,
-        hasMoreData: newHasMoreData,
-        isLoadingMore: false,
-      ));
+      _updateState(
+        _state.copyWith(
+          displayedClientes: updatedDisplayedClientes,
+          currentPage: newCurrentPage,
+          hasMoreData: newHasMoreData,
+          isLoadingMore: false,
+        ),
+      );
     } else {
-      _updateState(_state.copyWith(
-        hasMoreData: false,
-        isLoadingMore: false,
-      ));
+      _updateState(_state.copyWith(hasMoreData: false, isLoadingMore: false));
     }
   }
 
@@ -285,6 +310,5 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     };
   }
 
-  void logDebugInfo() {
-  }
+  void logDebugInfo() {}
 }
