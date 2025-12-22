@@ -13,6 +13,7 @@ class DeviceLogRepository {
   // ==================== MÉTODOS EXISTENTES ====================
 
   Future<String> guardarLog({
+    String? id, // <--- ID opcional
     String? employeeId,
     required double latitud,
     required double longitud,
@@ -20,7 +21,7 @@ class DeviceLogRepository {
     required String modelo,
   }) async {
     final log = DeviceLog(
-      id: _uuid.v4(),
+      id: id ?? _uuid.v4(), // <--- Usar ID si se provee
       employeeId: employeeId,
       latitudLongitud: '$latitud,$longitud',
       bateria: bateria,
@@ -71,10 +72,7 @@ class DeviceLogRepository {
   }
 
   /// 🆕 Verificar si existe un log muy reciente (prevenir duplicados)
-  Future<bool> existeLogReciente(
-    String? employeeId, {
-    int minutos = 8,
-  }) async {
+  Future<bool> existeLogReciente(String? employeeId, {int minutos = 8}) async {
     try {
       final ultimoLog = await obtenerUltimoLog(employeeId);
 

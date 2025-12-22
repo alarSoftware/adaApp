@@ -254,6 +254,7 @@ class DeviceLogBackgroundExtension {
       final repository = DeviceLogRepository(db);
 
       await repository.guardarLog(
+        id: log.id, // <--- PASAR ID EXISTENTE
         employeeId: log.employeeId,
         latitud: double.parse(log.latitudLongitud.split(',')[0]),
         longitud: double.parse(log.latitudLongitud.split(',')[1]),

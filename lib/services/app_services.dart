@@ -21,7 +21,6 @@ class AppServices {
 
   // ==================== INICIALIZACIÓN EN LOGIN ====================
 
-  /// Inicializar todos los servicios cuando el usuario hace login
   Future<void> inicializarEnLogin() async {
     try {
       _logger.i(
@@ -30,8 +29,8 @@ class AppServices {
 
       _isUserLoggedIn = true;
 
-      // ❌ REMOVIDO: NO inicializar device logging aquí
-      // await _inicializarExtensionLogging(); // ← COMENTADO
+      // 3. Inicializar device logging (Background Service)
+      await AppBackgroundService.initialize();
 
       // 1. Obtener información del usuario
       final usuario = await _obtenerUsuarioActual();
@@ -152,10 +151,16 @@ class AppServices {
     try {
       _logger.i('Inicializando servicios de la aplicación');
 
+      // VERIFICACIÓN DOBLE: Si la variable interna es false, verificamos con AuthService por si acaso
+      if (!_isUserLoggedIn) {
+        final authService = AuthService();
+        _isUserLoggedIn = await authService.hasUserLoggedInBefore();
+      }
+
       if (_isUserLoggedIn) {
-        //NO inicializar device logging automáticamente
-        // Solo los servicios básicos
-        _logger.i('Servicios básicos inicializados (device logging pendiente)');
+        // Inicializar background service si el usuario ya tiene sesión
+        await AppBackgroundService.initialize();
+        _logger.i('Servicios básicos y background service inicializados');
       } else {
         _logger.i('Usuario no logueado - servicios no iniciados');
       }

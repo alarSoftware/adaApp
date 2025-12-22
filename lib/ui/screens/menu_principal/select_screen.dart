@@ -17,6 +17,7 @@ import 'package:ada_app/ui/screens/menu_principal/about_screen.dart';
 import 'package:ada_app/ui/screens/device_log_screen.dart';
 import 'package:ada_app/ui/screens/error_log_screen.dart';
 import 'package:ada_app/repositories/device_log_repository.dart'; // Needed for DeviceLogScreen
+import 'package:ada_app/services/device/location_service.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -44,6 +45,7 @@ class _SelectScreenState extends State<SelectScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkBatteryOptimizationOnFirstLoad();
+      _checkLocationPermissions();
     });
   }
 
@@ -110,6 +112,19 @@ class _SelectScreenState extends State<SelectScreen> {
         context,
       );
     } catch (e) {}
+  }
+
+  Future<void> _checkLocationPermissions() async {
+    try {
+      // Solicitar permisos de ubicación si no están otorgados
+      await LocationService().ensurePermissions();
+    } catch (e) {
+      if (mounted) {
+        _mostrarError(
+          'Se requieren permisos de ubicación para el funcionamiento correcto.',
+        );
+      }
+    }
   }
 
   Future<void> _handleLogout() async {
