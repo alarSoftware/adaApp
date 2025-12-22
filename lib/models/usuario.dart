@@ -3,7 +3,7 @@ import 'package:ada_app/utils/parsing_helpers.dart';
 class Usuario {
   final int? id;
   final String? employeeId;
-  final String? edfVendedorNombre; // <--- NUEVO CAMPO
+  final String? employeeName; // <--- RENAMED
   final int code;
   final String username;
   final String password;
@@ -12,7 +12,7 @@ class Usuario {
   const Usuario({
     this.id,
     this.employeeId,
-    this.edfVendedorNombre, // <--- Añadido al constructor
+    this.employeeName, // <--- RENAMED
     required this.code,
     required this.username,
     required this.password,
@@ -25,8 +25,8 @@ class Usuario {
     return Usuario(
       id: ParsingHelpers.parseInt(map['id']),
       employeeId: ParsingHelpers.parseString(map['employee_id']),
-      // Asegúrate de que la clave coincida con tu CREATE TABLE ('edfVendedorNombre')
-      edfVendedorNombre: ParsingHelpers.parseString(map['edf_vendedor_nombre']),
+      // Now using 'employee_name'
+      employeeName: ParsingHelpers.parseString(map['employee_name']),
       code: ParsingHelpers.parseInt(map['code']),
       username: ParsingHelpers.parseString(map['username']) ?? '',
       password: ParsingHelpers.parseString(map['password']) ?? '',
@@ -38,8 +38,10 @@ class Usuario {
     return Usuario(
       id: ParsingHelpers.parseInt(json['id']),
       employeeId: ParsingHelpers.parseString(json['employeeId']),
-      // Asumiendo que el JSON de la API trae la misma clave
-      edfVendedorNombre: ParsingHelpers.parseString(json['edfVendedorNombre']),
+      // Prefer 'employeeName' but keep fallback if needed or just switch
+      employeeName:
+          ParsingHelpers.parseString(json['employeeName']) ??
+          ParsingHelpers.parseString(json['edfVendedorNombre']),
       code: ParsingHelpers.parseInt(
         json['id'],
       ), // code usa el mismo ID según tu lógica original
@@ -56,7 +58,7 @@ class Usuario {
     return {
       'id': id,
       'employee_id': employeeId,
-      'edf_vendedor_nombre': edfVendedorNombre,
+      'employee_name': employeeName,
       'code': code,
       'username': username,
       'password': password,
@@ -69,7 +71,7 @@ class Usuario {
     return {
       'id': id,
       'employeeId': employeeId,
-      'edfVendedorNombre': edfVendedorNombre, // <--- Añadido
+      'employeeName': employeeName, // <--- RENAMED
       'code': code,
       'username': username,
       'password': password,
@@ -82,7 +84,7 @@ class Usuario {
   Usuario copyWith({
     int? id,
     String? employeeId,
-    String? edfVendedorNombre, // <--- Añadido parámetro
+    String? employeeName, // <--- RENAMED
     int? code,
     String? username,
     String? password,
@@ -91,8 +93,7 @@ class Usuario {
     return Usuario(
       id: id ?? this.id,
       employeeId: employeeId ?? this.employeeId,
-      edfVendedorNombre:
-          edfVendedorNombre ?? this.edfVendedorNombre, // <--- Lógica de copia
+      employeeName: employeeName ?? this.employeeName, // <--- RENAMED
       code: code ?? this.code,
       username: username ?? this.username,
       password: password ?? this.password,
@@ -102,7 +103,7 @@ class Usuario {
 
   @override
   String toString() =>
-      'Usuario(id: $id, username: $username, code: $code, edfVendedorNombre: $edfVendedorNombre)';
+      'Usuario(id: $id, username: $username, code: $code, employeeName: $employeeName)';
 
   @override
   bool operator ==(Object other) =>

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../models/cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
+import 'package:ada_app/ui/widgets/client_info_card.dart';
 import 'package:ada_app/viewmodels/preview_screen_viewmodel.dart';
 import 'package:ada_app/ui/widgets/preview/preview_dialogs.dart';
 import 'package:ada_app/ui/widgets/preview/preview_image_section.dart';
@@ -462,7 +463,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (esHistorial) _buildSyncStatusIndicator(estadoId),
-          PreviewClienteCard(cliente: cliente),
+          ClientInfoCard(cliente: cliente),
           const SizedBox(height: 16),
           PreviewEquipoCard(datos: widget.datos),
           const SizedBox(height: 16),

@@ -1,70 +1,9 @@
 // ui/widgets/preview/preview_cards.dart
 
 import 'package:flutter/material.dart';
-import 'package:ada_app/models/cliente.dart';
+
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/ui/widgets/gps_navigation_widget.dart';
-
-/// Card para mostrar información del cliente
-class PreviewClienteCard extends StatelessWidget {
-  final Cliente cliente;
-
-  const PreviewClienteCard({super.key, required this.cliente});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 2,
-      color: AppColors.surface,
-      shadowColor: AppColors.shadowLight,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.border, width: 0.5),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.person, color: AppColors.secondary, size: 24),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Informacion del Cliente',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            Divider(height: 20, color: AppColors.border),
-            InfoRow(
-              label: 'Nombre',
-              value: cliente.nombre,
-              icon: Icons.account_circle,
-            ),
-            InfoRow(
-              label: 'Direccion',
-              value: cliente.direccion,
-              icon: Icons.location_on,
-            ),
-            InfoRow(
-              label: 'Telefono',
-              value: cliente.telefono,
-              icon: Icons.phone,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 /// Card para mostrar información del equipo/visicooler
 class PreviewEquipoCard extends StatelessWidget {
@@ -89,11 +28,11 @@ class PreviewEquipoCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.devices, color: AppColors.primary, size: 24),
+                Icon(Icons.kitchen, color: AppColors.primary, size: 24),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Datos del Visicooler',
+                    'Datos del Equipo',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,

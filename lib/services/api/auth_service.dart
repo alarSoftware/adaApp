@@ -50,16 +50,16 @@ class AuthService {
 
   // ✅ MÉTODO HELPER PARA CONSTRUIR EL NOMBRE DEL VENDEDOR
   String _buildVendorDisplayName(Usuario usuario) {
-    if (usuario.edfVendedorNombre != null &&
-        usuario.edfVendedorNombre!.trim().isNotEmpty) {
-      return '${usuario.username} - ${usuario.edfVendedorNombre}';
+    if (usuario.employeeName != null &&
+        usuario.employeeName!.trim().isNotEmpty) {
+      return '${usuario.username} - ${usuario.employeeName}';
     }
     return usuario.username;
   }
 
   Future<SyncValidationResult> validateSyncRequirement(
     String currentEmployeeId,
-    String currentEdfVendedorNombre,
+    String currentEmployeeName,
   ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -77,7 +77,7 @@ class AuthService {
           vendedorAnteriorId: null,
           vendedorActualId: currentEmployeeId,
           vendedorAnteriorNombre: null,
-          vendedorActualNombre: currentEdfVendedorNombre,
+          vendedorActualNombre: currentEmployeeName,
         );
       }
 
@@ -88,7 +88,7 @@ class AuthService {
           vendedorAnteriorId: lastSyncedVendedorId,
           vendedorActualId: currentEmployeeId,
           vendedorAnteriorNombre: lastSyncedVendedorName,
-          vendedorActualNombre: currentEdfVendedorNombre,
+          vendedorActualNombre: currentEmployeeName,
         );
       }
 
@@ -98,7 +98,7 @@ class AuthService {
         vendedorAnteriorId: lastSyncedVendedorId,
         vendedorActualId: currentEmployeeId,
         vendedorAnteriorNombre: lastSyncedVendedorName,
-        vendedorActualNombre: currentEdfVendedorNombre,
+        vendedorActualNombre: currentEmployeeName,
       );
     } catch (e) {
       return SyncValidationResult(
@@ -107,19 +107,16 @@ class AuthService {
         vendedorAnteriorId: null,
         vendedorActualId: currentEmployeeId,
         vendedorAnteriorNombre: null,
-        vendedorActualNombre: currentEdfVendedorNombre,
+        vendedorActualNombre: currentEmployeeName,
       );
     }
   }
 
-  Future<void> markSyncCompleted(
-    String employeeId,
-    String edfVendedorNombre,
-  ) async {
+  Future<void> markSyncCompleted(String employeeId, String employeeName) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyLastSyncedVendedor, employeeId);
-      await prefs.setString(_keyLastSyncedVendedorName, edfVendedorNombre);
+      await prefs.setString(_keyLastSyncedVendedorName, employeeName);
       await prefs.setString('last_sync_date', DateTime.now().toIso8601String());
 
       try {
@@ -173,7 +170,9 @@ class AuthService {
           final usuarioProcesado = {
             'id': usuario['id'],
             'employee_id': usuario['employeeId']?.toString(),
-            'edfVendedorNombre': usuario['edfVendedorNombre']?.toString(),
+            'employeeName':
+                usuario['employeeName']?.toString() ??
+                usuario['edfVendedorNombre']?.toString(),
             'code': usuario['id'],
             'username': usuario['username'],
             'password': password,

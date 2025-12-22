@@ -203,9 +203,9 @@ class LoginScreenViewModel extends ChangeNotifier {
 
   // ✅ MÉTODO HELPER PARA CONSTRUIR EL DISPLAY NAME (igual que en AuthService)
   String _buildVendorDisplayName(Usuario usuario) {
-    if (usuario.edfVendedorNombre != null &&
-        usuario.edfVendedorNombre!.trim().isNotEmpty) {
-      return '${usuario.username} - ${usuario.edfVendedorNombre}';
+    if (usuario.employeeName != null &&
+        usuario.employeeName!.trim().isNotEmpty) {
+      return '${usuario.username} - ${usuario.employeeName}';
     }
     return usuario.username;
   }

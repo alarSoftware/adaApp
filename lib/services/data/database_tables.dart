@@ -124,7 +124,7 @@ class DatabaseTables {
   CREATE TABLE Users (
     id INTEGER PRIMARY KEY,
     employee_id TEXT,
-    edf_vendedor_nombre TEXT,
+    employee_name TEXT,
     code INTEGER,
     username TEXT NOT NULL,
     password TEXT NOT NULL,   
@@ -293,6 +293,7 @@ class DatabaseTables {
     tipo_operacion TEXT NOT NULL,
     fecha_creacion TEXT NOT NULL,
     fecha_retiro TEXT,
+    snc TEXT,
     employee_id TEXT,
     latitud REAL,
     longitud REAL,

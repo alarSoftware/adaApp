@@ -47,7 +47,6 @@ class CensoUploadService {
     required String censoActivoId,
     required int usuarioId,
     required String employeeId,
-    required bool guardarLog,
   }) async {
     String? fullUrl;
 
@@ -139,7 +138,6 @@ class CensoUploadService {
         marca: censoActivoMap['marca_nombre']?.toString(),
         modelo: censoActivoMap['modelo']?.toString(),
         logo: censoActivoMap['logo']?.toString(),
-        guardarLog: guardarLog,
         equipoDataMap: equipoDataMap,
       );
     } catch (e, stackTrace) {
@@ -275,9 +273,7 @@ class CensoUploadService {
         'Sincronizando $censoActivoId (intento #$numeroIntento/$maxIntentos)',
       );
 
-      final employeeId = await _obtenerEmployeeIdDesdeUsuarioId(
-        usuarioId,
-      );
+      final employeeId = await _obtenerEmployeeIdDesdeUsuarioId(usuarioId);
       if (employeeId == null || employeeId.isEmpty) {
         throw Exception('employeeId no encontrado');
       }
@@ -289,7 +285,6 @@ class CensoUploadService {
         censoActivoId: censoActivoId,
         usuarioId: usuarioId,
         employeeId: employeeId,
-        guardarLog: false,
       );
     } catch (e) {
       rethrow;
@@ -315,7 +310,6 @@ class CensoUploadService {
         censoActivoId: censoActivoId,
         usuarioId: usuarioId,
         employeeId: employeeId,
-        guardarLog: true,
       );
 
       final censoActivoMapList = await censoActivoRepository.dbHelper.consultar(

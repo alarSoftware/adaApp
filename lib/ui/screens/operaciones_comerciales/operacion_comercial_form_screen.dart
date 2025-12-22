@@ -194,24 +194,23 @@ class _OperacionComercialFormViewState
               fontSize: 17,
             ),
           ),
-          if (!viewModel.isViewOnly)
-            Container(
-              margin: const EdgeInsets.only(top: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                viewModel.tipoOperacion.displayName.toUpperCase(),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                  fontSize: 14,
-                  letterSpacing: 0.5,
-                ),
+          Container(
+            margin: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              viewModel.tipoOperacion.displayName.toUpperCase(),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+                fontSize: 14,
+                letterSpacing: 0.5,
               ),
             ),
+          ),
         ],
       ),
       backgroundColor: Colors.white,

@@ -142,13 +142,13 @@ class _AboutScreenState extends State<AboutScreen> {
             Divider(height: 24),
             _buildInfoRow(
               icon: Icons.badge_outlined,
-              label: 'Vendedor',
-              value: _currentUser?.edfVendedorNombre ?? 'No asignado',
+              label: 'Employee Name',
+              value: _currentUser?.employeeName ?? 'No asignado',
             ),
             Divider(height: 24),
             _buildInfoRow(
               icon: Icons.verified_user_outlined,
-              label: 'ID Vendedor',
+              label: 'ID Employee',
               value: _currentUser?.employeeId ?? 'No asignado',
             ),
           ],

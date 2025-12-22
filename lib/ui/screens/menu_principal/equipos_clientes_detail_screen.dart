@@ -35,8 +35,7 @@ class _EquiposClientesDetailScreenState
     _setupEventListener();
   }
 
-  void _checkDatabase() async {
-  }
+  void _checkDatabase() async {}
 
   @override
   void dispose() {
@@ -80,64 +79,118 @@ class _EquiposClientesDetailScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(
-          'Detalle del Equipo',
-          style: TextStyle(color: AppColors.onPrimary),
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(kToolbarHeight),
+        child: ListenableBuilder(
+          listenable: _viewModel,
+          builder: (context, child) {
+            return AppBar(
+              automaticallyImplyLeading: !_viewModel.isProcessing,
+              title: Text(
+                'Detalle del Equipo',
+                style: TextStyle(color: AppColors.onPrimary),
+              ),
+              backgroundColor: AppColors.appBarBackground,
+              foregroundColor: AppColors.appBarForeground,
+              actions: [
+                if (_viewModel.isEquipoActivo)
+                  ListenableBuilder(
+                    listenable: _viewModel,
+                    builder: (context, child) {
+                      final canSave = _viewModel.saveButtonEnabled;
+                      final buttonText = _viewModel.saveButtonText;
+
+                      return TextButton.icon(
+                        onPressed: canSave ? _showSaveConfirmation : null,
+                        icon: Icon(
+                          Icons.save,
+                          color: canSave
+                              ? AppColors.onPrimary
+                              : AppColors.onPrimary.withValues(alpha: 0.5),
+                          size: 20,
+                        ),
+                        label: Text(
+                          buttonText,
+                          style: TextStyle(
+                            color: canSave
+                                ? AppColors.onPrimary
+                                : AppColors.onPrimary.withValues(alpha: 0.5),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                SizedBox(width: 8),
+              ],
+            );
+          },
         ),
-        backgroundColor: AppColors.appBarBackground,
-        foregroundColor: AppColors.appBarForeground,
-        actions: [
-          if (_viewModel.isEquipoActivo)
+      ),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: EdgeInsets.only(
+                left: 16.0,
+                right: 16.0,
+                top: 16.0,
+                bottom: 16.0 + MediaQuery.of(context).padding.bottom,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildClienteInfo(),
+                  SizedBox(height: 32),
+                  _buildEquipoInfo(),
+                  SizedBox(height: 32),
+                  _buildActionButtons(),
+                  SizedBox(height: 20),
+                ],
+              ),
+            ),
             ListenableBuilder(
               listenable: _viewModel,
               builder: (context, child) {
-                final canSave = _viewModel.saveButtonEnabled;
-                final buttonText = _viewModel.saveButtonText;
+                if (!_viewModel.isProcessing) return SizedBox.shrink();
 
-                return TextButton.icon(
-                  onPressed: canSave ? _showSaveConfirmation : null,
-                  icon: Icon(
-                    Icons.save,
-                    color: canSave
-                        ? AppColors.onPrimary
-                        : AppColors.onPrimary.withValues(alpha: 0.5),
-                    size: 20,
-                  ),
-                  label: Text(
-                    buttonText,
-                    style: TextStyle(
-                      color: canSave
-                          ? AppColors.onPrimary
-                          : AppColors.onPrimary.withValues(alpha: 0.5),
-                      fontWeight: FontWeight.w600,
+                return Container(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  child: Center(
+                    child: Container(
+                      padding: EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 10,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(color: AppColors.primary),
+                          SizedBox(height: 16),
+                          Text(
+                            'Procesando...',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
               },
             ),
-          SizedBox(width: 8),
-        ],
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.only(
-            left: 16.0,
-            right: 16.0,
-            top: 16.0,
-            bottom: 16.0 + MediaQuery.of(context).padding.bottom,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildClienteInfo(),
-              SizedBox(height: 32),
-              _buildEquipoInfo(),
-              SizedBox(height: 32),
-              _buildActionButtons(),
-              SizedBox(height: 20),
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -228,15 +281,15 @@ class _EquiposClientesDetailScreenState
                       Container(
                         decoration: BoxDecoration(
                           color:
-                          _viewModel.equipoCliente['tipo_estado'] ==
-                              'asignado'
+                              _viewModel.equipoCliente['tipo_estado'] ==
+                                  'asignado'
                               ? AppColors.success.withValues(alpha: 0.1)
                               : AppColors.warning.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color:
-                            _viewModel.equipoCliente['tipo_estado'] ==
-                                'asignado'
+                                _viewModel.equipoCliente['tipo_estado'] ==
+                                    'asignado'
                                 ? AppColors.success.withValues(alpha: 0.3)
                                 : AppColors.warning.withValues(alpha: 0.3),
                           ),
@@ -247,8 +300,8 @@ class _EquiposClientesDetailScreenState
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color:
-                            _viewModel.equipoCliente['tipo_estado'] ==
-                                'asignado'
+                                _viewModel.equipoCliente['tipo_estado'] ==
+                                    'asignado'
                                 ? AppColors.success
                                 : AppColors.warning,
                           ),
@@ -490,28 +543,30 @@ class _EquiposClientesDetailScreenState
                         ),
                       ],
                     ),
-                    items: dropdownHabilitado ? [
-                      DropdownMenuItem<bool?>(
-                        value: false,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.location_off,
-                              color: AppColors.warning,
-                              size: 20,
-                            ),
-                            SizedBox(width: 12),
-                            Flexible(
-                              child: Text(
-                                'Fuera del local',
-                                overflow: TextOverflow.ellipsis,
+                    items: dropdownHabilitado
+                        ? [
+                            DropdownMenuItem<bool?>(
+                              value: false,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.location_off,
+                                    color: AppColors.warning,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 12),
+                                  Flexible(
+                                    child: Text(
+                                      'Fuera del local',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ] : null,
+                          ]
+                        : null,
                     onChanged: dropdownHabilitado
                         ? (value) => _viewModel.cambiarUbicacionEquipo(value)
                         : null,
@@ -764,8 +819,8 @@ class _EquiposClientesDetailScreenState
   }
 
   Future<Map<String, dynamic>> _prepararDatosHistorialParaPreview(
-      dynamic historialItem,
-      ) async {
+    dynamic historialItem,
+  ) async {
     try {
       final clienteIdRaw = widget.equipoCliente['cliente_id'];
 
@@ -805,7 +860,7 @@ class _EquiposClientesDetailScreenState
         'cod_barras': widget.equipoCliente['cod_barras']?.toString() ?? '',
         'numero_serie': widget.equipoCliente['numero_serie']?.toString() ?? '',
         'modelo_nombre':
-        widget.equipoCliente['modelo_nombre']?.toString() ?? '',
+            widget.equipoCliente['modelo_nombre']?.toString() ?? '',
         'logo_nombre': widget.equipoCliente['logo_nombre']?.toString() ?? '',
         'marca_nombre': widget.equipoCliente['marca_nombre']?.toString() ?? '',
       };
@@ -853,8 +908,7 @@ class _EquiposClientesDetailScreenState
             tieneImagen2 = segundaFoto.tieneImagen;
             imagenTamano2 = segundaFoto.imagenTamano;
           }
-        } catch (e) {
-        }
+        } catch (e) {}
       }
 
       final datosFinales = {
@@ -867,15 +921,15 @@ class _EquiposClientesDetailScreenState
         'timestamp_gps': fechaRevisionSafe?.toString(),
 
         'codigo_barras':
-        widget.equipoCliente['cod_barras']?.toString() ?? 'No especificado',
+            widget.equipoCliente['cod_barras']?.toString() ?? 'No especificado',
         'modelo':
-        widget.equipoCliente['modelo_nombre']?.toString() ??
+            widget.equipoCliente['modelo_nombre']?.toString() ??
             'No especificado',
         'logo':
-        widget.equipoCliente['logo_nombre']?.toString() ??
+            widget.equipoCliente['logo_nombre']?.toString() ??
             'No especificado',
         'numero_serie':
-        widget.equipoCliente['numero_serie']?.toString() ??
+            widget.equipoCliente['numero_serie']?.toString() ??
             'No especificado',
 
         'observaciones': historialItem?.observaciones ?? 'Sin observaciones',

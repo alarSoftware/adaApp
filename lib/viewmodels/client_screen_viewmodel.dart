@@ -24,6 +24,7 @@ class ClienteListState {
   final int currentPage;
   final int totalCount;
   final String? error;
+  final String? filterMode; // 'all' or 'registered_today'
 
   ClienteListState({
     this.isLoading = false,
@@ -34,6 +35,7 @@ class ClienteListState {
     this.currentPage = 0,
     this.totalCount = 0,
     this.error,
+    this.filterMode = 'all',
   });
 
   ClienteListState copyWith({
@@ -47,6 +49,7 @@ class ClienteListState {
     int? currentPage,
     int? totalCount,
     String? error,
+    String? filterMode,
   }) {
     return ClienteListState(
       isLoading: isLoading ?? this.isLoading,
@@ -57,6 +60,7 @@ class ClienteListState {
       currentPage: currentPage ?? this.currentPage,
       totalCount: totalCount ?? this.totalCount,
       error: error ?? this.error,
+      filterMode: filterMode ?? this.filterMode,
     );
   }
 }
@@ -102,20 +106,32 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     _applyFilters();
   }
 
+  void setFilterMode(String mode) {
+    if (_state.filterMode == mode) return;
+    _updateState(_state.copyWith(filterMode: mode));
+    _applyFilters();
+  }
+
   Future<void> _applyFilters() async {
     try {
-      // Optimizacion: Filtrado en memoria en lugar de DB
-      // final resultados = await _repository.buscarConFiltros(
-      //   query: _state.searchQuery,
-      // );
-
       List<Cliente> resultados;
       final query = _state.searchQuery.toLowerCase().trim();
+      List<Cliente> baseList = _allClientes;
 
+      // 1. Filtrar por Modo (Todos / Registrados Hoy)
+      if (_state.filterMode == 'registered_today') {
+        baseList = baseList.where((c) {
+          return c.tieneCensoHoy ||
+              c.tieneOperacionComercialHoy ||
+              c.tieneFormularioCompleto;
+        }).toList();
+      }
+
+      // 2. Filtrar por Búsqueda
       if (query.isEmpty) {
-        resultados = List.from(_allClientes);
+        resultados = List.from(baseList);
       } else {
-        resultados = _allClientes.where((cliente) {
+        resultados = baseList.where((cliente) {
           final nombreMatches = cliente.nombre.toLowerCase().contains(query);
           final rucMatches = cliente.rucCi.toLowerCase().contains(query);
           final codigoMatches = cliente.codigo.toString().contains(query);

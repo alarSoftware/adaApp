@@ -256,7 +256,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
         censoActivoId: censoActivoId,
         usuarioId: usuarioId,
         employeeId: employeeId,
-        guardarLog: true,
       );
 
       Map<String, dynamic>? equipoCompleto;

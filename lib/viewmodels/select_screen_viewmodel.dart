@@ -237,10 +237,10 @@ class SelectScreenViewModel extends ChangeNotifier {
       // 2. Construir display name con formato: username - Nombre Vendedor
       // 2. Construir display name con formato: username - Nombre Vendedor
       String displayName;
-      // if (_currentUser!.edfVendedorNombre != null &&
-      //     _currentUser!.edfVendedorNombre!.trim().isNotEmpty) {
+      // if (_currentUser!.employeeName != null &&
+      //     _currentUser!.employeeName!.trim().isNotEmpty) {
       //   displayName =
-      //       '${_currentUser!.username} - ${_currentUser!.edfVendedorNombre}';
+      //       '${_currentUser!.username} - ${_currentUser!.employeeName}';
       // } else {
       displayName = _currentUser!.username;
       // }
@@ -517,10 +517,10 @@ class SelectScreenViewModel extends ChangeNotifier {
 
       // Construir nombre para logs: username - Nombre Vendedor
       String nombreVendedor;
-      if (_currentUser!.edfVendedorNombre != null &&
-          _currentUser!.edfVendedorNombre!.trim().isNotEmpty) {
+      if (_currentUser!.employeeName != null &&
+          _currentUser!.employeeName!.trim().isNotEmpty) {
         nombreVendedor =
-            '${_currentUser!.username} - ${_currentUser!.edfVendedorNombre}';
+            '${_currentUser!.username} - ${_currentUser!.employeeName}';
       } else {
         nombreVendedor = _currentUser!.username;
       }
@@ -554,10 +554,10 @@ class SelectScreenViewModel extends ChangeNotifier {
 
     // Construir nombre para logs: username - Nombre Vendedor
     String nombreVendedor;
-    if (_currentUser!.edfVendedorNombre != null &&
-        _currentUser!.edfVendedorNombre!.trim().isNotEmpty) {
+    if (_currentUser!.employeeName != null &&
+        _currentUser!.employeeName!.trim().isNotEmpty) {
       nombreVendedor =
-          '${_currentUser!.username} - ${_currentUser!.edfVendedorNombre}';
+          '${_currentUser!.username} - ${_currentUser!.employeeName}';
     } else {
       nombreVendedor = _currentUser!.username;
     }
