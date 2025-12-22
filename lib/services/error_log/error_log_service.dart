@@ -648,6 +648,15 @@ class ErrorLogService {
     }
   }
 
+  /// Alias para mantener consistencia con UI
+  static Future<void> limpiarLogsAntiguos({int diasAntiguedad = 0}) async {
+    if (diasAntiguedad <= 0) {
+      await clearAllErrors();
+    } else {
+      await cleanOldResolvedErrors(daysOld: diasAntiguedad);
+    }
+  }
+
   static Future<void> logNetworkError({
     required String tableName,
     required String operation,

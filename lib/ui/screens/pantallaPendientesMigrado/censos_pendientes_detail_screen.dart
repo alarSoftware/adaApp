@@ -151,11 +151,70 @@ class _CensosPendientesDetailScreenState
         Navigator.of(context).pop();
       }
 
-      debugPrint('Error navegando al preview: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
+      }
+    }
+  }
+
+  Future<void> _confirmarEliminacion(Map<String, dynamic> censo) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar Censo'),
+        content: const Text(
+          '¿Estás seguro de que deseas eliminar este censo con error? Esta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar == true) {
+      await _eliminarCenso(censo['id']);
+    }
+  }
+
+  Future<void> _eliminarCenso(String censoId) async {
+    setState(() => _isLoading = true);
+    try {
+      await widget.viewModel.deleteCenso(censoId);
+      await _loadCensosFallidos(); // Recargar lista
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Censo eliminado correctamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al eliminar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -460,6 +519,14 @@ class _CensosPendientesDetailScreenState
                       ],
                     ),
                   ),
+                  // 🆕 Botón de eliminar (solo si tiene error)
+                  if (censo['estado_censo'] == 'error')
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      onPressed: () => _confirmarEliminacion(censo),
+                      tooltip: 'Eliminar censo',
+                    ),
+
                   // 🆕 Indicador de que es clickeable
                   Icon(
                     Icons.arrow_forward_ios,

@@ -14,6 +14,9 @@ import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/ui/screens/menu_principal/productos_screen.dart';
 import 'package:ada_app/ui/screens/menu_principal/about_screen.dart';
+import 'package:ada_app/ui/screens/device_log_screen.dart';
+import 'package:ada_app/ui/screens/error_log_screen.dart';
+import 'package:ada_app/repositories/device_log_repository.dart'; // Needed for DeviceLogScreen
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -1127,6 +1130,47 @@ class _SelectScreenState extends State<SelectScreen> {
                           icon: Icons.inventory_2,
                           color: AppColors.primary,
                           page: const ProductosScreen(),
+                        ),
+                        SizedBox(height: 12),
+
+                        // 🆕 SECCIÓN DE REGISTROS (LOGS)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Text(
+                            'Registros del Sistema',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        _buildMenuCard(
+                          label: 'Device Logs',
+                          description: 'Historial de sincronización background',
+                          icon: Icons.history, // Icono más adecuado
+                          color: Colors.teal,
+                          onTap: () async {
+                            final db = await DatabaseHelper().database;
+                            if (context.mounted) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => DeviceLogScreen(
+                                    repository: DeviceLogRepository(db),
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                        SizedBox(height: 12),
+                        _buildMenuCard(
+                          label: 'Log de Errores',
+                          description: 'Registro de fallos y excepciones',
+                          icon: Icons.bug_report,
+                          color: Colors.redAccent,
+                          page: const ErrorLogScreen(),
                         ),
                         SizedBox(height: 12),
                       ],

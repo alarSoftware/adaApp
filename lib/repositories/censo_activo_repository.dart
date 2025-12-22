@@ -237,7 +237,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
     }
   }
 
-  /// Obtener estados con error
   Future<List<CensoActivo>> obtenerConError() async {
     try {
       final maps = await dbHelper.consultar(
@@ -249,6 +248,26 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
       return [];
+    }
+  }
+
+  /// Eliminar censo y sus fotos asociadas
+  Future<void> eliminarCenso(String censoId) async {
+    try {
+      final db = await dbHelper.database;
+      await db.transaction((txn) async {
+        // 1. Eliminar fotos asociadas
+        await txn.delete(
+          'censo_activo_foto',
+          where: 'censo_activo_id = ?',
+          whereArgs: [censoId],
+        );
+
+        // 2. Eliminar el censo
+        await txn.delete(tableName, where: 'id = ?', whereArgs: [censoId]);
+      });
+    } catch (e) {
+      rethrow;
     }
   }
 
