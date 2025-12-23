@@ -344,7 +344,7 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
                           ),
                         ],
                         const SizedBox(height: 40),
-                        _buildFooter(),
+                        // _buildFooter(),
                       ],
                     );
                   },
@@ -377,19 +377,19 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
     );
   }
 
-  Widget _buildFooter() {
-    return Column(
-      children: [
-        Text(
-          '© 2025 Alarsoftware. Todos los derechos reservados.',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 12,
-            fontWeight: FontWeight.w400,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
+  // Widget _buildFooter() {
+  //   return Column(
+  //     children: [
+  //       Text(
+  //         '© 2025 Alarsoftware. Todos los derechos reservados.',
+  //         style: TextStyle(
+  //           color: AppColors.textSecondary,
+  //           fontSize: 12,
+  //           fontWeight: FontWeight.w400,
+  //         ),
+  //         textAlign: TextAlign.center,
+  //       ),
+  //     ],
+  //   );
+  // }
 }
