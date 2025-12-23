@@ -197,7 +197,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   // CARGAR ESTADO INICIAL Y HISTORIAL
   Future<void> _loadInitialState() async {
     try {
-      // ✅ USAR CÓDIGO DE BARRAS para buscar historial
       final codigoBarras = equipoCliente['cod_barras']?.toString();
       final clienteId = equipoCliente['cliente_id'];
 

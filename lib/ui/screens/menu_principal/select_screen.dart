@@ -921,6 +921,199 @@ class _SelectScreenState extends State<SelectScreen> {
     );
   }
 
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
+            decoration: BoxDecoration(color: AppColors.primary),
+            child: ListenableBuilder(
+              listenable: _viewModel,
+              builder: (context, child) {
+                if (_viewModel.isLoadingUser) {
+                  return Text(
+                    'Cargando...',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _viewModel.userDisplayName,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(
+                          'Panel de Control',
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
+                        SizedBox(width: 12),
+                        _buildConnectionStatus(),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _buildDrawerItem(
+                  icon: Icons.kitchen,
+                  label: 'Equipos',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const EquipoListScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.widgets,
+                  label: 'Modelos',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ModelosScreen()),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.local_offer,
+                  label: 'Logos',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LogosScreen()),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.domain,
+                  label: 'Marcas',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MarcaScreen()),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.inventory_2,
+                  label: 'Productos',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ProductosScreen(),
+                      ),
+                    );
+                  },
+                ),
+                Divider(),
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
+                  child: Text(
+                    'Sistema',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                _buildDrawerItem(
+                  icon: Icons.history,
+                  label: 'Device Logs',
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final db = await DatabaseHelper().database;
+                    if (context.mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DeviceLogScreen(
+                            repository: DeviceLogRepository(db),
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.bug_report,
+                  label: 'Log de Errores',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ErrorLogScreen()),
+                    );
+                  },
+                ),
+                Divider(),
+                _buildDrawerItem(
+                  icon: Icons.logout,
+                  label: 'Cerrar Sesión',
+                  color: AppColors.error,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _handleLogout();
+                  },
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'Versión 1.0.0', // You might want to get this dynamically
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color? color,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: color ?? AppColors.textSecondary),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: color ?? AppColors.textPrimary,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      onTap: onTap,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -956,7 +1149,6 @@ class _SelectScreenState extends State<SelectScreen> {
             },
           ),
           _buildPendingDataButton(),
-          _buildConnectionStatus(),
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {
@@ -1042,6 +1234,7 @@ class _SelectScreenState extends State<SelectScreen> {
           ),
         ],
       ),
+      drawer: _buildDrawer(context),
       body: Stack(
         children: [
           SafeArea(
@@ -1108,116 +1301,14 @@ class _SelectScreenState extends State<SelectScreen> {
                       ),
                     ),
                   ),
-
-                  Expanded(
-                    child: ListView(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      children: [
-                        _buildMenuCard(
-                          label: 'Clientes',
-                          description: 'Lista de clientes',
-                          icon: Icons.people,
-                          color: AppColors.primary,
-                          routeName: '/clienteLista',
-                        ),
-                        SizedBox(height: 12),
-                        _buildMenuCard(
-                          label: 'Equipos',
-                          description: 'Lista de equipos de frío',
-                          icon: Icons.kitchen,
-                          color: AppColors.primary,
-                          page: const EquipoListScreen(),
-                        ),
-                        SizedBox(height: 12),
-                        _buildMenuCard(
-                          label: 'Modelos',
-                          description: 'Catálogo de modelos de equipos',
-                          icon: Icons.widgets,
-                          color: AppColors.primary,
-                          page: const ModelosScreen(),
-                        ),
-                        SizedBox(height: 12),
-                        _buildMenuCard(
-                          label: 'Logos',
-                          description: 'Lista de los logos de la empresa',
-                          icon: Icons.local_offer,
-                          color: AppColors.primary,
-                          page: const LogosScreen(),
-                        ),
-                        SizedBox(height: 12),
-                        _buildMenuCard(
-                          label: 'Marcas',
-                          description: 'Lista de las Marcas',
-                          icon: Icons.domain,
-                          color: AppColors.primary,
-                          page: const MarcaScreen(),
-                        ),
-                        SizedBox(height: 12),
-                        _buildMenuCard(
-                          label: 'Productos',
-                          description: 'Catálogo completo de productos',
-                          icon: Icons.inventory_2,
-                          color: AppColors.primary,
-                          page: const ProductosScreen(),
-                        ),
-                        SizedBox(height: 12),
-
-                        // 🆕 SECCIÓN DE REGISTROS (LOGS)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Text(
-                            'Registros del Sistema',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                        _buildMenuCard(
-                          label: 'Device Logs',
-                          description: 'Historial de sincronización background',
-                          icon: Icons.history, // Icono más adecuado
-                          color: Colors.teal,
-                          onTap: () async {
-                            final db = await DatabaseHelper().database;
-                            if (context.mounted) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => DeviceLogScreen(
-                                    repository: DeviceLogRepository(db),
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                        ),
-                        SizedBox(height: 12),
-                        _buildMenuCard(
-                          label: 'Log de Errores',
-                          description: 'Registro de fallos y excepciones',
-                          icon: Icons.bug_report,
-                          color: Colors.redAccent,
-                          page: const ErrorLogScreen(),
-                        ),
-                        SizedBox(height: 12),
-                      ],
-                    ),
-                  ),
-
                   Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: TextButton.icon(
-                      onPressed: _handleLogout,
-                      icon: Icon(Icons.logout, color: AppColors.textSecondary),
-                      label: Text(
-                        'Cerrar Sesión',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 16,
-                        ),
-                      ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: _buildMenuCard(
+                      label: 'Clientes',
+                      description: 'Lista de clientes y operaciones',
+                      icon: Icons.people,
+                      color: AppColors.primary,
+                      routeName: '/clienteLista',
                     ),
                   ),
                 ],

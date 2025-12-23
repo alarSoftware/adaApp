@@ -10,6 +10,8 @@ import 'package:ada_app/ui/widgets/preview/preview_bottom_bar.dart';
 import 'package:ada_app/ui/widgets/preview/preview_cards.dart';
 import 'package:ada_app/ui/screens/menu_principal/equipos_clientes_detail_screen.dart';
 
+import 'package:ada_app/ui/screens/clientes/cliente_detail_screen.dart';
+
 import 'dart:io';
 import 'dart:convert';
 
@@ -323,7 +325,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
         }
         return;
       }
-
       final Map<String, dynamic> equipoCliente;
 
       if (equipoCompleto != null) {
@@ -341,7 +342,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
           'cliente_nombre': cliente.nombre,
           'cliente_telefono': cliente.telefono,
           'cliente_direccion': cliente.direccion,
-          'tipo_estado': equipoCompleto['tipo_estado'] ??
+          'tipo_estado':
+              equipoCompleto['tipo_estado'] ??
               widget.datos['tipo_estado_original'] ??
               'asignado',
         };
@@ -365,13 +367,22 @@ class _PreviewScreenState extends State<PreviewScreen> {
       }
 
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
+        // RECONSTRUIR PILA DE NAVEGACIÓN:
+        // 1. Ir a la lista de equipos del cliente (Base)
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => ClienteDetailScreen(cliente: cliente),
+          ),
+          (route) => route.isFirst,
+        );
+
+        // 2. Poner encima el detalle del equipo (Top)
+        // Así, al dar Atrás en Detalle, caerás en la Lista.
+        Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) =>
                 EquiposClientesDetailScreen(equipoCliente: equipoCliente),
           ),
-              (route) => route.isFirst,
         );
       }
     } catch (e) {
