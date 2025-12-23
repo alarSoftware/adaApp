@@ -265,6 +265,7 @@ class AppServices {
       _logger.e('Error forzando sync de censos: $e');
       return null;
     }
+    return null;
   }
 
   /// Fuerza la sincronización de formularios pendientes
