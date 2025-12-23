@@ -22,11 +22,23 @@ void onStart(ServiceInstance service) async {
     service.on('setAsBackground').listen((event) {
       service.setAsBackgroundService();
     });
+
+    // 🔴 FIX ANDROID 14 CRASH: Explicitly set valid notification info immediately
+    // This ensures the notification channel and content are valid before any other operation
+    /*
+    await service.setForegroundNotificationInfo(
+      title: "AdaApp",
+      content: "Servicio en segundo plano activo",
+    );
+    */
   }
 
   service.on('stopService').listen((event) {
     service.stopSelf();
   });
+
+  // 🔴 FIX: Add delay to allow service to stabilize before heavy work
+  await Future.delayed(const Duration(seconds: 2));
 
   // Inicializar lógica de logs (DeviceLogBackgroundExtension)
   // NOTA: Esto inicia su propio Timer interno.
@@ -72,12 +84,13 @@ class AppBackgroundService {
         onStart: onStart,
 
         // Auto-inicio al arrancar (opcional, por ahora false para control manual)
-        autoStart: false,
+        autoStart: true,
         isForegroundMode: true,
 
         notificationChannelId: 'ada_background_service',
-        initialNotificationTitle: 'AdaApp en segundo plano',
-        initialNotificationContent: 'Sincronizando datos y ubicación...',
+        // Ensure a minimal notification is provided for foreground start
+        initialNotificationTitle: 'AdaApp',
+        initialNotificationContent: 'Servicio en segundo plano activo',
         foregroundServiceNotificationId: 888,
       ),
       iosConfiguration: IosConfiguration(

@@ -8,6 +8,9 @@ import 'package:ada_app/services/sync/full_sync_service.dart';
 import 'package:ada_app/models/usuario.dart';
 import 'dart:async';
 import 'package:sqflite/sqflite.dart';
+import 'package:ada_app/services/censo/censo_upload_service.dart';
+import 'package:ada_app/services/dynamic_form/dynamic_form_upload_service.dart';
+import 'package:ada_app/services/device_log/device_log_upload_service.dart';
 
 abstract class LoginUIEvent {}
 
@@ -403,6 +406,70 @@ class LoginScreenViewModel extends ChangeNotifier {
       await executeSync();
     } catch (e) {
       _eventController.add(ShowErrorEvent('Error al validar datos: $e'));
+    }
+  }
+
+  Future<void> uploadPendingData() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      // 1. Intentar subir censos
+      try {
+        final censoService = CensoUploadService();
+        final userId = _currentUser?.id ?? 0;
+        await censoService.sincronizarCensosNoMigrados(userId);
+      } catch (e) {
+        debugPrint('Error subiendo censos: $e');
+      }
+
+      // 2. Intentar subir formularios
+      try {
+        final formService = DynamicFormUploadService();
+        final userIdStr = _currentUser?.id?.toString() ?? '0';
+        await formService.sincronizarRespuestasPendientes(userIdStr);
+      } catch (e) {
+        debugPrint('Error subiendo formularios: $e');
+      }
+
+      // 3. Intentar subir logs
+      try {
+        await DeviceLogUploadService.sincronizarDeviceLogsPendientes();
+      } catch (e) {
+        debugPrint('Error subiendo logs: $e');
+      }
+
+      // 4. Re-verificar estado
+      final db = await _dbHelper.database;
+      final validationService = DatabaseValidationService(db);
+      final validationResult = await validationService.canDeleteDatabase();
+
+      _isLoading = false;
+      notifyListeners();
+
+      if (!validationResult.canDelete) {
+        // Aún hay pendientes
+        _eventController.add(ShowPendingRecordsDialogEvent(validationResult));
+        _eventController.add(
+          ShowErrorEvent(
+            'Aún quedan registros pendientes. Revise su conexión.',
+          ),
+        );
+      } else {
+        // Ya no hay pendientes, ¡Éxito!
+        _eventController.add(
+          ShowSuccessEvent(
+            'Datos pendientes enviados correctamente',
+            Icons.cloud_upload,
+          ),
+        );
+      }
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      _eventController.add(
+        ShowErrorEvent('Error enviando datos pendientes: $e'),
+      );
     }
   }
 

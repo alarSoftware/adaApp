@@ -30,7 +30,8 @@ class _LoginScreenContent extends StatefulWidget {
   State<_LoginScreenContent> createState() => _LoginScreenContentState();
 }
 
-class _LoginScreenContentState extends State<_LoginScreenContent> with TickerProviderStateMixin {
+class _LoginScreenContentState extends State<_LoginScreenContent>
+    with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   StreamSubscription? _eventSubscription;
 
@@ -62,21 +63,14 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeOutCubic,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeOutCubic),
+    );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.2),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
 
     _fadeController.forward();
     _slideController.forward();
@@ -114,11 +108,7 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
   }
 
   void _handleShowSuccess(String message, IconData? icon) {
-    SnackbarHelper.showSuccess(
-      context,
-      message,
-      icon ?? Icons.check,
-    );
+    SnackbarHelper.showSuccess(context, message, icon ?? Icons.check);
   }
 
   void _handleNavigateToHome() {
@@ -139,7 +129,8 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => _buildPendingRecordsDialog(event.validationResult),
+      builder: (dialogContext) =>
+          _buildPendingRecordsDialog(event.validationResult),
     );
   }
 
@@ -253,10 +244,24 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
       ),
       actions: [
         TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            final viewModel = Provider.of<LoginScreenViewModel>(
+              context,
+              listen: false,
+            );
+            viewModel.uploadPendingData();
+          },
+          child: Text(
+            'Intentar Enviar Pendientes',
+            style: TextStyle(color: AppColors.primary),
+          ),
+        ),
+        TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(
             'Entendido',
-            style: TextStyle(color: AppColors.primary),
+            style: TextStyle(color: AppColors.textSecondary),
           ),
         ),
       ],
@@ -339,9 +344,7 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
                           const SizedBox(height: 24),
                           _buildDivider(),
                           const SizedBox(height: 24),
-                          BiometricButton(
-                            onPressed: _handleBiometricLogin,
-                          ),
+                          BiometricButton(onPressed: _handleBiometricLogin),
                         ],
                         const SizedBox(height: 40),
                         // _buildFooter(),
