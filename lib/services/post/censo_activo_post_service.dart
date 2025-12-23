@@ -10,6 +10,9 @@ import 'package:ada_app/config/app_config.dart';
 
 import '../../config/constants/server_response.dart';
 import '../censo/censo_upload_service.dart';
+import '../../repositories/censo_activo_repository.dart';
+import '../error_log/error_log_service.dart';
+import '../../models/censo_activo.dart';
 
 class CensoActivoPostService {
   static const String _tableName = 'censo_activo';
@@ -344,55 +347,5 @@ class CensoActivoPostService {
     }
 
     return censo;
-  }
-
-  static Future<Map<String, dynamic>> enviarCambioEstado({
-    required String codigoBarras,
-    required int clienteId,
-    required bool enLocal,
-    required dynamic position, // Geolocator Position
-    String? observaciones,
-    required String equipoId,
-    required String clienteNombre,
-    required String numeroSerie,
-    required String modelo,
-    required String marca,
-    required String logo,
-    required int usuarioId,
-    required String employeeId,
-    String? censoId, // Nuevo parámetro opcional
-  }) async {
-    try {
-      await enviarCensoActivo(
-        censoId:
-            censoId ??
-            DateTime.now().millisecondsSinceEpoch
-                .toString(), // Usa el ID pasado o genera uno nuevo
-        equipoId: equipoId,
-        codigoBarras: codigoBarras,
-        clienteId: clienteId,
-        usuarioId: usuarioId,
-        employeeId: employeeId,
-        latitud: position.latitude,
-        longitud: position.longitude,
-        observaciones: observaciones,
-        enLocal: enLocal,
-        estadoCenso: 'migrado', // Se asume migrado si se envía directo
-        esNuevoEquipo: false,
-        crearPendiente: false,
-        clienteNombre: clienteNombre,
-        numeroSerie: numeroSerie,
-        modelo: modelo,
-        marca: marca,
-        logo: logo,
-      );
-
-      return {'exito': true, 'mensaje': 'Estado actualizado correctamente'};
-    } catch (e) {
-      return {
-        'exito': false,
-        'mensaje': e.toString().replaceAll('Exception: ', ''),
-      };
-    }
   }
 }

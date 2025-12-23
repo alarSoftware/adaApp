@@ -41,7 +41,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
     required DateTime fechaRevision,
     double? latitud,
     double? longitud,
-    String? estadoCenso,
     String? observaciones,
     String? employeeId,
   }) async {

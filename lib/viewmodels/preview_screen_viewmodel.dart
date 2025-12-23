@@ -149,7 +149,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
     _isProcessing = true;
 
     try {
-      return await _insertarEnviarCensoActivo(datos, processId);
+      // Llamada estática
+      datos['en_local'] = true;
+      return await insertarEnviarCensoActivo(datos, processId);
     } finally {
       if (_currentProcessId == processId) {
         _isProcessing = false;
@@ -158,25 +160,27 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> _insertarEnviarCensoActivo(
+  static Future<Map<String, dynamic>> insertarEnviarCensoActivo(
     Map<String, dynamic> datos,
     String processId,
   ) async {
-    _setSaving(true);
+    // Instancias locales para contexto estático
+    final equipoRepo = EquipoRepository();
+    final estadoEquipoRepo = CensoActivoRepository();
+    final equipoPendienteRepo = EquipoPendienteRepository();
+    final uploadService = CensoUploadService();
+    final fotoService = CensoFotoService();
+    final fotoRepo = CensoActivoFotoRepository();
+    final authService = AuthService();
+
     String? censoActivoId;
     String? equipoId;
     int? usuarioId;
     Map<String, dynamic> resultado = {};
 
     try {
-      if (_currentProcessId != processId) {
-        resultado = {'success': false, 'error': 'Proceso cancelado'};
-        return resultado;
-      }
-
       var esNuevoEquipo = datos['es_nuevo_equipo'] as bool? ?? false;
       var cliente = datos['cliente'];
-      var id = equipoId;
       var numeroSerie = datos['numero_serie']?.toString();
       var modeloId = datos['modelo_id'];
       var logoId = datos['logo_id'];
@@ -184,28 +188,59 @@ class PreviewScreenViewModel extends ChangeNotifier {
       var marcaNombre = datos['marca_nombre']?.toString() ?? '';
       var modeloNombre = datos['modelo']?.toString() ?? '';
       var logoNombre = datos['logo']?.toString() ?? '';
-      int? clienteId = cliente != null
-          ? int.tryParse(cliente.id.toString())
-          : null;
+      var enLocal = datos['en_local'] as bool? ?? false;
+
+      // Manejo seguro de cliente
+      int? clienteId;
+
+      // Manejo seguro de clienteId
+      if (cliente is Map) {
+        clienteId = cliente['id'] != null
+            ? int.tryParse(cliente['id'].toString())
+            : null;
+      } else if (cliente != null) {
+        try {
+          clienteId = int.tryParse(cliente.id.toString());
+        } catch (_) {}
+      }
+
       var codBarras = datos['codigo_barras']?.toString() ?? '';
 
-      if (cliente == null || cliente.id == null) {
+      if (clienteId == null) {
+        // Fallback si viene directo en datos
+        if (datos['cliente_id'] != null) {
+          clienteId = int.tryParse(datos['cliente_id'].toString());
+        }
+      }
+
+      if (clienteId == null) {
         throw 'Cliente no válido';
       }
 
-      usuarioId = await _getUsuarioId;
+      // Obtener usuarioId: de datos o del servicio
+      if (datos['usuario_id'] != null) {
+        usuarioId = int.tryParse(datos['usuario_id'].toString());
+      }
+      if (usuarioId == null) {
+        final currentUser = await authService.getCurrentUser();
+        usuarioId = currentUser?.id ?? 1;
+      }
+
       final now = DateTime.now().toLocal();
 
       if (esNuevoEquipo) {
-        _setStatusMessage('Registrando equipo...');
-        equipoId = await _crearEquipoNuevo(
+        equipoId = await _crearEquipoNuevoStatic(
           datos,
           clienteId,
           processId,
           usuarioId.toString(),
+          equipoRepo,
         );
       } else {
         equipoId = datos['equipo_completo']?['id']?.toString();
+        // Fallback: si equipo_id viene plano
+        if (equipoId == null) equipoId = datos['equipo_id']?.toString();
+
         if (equipoId == null) throw 'Equipo ID no válido';
       }
 
@@ -213,7 +248,11 @@ class PreviewScreenViewModel extends ChangeNotifier {
       if (esNuevoEquipo) {
         yaAsignado = false;
       } else {
-        yaAsignado = await _verificarAsignacionLocal(equipoId, clienteId!);
+        yaAsignado = await _verificarAsignacionLocalStatic(
+          equipoId!,
+          clienteId,
+          equipoRepo,
+        );
       }
 
       final employeeId = await SyncService.obtenerEmployeeId();
@@ -222,37 +261,38 @@ class PreviewScreenViewModel extends ChangeNotifier {
       }
 
       if (!yaAsignado) {
-        _setStatusMessage('Registrando asignación pendiente...');
-        await _equipoPendienteRepository.procesarEscaneoCenso(
-          equipoId: equipoId,
-          clienteId: clienteId!,
+        await equipoPendienteRepo.procesarEscaneoCenso(
+          equipoId: equipoId!,
+          clienteId: clienteId,
           usuarioId: usuarioId,
           employeeId: employeeId,
         );
       } else {}
 
-      _setStatusMessage('Guardando censo...');
-      censoActivoId = await _crearCensoLocalConUsuario(
-        equipoId: equipoId,
-        clienteId: clienteId!,
-        usuarioId: usuarioId,
+      // Crear censo local
+      censoActivoId = await _crearCensoLocalConUsuarioStatic(
+        equipoId: equipoId!,
+        clienteId: clienteId,
+        usuarioId: usuarioId!,
         datos: datos,
         processId: processId,
-        yaAsignado: yaAsignado,
         employeeId: employeeId,
+        estadoEquipoRepo: estadoEquipoRepo,
+          enLocal:enLocal
       );
 
       if (censoActivoId == null) {
         throw 'No se pudo crear el censo en la base de datos';
       }
 
-      final idsImagenes = await _fotoService.guardarFotosDelCenso(
+      // ignore: unused_local_variable
+      final idsImagenes = await fotoService.guardarFotosDelCenso(
         censoActivoId,
         datos,
       );
       final tiempoLocal = DateTime.now().difference(now).inSeconds;
 
-      await _uploadService.enviarCensoUnificado(
+      await uploadService.enviarCensoUnificado(
         censoActivoId: censoActivoId,
         usuarioId: usuarioId,
         employeeId: employeeId,
@@ -274,7 +314,9 @@ class PreviewScreenViewModel extends ChangeNotifier {
           'cliente_id': clienteId,
         };
       } else {
-        equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>?;
+        if (datos['equipo_completo'] is Map<String, dynamic>) {
+          equipoCompleto = datos['equipo_completo'] as Map<String, dynamic>;
+        }
       }
 
       resultado = {
@@ -290,7 +332,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     } catch (e) {
       resultado = {'success': false, 'error': 'Error guardando registro: $e'};
     } finally {
-      _setSaving(false);
+      // _setSaving(false) no disponible en static
     }
 
     return resultado;
@@ -306,28 +348,23 @@ class PreviewScreenViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String> _crearEquipoNuevo(
+  // HELPER STATICS
+  static Future<String> _crearEquipoNuevoStatic(
     Map<String, dynamic> datos,
     int? clienteId,
     String processId,
     String? userId,
+    EquipoRepository repo,
   ) async {
-    _setStatusMessage('Registrando equipo nuevo...');
-
-    if (_currentProcessId != processId) throw 'Proceso cancelado';
-
     try {
-      final equipoId = await _equipoRepository.crearEquipoNuevo(
+      final equipoId = await repo.crearEquipoNuevo(
         codigoBarras: datos['codigo_barras']?.toString() ?? '',
-        marcaId: _safeCastToInt(datos['marca_id'], 'marca_id') ?? 1,
-        modeloId: _safeCastToInt(datos['modelo_id'], 'modelo_id') ?? 1,
+        marcaId: _safeCastToIntStatic(datos['marca_id']) ?? 1,
+        modeloId: _safeCastToIntStatic(datos['modelo_id']) ?? 1,
         numeroSerie: datos['numero_serie']?.toString(),
-        logoId: _safeCastToInt(datos['logo_id'], 'logo_id') ?? 1,
+        logoId: _safeCastToIntStatic(datos['logo_id']) ?? 1,
         clienteId: clienteId,
       );
-
-      if (clienteId != null) {
-      } else {}
 
       return equipoId;
     } catch (e) {
@@ -335,48 +372,67 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> _verificarAsignacionLocal(String equipoId, int clienteId) async {
+  // Wrapper de instancia para compatibilidad si fuera necesario
+  Future<String> _crearEquipoNuevo(
+    Map<String, dynamic> datos,
+    int? clienteId,
+    String processId,
+    String? userId,
+  ) async {
+    return _crearEquipoNuevoStatic(
+      datos,
+      clienteId,
+      processId,
+      userId,
+      _equipoRepository,
+    );
+  }
+
+  static Future<bool> _verificarAsignacionLocalStatic(
+    String equipoId,
+    int clienteId,
+    EquipoRepository repo,
+  ) async {
     try {
-      return await _equipoRepository.verificarAsignacionEquipoCliente(
-        equipoId,
-        clienteId,
-      );
+      return await repo.verificarAsignacionEquipoCliente(equipoId, clienteId);
     } catch (e) {
       rethrow;
     }
   }
 
-  Future<String?> _crearCensoLocalConUsuario({
+  // Future<bool> _verificarAsignacionLocal(String equipoId, int clienteId) async {
+  //   return _verificarAsignacionLocalStatic(
+  //     equipoId,
+  //     clienteId,
+  //     _equipoRepository,
+  //   );
+  // }
+
+  static Future<String?> _crearCensoLocalConUsuarioStatic({
     required String equipoId,
     required int clienteId,
     required int usuarioId,
     required Map<String, dynamic> datos,
     required String processId,
-    required bool yaAsignado,
     required String employeeId,
+    required CensoActivoRepository estadoEquipoRepo,
+    required bool enLocal
   }) async {
-    _setStatusMessage('Registrando censo...');
-
-    if (_currentProcessId != processId) throw 'Proceso cancelado';
-
     try {
       final now = DateTime.now().toLocal();
-      final estadoCenso = yaAsignado ? 'asignado' : 'pendiente';
-
-      final censoActivo = await _estadoEquipoRepository.crearCensoActivo(
+      final censoActivo = await estadoEquipoRepo.crearCensoActivo(
         equipoId: equipoId,
         clienteId: clienteId,
         latitud: datos['latitud'],
         longitud: datos['longitud'],
         fechaRevision: now,
-        enLocal: true,
+        enLocal: enLocal,
         observaciones: datos['observaciones']?.toString(),
-        estadoCenso: estadoCenso,
         employeeId: employeeId,
       );
 
       if (censoActivo.id != null) {
-        await _estadoEquipoRepository.dbHelper.actualizar(
+        await estadoEquipoRepo.dbHelper.actualizar(
           'censo_activo',
           {
             'usuario_id': usuarioId,
@@ -386,7 +442,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
           whereArgs: [censoActivo.id!],
         );
 
-        final verificacion = await _estadoEquipoRepository.dbHelper.consultar(
+        final verificacion = await estadoEquipoRepo.dbHelper.consultar(
           'censo_activo',
           where: 'id = ?',
           whereArgs: [censoActivo.id!],
@@ -409,6 +465,29 @@ class PreviewScreenViewModel extends ChangeNotifier {
       rethrow;
     }
   }
+
+  // Wrapper instancia
+  // Future<String?> _crearCensoLocalConUsuario({
+  //   required String equipoId,
+  //   required int clienteId,
+  //   required int usuarioId,
+  //   required Map<String, dynamic> datos,
+  //   required String processId,
+  //   required bool yaAsignado,
+  //   required String employeeId,
+  // }) {
+  //   return _crearCensoLocalConUsuarioStatic(
+  //     equipoId: equipoId,
+  //     clienteId: clienteId,
+  //     usuarioId: usuarioId,
+  //     datos: datos,
+  //     processId: processId,
+  //     yaAsignado: yaAsignado,
+  //     employeeId: employeeId,
+  //     estadoEquipoRepo: _estadoEquipoRepository,
+  //       enLocal:enLocal
+  //   );
+  // }
 
   String formatearFecha(String? fechaIso) {
     if (fechaIso == null) return 'No disponible';
@@ -712,6 +791,10 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   int? _safeCastToInt(dynamic value, String fieldName) {
+    return _safeCastToIntStatic(value);
+  }
+
+  static int? _safeCastToIntStatic(dynamic value) {
     try {
       if (value == null) return null;
       if (value is int) return value;

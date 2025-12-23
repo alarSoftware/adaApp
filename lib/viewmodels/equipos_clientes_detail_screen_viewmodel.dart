@@ -1,14 +1,17 @@
+import 'package:ada_app/viewmodels/preview_screen_viewmodel.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import '../repositories/censo_activo_repository.dart';
-import 'package:ada_app/services/post/censo_activo_post_service.dart';
 import '../repositories/equipo_repository.dart';
+
 import '../models/censo_activo.dart';
 import 'package:ada_app/services/device/location_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:ada_app/services/api/auth_service.dart';
+import 'package:uuid/uuid.dart';
 
-// ========== EVENTOS PARA LA UI ==========
+final Uuid _uuid = const Uuid();
+
 abstract class EquiposClienteDetailUIEvent {}
 
 class ShowMessageEvent extends EquiposClienteDetailUIEvent {
@@ -24,7 +27,6 @@ class ShowRetireConfirmationDialogEvent extends EquiposClienteDetailUIEvent {
 
 enum MessageType { error, success, info, warning }
 
-// ========== ESTADO PURO ==========
 class EquiposClienteDetailState {
   final dynamic equipoCliente;
   final bool isProcessing;
@@ -58,26 +60,22 @@ class EquiposClienteDetailState {
   }
 }
 
-// ========== VIEWMODEL LIMPIO ==========
 class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   final CensoActivoRepository _estadoEquipoRepository;
   final EquipoRepository _equipoRepository;
+
   final LocationService _locationService = LocationService();
 
-  // ========== ESTADO INTERNO ==========
   EquiposClienteDetailState _state;
 
-  // ========== NUEVOS CAMPOS PARA DROPDOWN ==========
   bool? _estadoUbicacionEquipo;
   bool _hasUnsavedChanges = false;
   int _estadoLocalActual;
 
-  // ========== STREAMS PARA EVENTOS ==========
   final StreamController<EquiposClienteDetailUIEvent> _eventController =
       StreamController<EquiposClienteDetailUIEvent>.broadcast();
   Stream<EquiposClienteDetailUIEvent> get uiEvents => _eventController.stream;
 
-  // ========== CONSTRUCTOR ==========
   EquiposClienteDetailScreenViewModel(
     dynamic equipoCliente,
     this._estadoEquipoRepository,
@@ -85,10 +83,9 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   ) : _state = EquiposClienteDetailState(equipoCliente: equipoCliente),
       _estadoLocalActual = _determinarEstadoInicial(equipoCliente) {
     _initializeState();
-    _loadInitialState();
+    _verificarEstadoReal();
   }
 
-  // ========== HELPER METHOD ==========
   static int _determinarEstadoInicial(dynamic equipoCliente) {
     final tipoEstado = equipoCliente['tipo_estado']?.toString();
     if (tipoEstado == 'asignado') {
@@ -97,8 +94,6 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       return 0;
     }
   }
-
-  // ========== MÉTODOS PARA VALIDACIÓN DE DÍA DE RUTA ==========
 
   String _getDiaActual() {
     final diasSemana = [
@@ -140,12 +135,63 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         'Hoy es: $diaActual';
   }
 
-  // ============================================================
-
-  // ========== INICIALIZAR ESTADO DEL DROPDOWN ==========
   void _initializeState() {
     _estadoUbicacionEquipo = null;
     _hasUnsavedChanges = false;
+  }
+
+  // VALIDAR ESTADO REAL CON REPOSITORIOS (ASIGNADO vs PENDIENTE)
+  Future<void> _verificarEstadoReal() async {
+    try {
+      final equipoId = equipoCliente['equipo_id'] ?? equipoCliente['id'];
+      final clienteId = equipoCliente['cliente_id'];
+
+      if (equipoId == null || clienteId == null) {
+        _loadInitialState();
+        return;
+      }
+
+      final cId = int.tryParse(clienteId.toString());
+      if (cId == null) {
+        _loadInitialState();
+        return;
+      }
+
+      String nuevoTipoEstado;
+
+      // Usar la lógica estricta de "Asignado" que usa la pantalla de Cliente
+      final esAsignado = await _equipoRepository.verificarAsignacionEstricta(
+        equipoId.toString(),
+        cId,
+      );
+
+      if (esAsignado) {
+        nuevoTipoEstado = 'asignado';
+      } else {
+        // Si no pasa la validación estricta de asignado, asumimos pendiente
+        // (ya que debería estar en una de las dos listas)
+        nuevoTipoEstado = 'pendiente';
+      }
+
+      // Actualizar el estado local si cambió
+      if (nuevoTipoEstado != equipoCliente['tipo_estado']) {
+        final nuevoEquipoCliente = Map<String, dynamic>.from(equipoCliente);
+        nuevoEquipoCliente['tipo_estado'] = nuevoTipoEstado;
+
+        _state = _state.copyWith(equipoCliente: nuevoEquipoCliente);
+
+        // Recalcular estado local based on new type
+        _estadoLocalActual = _determinarEstadoInicial(nuevoEquipoCliente);
+
+        // Notificar cambio
+        notifyListeners();
+      }
+
+      // Finalmente cargar historial
+      await _loadInitialState();
+    } catch (e) {
+      _loadInitialState();
+    }
   }
 
   // CARGAR ESTADO INICIAL Y HISTORIAL
@@ -186,7 +232,9 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
           : null;
 
       if (estadoActual == null && tipoEstado == 'asignado') {
+        print("ESTOY");
         try {
+          print("antes");
           estadoActual = await _estadoEquipoRepository.obtenerUltimoEstado(
             codigoBarras,
             int.parse(clienteId.toString()),
@@ -196,7 +244,8 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
             historialCompleto = [estadoActual];
           }
         } catch (e) {
-          // Error al obtener estado individual
+          //LOG ERROR
+          print("Error al obtener último estado: $e");
         }
       }
 
@@ -310,7 +359,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== GUARDAR CAMBIOS ==========
+  // ========== GUARDAR CAMBIOS DESDE EQUIPO FUERA DE LOCAL ==========
   Future<void> saveAllChanges() async {
     // VALIDAR DÍA DE RUTA ANTES DE GUARDAR
     if (!_validarDiaRuta()) {
@@ -358,78 +407,62 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       // Obtener usuario actual antes de crear el registro
       final currentUser = await AuthService().getCurrentUser();
 
-      final newCensoActivo = await _estadoEquipoRepository.crearCensoActivo(
-        equipoId: codigoBarras,
-        clienteId: int.parse(clienteId.toString()),
-        enLocal: _estadoUbicacionEquipo!,
-        fechaRevision: DateTime.now(),
-        latitud: position.latitude,
-        longitud: position.longitude,
-        usuarioId: currentUser?.id,
-        employeeId: currentUser?.employeeId,
+      Map<String, dynamic> datos = {};
+      final processId = _uuid.v4();
+
+      datos['es_nuevo_equipo'] = false;
+      datos['cliente'] = {'id': int.parse(clienteId.toString())};
+
+      // CORRECCIÓN: equipo_completo debe ser un Map, no un ID
+      datos['equipo_completo'] = {
+        'id': equipoCliente['id'],
+        'cod_barras': codigoBarras,
+        'numero_serie': equipoCliente['numero_serie'],
+        'marca_id': equipoCliente['marca_id'],
+        'modelo_id': equipoCliente['modelo_id'],
+        'logo_id': equipoCliente['logo_id'],
+        'marca_nombre': equipoCliente['marca_nombre'],
+        'modelo_nombre': equipoCliente['modelo_nombre'],
+        'logo_nombre': equipoCliente['logo_nombre'],
+        'cliente_id': clienteId,
+        'tipo_estado':
+            'asignado', // Asumimos asignado al guardar cambios de ubicación
+      };
+
+      datos['codigo_barras'] = codigoBarras;
+      datos['numero_serie'] = equipoCliente['numero_serie'];
+      datos['modelo_id'] = equipoCliente['modelo_id'];
+      datos['logo_id'] = equipoCliente['logo_id'];
+      datos['marca_id'] = equipoCliente['marca_id'];
+      datos['marca_nombre'] = equipoCliente['marca_nombre'];
+      datos['modelo'] = equipoCliente['modelo_nombre'];
+      datos['logo'] = equipoCliente['logo_nombre'];
+      datos['latitud'] = position.latitude;
+      datos['longitud'] = position.longitude;
+      datos['observaciones'] = '';
+      datos['usuario_id'] = currentUser?.id;
+      datos['equipo_id'] = equipoCliente['id'];
+
+      // Asignar el valor seleccionado en el dropdown
+      datos['en_local'] = _estadoUbicacionEquipo;
+
+      final result = await PreviewScreenViewModel.insertarEnviarCensoActivo(
+        datos,
+        processId,
       );
 
-      // 2. Sincronizar con el servidor
-      try {
-        if (currentUser != null &&
-            currentUser.id != null &&
-            currentUser.employeeId != null) {
-          final resultadoSync = await CensoActivoPostService.enviarCambioEstado(
-            codigoBarras: codigoBarras,
-            clienteId: int.parse(clienteId.toString()),
-            enLocal: _estadoUbicacionEquipo!,
-            position: position,
-            observaciones: newCensoActivo.observaciones,
-            equipoId: equipoCliente['equipo_id']?.toString() ?? codigoBarras,
-            clienteNombre: equipoCliente['cliente_nombre']?.toString() ?? '',
-            numeroSerie: equipoCliente['numero_serie']?.toString() ?? '',
-            modelo: equipoCliente['modelo_nombre']?.toString() ?? '',
-            marca: equipoCliente['marca_nombre']?.toString() ?? '',
-            logo: equipoCliente['logo_nombre']?.toString() ?? '',
-            usuarioId: currentUser.id!,
-            employeeId: currentUser.employeeId!,
-            censoId: newCensoActivo.id, // ✅ ID consistente
-          );
-
-          if (resultadoSync['exito']) {
-            if (newCensoActivo.id != null) {
-              await _estadoEquipoRepository.marcarComoMigrado(
-                newCensoActivo.id!,
-              );
-            }
-          } else {
-            // Si falla el servidor, marcamos como error para que se sepa
-            if (newCensoActivo.id != null) {
-              await _estadoEquipoRepository.marcarComoError(
-                newCensoActivo.id!,
-                resultadoSync['mensaje'] ?? 'Error desconocido del servidor',
-              );
-            }
-          }
-        }
-      } catch (syncError) {
-        // Si hay excepción de red o código, marcamos como error
-        if (newCensoActivo.id != null) {
-          await _estadoEquipoRepository.marcarComoError(
-            newCensoActivo.id!,
-            syncError.toString(),
-          );
-        }
+      if (result['success'] != true) {
+        throw result['error'] ?? 'Error desconocido';
       }
 
       _estadoLocalActual = _estadoUbicacionEquipo! ? 1 : 0;
       _estadoUbicacionEquipo = null;
       _hasUnsavedChanges = false;
 
-      final historialActualizado = [newCensoActivo, ..._state.historialCambios];
-      final ultimos5Actualizado = historialActualizado.take(5).toList();
+      // Recargar historial para reflejar cambios
+      await recargarHistorial();
 
-      _state = _state.copyWith(
-        equipoEnLocal: _estadoLocalActual == 1,
-        historialCambios: historialActualizado,
-        historialUltimos5: ultimos5Actualizado,
-        isProcessing: false,
-      );
+      _state = _state.copyWith(isProcessing: false);
 
       notifyListeners();
 

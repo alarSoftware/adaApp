@@ -315,8 +315,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
   void _volverDesdeHistorial() {
     try {
       final cliente = widget.datos['cliente'];
-      // Para equipos nuevos, equipoCompleto será null.
-      // Construimos el objeto equipoCliente con los datos disponibles en widget.datos.
       final equipoCompleto = widget.datos['equipo_completo'];
 
       if (cliente == null || cliente is! Cliente) {
@@ -329,7 +327,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
       final Map<String, dynamic> equipoCliente;
 
       if (equipoCompleto != null) {
-        // Caso: Equipo existente (Censo)
         equipoCliente = {
           'id': equipoCompleto['id'],
           'cod_barras': equipoCompleto['cod_barras'],
@@ -344,42 +341,37 @@ class _PreviewScreenState extends State<PreviewScreen> {
           'cliente_nombre': cliente.nombre,
           'cliente_telefono': cliente.telefono,
           'cliente_direccion': cliente.direccion,
-          'tipo_estado': widget.datos['ya_asignado'] == true
-              ? 'asignado'
-              : 'pendiente',
+          'tipo_estado': equipoCompleto['tipo_estado'] ??
+              widget.datos['tipo_estado_original'] ??
+              'asignado',
         };
       } else {
-        // Caso: Nuevo Equipo
         equipoCliente = {
-          'id': null, // ID desconocido aún
+          'id': null,
           'cod_barras': widget.datos['codigo_barras'],
           'numero_serie': widget.datos['numero_serie'],
           'marca_id': widget.datos['marca_id'],
           'modelo_id': widget.datos['modelo_id'],
           'logo_id': widget.datos['logo_id'],
           'cliente_id': cliente.id,
-          'marca_nombre':
-              widget.datos['marca'], // Nota: keys diferentes en datos
+          'marca_nombre': widget.datos['marca'],
           'modelo_nombre': widget.datos['modelo'],
           'logo_nombre': widget.datos['logo'],
           'cliente_nombre': cliente.nombre,
           'cliente_telefono': cliente.telefono,
           'cliente_direccion': cliente.direccion,
-          'tipo_estado': 'pendiente', // Nuevo siempre es pendiente
+          'tipo_estado': 'pendiente',
         };
       }
 
       if (mounted) {
-        // Usamos pushAndRemoveUntil para asegurar que salimos del FormScreen (y cualquier pantalla intermedia)
-        // Mantenemos solo la pantalla principal (Dashboard/Lista) debajo
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
             builder: (context) =>
                 EquiposClientesDetailScreen(equipoCliente: equipoCliente),
           ),
-          (route) =>
-              route.isFirst, // Remueve hasta la raíz (o hasta donde sea seguro)
+              (route) => route.isFirst,
         );
       }
     } catch (e) {

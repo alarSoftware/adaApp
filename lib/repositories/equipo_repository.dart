@@ -222,6 +222,34 @@ class EquipoRepository extends BaseRepository<Equipo> {
     }
   }
 
+  /// Verifica si un equipo está asignado usando la misma lógica estricta que obtenerEquiposAsignados
+  /// Es decir: Está en 'equipos' Y NO está en 'equipos_pendientes'
+  Future<bool> verificarAsignacionEstricta(
+    String equipoId,
+    int clienteId,
+  ) async {
+    try {
+      final query = '''
+        SELECT e.id 
+        FROM equipos e
+        LEFT JOIN equipos_pendientes ep 
+          ON CAST(e.id AS TEXT) = CAST(ep.equipo_id AS TEXT) 
+          AND CAST(e.cliente_id AS TEXT) = CAST(ep.cliente_id AS TEXT)
+        WHERE e.id = ? 
+          AND e.cliente_id = ?
+          AND ep.id IS NULL
+        LIMIT 1
+      ''';
+
+      final db = await dbHelper.database;
+      final result = await db.rawQuery(query, [equipoId, clienteId]);
+
+      return result.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> obtenerEquiposDisponibles() async {
     try {
       final sql = '''
