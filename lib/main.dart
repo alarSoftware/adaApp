@@ -12,6 +12,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'ui/screens/api_settings_screen.dart';
 import 'models/cliente.dart';
 import 'package:ada_app/config/app_config.dart';
+import 'package:permission_handler/permission_handler.dart';
 //IMPORTS PARA EL RESET TEMPORAL - COMENTADOS PARA PRODUCCIÓN
 // import 'package:ada_app/services/database_helper.dart';
 
@@ -99,6 +100,9 @@ class _InitializationScreenState extends State<InitializationScreen> {
       setState(() {
         _loadingMessage = 'Inicializando servicios...';
       });
+
+      // 🔴 NUEVO: Solicitar permisos ANTES de cualquier cosa
+      await _checkAndRequestPermissions();
 
       await AppServices().inicializar();
 
@@ -189,6 +193,44 @@ class _InitializationScreenState extends State<InitializationScreen> {
       _loadingMessage = 'Reintentando...';
     });
     _initializeApp();
+  }
+
+  /// 🛡️ Validar y solicitar permisos críticos AL INICIO
+  Future<void> _checkAndRequestPermissions() async {
+    try {
+      if (mounted) {
+        setState(() {
+          _loadingMessage = 'Verificando permisos...';
+        });
+      }
+
+      // 1. Notificaciones (Android 13+)
+      if (await Permission.notification.isDenied) {
+        await Permission.notification.request();
+      }
+
+      // 2. Ubicación
+      // Primero 'location' (precisa/coarse en uso)
+      var locStatus = await Permission.location.status;
+      if (!locStatus.isGranted) {
+        locStatus = await Permission.location.request();
+      }
+
+      // Si se concedió ubicación básica, intentar 'locationAlways' para background
+      // Nota: En Android 11+ el sistema puede requerir hacerlo en pasos separados o ajustes
+      if (locStatus.isGranted) {
+        if (await Permission.locationAlways.isDenied) {
+          await Permission.locationAlways.request();
+        }
+      }
+
+      // 3. Optimización de batería se maneja aparte en BatteryOptimizationDialog
+      // pero podríamos pedirla aquí también si quisiéramos unificar.
+      // Por consistencia con el código existente, dejaremos BatteryOptimizationDialog
+      // verificarlo después, o podemos unificarlo si el usuario lo prefiere.
+    } catch (e) {
+      debugPrint('Error solicitando permisos iniciales: $e');
+    }
   }
 
   @override

@@ -19,6 +19,7 @@ import 'package:ada_app/ui/screens/error_log_screen.dart';
 import 'package:ada_app/repositories/device_log_repository.dart'; // Needed for DeviceLogScreen
 import 'package:ada_app/services/device/location_service.dart';
 import 'package:permission_handler/permission_handler.dart'; // <--- Importar permiso
+import 'package:ada_app/ui/screens/settings/work_hours_settings_screen.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -102,7 +103,9 @@ class _SelectScreenState extends State<SelectScreen> {
           _pendingDataCount = totalPendientes;
         });
       }
-    } catch (e) {}
+    } catch (e) {
+      debugPrint('Error checking pending data: $e');
+    }
   }
 
   Future<void> _checkBatteryOptimizationOnFirstLoad() async {
@@ -113,7 +116,9 @@ class _SelectScreenState extends State<SelectScreen> {
       await BatteryOptimizationDialog.checkAndRequestBatteryOptimization(
         context,
       );
-    } catch (e) {}
+    } catch (e) {
+      debugPrint('Error checking battery optimization: $e');
+    }
   }
 
   Future<void> _checkLocationPermissions() async {
@@ -757,7 +762,7 @@ class _SelectScreenState extends State<SelectScreen> {
   void _mostrarError(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$mensaje'),
+        content: Text(mensaje),
         backgroundColor: AppColors.error,
         duration: Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
@@ -769,7 +774,7 @@ class _SelectScreenState extends State<SelectScreen> {
   void _mostrarExito(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$mensaje'),
+        content: Text(mensaje),
         backgroundColor: AppColors.success,
         duration: Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
@@ -1082,9 +1087,43 @@ class _SelectScreenState extends State<SelectScreen> {
                     _handleLogout();
                   },
                 ),
-              ],
-            ),
-          ),
+                if (_viewModel.userDisplayName.toLowerCase().contains(
+                      'admin',
+                    ) ||
+                    _viewModel.userDisplayName.toLowerCase().contains(
+                      'sistemas',
+                    )) ...[
+                  _buildDrawerItem(
+                    icon: Icons.settings_applications,
+                    label: 'Configurar Horario',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const WorkHoursSettingsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+                _buildDrawerItem(
+                  icon: Icons.access_time, // Icono válido
+                  label: 'Horario de Trabajo',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const WorkHoursSettingsScreen(),
+                      ),
+                    );
+                  },
+                ),
+                Divider(),
+              ], // Closing the children list
+            ), // Closing the ListView
+          ), // Closing the Expanded
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(

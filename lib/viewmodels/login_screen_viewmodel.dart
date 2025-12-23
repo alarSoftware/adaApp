@@ -11,6 +11,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:ada_app/services/censo/censo_upload_service.dart';
 import 'package:ada_app/services/dynamic_form/dynamic_form_upload_service.dart';
 import 'package:ada_app/services/device_log/device_log_upload_service.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 abstract class LoginUIEvent {}
 
@@ -260,6 +261,10 @@ class LoginScreenViewModel extends ChangeNotifier {
       }
 
       await _checkBiometricAvailability();
+
+      // Solicitud de permisos proactiva
+      await checkAndRequestPermissions();
+
       _eventController.add(
         ShowSuccessEvent(
           'Bienvenido ${_currentUser!.fullname}',
@@ -325,6 +330,9 @@ class LoginScreenViewModel extends ChangeNotifier {
         );
         return;
       }
+
+      // Solicitud de permisos proactiva
+      await checkAndRequestPermissions();
 
       _eventController.add(
         ShowSuccessEvent(
@@ -406,6 +414,40 @@ class LoginScreenViewModel extends ChangeNotifier {
       await executeSync();
     } catch (e) {
       _eventController.add(ShowErrorEvent('Error al validar datos: $e'));
+    }
+  }
+
+  /// 🛡️ Validar y solicitar permisos críticos antes de entrar a la app
+  Future<void> checkAndRequestPermissions() async {
+    try {
+      // 1. Notificaciones (Android 13+)
+      if (await Permission.notification.isDenied) {
+        await Permission.notification.request();
+      }
+
+      // 2. Ubicación
+      // Primero 'location' (precisa/coarse en uso)
+      var locStatus = await Permission.location.status;
+      if (!locStatus.isGranted) {
+        locStatus = await Permission.location.request();
+      }
+
+      // Si se concedió ubicación básica, intentar 'locationAlways' para background
+      // Nota: En Android 11+ el sistema puede requerir hacerlo en pasos separados o ajustes
+      if (locStatus.isGranted) {
+        if (await Permission.locationAlways.isDenied) {
+          // No bloqueamos el login si esto falla, pero lo intentamos
+          await Permission.locationAlways.request();
+        }
+      }
+
+      // 3. Optimización de batería
+      // Importante para que el servicio no muera
+      if (await Permission.ignoreBatteryOptimizations.isDenied) {
+        await Permission.ignoreBatteryOptimizations.request();
+      }
+    } catch (e) {
+      debugPrint('Error solicitando permisos: $e');
     }
   }
 

@@ -10,14 +10,21 @@ import 'package:ada_app/utils/device_info_helper.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 import 'package:logger/logger.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 //  CONFIGURACIÓN CENTRALIZADA
 class BackgroundLogConfig {
-  ///  HORARIO DE TRABAJO
-  static const int horaInicio = 9; // 9 AM
-  static const int horaFin = 17; // 5 PM
+  ///  HORARIO DE TRABAJO (Dinámico)
+  static int horaInicio = 9; // Default 9 AM
+  static int horaFin = 17; // Default 5 PM
 
-  ///  INTERVALO ENTRE REGISTROS
-  static const Duration intervalo = Duration(minutes: 10);
+  /// Keys para SharedPreferences
+  static const String keyHoraInicio = 'work_hours_start';
+  static const String keyHoraFin = 'work_hours_end';
+  static const String keyIntervalo = 'work_interval_minutes';
+
+  ///  INTERVALO ENTRE REGISTROS (Dinámico)
+  static Duration intervalo = Duration(minutes: 5); // Default 5 min
 
   /// NÚMERO MÁXIMO DE REINTENTOS
   static const int maxReintentos = 5;
@@ -41,7 +48,7 @@ class BackgroundLogConfig {
   }
 
   ///  MINUTOS MÍNIMOS ENTRE LOGS (prevenir duplicados)
-  static const int minutosMinimosEntreLogs = 8;
+  // static const int minutosMinimosEntreLogs = 8;
 }
 
 /// - CON PROTECCIÓN ANTI-DUPLICADOS Y LOCK DE CONCURRENCIA
@@ -110,14 +117,17 @@ class DeviceLogBackgroundExtension {
       _logger.i(
         'Intervalo: ${BackgroundLogConfig.intervalo.inMinutes} minutos',
       );
-      _logger.i('Reintentos máximos: ${BackgroundLogConfig.maxReintentos}');
-      _logger.i(
-        'Mínimo entre logs: ${BackgroundLogConfig.minutosMinimosEntreLogs} min',
-      );
+      // _logger.i('Reintentos máximos: ${BackgroundLogConfig.maxReintentos}');
+      // _logger.i(
+      //   // 'Mínimo entre logs: ${BackgroundLogConfig.minutosMinimosEntreLogs} min',
+      // );
       _logger.i(
         'Verificación de sesión: ${verificarSesion ? "ACTIVADA" : "DESACTIVADA"}',
       );
       _logger.i('═══════════════════════════════════════');
+
+      // Cargar configuración de horario
+      await _cargarConfiguracionHorario();
 
       // Verificar disponibilidad de servicios
       await DeviceInfoHelper.mostrarEstadoDisponibilidad();
@@ -126,9 +136,78 @@ class DeviceLogBackgroundExtension {
     }
   }
 
+  /// 🕒 Cargar horarios e intervalo desde SharedPreferences
+  static Future<void> _cargarConfiguracionHorario() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      BackgroundLogConfig.horaInicio =
+          prefs.getInt(BackgroundLogConfig.keyHoraInicio) ?? 9;
+      BackgroundLogConfig.horaFin =
+          prefs.getInt(BackgroundLogConfig.keyHoraFin) ?? 17;
+
+      // Cargar intervalo
+      final intervaloMin = prefs.getInt(BackgroundLogConfig.keyIntervalo) ?? 5;
+      BackgroundLogConfig.intervalo = Duration(minutes: intervaloMin);
+
+      _logger.i(
+        'Configuración cargada - Horario: ${BackgroundLogConfig.horaInicio}:00-${BackgroundLogConfig.horaFin}:00 | Intervalo: ${intervaloMin}min',
+      );
+
+      // Si el timer está activo, REINICIARLO con el nuevo intervalo
+      if (_isInitialized &&
+          _backgroundTimer != null &&
+          _backgroundTimer!.isActive) {
+        _logger.i('Reiniciando timer con nuevo intervalo log...');
+        _backgroundTimer?.cancel();
+        _backgroundTimer = Timer.periodic(
+          BackgroundLogConfig.intervalo,
+          (timer) async => await _ejecutarLoggingConHorario(),
+        );
+      }
+    } catch (e) {
+      _logger.e('Error cargando configuración: $e');
+    }
+  }
+
+  /// 💾 Guardar nuevos horarios e intervalo
+  static Future<void> guardarConfiguracionHorario(
+    int inicio,
+    int fin, {
+    int? intervaloMinutos,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(BackgroundLogConfig.keyHoraInicio, inicio);
+      await prefs.setInt(BackgroundLogConfig.keyHoraFin, fin);
+
+      BackgroundLogConfig.horaInicio = inicio;
+      BackgroundLogConfig.horaFin = fin;
+
+      if (intervaloMinutos != null) {
+        await prefs.setInt(BackgroundLogConfig.keyIntervalo, intervaloMinutos);
+        BackgroundLogConfig.intervalo = Duration(minutes: intervaloMinutos);
+      }
+
+      _logger.i(
+        'Nueva configuración guardada - Intervalo: ${intervaloMinutos ?? BackgroundLogConfig.intervalo.inMinutes}min',
+      );
+
+      // Recargar para aplicar cambios al timer inmediatamente
+      await _cargarConfiguracionHorario();
+    } catch (e) {
+      _logger.e('Error guardando configuración: $e');
+      rethrow;
+    }
+  }
+
   /// Ejecutar logging con verificación de horario y sesión
   static Future<void> _ejecutarLoggingConHorario() async {
     try {
+      // 🔄 IMPORTANTE: Recargar configuración en cada ejecución
+      // Esto es necesario porque el servicio corre en un Isolate separado
+      // y no recibe las actualizaciones de variables estáticas desde la UI
+      await _cargarConfiguracionHorario();
+
       // Verificar sesión antes de cada ejecución
       if (!await _verificarSesionActiva()) {
         return; // Ya se maneja el stop dentro de _verificarSesionActiva
@@ -185,20 +264,15 @@ class DeviceLogBackgroundExtension {
       }
 
       // VALIDAR QUE NO EXISTA UN LOG MUY RECIENTE (prevenir duplicados)
+      /*
+      // COMENTADO PARA TESTING TESTING EXTENSIVO - IGNORAR DUPLICADOS
       final db = await DatabaseHelper().database;
       final repository = DeviceLogRepository(db);
 
       // Obtener vendedor actual (puede ser null en algunas situaciones)
-      final log = await DeviceInfoHelper.crearDeviceLog();
-      final vendedorId = log?.employeeId;
-
-      if (log == null) {
-        _logger.w(
-          'No se pudo crear el device log - posiblemente sin sesión activa',
-        );
-        return;
-      }
-
+      final logInfo = await DeviceInfoHelper.crearDeviceLog();
+      final vendedorId = logInfo?.employeeId;
+      
       final existeReciente = await repository.existeLogReciente(
         vendedorId,
         minutos: BackgroundLogConfig.minutosMinimosEntreLogs,
@@ -210,9 +284,18 @@ class DeviceLogBackgroundExtension {
         );
         return;
       }
+      */
 
       // Crear log usando helper compartido
       _logger.i('Creando device log...');
+      final log = await DeviceInfoHelper.crearDeviceLog();
+
+      if (log == null) {
+        _logger.w(
+          'No se pudo crear el device log - posiblemente sin sesión activa',
+        );
+        return;
+      }
 
       //  Guardar en base de datos local
       _logger.i('Guardando en base de datos local...');
@@ -429,7 +512,7 @@ class DeviceLogBackgroundExtension {
       'url_servidor': urlActual,
       'max_reintentos': BackgroundLogConfig.maxReintentos,
       'tiempos_backoff': BackgroundLogConfig.tiemposBackoff.join(', '),
-      'minutos_minimos_entre_logs': BackgroundLogConfig.minutosMinimosEntreLogs,
+      // 'minutos_minimos_entre_logs': BackgroundLogConfig.minutosMinimosEntreLogs,
     };
   }
 
