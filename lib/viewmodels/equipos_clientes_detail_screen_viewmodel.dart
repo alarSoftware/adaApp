@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'dart:async';
 import '../repositories/censo_activo_repository.dart';
 import '../repositories/equipo_repository.dart';
-
 import '../models/censo_activo.dart';
 import 'package:ada_app/services/device/location_service.dart';
 import 'package:geolocator/geolocator.dart';

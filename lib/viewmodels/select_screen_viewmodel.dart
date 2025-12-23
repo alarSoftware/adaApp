@@ -234,16 +234,15 @@ class SelectScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      // 2. Construir display name con formato: username - Nombre Vendedor
-      // 2. Construir display name con formato: username - Nombre Vendedor
+
+      // 2. Construir display name: Prefiriendo employeeName
       String displayName;
-      // if (_currentUser!.employeeName != null &&
-      //     _currentUser!.employeeName!.trim().isNotEmpty) {
-      //   displayName =
-      //       '${_currentUser!.username} - ${_currentUser!.employeeName}';
-      // } else {
-      displayName = _currentUser!.username;
-      // }
+      if (_currentUser!.employeeName != null &&
+          _currentUser!.employeeName!.trim().isNotEmpty) {
+        displayName = _currentUser!.employeeName!;
+      } else {
+        displayName = _currentUser!.username;
+      }
       _userFullName = displayName;
 
       // 3. ✅ USAR AuthService para validar sincronización (NO código duplicado)

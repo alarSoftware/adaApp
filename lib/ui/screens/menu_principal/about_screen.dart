@@ -82,7 +82,7 @@ class _AboutScreenState extends State<AboutScreen> {
                     SizedBox(height: 24),
                     _buildVersionInfo(),
                     SizedBox(height: 48),
-                    _buildCopyright(),
+                    // _buildCopyright(),
                   ],
                 ),
               ),
@@ -224,14 +224,14 @@ class _AboutScreenState extends State<AboutScreen> {
     );
   }
 
-  Widget _buildCopyright() {
-    return Text(
-      '© ${DateTime.now().year} Alar Software.\nTodos los derechos reservados.',
-      textAlign: TextAlign.center,
-      style: TextStyle(
-        color: AppColors.textSecondary.withValues(alpha: 0.6),
-        fontSize: 12,
-      ),
-    );
-  }
+  // Widget _buildCopyright() {
+  //   return Text(
+  //     '© ${DateTime.now().year} Alar Software.\nTodos los derechos reservados.',
+  //     textAlign: TextAlign.center,
+  //     style: TextStyle(
+  //       color: AppColors.textSecondary.withValues(alpha: 0.6),
+  //       fontSize: 12,
+  //     ),
+  //   );
+  // }
 }

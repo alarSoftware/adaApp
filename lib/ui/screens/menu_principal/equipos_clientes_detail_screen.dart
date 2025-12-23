@@ -98,26 +98,19 @@ class _EquiposClientesDetailScreenState
                     listenable: _viewModel,
                     builder: (context, child) {
                       final canSave = _viewModel.saveButtonEnabled;
-                      final buttonText = _viewModel.saveButtonText;
 
-                      return TextButton.icon(
-                        onPressed: canSave ? _showSaveConfirmation : null,
+                      return IconButton(
+                        onPressed: (canSave && !_viewModel.isProcessing)
+                            ? _showSaveConfirmation
+                            : null,
                         icon: Icon(
                           Icons.save,
-                          color: canSave
+                          color: (canSave && !_viewModel.isProcessing)
                               ? AppColors.onPrimary
                               : AppColors.onPrimary.withValues(alpha: 0.5),
-                          size: 20,
+                          size: 28,
                         ),
-                        label: Text(
-                          buttonText,
-                          style: TextStyle(
-                            color: canSave
-                                ? AppColors.onPrimary
-                                : AppColors.onPrimary.withValues(alpha: 0.5),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        tooltip: 'Guardar Cambios',
                       );
                     },
                   ),
@@ -281,15 +274,15 @@ class _EquiposClientesDetailScreenState
                       Container(
                         decoration: BoxDecoration(
                           color:
-                          _viewModel.equipoCliente['tipo_estado'] ==
-                              'asignado'
+                              _viewModel.equipoCliente['tipo_estado'] ==
+                                  'asignado'
                               ? AppColors.success.withValues(alpha: 0.1)
                               : AppColors.warning.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color:
-                            _viewModel.equipoCliente['tipo_estado'] ==
-                                'asignado'
+                                _viewModel.equipoCliente['tipo_estado'] ==
+                                    'asignado'
                                 ? AppColors.success.withValues(alpha: 0.3)
                                 : AppColors.warning.withValues(alpha: 0.3),
                           ),
@@ -300,8 +293,8 @@ class _EquiposClientesDetailScreenState
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color:
-                            _viewModel.equipoCliente['tipo_estado'] ==
-                                'asignado'
+                                _viewModel.equipoCliente['tipo_estado'] ==
+                                    'asignado'
                                 ? AppColors.success
                                 : AppColors.warning,
                           ),
@@ -545,27 +538,27 @@ class _EquiposClientesDetailScreenState
                     ),
                     items: dropdownHabilitado
                         ? [
-                      DropdownMenuItem<bool?>(
-                        value: false,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.location_off,
-                              color: AppColors.warning,
-                              size: 20,
-                            ),
-                            SizedBox(width: 12),
-                            Flexible(
-                              child: Text(
-                                'Fuera del local',
-                                overflow: TextOverflow.ellipsis,
+                            DropdownMenuItem<bool?>(
+                              value: false,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.location_off,
+                                    color: AppColors.warning,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 12),
+                                  Flexible(
+                                    child: Text(
+                                      'Fuera del local',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ]
+                          ]
                         : null,
                     onChanged: dropdownHabilitado
                         ? (value) => _viewModel.cambiarUbicacionEquipo(value)
@@ -819,8 +812,8 @@ class _EquiposClientesDetailScreenState
   }
 
   Future<Map<String, dynamic>> _prepararDatosHistorialParaPreview(
-      dynamic historialItem,
-      ) async {
+    dynamic historialItem,
+  ) async {
     try {
       final clienteIdRaw = widget.equipoCliente['cliente_id'];
 
@@ -860,7 +853,7 @@ class _EquiposClientesDetailScreenState
         'cod_barras': widget.equipoCliente['cod_barras']?.toString() ?? '',
         'numero_serie': widget.equipoCliente['numero_serie']?.toString() ?? '',
         'modelo_nombre':
-        widget.equipoCliente['modelo_nombre']?.toString() ?? '',
+            widget.equipoCliente['modelo_nombre']?.toString() ?? '',
         'logo_nombre': widget.equipoCliente['logo_nombre']?.toString() ?? '',
         'marca_nombre': widget.equipoCliente['marca_nombre']?.toString() ?? '',
         'tipo_estado': widget.equipoCliente['tipo_estado'],
@@ -922,15 +915,15 @@ class _EquiposClientesDetailScreenState
         'timestamp_gps': fechaRevisionSafe?.toString(),
 
         'codigo_barras':
-        widget.equipoCliente['cod_barras']?.toString() ?? 'No especificado',
+            widget.equipoCliente['cod_barras']?.toString() ?? 'No especificado',
         'modelo':
-        widget.equipoCliente['modelo_nombre']?.toString() ??
+            widget.equipoCliente['modelo_nombre']?.toString() ??
             'No especificado',
         'logo':
-        widget.equipoCliente['logo_nombre']?.toString() ??
+            widget.equipoCliente['logo_nombre']?.toString() ??
             'No especificado',
         'numero_serie':
-        widget.equipoCliente['numero_serie']?.toString() ??
+            widget.equipoCliente['numero_serie']?.toString() ??
             'No especificado',
 
         'observaciones': historialItem?.observaciones ?? 'Sin observaciones',

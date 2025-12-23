@@ -949,6 +949,8 @@ class _SelectScreenState extends State<SelectScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     SizedBox(height: 8),
                     Row(
@@ -1286,12 +1288,15 @@ class _SelectScreenState extends State<SelectScreen> {
                                     ),
                                   ),
                                 ] else
-                                  Text(
-                                    'Hola, ${_viewModel.userDisplayName}',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textPrimary,
+                                  Expanded(
+                                    child: Text(
+                                      'Hola, ${_viewModel.userDisplayName}',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                               ],
