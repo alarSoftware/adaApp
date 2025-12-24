@@ -151,6 +151,9 @@ class AppServices {
     try {
       _logger.i('Inicializando servicios de la aplicación');
 
+      // 🕒 CARGAR CONFIGURACIÓN DE HORARIO EN UI ISOLATE
+      await DeviceLogBackgroundExtension.cargarConfiguracionHorario();
+
       // VERIFICACIÓN DOBLE: Si la variable interna es false, verificamos con AuthService por si acaso
       if (!_isUserLoggedIn) {
         final authService = AuthService();

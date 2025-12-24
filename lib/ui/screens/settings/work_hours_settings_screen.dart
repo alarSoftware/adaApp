@@ -23,8 +23,10 @@ class _WorkHoursSettingsScreenState extends State<WorkHoursSettingsScreen> {
   }
 
   Future<void> _loadCurrentSettings() async {
-    // Como las variables son estáticas y ya se cargaron al inicio,
-    // podemos leerlas directamente, pero para estar seguros simulamos una carga
+    // 1. Cargar la configuración persistida actualizada
+    await DeviceLogBackgroundExtension.cargarConfiguracionHorario();
+
+    // 2. Leer las variables estáticas actualizadas
     setState(() {
       _startHour = BackgroundLogConfig.horaInicio;
       _endHour = BackgroundLogConfig.horaFin;

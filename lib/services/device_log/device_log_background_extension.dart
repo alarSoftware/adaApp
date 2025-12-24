@@ -127,7 +127,7 @@ class DeviceLogBackgroundExtension {
       _logger.i('═══════════════════════════════════════');
 
       // Cargar configuración de horario
-      await _cargarConfiguracionHorario();
+      await cargarConfiguracionHorario();
 
       // Verificar disponibilidad de servicios
       await DeviceInfoHelper.mostrarEstadoDisponibilidad();
@@ -137,7 +137,7 @@ class DeviceLogBackgroundExtension {
   }
 
   /// 🕒 Cargar horarios e intervalo desde SharedPreferences
-  static Future<void> _cargarConfiguracionHorario() async {
+  static Future<void> cargarConfiguracionHorario() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       BackgroundLogConfig.horaInicio =
@@ -193,7 +193,7 @@ class DeviceLogBackgroundExtension {
       );
 
       // Recargar para aplicar cambios al timer inmediatamente
-      await _cargarConfiguracionHorario();
+      await cargarConfiguracionHorario();
     } catch (e) {
       _logger.e('Error guardando configuración: $e');
       rethrow;
@@ -206,7 +206,7 @@ class DeviceLogBackgroundExtension {
       // 🔄 IMPORTANTE: Recargar configuración en cada ejecución
       // Esto es necesario porque el servicio corre en un Isolate separado
       // y no recibe las actualizaciones de variables estáticas desde la UI
-      await _cargarConfiguracionHorario();
+      await cargarConfiguracionHorario();
 
       // Verificar sesión antes de cada ejecución
       if (!await _verificarSesionActiva()) {
@@ -319,8 +319,8 @@ class DeviceLogBackgroundExtension {
     final now = DateTime.now();
     final hora = now.hour;
 
-    // Verificar día laboral (Lunes = 1 a Viernes = 5)
-    final esDiaLaboral = now.weekday >= 1 && now.weekday <= 5;
+    // Verificar día laboral (Lunes = 1 a Sábado = 6)
+    final esDiaLaboral = now.weekday >= 1 && now.weekday <= 6;
 
     // Verificar horario
     final esHorarioTrabajo =
