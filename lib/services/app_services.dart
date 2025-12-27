@@ -24,7 +24,7 @@ class AppServices {
   Future<void> inicializarEnLogin() async {
     try {
       _logger.i(
-        'Usuario logueado - Inicializando servicios básicos (SIN device logging)',
+        'User logged in - Initializing basic services (no device logging yet)',
       );
 
       _isUserLoggedIn = true;
@@ -149,9 +149,9 @@ class AppServices {
 
   Future<void> inicializar() async {
     try {
-      _logger.i('Inicializando servicios de la aplicación');
+      _logger.i('Initializing app services');
 
-      // 🕒 CARGAR CONFIGURACIÓN DE HORARIO EN UI ISOLATE
+      // Load work hours config
       await DeviceLogBackgroundExtension.cargarConfiguracionHorario();
 
       // VERIFICACIÓN DOBLE: Si la variable interna es false, verificamos con AuthService por si acaso
@@ -319,9 +319,7 @@ class AppServices {
   /// Mostrar configuración completa de todos los servicios
   Future<void> mostrarConfiguracionCompleta() async {
     try {
-      _logger.i("═══════════════════════════════════════");
-      _logger.i("CONFIGURACIÓN COMPLETA DE SERVICIOS");
-      _logger.i("═══════════════════════════════════════");
+      _logger.i("FULL SERVICE CONFIGURATION");
 
       // Estado general
       final estado = await obtenerEstadoServicios();
@@ -337,8 +335,6 @@ class AppServices {
 
       // Configuración de Upload Service
       await DeviceLogUploadService.mostrarConfiguracion();
-
-      _logger.i("═══════════════════════════════════════");
     } catch (e) {
       _logger.e("Error mostrando configuración: $e");
     }

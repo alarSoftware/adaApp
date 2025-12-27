@@ -89,10 +89,6 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
                 if (equipo['numero_serie'] != null)
                   _buildDetalleRow('Número de Serie', equipo['numero_serie']),
                 _buildDetalleRow(
-                  'Estado Local',
-                  (equipo['estado_local'] == 1) ? "Activo" : "Inactivo",
-                ),
-                _buildDetalleRow(
                   'Estado Asignación',
                   _viewModel.getEstadoAsignacion(equipo),
                 ),

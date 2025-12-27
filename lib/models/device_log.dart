@@ -19,20 +19,19 @@ class DeviceLog {
     this.sincronizado = 1,
   });
 
-  /// 🎯 MÉTODO CORREGIDO - Coincide exactamente con backend Grails
+  /// Metodo coincidente con backend Grails
   Map<String, dynamic> toMap() {
     return {
-      'uuid': id,                           // ✅ Backend espera 'uuid'
-      'emplyedId': employeeId,       // ✅ camelCase
-      'latitudLongitud': latitudLongitud,   // ✅ camelCase
-      'bateria': bateria,                   // ✅ igual
-      'modelo': modelo,                     // ✅ igual
-      'fechaRegistro': fechaRegistro,       // ✅ camelCase
-      // ❌ NO enviar 'sincronizado' - no existe en backend
+      'uuid': id,
+      'emplyedId': employeeId,
+      'latitudLongitud': latitudLongitud,
+      'bateria': bateria,
+      'modelo': modelo,
+      'fechaRegistro': fechaRegistro,
     };
   }
 
-  /// 📦 Método para BD local (mantiene formato con snake_case)
+  /// Metodo para BD local (mantiene formato con snake_case)
   Map<String, dynamic> toMapLocal() {
     return {
       'id': id,
@@ -57,11 +56,11 @@ class DeviceLog {
     );
   }
 
-  /// 🔍 Ver exactamente qué se envía al backend (para debugging)
+  /// Ver exactamente qué se envía al backend (para debugging)
   String toBackendJsonDebug() {
     final map = toMap();
     return '''
-🎯 JSON QUE SE ENVÍA AL BACKEND GRAILS:
+JSON QUE SE ENVIA AL BACKEND GRAILS:
 {
   "uuid": "${map['uuid']}",
   "employeeId": "${map['employeeId']}",
@@ -71,7 +70,7 @@ class DeviceLog {
   "fechaRegistro": "${map['fechaRegistro']}"
 }
 
-✅ Todos los campos coinciden con AppDeviceLog.groovy
+Todos los campos coinciden con AppDeviceLog.groovy
 ''';
   }
 }

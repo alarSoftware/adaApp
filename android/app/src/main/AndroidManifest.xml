@@ -43,7 +43,7 @@
 
     <application
         android:label="AdaApp"
-        android:name="${applicationName}"
+        android:name=".Application"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"

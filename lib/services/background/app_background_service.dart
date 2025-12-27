@@ -45,20 +45,27 @@ void onStart(ServiceInstance service) async {
   // Como estamos en un aislamiento separado, funcionará aunque la UI se cierre.
   await DeviceLogBackgroundExtension.inicializar(verificarSesion: true);
 
-  // Timer para actualizar la notificación o verificar estado (opcional)
-  Timer.periodic(const Duration(minutes: 15), (timer) async {
-    if (service is AndroidServiceInstance) {
-      if (await service.isForegroundService()) {
-        service.setForegroundNotificationInfo(
-          title: "AdaApp Activa",
-          content:
-              "Última sincronización: ${DateTime.now().toString().split('.')[0]}",
-        );
+  // 🔴 ROBUST LOOP: Instead of a simple Timer, we use a loop that re-checks config
+  // This is more resistant to OS kills/restarts because it's the main thread of the Isolate
+  Timer.periodic(const Duration(seconds: 30), (timer) async {
+    try {
+      if (service is AndroidServiceInstance) {
+        if (await service.isForegroundService()) {
+          service.setForegroundNotificationInfo(
+            title: "AdaApp Activa",
+            content:
+                "Última actividad: ${DateTime.now().toString().split('.')[0]}",
+          );
+        }
       }
-    }
 
-    // Heartbeat en el log
-    logger.i('Background Service Heartbeat: ${DateTime.now()}');
+      if (!DeviceLogBackgroundExtension.estaActivo) {
+        logger.w('Watchdog: Timer de logs inactivo. Reinicializando...');
+        await DeviceLogBackgroundExtension.inicializar(verificarSesion: true);
+      }
+    } catch (e) {
+      logger.e("Error en ciclo principal de background: $e");
+    }
   });
 }
 

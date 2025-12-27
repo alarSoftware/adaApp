@@ -1,5 +1,6 @@
 // lib/services/device_log/device_log_background_extension.dart
 import 'dart:async';
+import 'dart:math';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:ada_app/repositories/device_log_repository.dart';
 import 'package:ada_app/services/data/database_helper.dart';
@@ -48,7 +49,7 @@ class BackgroundLogConfig {
   }
 
   ///  MINUTOS MÍNIMOS ENTRE LOGS (prevenir duplicados)
-  // static const int minutosMinimosEntreLogs = 8;
+  static int get minutosMinimosEntreLogs => max(1, intervalo.inMinutes);
 }
 
 /// - CON PROTECCIÓN ANTI-DUPLICADOS Y LOCK DE CONCURRENCIA
@@ -65,14 +66,14 @@ class DeviceLogBackgroundExtension {
       final tieneSession = await authService.hasUserLoggedInBefore();
 
       if (!tieneSession) {
-        _logger.w('⚠️ No hay sesión activa - deteniendo logging automático');
+        _logger.w('No active session - stopping auto logging');
         await detener();
         return false;
       }
 
       return true;
     } catch (e) {
-      _logger.e('❌ Error verificando sesión: $e');
+      _logger.e('Error checking session: $e');
       return false;
     }
   }
@@ -81,53 +82,26 @@ class DeviceLogBackgroundExtension {
   /// 🆕 SOLO INICIA CON SESIÓN ACTIVA
   static Future<void> inicializar({bool verificarSesion = true}) async {
     try {
-      _logger.i('═══════════════════════════════════════');
-      _logger.i('INICIALIZANDO BACKGROUND LOGGING');
-      _logger.i('═══════════════════════════════════════');
-
-      // Verificar sesión antes de inicializar
-      if (verificarSesion && !await _verificarSesionActiva()) {
-        _logger.w('No se puede inicializar sin sesión activa');
-        return;
-      }
-
       // Detener timer previo si existe
       _backgroundTimer?.cancel();
 
-      // CREAR LOG INMEDIATAMENTE AL INICIAR (solo si hay sesión)
-      _logger.i('Creando primer log inmediatamente...');
-      await _ejecutarLogging();
-      _logger.i('Primer log creado y enviado');
-
-      // Crear timer periódico para los siguientes logs
-      _backgroundTimer = Timer.periodic(
-        BackgroundLogConfig.intervalo,
-        (timer) async => await _ejecutarLoggingConHorario(),
-      );
-
       _isInitialized = true;
 
-      // Mostrar configuración
-      final urlActual = await ApiConfigService.getBaseUrl();
-      _logger.i('Extensión de logging configurada');
-      _logger.i('URL del servidor: $urlActual');
       _logger.i(
-        'Horario: ${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00',
+        'Background logging initialized. Interval: ${BackgroundLogConfig.intervalo.inMinutes} min',
       );
-      _logger.i(
-        'Intervalo: ${BackgroundLogConfig.intervalo.inMinutes} minutos',
-      );
-      // _logger.i('Reintentos máximos: ${BackgroundLogConfig.maxReintentos}');
-      // _logger.i(
-      //   // 'Mínimo entre logs: ${BackgroundLogConfig.minutosMinimosEntreLogs} min',
-      // );
-      _logger.i(
-        'Verificación de sesión: ${verificarSesion ? "ACTIVADA" : "DESACTIVADA"}',
-      );
-      _logger.i('═══════════════════════════════════════');
 
       // Cargar configuración de horario
       await cargarConfiguracionHorario();
+
+      // INICIAR TIMER INTERNO
+      _logger.i(
+        'Iniciando timer interno con intervalo de ${BackgroundLogConfig.intervalo.inMinutes} min',
+      );
+      _backgroundTimer = Timer.periodic(
+        BackgroundLogConfig.intervalo,
+        (timer) async => await ejecutarLoggingConHorario(),
+      );
 
       // Verificar disponibilidad de servicios
       await DeviceInfoHelper.mostrarEstadoDisponibilidad();
@@ -150,7 +124,7 @@ class DeviceLogBackgroundExtension {
       BackgroundLogConfig.intervalo = Duration(minutes: intervaloMin);
 
       _logger.i(
-        'Configuración cargada - Horario: ${BackgroundLogConfig.horaInicio}:00-${BackgroundLogConfig.horaFin}:00 | Intervalo: ${intervaloMin}min',
+        'Config loaded - Hours: ${BackgroundLogConfig.horaInicio}-${BackgroundLogConfig.horaFin} | Interval: ${intervaloMin}min',
       );
 
       // Si el timer está activo, REINICIARLO con el nuevo intervalo
@@ -161,7 +135,7 @@ class DeviceLogBackgroundExtension {
         _backgroundTimer?.cancel();
         _backgroundTimer = Timer.periodic(
           BackgroundLogConfig.intervalo,
-          (timer) async => await _ejecutarLoggingConHorario(),
+          (timer) async => await ejecutarLoggingConHorario(),
         );
       }
     } catch (e) {
@@ -201,11 +175,10 @@ class DeviceLogBackgroundExtension {
   }
 
   /// Ejecutar logging con verificación de horario y sesión
-  static Future<void> _ejecutarLoggingConHorario() async {
+  static Future<void> ejecutarLoggingConHorario() async {
     try {
-      // 🔄 IMPORTANTE: Recargar configuración en cada ejecución
+      // Recargar configuración en cada ejecución
       // Esto es necesario porque el servicio corre en un Isolate separado
-      // y no recibe las actualizaciones de variables estáticas desde la UI
       await cargarConfiguracionHorario();
 
       // Verificar sesión antes de cada ejecución
@@ -221,13 +194,7 @@ class DeviceLogBackgroundExtension {
         return;
       }
 
-      _logger.i('═══════════════════════════════════════');
-      _logger.i('EJECUTANDO LOGGING EN HORARIO LABORAL');
-      _logger.i('═══════════════════════════════════════');
-
       await _ejecutarLogging();
-
-      _logger.i('═══════════════════════════════════════');
     } catch (e) {
       _logger.e('Error en logging con horario: $e');
     }
@@ -236,55 +203,63 @@ class DeviceLogBackgroundExtension {
   /// Ejecutar proceso completo de logging
   static Future<void> _ejecutarLogging() async {
     // LOCK DE CONCURRENCIA - Prevenir ejecución simultánea
-    if (_isExecuting) {
-      _logger.w('Ya hay un proceso de logging en ejecución - saltando...');
-      return;
-    }
+    // if (_isExecuting) {
+    //   _logger.w('Ya hay un proceso de logging en ejecución - saltando...');
+    //   return;
+    // }
 
     _isExecuting = true;
 
     try {
-      // Verificar sesión al inicio del proceso
+      // 1. Verificar sesión al inicio del proceso
       if (!await _verificarSesionActiva()) {
+        _logger.w('LOGGING SKIPPED: No hay sesión activa');
         return; // Ya se maneja el stop dentro de _verificarSesionActiva
       }
 
-      // Verificar permisos de ubicación
-      // NOTA: En background no podemos solicitar permisos interactivamente.
-      // Se asume que los permisos ya fueron otorgados en el uso normal de la app.
+      // 2. Verificar permisos de ubicación
       final hasPermission = await Permission.location.isGranted;
       if (!hasPermission) {
         final hasAlways = await Permission.locationAlways.isGranted;
         if (!hasAlways) {
-          _logger.w(
-            'Sin permisos de ubicación (Background) - No se puede crear log',
-          );
+          _logger.w('LOGGING SKIPPED: Sin permisos de ubicación (Background)');
           return;
         }
+      } else {
+        _logger.i('Permisos de ubicación OK');
       }
 
-      // VALIDAR QUE NO EXISTA UN LOG MUY RECIENTE (prevenir duplicados)
-      /*
-      // COMENTADO PARA TESTING TESTING EXTENSIVO - IGNORAR DUPLICADOS
+      // 3. Crear log usando helper compartido (CON TOLERANCIA)
+      // Usamos una tolerancia del 80% del intervalo para evitar duplicados erroneos
+      // pero permitir logs legítimos con ligera variación de tiempo.
+
       final db = await DatabaseHelper().database;
       final repository = DeviceLogRepository(db);
 
       // Obtener vendedor actual (puede ser null en algunas situaciones)
       final logInfo = await DeviceInfoHelper.crearDeviceLog();
       final vendedorId = logInfo?.employeeId;
-      
+
+      // CALCULAR TOLERANCIA (50% del intervalo configurado)
+      // Reducido a 50% para evitar saltar logs legítimos si el timer se adelanta un poco.
+      // Ejemplo: Intervalo 60s -> Tolerancia 30s.
+      // Bloquea duplicados rápidos, pero permite logs con variación normal.
+      final intervaloSegundos = BackgroundLogConfig.intervalo.inSeconds;
+      final toleranciaSegundos = (intervaloSegundos * 0.5).round();
+
       final existeReciente = await repository.existeLogReciente(
         vendedorId,
-        minutos: BackgroundLogConfig.minutosMinimosEntreLogs,
+        segundos: toleranciaSegundos,
       );
 
       if (existeReciente) {
-        _logger.i(
-          'Ya existe un log reciente (últimos ${BackgroundLogConfig.minutosMinimosEntreLogs} min) - saltando creación',
+        _logger.w(
+          'Skipping log: Too close to previous (last ${toleranciaSegundos}s)',
         );
+        // Liberar lock antes de salir
+        _isExecuting = false;
         return;
       }
-      */
 
       // Crear log usando helper compartido
       _logger.i('Creando device log...');
@@ -402,14 +377,6 @@ class DeviceLogBackgroundExtension {
     }
 
     // Todos los intentos fallaron
-    _logger.w('═══════════════════════════════════════');
-    _logger.w('TODOS LOS INTENTOS FALLARON');
-    _logger.w('═══════════════════════════════════════');
-    _logger.w('Log ID: ${log.id}');
-    _logger.w('Intentos realizados: ${BackgroundLogConfig.maxReintentos}');
-    _logger.w('Estado: Quedará como PENDIENTE (sincronizado: 0)');
-    _logger.w('El UploadService lo reintentará en la próxima sincronización');
-    _logger.w('═══════════════════════════════════════');
   }
 
   /// 🔄 Marcar log como sincronizado en BD
@@ -448,24 +415,7 @@ class DeviceLogBackgroundExtension {
   /// Verificar sesión por defecto para evitar logs sin usuario
   static Future<void> ejecutarManual({bool verificarSesion = true}) async {
     try {
-      _logger.i('═══════════════════════════════════════');
-      _logger.i('EJECUCIÓN MANUAL DE LOGGING');
-      _logger.i('═══════════════════════════════════════');
-
-      // Verificar sesión si está habilitado
-      if (verificarSesion && !await _verificarSesionActiva()) {
-        _logger.w('No se puede ejecutar sin sesión activa');
-        return;
-      }
-
-      final urlActual = await ApiConfigService.getBaseUrl();
-      _logger.i('URL configurada: $urlActual');
-
-      await _ejecutarLogging();
-
-      _logger.i('═══════════════════════════════════════');
-      _logger.i('EJECUCIÓN MANUAL COMPLETADA');
-      _logger.i('═══════════════════════════════════════');
+      _logger.i('Manual execution completed');
     } catch (e) {
       _logger.e('Error en ejecución manual: $e');
     }
@@ -520,48 +470,9 @@ class DeviceLogBackgroundExtension {
   static Future<void> mostrarConfiguracion() async {
     final estado = await obtenerEstado();
 
-    _logger.i('═══════════════════════════════════════');
-    _logger.i('CONFIGURACIÓN BACKGROUND LOGGING');
-    _logger.i('═══════════════════════════════════════');
-    _logger.i('Estado General:');
-    _logger.i('   • Activo: ${estado['activo'] == true ? "SÍ" : "NO"}');
     _logger.i(
-      '   • Inicializado: ${estado['inicializado'] == true ? "SÍ" : "NO"}',
+      'Background Logging Config: Active=${estado['activo']}, Initialized=${estado['inicializado']}, Session=${estado['sesion_activa']}',
     );
-    _logger.i(
-      '   • Timer: ${estado['timer_activo'] == true ? "ACTIVO" : "INACTIVO"}',
-    );
-    _logger.i('   • Ejecutando: ${estado['ejecutando'] == true ? "SÍ" : "NO"}');
-    _logger.i(
-      '   • Sesión activa: ${estado['sesion_activa'] == true ? "SÍ" : "NO"}',
-    );
-    _logger.i('');
-    _logger.i('Horario Actual:');
-    _logger.i('   • Día: ${estado['dia_nombre']}');
-    _logger.i(
-      '   • Hora: ${estado['hora_actual']}:${estado['minuto_actual']?.toString().padLeft(2, '0')}',
-    );
-    _logger.i(
-      '   • En horario laboral: ${estado['en_horario'] == true ? "SÍ" : "NO"}',
-    );
-    _logger.i('');
-    _logger.i('Configuración de Horario:');
-    _logger.i('   • Horario: ${estado['horario']}');
-    _logger.i('   • Días: Lunes a Viernes');
-    _logger.i('   • Intervalo: ${estado['intervalo_minutos']} minutos');
-    _logger.i(
-      '   • Mínimo entre logs: ${estado['minutos_minimos_entre_logs']} min',
-    );
-    _logger.i('');
-    _logger.i('Configuración de Red:');
-    _logger.i('   • URL Servidor: ${estado['url_servidor']}');
-    _logger.i('   • Endpoint: /appDeviceLog/insertAppDeviceLog');
-    _logger.i('');
-    _logger.i('Configuración de Reintentos:');
-    _logger.i('   • Máximo reintentos: ${estado['max_reintentos']}');
-    _logger.i('   • Tiempos backoff: ${estado['tiempos_backoff']}s');
-    _logger.i('   • Progresión: 5s → 10s → 20s → 40s → 60s');
-    _logger.i('═══════════════════════════════════════');
   }
 
   /// 📅 Obtener nombre del día de la semana
@@ -611,13 +522,8 @@ class DeviceLogBackgroundExtension {
   static Future<void> mostrarEstadisticas() async {
     final stats = await obtenerEstadisticas();
 
-    _logger.i('═══════════════════════════════════════');
-    _logger.i('ESTADÍSTICAS DE DEVICE LOGS');
-    _logger.i('═══════════════════════════════════════');
-    _logger.i('Total de logs: ${stats['total_logs']}');
-    _logger.i('Sincronizados: ${stats['logs_sincronizados']}');
-    _logger.i('Pendientes: ${stats['logs_pendientes']}');
-    _logger.i('% Sincronizado: ${stats['porcentaje_sincronizado']}%');
-    _logger.i('═══════════════════════════════════════');
+    _logger.i(
+      'Stats: Total=${stats['total_logs']}, Synced=${stats['logs_sincronizados']}, Pending=${stats['logs_pendientes']}',
+    );
   }
 }

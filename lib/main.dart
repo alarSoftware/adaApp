@@ -195,41 +195,110 @@ class _InitializationScreenState extends State<InitializationScreen> {
     _initializeApp();
   }
 
-  /// 🛡️ Validar y solicitar permisos críticos AL INICIO
+  /// Validar y solicitar permisos críticos AL INICIO (Bloqueante)
   Future<void> _checkAndRequestPermissions() async {
-    try {
+    bool permissionsGranted = false;
+
+    while (!permissionsGranted) {
       if (mounted) {
         setState(() {
-          _loadingMessage = 'Verificando permisos...';
+          _loadingMessage = 'Verificando permisos necesarios...';
         });
       }
 
-      // 1. Notificaciones (Android 13+)
-      if (await Permission.notification.isDenied) {
-        await Permission.notification.request();
-      }
-
-      // 2. Ubicación
-      // Primero 'location' (precisa/coarse en uso)
+      // 1. Verificar todos los permisos críticos
+      // Estado de Ubicación
       var locStatus = await Permission.location.status;
-      if (!locStatus.isGranted) {
-        locStatus = await Permission.location.request();
-      }
+      // Estado de Ubicación Background (A veces requiere 'Always' explícito)
+      var locAlwaysStatus = await Permission.locationAlways.status;
+      // Estado de Notificaciones (Android 13+)
+      var notifStatus = await Permission.notification.status;
 
-      // Si se concedió ubicación básica, intentar 'locationAlways' para background
-      // Nota: En Android 11+ el sistema puede requerir hacerlo en pasos separados o ajustes
-      if (locStatus.isGranted) {
+      // Criterio de aceptación:
+      // - Ubicación: Debe ser 'granted' (Foreground) Y, si es posible, 'Always' (Background).
+      //   Nota: En Android 11+ pedir 'Always' directamente puede fallar si no se tiene 'WhenInUse'.
+      // - Notificaciones: 'granted' (o no soportado en versiones viejas).
+
+      bool locationOk =
+          locStatus.isGranted || await Permission.location.request().isGranted;
+
+      // Si tenemos ubicación básica, intentamos background
+      if (locationOk) {
+        // En Android moderno, locationAlways suele requerir ir a settings
         if (await Permission.locationAlways.isDenied) {
           await Permission.locationAlways.request();
+          // Actualizamos status
+          locAlwaysStatus = await Permission.locationAlways.status;
         }
       }
 
-      // 3. Optimización de batería se maneja aparte en BatteryOptimizationDialog
-      // pero podríamos pedirla aquí también si quisiéramos unificar.
-      // Por consistencia con el código existente, dejaremos BatteryOptimizationDialog
-      // verificarlo después, o podemos unificarlo si el usuario lo prefiere.
-    } catch (e) {
-      debugPrint('Error solicitando permisos iniciales: $e');
+      bool notifOk = true;
+      if (await Permission.notification.isDenied) {
+        if (await Permission.notification.request().isDenied) {
+          // Si es denegado permanentemente
+          if (await Permission.notification.isPermanentlyDenied) {
+            notifOk = false;
+          } else {
+            // Si solo fue denegado una vez, consideramos 'false' para volver a pedir o mostrar dialogo
+            notifOk = false;
+          }
+        }
+      }
+
+      // Re-verificar estados finales
+      locStatus = await Permission.location.status;
+      locAlwaysStatus = await Permission.locationAlways.status;
+      notifStatus = await Permission.notification.status;
+
+      // Validar si podemos continuar
+      // Nota: Somos estrictos con Location 'Always' por el requerimiento de background
+      bool isLocationReady = locAlwaysStatus.isGranted || locStatus.isGranted;
+      // Idealmente queremos 'Always', pero algunos telefonos lo manejan distinto.
+      // SÍ forzamos que al menos tenga permiso de ubicación activo.
+
+      if (isLocationReady && notifOk) {
+        permissionsGranted = true;
+      } else {
+        // BLOQUEO: Mostrar diálogo y esperar
+        if (mounted) {
+          final result = await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('Permisos Requeridos'),
+              content: const Text(
+                'Para funcionar correctamente, AdaApp necesita acceso OBLIGATORIO a:\n\n'
+                '📍 Ubicación: "Permitir todo el tiempo" (para el monitoreo en segundo plano).\n'
+                '🔔 Notificaciones: Para mantener el servicio activo.\n\n'
+                'Por favor, ve a Configuración y habilita estos permisos manualmente.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    openAppSettings();
+                    Navigator.of(context).pop(false); // Reintentar loop
+                  },
+                  child: const Text('Abrir Configuración'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(true); // Solo reintentar check
+                  },
+                  child: const Text('Ya los habilité'),
+                ),
+              ],
+            ),
+          );
+
+          // Esperar un momento para dar tiempo al usuario si fue a settings
+          if (result == false) {
+            await Future.delayed(const Duration(seconds: 1));
+          }
+        } else {
+          // Si no está montado, rompemos el loop para no quedar colgados (cierre de app)
+          return;
+        }
+      }
     }
   }
 

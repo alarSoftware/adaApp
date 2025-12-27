@@ -1,5 +1,3 @@
-// lib/repositories/device_log_repository.dart
-
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'package:ada_app/models/device_log.dart';
@@ -72,7 +70,11 @@ class DeviceLogRepository {
   }
 
   /// 🆕 Verificar si existe un log muy reciente (prevenir duplicados)
-  Future<bool> existeLogReciente(String? employeeId, {int minutos = 8}) async {
+  Future<bool> existeLogReciente(
+    String? employeeId, {
+    int minutos = 0,
+    int segundos = 0,
+  }) async {
     try {
       final ultimoLog = await obtenerUltimoLog(employeeId);
 
@@ -82,9 +84,17 @@ class DeviceLogRepository {
         DateTime.parse(ultimoLog.fechaRegistro),
       );
 
-      final esReciente = tiempoDesdeUltimo.inMinutes < minutos;
+      // Calcular el umbral total en segundos
+      final umbralSegundos = (minutos * 60) + segundos;
 
-      if (esReciente) {}
+      // Si no se especifica umbral, asumimos 0 y devolvemos false (siempre permite)
+      if (umbralSegundos <= 0) return false;
+
+      final esReciente = tiempoDesdeUltimo.inSeconds < umbralSegundos;
+
+      if (esReciente) {
+        // print('Log bloqueado: Último hace ${tiempoDesdeUltimo.inSeconds}s (Umbral: ${umbralSegundos}s)');
+      }
 
       return esReciente;
     } catch (e) {
