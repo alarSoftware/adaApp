@@ -227,29 +227,13 @@ class DeviceLogBackgroundExtension {
         return;
       }
 
-      /*  LOGIC ANTI-DUPLICADOS
-          Dado que WorkManager es ~15 mins, la chance de duplicados por ejecución rápida
-          es baja, pero mantenemos la lógica por seguridad.
-      */
-      final db = await DatabaseHelper().database;
-      final repository = DeviceLogRepository(db);
-      final logInfo = await DeviceInfoHelper.crearDeviceLog();
-      final vendedorId = logInfo?.employeeId;
-
-      // Tolerancia: 5 minutos (ya que el intervalo es 15)
-      const toleranciaSegundos = 300;
-
-      final existeReciente = await repository.existeLogReciente(
-        vendedorId,
-        segundos: toleranciaSegundos,
-      );
-
-      if (existeReciente) {
-        _logger.w('Skipping log: Reciente encontrado');
-        return;
-      }
-
-      // 📦 CREAR Y GUARDAR
+      /*  LOGIC ANTI-DUPLICADOS: REMOVIDA POR SOLICITUD DEL USUARIO
+          Se permite que el log manual y el background ocurran simultáneamente si coinciden.
+       */
+      // final db = await DatabaseHelper().database;
+      // final repository = DeviceLogRepository(db);
+      // final logInfo = await DeviceInfoHelper.crearDeviceLog();
+      // final vendedorId = logInfo?.employeeId;
       final log = await DeviceInfoHelper.crearDeviceLog();
       if (log == null) return;
 
@@ -261,7 +245,7 @@ class DeviceLogBackgroundExtension {
       await DeviceLogUploadService.sincronizarDeviceLogsPendientes();
     } catch (e) {
       _logger.e('Error en ejecución de logging background: $e');
-      throw e; // Re-lanzar para que WorkManager sepa que falló (y haga retry si configurado)
+      throw e;
     }
   }
 
@@ -293,9 +277,6 @@ class DeviceLogBackgroundExtension {
   }
 
   static Future<void> _intentarEnviarConReintentos(DeviceLog log) async {
-    // Intento simple de envío inmediato
-    // Si falla, quedará en BD local con sincronizado=0
-    // y el DeviceLogUploadService lo recogerá después.
     try {
       final resultado = await DeviceLogPostService.enviarDeviceLog(
         log,
@@ -322,7 +303,6 @@ class DeviceLogBackgroundExtension {
     );
   }
 
-  /// 🛑 Detener servicio
   static Future<void> detener() async {
     await Workmanager().cancelByUniqueName(uniqueName);
     _isInitialized = false;
@@ -330,7 +310,7 @@ class DeviceLogBackgroundExtension {
   }
 
   // ===========================================================================
-  // 🆕 MÉTODOS DE COMPATIBILIDAD (Para evitar romper otras partes de la app)
+  //MÉTODOS DE COMPATIBILIDAD (Para evitar romper otras partes de la app)
   // ===========================================================================
 
   /// Obtener estado actual (Simulado para compatibilidad)

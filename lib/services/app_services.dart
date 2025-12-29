@@ -30,6 +30,10 @@ class AppServices {
       // 3. Inicializar device logging (Background Service)
       await DeviceLogBackgroundExtension.inicializar();
 
+      // 4. Forzar primer log inmediato (Registro de inicio de jornada)
+      _logger.i('Forzando primer log de dispositivo inmediato...');
+      await DeviceLogBackgroundExtension.ejecutarManual();
+
       // 1. Obtener información del usuario
       final usuario = await _obtenerUsuarioActual();
 
@@ -64,6 +68,11 @@ class AppServices {
       }
 
       await DeviceLogBackgroundExtension.inicializar();
+
+      // Forzar log inmediato también aquí
+      _logger.i('Forzando primer log inmediato tras sync...');
+      await DeviceLogBackgroundExtension.ejecutarManual();
+
       _logger.i(
         'Background Service iniciado exitosamente después de sincronización',
       );
@@ -158,6 +167,13 @@ class AppServices {
       if (_isUserLoggedIn) {
         // Inicializar background service si el usuario ya tiene sesión
         await DeviceLogBackgroundExtension.inicializar();
+
+        // Forzar log inmediato (Auto-login)
+        _logger.i(
+          'Forzando primer log de dispositivo inmediato (Auto-login)...',
+        );
+        await DeviceLogBackgroundExtension.ejecutarManual();
+
         _logger.i('Servicios básicos y background service inicializados');
       } else {
         _logger.i('Usuario no logueado - servicios no iniciados');
