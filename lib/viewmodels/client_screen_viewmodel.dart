@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'dart:async';
+import 'package:intl/intl.dart';
 import '../models/cliente.dart';
 import '../repositories/cliente_repository.dart';
 
@@ -118,8 +119,28 @@ class ClienteListScreenViewModel extends ChangeNotifier {
       final query = _state.searchQuery.toLowerCase().trim();
       List<Cliente> baseList = _allClientes;
 
-      // 1. Filtrar por Modo (Todos / Registrados Hoy)
-      if (_state.filterMode == 'registered_today') {
+      // 1. Filtrar por Modo (Ruta de Hoy / Visitados Hoy / Todos)
+      if (_state.filterMode == 'today_route') {
+        final now = DateTime.now();
+        // Obtener nombre del día en español (ej: "lunes", "martes")
+        final diaHoy = DateFormat(
+          'EEEE',
+          'es',
+        ).format(now).toLowerCase().trim();
+
+        baseList = baseList.where((c) {
+          if (c.rutaDia == null || c.rutaDia!.isEmpty) return false;
+
+          final rutasCliente = c.rutaDia!.toLowerCase();
+          // Casos: "Sábado", "Martes, Viernes"
+          // Dividir por comas si existen
+          final dias = rutasCliente.split(',').map((d) {
+            return d.trim();
+          }).toList();
+
+          return dias.contains(diaHoy);
+        }).toList();
+      } else if (_state.filterMode == 'visited_today') {
         baseList = baseList.where((c) {
           return c.tieneCensoHoy ||
               c.tieneOperacionComercialHoy ||
@@ -148,6 +169,7 @@ class ClienteListScreenViewModel extends ChangeNotifier {
           displayedClientes: [],
           hasMoreData: true,
           totalCount: resultados.length,
+          error: null, // Limpiar error si hubo
         ),
       );
 

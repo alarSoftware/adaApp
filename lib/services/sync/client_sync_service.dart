@@ -187,9 +187,7 @@ class ClientSyncService {
         rucCi: rucCi,
         propietario: data['propietario']?.toString().trim() ?? '',
         condicionVenta: data['terminoPago']?.toString().trim(),
-        rutaDia:
-            data['rutaDia']?.toString().trim() ??
-            data['ruta_dia']?.toString().trim(),
+        rutaDia: data['diasVisita']?.toString().trim(),
       );
     } catch (e) {
       return null;

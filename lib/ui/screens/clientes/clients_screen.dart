@@ -206,7 +206,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
     final fechaFormateada = toBeginningOfSentenceCase(fechaHoy);
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: _buildReactiveAppBar(fechaString: fechaFormateada),
@@ -319,7 +319,10 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                   ),
                   child: TabBar(
                     onTap: (index) {
-                      final mode = index == 0 ? 'all' : 'registered_today';
+                      String mode = 'all';
+                      if (index == 0) mode = 'today_route';
+                      if (index == 1) mode = 'visited_today';
+                      // index 2 is 'all'
                       _viewModel.setFilterMode(mode);
                     },
                     indicator: BoxDecoration(
@@ -330,13 +333,14 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                     unselectedLabelColor: Colors.grey.shade600,
                     labelStyle: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontSize: 12, // Reduced font size to fit 3 tabs
                     ),
                     dividerColor: Colors.transparent,
                     indicatorSize: TabBarIndicatorSize.tab,
                     tabs: const [
+                      Tab(text: "Ruta de Hoy"),
+                      Tab(text: "Ya Visitados"),
                       Tab(text: "Todos"),
-                      Tab(text: "Registrados Hoy"),
                     ],
                   ),
                 ),
