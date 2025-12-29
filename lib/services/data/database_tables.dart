@@ -75,7 +75,8 @@ class DatabaseTables {
       direccion TEXT,
       ruc_ci TEXT,
       propietario TEXT,
-      condicion_venta TEXT
+      condicion_venta TEXT,
+      ruta_dia TEXT
     )
   ''';
 

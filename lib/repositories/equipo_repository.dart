@@ -288,7 +288,10 @@ class EquipoRepository extends BaseRepository<Equipo> {
              WHEN e.cliente_id IS NOT NULL AND e.cliente_id != '' AND e.cliente_id != '0' THEN 'Asignado'
              ELSE 'Disponible'
            END as estado_asignacion,
-           c.nombre as cliente_nombre
+           c.nombre as cliente_nombre,
+           (SELECT MAX(ca.fecha_creacion) 
+            FROM censo_activo ca 
+            WHERE ca.equipo_id = e.id) as ultima_fecha_censo
     FROM equipos e
     LEFT JOIN marcas m ON e.marca_id = m.id
     LEFT JOIN modelos mo ON e.modelo_id = mo.id
@@ -323,7 +326,10 @@ class EquipoRepository extends BaseRepository<Equipo> {
                WHEN e.cliente_id IS NOT NULL AND e.cliente_id != '' AND e.cliente_id != '0' THEN 'Asignado'
                ELSE 'Disponible'
              END as estado_asignacion,
-             c.nombre as cliente_nombre
+             c.nombre as cliente_nombre,
+             (SELECT MAX(ca.fecha_creacion) 
+              FROM censo_activo ca 
+              WHERE ca.equipo_id = e.id) as ultima_fecha_censo
       FROM equipos e
       LEFT JOIN marcas m ON e.marca_id = m.id
       LEFT JOIN modelos mo ON e.modelo_id = mo.id

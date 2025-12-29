@@ -420,11 +420,6 @@ class LoginScreenViewModel extends ChangeNotifier {
   /// 🛡️ Validar y solicitar permisos críticos antes de entrar a la app
   Future<void> checkAndRequestPermissions() async {
     try {
-      // 1. Notificaciones (Android 13+)
-      if (await Permission.notification.isDenied) {
-        await Permission.notification.request();
-      }
-
       // 2. Ubicación
       // Primero 'location' (precisa/coarse en uso)
       var locStatus = await Permission.location.status;

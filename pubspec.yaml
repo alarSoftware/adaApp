@@ -35,7 +35,7 @@ dependencies:
   permission_handler: ^11.0.0
   synchronized: ^3.1.0
   #workmanager: ^0.5.2
-  flutter_background_service: ^5.0.5
+
 
   # Para peticiones HTTP
   http: ^1.2.0

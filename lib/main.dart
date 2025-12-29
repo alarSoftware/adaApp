@@ -206,96 +206,65 @@ class _InitializationScreenState extends State<InitializationScreen> {
         });
       }
 
-      // 1. Verificar todos los permisos críticos
-      // Estado de Ubicación
+      // 1. Verificar/Solicitar Ubicación (Foreground)
+      // Esta es la que muestra la "ventanita nativa"
       var locStatus = await Permission.location.status;
-      // Estado de Ubicación Background (A veces requiere 'Always' explícito)
+
+      if (!locStatus.isGranted) {
+        // Intentamos mostrar la nativa
+        locStatus = await Permission.location.request();
+      }
+
+      // 2. Verificar Ubicación Background (Solo si tenemos la básica)
       var locAlwaysStatus = await Permission.locationAlways.status;
-      // Estado de Notificaciones (Android 13+)
-      var notifStatus = await Permission.notification.status;
-
-      // Criterio de aceptación:
-      // - Ubicación: Debe ser 'granted' (Foreground) Y, si es posible, 'Always' (Background).
-      //   Nota: En Android 11+ pedir 'Always' directamente puede fallar si no se tiene 'WhenInUse'.
-      // - Notificaciones: 'granted' (o no soportado en versiones viejas).
-
-      bool locationOk =
-          locStatus.isGranted || await Permission.location.request().isGranted;
-
-      // Si tenemos ubicación básica, intentamos background
-      if (locationOk) {
-        // En Android moderno, locationAlways suele requerir ir a settings
-        if (await Permission.locationAlways.isDenied) {
-          await Permission.locationAlways.request();
-          // Actualizamos status
-          locAlwaysStatus = await Permission.locationAlways.status;
-        }
+      if (locStatus.isGranted && !locAlwaysStatus.isGranted) {
+        // Intentar pedir background (en Android 11+ esto suele ir a settings o UI sistema)
+        locAlwaysStatus = await Permission.locationAlways.request();
+        // Re-verificar
+        locAlwaysStatus = await Permission.locationAlways.status;
       }
 
-      bool notifOk = true;
-      if (await Permission.notification.isDenied) {
-        if (await Permission.notification.request().isDenied) {
-          // Si es denegado permanentemente
-          if (await Permission.notification.isPermanentlyDenied) {
-            notifOk = false;
-          } else {
-            // Si solo fue denegado una vez, consideramos 'false' para volver a pedir o mostrar dialogo
-            notifOk = false;
-          }
-        }
-      }
-
-      // Re-verificar estados finales
-      locStatus = await Permission.location.status;
-      locAlwaysStatus = await Permission.locationAlways.status;
-      notifStatus = await Permission.notification.status;
-
-      // Validar si podemos continuar
-      // Nota: Somos estrictos con Location 'Always' por el requerimiento de background
       bool isLocationReady = locAlwaysStatus.isGranted || locStatus.isGranted;
-      // Idealmente queremos 'Always', pero algunos telefonos lo manejan distinto.
-      // SÍ forzamos que al menos tenga permiso de ubicación activo.
 
-      if (isLocationReady && notifOk) {
+      if (isLocationReady) {
         permissionsGranted = true;
       } else {
-        // BLOQUEO: Mostrar diálogo y esperar
         if (mounted) {
           final result = await showDialog<bool>(
             context: context,
             barrierDismissible: false,
             builder: (context) => AlertDialog(
-              title: const Text('Permisos Requeridos'),
+              title: const Text('Permiso Requerido'),
               content: const Text(
-                'Para funcionar correctamente, AdaApp necesita acceso OBLIGATORIO a:\n\n'
-                '📍 Ubicación: "Permitir todo el tiempo" (para el monitoreo en segundo plano).\n'
-                '🔔 Notificaciones: Para mantener el servicio activo.\n\n'
-                'Por favor, ve a Configuración y habilita estos permisos manualmente.',
+                'Esta aplicación requiere permisos de ubicación para funcionar.\n\n'
+                'Por favor, otorgue el permiso "Permitir todo el tiempo" en la configuración para un funcionamiento óptimo.\n'
+                'Si no logra avanzar, vaya a Configuración manualmente.',
               ),
               actions: [
                 TextButton(
                   onPressed: () {
                     openAppSettings();
-                    Navigator.of(context).pop(false); // Reintentar loop
+                    Navigator.of(context).pop(false);
                   },
-                  child: const Text('Abrir Configuración'),
+                  child: const Text('Ir a Configuración'),
                 ),
+
                 TextButton(
                   onPressed: () {
-                    Navigator.of(context).pop(true); // Solo reintentar check
+                    Navigator.of(
+                      context,
+                    ).pop(true); // Reintentar bucle -> .request()
                   },
-                  child: const Text('Ya los habilité'),
+                  child: const Text('Reintentar'),
                 ),
               ],
             ),
           );
 
-          // Esperar un momento para dar tiempo al usuario si fue a settings
           if (result == false) {
             await Future.delayed(const Duration(seconds: 1));
           }
         } else {
-          // Si no está montado, rompemos el loop para no quedar colgados (cierre de app)
           return;
         }
       }

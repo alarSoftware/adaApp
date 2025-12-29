@@ -7,6 +7,7 @@ class Cliente {
   final String rucCi;
   final String propietario;
   final String? condicionVenta;
+  final String? rutaDia;
   final bool tieneCensoHoy;
   final bool tieneFormularioCompleto;
   final bool tieneOperacionComercialHoy;
@@ -20,10 +21,10 @@ class Cliente {
     required this.rucCi,
     required this.propietario,
     this.condicionVenta,
+    this.rutaDia,
     this.tieneCensoHoy = false,
     this.tieneFormularioCompleto = false,
     this.tieneOperacionComercialHoy = false,
-
   });
 
   String get displayName {
@@ -36,9 +37,11 @@ class Cliente {
   bool get esCredito => condicionVenta?.toUpperCase().trim() == 'CRÉDITO';
   bool get esContado => condicionVenta?.toUpperCase().trim() == 'CONTADO';
 
-
   String get displayCondicionVenta {
-    if (condicionVenta == null || condicionVenta!.isEmpty || (condicionVenta?.toUpperCase() != 'CONTADO' && condicionVenta?.toUpperCase() != 'CRÉDITO')) {
+    if (condicionVenta == null ||
+        condicionVenta!.isEmpty ||
+        (condicionVenta?.toUpperCase() != 'CONTADO' &&
+            condicionVenta?.toUpperCase() != 'CRÉDITO')) {
       return 'No especificado';
     }
     return condicionVenta!.toUpperCase();
@@ -56,6 +59,7 @@ class Cliente {
       condicionVenta: _parseString(
         json['terminoPago'] ?? json['condicionVenta'],
       ),
+      rutaDia: _parseString(json['ruta_dia'] ?? json['rutaDia']),
       tieneCensoHoy:
           json['tiene_censo_hoy'] == 1 || json['tiene_censo_hoy'] == true,
       tieneFormularioCompleto:
@@ -84,6 +88,7 @@ class Cliente {
       rucCi: map['ruc_ci']?.toString() ?? '',
       propietario: map['propietario']?.toString() ?? '',
       condicionVenta: map['condicion_venta']?.toString(),
+      rutaDia: map['ruta_dia']?.toString(),
 
       tieneCensoHoy:
           map['tiene_censo_hoy'] == 1 || map['tiene_censo_hoy'] == true,
@@ -106,6 +111,7 @@ class Cliente {
       'ruc_ci': rucCi,
       'propietario': propietario,
       'condicion_venta': condicionVenta,
+      'ruta_dia': rutaDia,
     };
   }
 
@@ -121,6 +127,7 @@ class Cliente {
 
     if (id != null) json['id'] = id;
     if (condicionVenta != null) json['terminoPago'] = condicionVenta;
+    if (rutaDia != null) json['rutaDia'] = rutaDia;
     return json;
   }
 
@@ -133,6 +140,7 @@ class Cliente {
     String? rucCi,
     String? propietario,
     String? condicionVenta,
+    String? rutaDia,
     bool? tieneCensoHoy,
     bool? tieneFormularioCompleto,
     bool? tieneOperacionComercialHoy,
@@ -146,6 +154,7 @@ class Cliente {
       rucCi: rucCi ?? this.rucCi,
       propietario: propietario ?? this.propietario,
       condicionVenta: condicionVenta ?? this.condicionVenta,
+      rutaDia: rutaDia ?? this.rutaDia,
       tieneCensoHoy: tieneCensoHoy ?? this.tieneCensoHoy,
       tieneFormularioCompleto:
           tieneFormularioCompleto ?? this.tieneFormularioCompleto,
@@ -218,6 +227,7 @@ class Cliente {
           rucCi == other.rucCi &&
           propietario == other.propietario &&
           condicionVenta == other.condicionVenta &&
+          rutaDia == other.rutaDia &&
           tieneCensoHoy == other.tieneCensoHoy &&
           tieneFormularioCompleto == other.tieneFormularioCompleto &&
           tieneOperacionComercialHoy == other.tieneOperacionComercialHoy;
@@ -232,12 +242,13 @@ class Cliente {
       rucCi.hashCode ^
       propietario.hashCode ^
       condicionVenta.hashCode ^
+      rutaDia.hashCode ^
       tieneCensoHoy.hashCode ^
       tieneFormularioCompleto.hashCode ^
       tieneOperacionComercialHoy.hashCode;
 
   @override
   String toString() {
-    return 'Cliente{id: $id, nombre: $nombre, codigo: $codigo, tipo: $tipoDocumento, ruc_ci: $rucCi, condicion: $condicionVenta, censo: $tieneCensoHoy, form: $tieneFormularioCompleto, opCom: $tieneOperacionComercialHoy}';
+    return 'Cliente{id: $id, nombre: $nombre, codigo: $codigo, tipo: $tipoDocumento, ruc_ci: $rucCi, condicion: $condicionVenta, rutaDia: $rutaDia, censo: $tieneCensoHoy, form: $tieneFormularioCompleto, opCom: $tieneOperacionComercialHoy}';
   }
 }

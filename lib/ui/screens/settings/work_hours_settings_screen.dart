@@ -30,7 +30,9 @@ class _WorkHoursSettingsScreenState extends State<WorkHoursSettingsScreen> {
     setState(() {
       _startHour = BackgroundLogConfig.horaInicio;
       _endHour = BackgroundLogConfig.horaFin;
-      _intervalMinutes = BackgroundLogConfig.intervalo.inMinutes;
+      _intervalMinutes = BackgroundLogConfig.intervalo.inMinutes < 15
+          ? 15
+          : BackgroundLogConfig.intervalo.inMinutes;
       _isLoading = false;
     });
   }
@@ -161,9 +163,9 @@ class _WorkHoursSettingsScreenState extends State<WorkHoursSettingsScreen> {
                       SizedBox(height: 8),
                       Slider(
                         value: _intervalMinutes.toDouble(),
-                        min: 1,
+                        min: 15,
                         max: 60,
-                        divisions: 59,
+                        divisions: 45,
                         label: '$_intervalMinutes min',
                         activeColor: AppColors.primary,
                         onChanged: (value) {
@@ -173,7 +175,7 @@ class _WorkHoursSettingsScreenState extends State<WorkHoursSettingsScreen> {
                         },
                       ),
                       Text(
-                        'Frecuencia con la que se guardará la ubicación.',
+                        'Frecuencia con la que se guardará la ubicación. Mínimo 15 minutos por restricción de sistema.',
                         style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,

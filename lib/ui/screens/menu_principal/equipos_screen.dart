@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:ada_app/viewmodels/equipos_screen_viewmodel.dart';
 import 'package:ada_app/ui/theme/colors.dart';
+import 'package:intl/intl.dart';
 
 class EquipoListScreen extends StatefulWidget {
   const EquipoListScreen({super.key});
@@ -92,6 +93,11 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
                   'Estado Asignación',
                   _viewModel.getEstadoAsignacion(equipo),
                 ),
+                if (equipo['ultima_fecha_censo'] != null)
+                  _buildDetalleRow(
+                    'Último Censo',
+                    _formatDate(equipo['ultima_fecha_censo']),
+                  ),
                 if (equipo['cliente_nombre'] != null)
                   _buildDetalleRow('Asignado a', equipo['cliente_nombre']),
               ],
@@ -131,6 +137,15 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
         ],
       ),
     );
+  }
+
+  String _formatDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr); // SQLite devuelve ISO strings
+      return DateFormat('dd/MM/yyyy HH:mm').format(date);
+    } catch (e) {
+      return dateStr;
+    }
   }
 
   @override
@@ -367,43 +382,66 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
                 'Serie: ${equipo['numero_serie']}',
                 style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
               ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _viewModel.getEstadoColor(estadoAsignacion),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    estadoAsignacion,
-                    style: TextStyle(
-                      color: AppColors.onPrimary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
+
+            if (equipo['ultima_fecha_censo'] != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2.0),
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: 'Último Censo: ',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                      TextSpan(
+                        text: _formatDate(equipo['ultima_fecha_censo']),
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                if (clienteNombre != null) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      'Cliente: $clienteNombre',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 11,
-                        fontStyle: FontStyle.italic,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ],
+              ),
+
+            const SizedBox(height: 8),
+
+            // Cliente (Línea propia)
+            if (clienteNombre != null) ...[
+              Text(
+                'Cliente: $clienteNombre',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+            ],
+
+            // Estado (Badge propio)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: _viewModel.getEstadoColor(estadoAsignacion),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                estadoAsignacion,
+                style: TextStyle(
+                  color: AppColors.onPrimary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         ),

@@ -1,6 +1,4 @@
 import 'package:ada_app/services/device_log/device_log_background_extension.dart';
-import 'package:ada_app/services/background/app_background_service.dart';
-import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:ada_app/services/dynamic_form/dynamic_form_upload_service.dart';
 import 'package:ada_app/services/device_log/device_log_upload_service.dart';
 import 'package:ada_app/services/api/auth_service.dart';
@@ -30,7 +28,7 @@ class AppServices {
       _isUserLoggedIn = true;
 
       // 3. Inicializar device logging (Background Service)
-      await AppBackgroundService.initialize();
+      await DeviceLogBackgroundExtension.inicializar();
 
       // 1. Obtener información del usuario
       final usuario = await _obtenerUsuarioActual();
@@ -65,7 +63,7 @@ class AppServices {
         return;
       }
 
-      await AppBackgroundService.initialize();
+      await DeviceLogBackgroundExtension.inicializar();
       _logger.i(
         'Background Service iniciado exitosamente después de sincronización',
       );
@@ -116,10 +114,7 @@ class AppServices {
       _isUserLoggedIn = false;
 
       // 1. Detener device logging (Service)
-      final service = FlutterBackgroundService();
-      if (await service.isRunning()) {
-        service.invoke("stopService");
-      }
+      await DeviceLogBackgroundExtension.detener();
 
       // 2. Detener sincronizaciones automáticas
       await _detenerSincronizacionesAutomaticas();
@@ -162,7 +157,7 @@ class AppServices {
 
       if (_isUserLoggedIn) {
         // Inicializar background service si el usuario ya tiene sesión
-        await AppBackgroundService.initialize();
+        await DeviceLogBackgroundExtension.inicializar();
         _logger.i('Servicios básicos y background service inicializados');
       } else {
         _logger.i('Usuario no logueado - servicios no iniciados');

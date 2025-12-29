@@ -63,13 +63,7 @@
             </intent-filter>
         </activity>
 
-        <!-- SERVICIO PARA FLUTTER BACKGROUND SERVICE -->
-        <service
-            android:name="id.flutter.flutter_background_service.BackgroundService"
-            android:foregroundServiceType="location|dataSync"
-            android:enabled="true"
-            android:exported="true"
-            android:permission="android.permission.FOREGROUND_SERVICE"/>
+
 
         <!-- CONFIGURACIÓN MÍNIMA PARA WORKMANAGER -->
         <provider
