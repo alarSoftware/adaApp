@@ -23,7 +23,7 @@ class DeviceLog {
   Map<String, dynamic> toMap() {
     return {
       'uuid': id,
-      'emplyedId': employeeId,
+      'employeeId': employeeId,
       'latitudLongitud': latitudLongitud,
       'bateria': bateria,
       'modelo': modelo,

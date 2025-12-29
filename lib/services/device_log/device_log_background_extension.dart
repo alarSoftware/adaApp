@@ -1,4 +1,3 @@
-// lib/services/device_log/device_log_background_extension.dart
 import 'dart:async';
 import 'dart:math';
 import 'package:permission_handler/permission_handler.dart';
@@ -13,11 +12,9 @@ import 'package:logger/logger.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-//  CONFIGURACIÓN CENTRALIZADA
 class BackgroundLogConfig {
-  ///  HORARIO DE TRABAJO (Dinámico)
-  static int horaInicio = 9; // Default 9 AM
-  static int horaFin = 17; // Default 5 PM
+  static int horaInicio = 9;
+  static int horaFin = 17;
 
   /// Keys para SharedPreferences
   static const String keyHoraInicio = 'work_hours_start';
@@ -25,41 +22,29 @@ class BackgroundLogConfig {
   static const String keyIntervalo = 'work_interval_minutes';
 
   ///  INTERVALO ENTRE REGISTROS (Dinámico)
-  static Duration intervalo = Duration(minutes: 5); // Default 5 min
+  static Duration intervalo = Duration(minutes: 5);
 
   /// NÚMERO MÁXIMO DE REINTENTOS
   static const int maxReintentos = 5;
-
-  /// TIEMPOS DE ESPERA PARA BACKOFF EXPONENCIAL (en segundos)
-  /// Progresión: 5s, 10s, 20s, 40s, 60s
   static const List<int> tiemposBackoff = [5, 10, 20, 40, 60];
 
-  /// Obtener tiempo de espera según el número de intento (1-based)
   static int obtenerTiempoEspera(int numeroIntento) {
-    // numeroIntento empieza en 1, pero el array en 0
     final index = numeroIntento - 1;
-
-    // Validar que el índice esté dentro del rango
     if (index >= 0 && index < tiemposBackoff.length) {
       return tiemposBackoff[index];
     }
-
-    // Si se excede, usar el último valor (mayor tiempo de espera)
     return tiemposBackoff.last;
   }
 
-  ///  MINUTOS MÍNIMOS ENTRE LOGS (prevenir duplicados)
   static int get minutosMinimosEntreLogs => max(1, intervalo.inMinutes);
 }
 
-/// - CON PROTECCIÓN ANTI-DUPLICADOS Y LOCK DE CONCURRENCIA
 class DeviceLogBackgroundExtension {
   static final _logger = Logger();
   static Timer? _backgroundTimer;
   static bool _isInitialized = false;
   static bool _isExecuting = false;
 
-  /// 🆕 Verificar si hay una sesión activa antes de proceder
   static Future<bool> _verificarSesionActiva() async {
     try {
       final authService = AuthService();
@@ -79,7 +64,6 @@ class DeviceLogBackgroundExtension {
   }
 
   /// Inicializar servicio de logging en background
-  /// 🆕 SOLO INICIA CON SESIÓN ACTIVA
   static Future<void> inicializar({bool verificarSesion = true}) async {
     try {
       // Detener timer previo si existe
@@ -114,6 +98,8 @@ class DeviceLogBackgroundExtension {
   static Future<void> cargarConfiguracionHorario() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs
+          .reload(); // 🔴 FORZAR RECARGA DESDE DISCO para ver cambios de UI
       BackgroundLogConfig.horaInicio =
           prefs.getInt(BackgroundLogConfig.keyHoraInicio) ?? 9;
       BackgroundLogConfig.horaFin =
@@ -177,16 +163,13 @@ class DeviceLogBackgroundExtension {
   /// Ejecutar logging con verificación de horario y sesión
   static Future<void> ejecutarLoggingConHorario() async {
     try {
-      // Recargar configuración en cada ejecución
-      // Esto es necesario porque el servicio corre en un Isolate separado
       await cargarConfiguracionHorario();
 
       // Verificar sesión antes de cada ejecución
       if (!await _verificarSesionActiva()) {
-        return; // Ya se maneja el stop dentro de _verificarSesionActiva
+        return;
       }
 
-      // Verificar si estamos en horario laboral
       if (!estaEnHorarioTrabajo()) {
         _logger.i(
           'Fuera del horario de trabajo (${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00)',
@@ -211,13 +194,10 @@ class DeviceLogBackgroundExtension {
     _isExecuting = true;
 
     try {
-      // 1. Verificar sesión al inicio del proceso
       if (!await _verificarSesionActiva()) {
         _logger.w('LOGGING SKIPPED: No hay sesión activa');
-        return; // Ya se maneja el stop dentro de _verificarSesionActiva
+        return;
       }
-
-      // 2. Verificar permisos de ubicación
       final hasPermission = await Permission.location.isGranted;
       if (!hasPermission) {
         final hasAlways = await Permission.locationAlways.isGranted;
@@ -229,21 +209,10 @@ class DeviceLogBackgroundExtension {
         _logger.i('Permisos de ubicación OK');
       }
 
-      // 3. Crear log usando helper compartido (CON TOLERANCIA)
-      // Usamos una tolerancia del 80% del intervalo para evitar duplicados erroneos
-      // pero permitir logs legítimos con ligera variación de tiempo.
-
       final db = await DatabaseHelper().database;
       final repository = DeviceLogRepository(db);
-
-      // Obtener vendedor actual (puede ser null en algunas situaciones)
       final logInfo = await DeviceInfoHelper.crearDeviceLog();
       final vendedorId = logInfo?.employeeId;
-
-      // CALCULAR TOLERANCIA (50% del intervalo configurado)
-      // Reducido a 50% para evitar saltar logs legítimos si el timer se adelanta un poco.
-      // Ejemplo: Intervalo 60s -> Tolerancia 30s.
-      // Bloquea duplicados rápidos, pero permite logs con variación normal.
       final intervaloSegundos = BackgroundLogConfig.intervalo.inSeconds;
       final toleranciaSegundos = (intervaloSegundos * 0.5).round();
 
@@ -466,7 +435,6 @@ class DeviceLogBackgroundExtension {
     };
   }
 
-  /// Mostrar configuración completa
   static Future<void> mostrarConfiguracion() async {
     final estado = await obtenerEstado();
 
@@ -475,7 +443,6 @@ class DeviceLogBackgroundExtension {
     );
   }
 
-  /// 📅 Obtener nombre del día de la semana
   static String _obtenerNombreDia(int weekday) {
     const dias = {
       1: 'Lunes',
@@ -487,43 +454,5 @@ class DeviceLogBackgroundExtension {
       7: 'Domingo',
     };
     return dias[weekday] ?? 'Desconocido';
-  }
-
-  /// 📈 Obtener estadísticas de uso
-  static Future<Map<String, dynamic>> obtenerEstadisticas() async {
-    try {
-      final db = await DatabaseHelper().database;
-      final repository = DeviceLogRepository(db);
-
-      final stats = await repository.obtenerEstadisticas();
-
-      return {
-        'total_logs': stats['total'] ?? 0,
-        'logs_sincronizados': stats['sincronizados'] ?? 0,
-        'logs_pendientes': stats['pendientes'] ?? 0,
-        'porcentaje_sincronizado': stats['total'] > 0
-            ? ((stats['sincronizados'] / stats['total']) * 100).toStringAsFixed(
-                1,
-              )
-            : '0.0',
-      };
-    } catch (e) {
-      _logger.e('Error obteniendo estadísticas: $e');
-      return {
-        'total_logs': 0,
-        'logs_sincronizados': 0,
-        'logs_pendientes': 0,
-        'porcentaje_sincronizado': '0.0',
-      };
-    }
-  }
-
-  /// Mostrar estadísticas completas
-  static Future<void> mostrarEstadisticas() async {
-    final stats = await obtenerEstadisticas();
-
-    _logger.i(
-      'Stats: Total=${stats['total_logs']}, Synced=${stats['logs_sincronizados']}, Pending=${stats['logs_pendientes']}',
-    );
   }
 }
