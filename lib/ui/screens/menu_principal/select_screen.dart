@@ -132,6 +132,103 @@ class _SelectScreenState extends State<SelectScreen> {
         );
       }
     }
+
+    // 🕵️‍♂️ NUEVO: Verificar ubicación simulada
+    await _checkFakeGps();
+  }
+
+  Future<void> _checkFakeGps() async {
+    try {
+      final isMocked = await LocationService().checkForMockLocation();
+      if (isMocked) {
+        if (mounted) {
+          _mostrarDialogoFakeLocation();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking fake GPS: $e');
+    }
+  }
+
+  Future<void> _mostrarDialogoFakeLocation() async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // NO SE PUEDE CERRAR TOCANDO AFUERA
+      builder: (BuildContext context) {
+        return PopScope(
+          canPop: false, // NO SE PUEDE CERRAR CON BACK BUTTON
+          child: AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: Row(
+              children: [
+                Icon(Icons.location_off, color: AppColors.error, size: 28),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Ubicación Simulada Detectada',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.error.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Text(
+                    'Se ha detectado el uso de una aplicación para simular la ubicación (Fake GPS).',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Por motivos de seguridad y control, no es posible utilizar la aplicación con ubicaciones falsas.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Por favor, desactiva cualquier aplicación de ubicación falsa y vuelve a intentar.',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  // Reintentar verificación
+                  await _checkFakeGps();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                child: Text('Reintentar'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _checkNotificationPermissions() async {
