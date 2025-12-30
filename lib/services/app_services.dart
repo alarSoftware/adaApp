@@ -1,4 +1,5 @@
 import 'package:ada_app/services/device_log/device_log_background_extension.dart';
+import 'package:ada_app/services/background/app_background_service.dart';
 import 'package:ada_app/services/dynamic_form/dynamic_form_upload_service.dart';
 import 'package:ada_app/services/device_log/device_log_upload_service.dart';
 import 'package:ada_app/services/api/auth_service.dart';
@@ -27,14 +28,9 @@ class AppServices {
 
       _isUserLoggedIn = true;
 
-      // 3. Inicializar device logging (Background Service)
-      await DeviceLogBackgroundExtension.inicializar();
+      await AppBackgroundService.initialize();
 
-      // 4. Forzar primer log inmediato (Registro de inicio de jornada)
-      _logger.i('Forzando primer log de dispositivo inmediato...');
-      await DeviceLogBackgroundExtension.ejecutarManual();
 
-      // 1. Obtener información del usuario
       final usuario = await _obtenerUsuarioActual();
 
       if (usuario != null) {
@@ -67,11 +63,8 @@ class AppServices {
         return;
       }
 
-      await DeviceLogBackgroundExtension.inicializar();
+      await AppBackgroundService.initialize();
 
-      // Forzar log inmediato también aquí
-      _logger.i('Forzando primer log inmediato tras sync...');
-      await DeviceLogBackgroundExtension.ejecutarManual();
 
       _logger.i(
         'Background Service iniciado exitosamente después de sincronización',
@@ -87,13 +80,6 @@ class AppServices {
       _logger.i(
         'Iniciando sincronizaciones automáticas (SIN device logging)...',
       );
-
-      // Sincronización de Censos (cada 1 minuto)
-      // if (usuario.id != null) {
-      //   CensoUploadService.iniciarSincronizacionAutomatica(usuario.id!);
-      //   _logger.i('  Censos: cada 1 minuto');
-      // }
-
       // Sincronización de Formularios Dinámicos (cada 2 minutos)
       if (usuario.employeeId != null && usuario.employeeId!.isNotEmpty) {
         // DynamicFormUploadService.iniciarSincronizacionAutomatica(usuario.employeeId!);
@@ -123,7 +109,7 @@ class AppServices {
       _isUserLoggedIn = false;
 
       // 1. Detener device logging (Service)
-      await DeviceLogBackgroundExtension.detener();
+      await AppBackgroundService.stopService();
 
       // 2. Detener sincronizaciones automáticas
       await _detenerSincronizacionesAutomaticas();
@@ -166,13 +152,8 @@ class AppServices {
 
       if (_isUserLoggedIn) {
         // Inicializar background service si el usuario ya tiene sesión
-        await DeviceLogBackgroundExtension.inicializar();
+        await AppBackgroundService.initialize();
 
-        // Forzar log inmediato (Auto-login)
-        _logger.i(
-          'Forzando primer log de dispositivo inmediato (Auto-login)...',
-        );
-        await DeviceLogBackgroundExtension.ejecutarManual();
 
         _logger.i('Servicios básicos y background service inicializados');
       } else {
@@ -196,8 +177,6 @@ class AppServices {
         return;
       }
 
-      await DeviceLogBackgroundExtension.ejecutarManual();
-      _logger.i('Logging manual ejecutado');
     } catch (e) {
       _logger.e('Error en logging manual: $e');
     }

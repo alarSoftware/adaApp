@@ -222,6 +222,14 @@ class _InitializationScreenState extends State<InitializationScreen> {
         locAlwaysStatus = await Permission.locationAlways.request();
         // Re-verificar
         locAlwaysStatus = await Permission.locationAlways.status;
+        locAlwaysStatus = await Permission.locationAlways.status;
+      }
+
+      // 3. Verificar Notificaciones (Android 13+)
+      // Necesario para Foreground Service
+      var notifStatus = await Permission.notification.status;
+      if (notifStatus.isDenied) {
+        notifStatus = await Permission.notification.request();
       }
 
       bool isLocationReady = locAlwaysStatus.isGranted || locStatus.isGranted;

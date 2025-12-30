@@ -63,20 +63,17 @@
             </intent-filter>
         </activity>
 
+        <!-- SERVICIO PARA FLUTTER BACKGROUND SERVICE -->
+        <service
+            android:name="id.flutter.flutter_background_service.BackgroundService"
+            android:foregroundServiceType="location|dataSync"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.FOREGROUND_SERVICE"/>
 
 
-        <!-- CONFIGURACIÓN MÍNIMA PARA WORKMANAGER -->
-        <provider
-            android:name="androidx.startup.InitializationProvider"
-            android:authorities="${applicationId}.androidx-startup"
-            android:exported="false"
-            tools:node="merge"
-            xmlns:tools="http://schemas.android.com/tools">
-            <meta-data
-                android:name="androidx.work.WorkManagerInitializer"
-                android:value="androidx.startup"
-                tools:node="remove" />
-        </provider>
+
+
 
         <meta-data
             android:name="flutterEmbedding"

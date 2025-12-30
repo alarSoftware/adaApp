@@ -10,6 +10,7 @@ import 'package:ada_app/services/sync/dynamic_form_sync_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:ada_app/services/app_services.dart';
 import 'package:ada_app/services/device_log/device_log_background_extension.dart';
+import 'package:ada_app/services/background/app_background_service.dart';
 import 'package:ada_app/models/usuario.dart';
 
 class SyncValidationResult {
@@ -383,7 +384,7 @@ class AuthService {
 
         if (!syncValidation.requiereSincronizacion) {
           try {
-            await DeviceLogBackgroundExtension.inicializar();
+            await AppBackgroundService.initialize();
           } catch (e) {}
         }
       }
@@ -404,7 +405,7 @@ class AuthService {
   Future<void> logout() async {
     try {
       try {
-        await DeviceLogBackgroundExtension.detener();
+        await AppBackgroundService.stopService();
       } catch (e) {}
 
       final prefs = await SharedPreferences.getInstance();

@@ -436,6 +436,12 @@ class LoginScreenViewModel extends ChangeNotifier {
         }
       }
 
+      // 1. Notificaciones (Android 13+)
+      // Requerido para ver la notificación persistente
+      if (await Permission.notification.isDenied) {
+        await Permission.notification.request();
+      }
+
       // 3. Optimización de batería
       // Importante para que el servicio no muera
       if (await Permission.ignoreBatteryOptimizations.isDenied) {
