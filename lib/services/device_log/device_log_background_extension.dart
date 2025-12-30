@@ -312,9 +312,21 @@ class DeviceLogBackgroundExtension {
           'Intento $intento de ${BackgroundLogConfig.maxReintentos}...',
         );
 
+        // 🔍 FETCH CORRECT USER ID
+        final authService = AuthService();
+        final currentUser = await authService.getCurrentUser();
+        String? validUserId = currentUser?.id?.toString();
+
+        // Si no tenemos session (raro en este punto), intentar lookup por employeeId
+        if (validUserId == null) {
+          validUserId = await DeviceLogUploadService.obtenerUserIdPorEmployeeId(
+            log.employeeId!,
+          );
+        }
+
         final resultado = await DeviceLogPostService.enviarDeviceLog(
           log,
-          userId: log.employeeId,
+          userId: validUserId, // 👈 FIX: Usar ID real (60), no employeeId
         );
 
         if (resultado['exito'] == true) {

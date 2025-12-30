@@ -66,8 +66,8 @@ class UserSyncService {
           }
 
           return {
+            'id': usuarioId, // 👈 FIX: Asignar ID explícitamente a la PK
             'employee_id': usuario['employeeId']?.toString(),
-            // 👇 NUEVA LÍNEA AGREGADA:
             'edfVendedorNombre': usuario['edfVendedorNombre']?.toString(),
             'code': usuarioId,
             'username': usuario['username'],

@@ -12,17 +12,27 @@ class DeviceLogPostService {
 
   /// Enviar un device log individual
   static Future<Map<String, dynamic>> enviarDeviceLog(
-    DeviceLog log, {
-    String? userId,
-  }) async {
+      DeviceLog log, {
+        String? userId,
+      }) async {
     try {
       final fullUrl = await ApiConfigService.getFullUrl(_endpoint);
       _logger.i('Enviando device log a: $fullUrl');
       _logger.i('Log ID: ${log.id}');
 
-      // Agregar userId al cuerpo del request
+      // ✅ Crear body desde el log
       final Map<String, dynamic> bodyConUserId = Map.from(log.toMap());
-      bodyConUserId['userId'] = userId ?? log.employeeId;
+
+      // ✅ Establecer userId (puede ser null)
+      bodyConUserId['userId'] = userId;
+
+      // 🔥 CRÍTICO: Eliminar employeeId para evitar que se envíe
+      bodyConUserId.remove('employeeId');
+
+      // 🔍 DEBUG
+      _logger.i('📤 Datos a enviar:');
+      _logger.i('   userId: $userId');
+      _logger.i('   employeeId removido: ${!bodyConUserId.containsKey('employeeId')}');
 
       final resultado = await BasePostService.post(
         endpoint: _endpoint,
@@ -32,23 +42,23 @@ class DeviceLogPostService {
       );
 
       if (resultado['exito'] == true) {
-        _logger.i('Device log enviado: ${log.id}');
+        _logger.i('✅ Device log enviado: ${log.id}');
       } else {
-        _logger.w('Error enviando device log: ${resultado['mensaje']}');
+        _logger.w('❌ Error enviando device log: ${resultado['mensaje']}');
       }
 
       return resultado;
     } catch (e) {
-      _logger.e('Error en enviarDeviceLog: $e');
+      _logger.e('💥 Error en enviarDeviceLog: $e');
       return {'exito': false, 'success': false, 'mensaje': 'Error: $e'};
     }
   }
 
   /// Enviar múltiples device logs en batch
   static Future<Map<String, int>> enviarDeviceLogsBatch(
-    List<DeviceLog> logs, {
-    String? userId,
-  }) async {
+      List<DeviceLog> logs, {
+        String? userId,
+      }) async {
     int exitosos = 0;
     int fallidos = 0;
 
@@ -56,6 +66,7 @@ class DeviceLogPostService {
 
     final fullUrl = await ApiConfigService.getFullUrl(_endpoint);
     _logger.i('URL destino: $fullUrl');
+    _logger.i('userId para batch: $userId');
 
     for (final log in logs) {
       try {
