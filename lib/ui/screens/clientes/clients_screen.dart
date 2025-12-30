@@ -317,31 +317,38 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                     color: Colors.grey.shade200,
                     borderRadius: BorderRadius.circular(25),
                   ),
-                  child: TabBar(
-                    onTap: (index) {
-                      String mode = 'all';
-                      if (index == 0) mode = 'today_route';
-                      if (index == 1) mode = 'visited_today';
-                      // index 2 is 'all'
-                      _viewModel.setFilterMode(mode);
+                  child: ListenableBuilder(
+                    listenable: _viewModel,
+                    builder: (context, _) {
+                      final state = _viewModel.state;
+                      return TabBar(
+                        onTap: (index) {
+                          String mode = 'all';
+                          if (index == 0) mode = 'today_route';
+                          if (index == 1) mode = 'visited_today';
+                          // index 2 is 'all'
+                          _viewModel.setFilterMode(mode);
+                        },
+                        indicator: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        labelColor: Colors.white,
+                        unselectedLabelColor: Colors.grey.shade600,
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                        labelStyle: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                        dividerColor: Colors.transparent,
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        tabs: [
+                          Tab(text: "De Hoy (${state.countTodayRoute})"),
+                          Tab(text: "Visitados (${state.countVisitedToday})"),
+                          Tab(text: "Todos (${state.countAll})"),
+                        ],
+                      );
                     },
-                    indicator: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                    labelColor: Colors.white,
-                    unselectedLabelColor: Colors.grey.shade600,
-                    labelStyle: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12, // Reduced font size to fit 3 tabs
-                    ),
-                    dividerColor: Colors.transparent,
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    tabs: const [
-                      Tab(text: "Ruta de Hoy"),
-                      Tab(text: "Ya Visitados"),
-                      Tab(text: "Todos"),
-                    ],
                   ),
                 ),
                 Expanded(

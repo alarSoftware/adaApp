@@ -16,6 +16,7 @@ import 'package:sqflite/sqflite.dart';
 import '../data/database_helper.dart';
 import 'package:ada_app/services/censo/censo_upload_service.dart';
 import 'package:ada_app/services/api/auth_service.dart';
+import 'package:ada_app/services/device_log/device_log_upload_service.dart'; // 🆕 AGREGAR
 
 class SyncService {
   static final _clienteRepo = ClienteRepository();
@@ -145,6 +146,29 @@ class SyncService {
             'Error: No se pudo obtener información del usuario. $e';
         return resultado;
       }
+
+      // ==================== DEVICE LOGS (Upload & Clean) - START ====================
+      try {
+        onProgress?.call(
+          0.02,
+          'Limpiando logs del dispositivo...',
+        ); // Changed message
+        // (REMOVED) Subir pendientes - User requested removal to avoid log generation loop
+        // await DeviceLogUploadService.sincronizarDeviceLogsPendientes();
+
+        // 2. Limpiar sincronizados (0 días = borrar todo lo enviado)
+        await DeviceLogUploadService.limpiarLogsSincronizadosAntiguos(
+          diasAntiguos: 0,
+        );
+      } catch (e) {
+        await ErrorLogService.logError(
+          tableName: 'device_log',
+          operation: 'sync_general_cleanup',
+          errorMessage: 'Error processing device logs in general sync: $e',
+          errorType: 'cleanup',
+        );
+      }
+      // ==============================================================================
 
       // 1. Intentar subir censos pendientes (REINTENTO)
       try {
@@ -369,6 +393,24 @@ class SyncService {
         resultado.erroresOperacionesComerciales =
             'Error al sincronizar operaciones comerciales: $e';
         resultado.operacionesComercialesSincronizadas = 0;
+      }
+
+      // ==================== DEVICE LOGS (Upload & Clean) ====================
+      try {
+        onProgress?.call(0.90, 'Procesando logs del dispositivo...');
+        // 1. Subir pendientes
+        await DeviceLogUploadService.sincronizarDeviceLogsPendientes();
+        // 2. Limpiar sincronizados (0 días = borrar todo lo enviado)
+        await DeviceLogUploadService.limpiarLogsSincronizadosAntiguos(
+          diasAntiguos: 0,
+        );
+      } catch (e) {
+        await ErrorLogService.logError(
+          tableName: 'device_log',
+          operation: 'sync_general_cleanup',
+          errorMessage: 'Error processing device logs in general sync: $e',
+          errorType: 'cleanup',
+        );
       }
 
       final exitosos = [

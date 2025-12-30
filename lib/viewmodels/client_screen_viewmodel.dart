@@ -25,7 +25,10 @@ class ClienteListState {
   final int currentPage;
   final int totalCount;
   final String? error;
-  final String? filterMode; // 'all' or 'registered_today'
+  final String? filterMode;
+  final int countTodayRoute;
+  final int countVisitedToday;
+  final int countAll;
 
   ClienteListState({
     this.isLoading = false,
@@ -37,6 +40,9 @@ class ClienteListState {
     this.totalCount = 0,
     this.error,
     this.filterMode = 'all',
+    this.countTodayRoute = 0,
+    this.countVisitedToday = 0,
+    this.countAll = 0,
   });
 
   ClienteListState copyWith({
@@ -51,6 +57,9 @@ class ClienteListState {
     int? totalCount,
     String? error,
     String? filterMode,
+    int? countTodayRoute,
+    int? countVisitedToday,
+    int? countAll,
   }) {
     return ClienteListState(
       isLoading: isLoading ?? this.isLoading,
@@ -62,6 +71,9 @@ class ClienteListState {
       totalCount: totalCount ?? this.totalCount,
       error: error ?? this.error,
       filterMode: filterMode ?? this.filterMode,
+      countTodayRoute: countTodayRoute ?? this.countTodayRoute,
+      countVisitedToday: countVisitedToday ?? this.countVisitedToday,
+      countAll: countAll ?? this.countAll,
     );
   }
 }
@@ -179,6 +191,31 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     }
   }
 
+  void _calculateCount() {
+    final now = DateTime.now();
+    final diaHoy = DateFormat('EEEE', 'es').format(now).toLowerCase().trim();
+
+    final rutaHoyCount = _allClientes.where((c) {
+      if (c.rutaDia == null || c.rutaDia!.isEmpty) return false;
+      return c.rutaDia!.toLowerCase().contains(diaHoy);
+    }).length;
+
+    final visitadosCount = _allClientes.where((c) {
+      return c.tieneCensoHoy ||
+          c.tieneOperacionComercialHoy ||
+          c.tieneFormularioCompleto;
+    }).length;
+
+    final totalCount = _allClientes.length;
+
+    _state = _state.copyWith(
+      countTodayRoute: rutaHoyCount,
+      countVisitedToday: visitadosCount,
+      countAll: totalCount,
+    );
+    notifyListeners();
+  }
+
   Future<void> loadClientes() async {
     _updateState(
       _state.copyWith(
@@ -195,6 +232,8 @@ class ClienteListScreenViewModel extends ChangeNotifier {
 
       _allClientes = clientesDB;
       _filteredClientes = clientesDB;
+
+      _calculateCount();
 
       // Si hay un query pendiente (ej: recharge), aplicar filtro
       if (_state.searchQuery.isNotEmpty) {

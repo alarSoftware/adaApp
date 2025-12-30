@@ -4,6 +4,7 @@ import 'package:logger/logger.dart';
 import 'package:ada_app/repositories/device_log_repository.dart';
 import 'package:ada_app/services/post/device_log_post_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
+import 'package:ada_app/services/api/auth_service.dart'; // 🆕 AGREGAR
 import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:ada_app/services/api/api_config_service.dart'; // 🆕 AGREGAR
@@ -40,10 +41,20 @@ class DeviceLogUploadService {
 
       for (final log in logsPendientes) {
         try {
+          // 🕵️‍♂️ Obtener usuario actual para userId
+          final currentUser = await AuthService().getCurrentUser();
+          final userIdFromAuth = currentUser?.id?.toString();
+
+          logger.i('🔍 Debug UserId:');
+          logger.i('   currentUser: ${currentUser?.username}');
+          logger.i('   currentUser.id: ${currentUser?.id}');
+          logger.i('   log.employeeId: ${log.employeeId}');
+          logger.i('   userId a enviar: ${userIdFromAuth ?? log.employeeId}');
+
           // ✅ Usar el servicio unificado con logging automático
           final resultado = await DeviceLogPostService.enviarDeviceLog(
             log,
-            userId: log.employeeId,
+            userId: userIdFromAuth ?? log.employeeId,
           );
 
           if (resultado['exito'] == true) {
@@ -56,7 +67,6 @@ class DeviceLogUploadService {
           }
         } catch (e) {
           logger.e('❌ Error enviando ${log.id}: $e');
-
 
           fallidos++;
         }
@@ -99,8 +109,11 @@ class DeviceLogUploadService {
       logger.i('📤 Enviando batch de ${logs.length} device logs...');
       logger.i('🌐 URL destino: $urlCompleta');
 
-      // Obtener userId del primer log (asumiendo que todos son del mismo usuario)
-      final userId = logs.isNotEmpty ? logs.first.employeeId : null;
+      // Obtener userId del usuario actual (User.id)
+      final currentUser = await AuthService().getCurrentUser();
+      final userId =
+          currentUser?.id?.toString() ??
+          (logs.isNotEmpty ? logs.first.employeeId : null);
 
       // ✅ Usar el servicio unificado
       final resultado = await DeviceLogPostService.enviarDeviceLogsBatch(
