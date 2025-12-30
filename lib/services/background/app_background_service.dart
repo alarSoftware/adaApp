@@ -17,7 +17,7 @@ void onStart(ServiceInstance service) async {
   final Logger logger = Logger();
   logger.i('Background Service: onStart ejecutado');
 
-  // Configuración de Notificación Persistente (Custom)
+  // Configuración de Notificación Persistente
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
@@ -38,11 +38,27 @@ void onStart(ServiceInstance service) async {
     playSound: false,
   );
 
+  // Canal de Alerta para GPS Desactivado (Alta Importancia)
+  const AndroidNotificationChannel gpsChannel = AndroidNotificationChannel(
+    'ada_gps_alert_v2', // CHANGED ID to force update
+    'Alerta de GPS',
+    description: 'Notificaciones críticas de estado de GPS',
+    importance: Importance.max, // MAX importance for Heads-Up
+    playSound: true,
+    enableVibration: true,
+  );
+
   await flutterLocalNotificationsPlugin
       .resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin
       >()
       ?.createNotificationChannel(channel);
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >()
+      ?.createNotificationChannel(gpsChannel);
 
   if (service is AndroidServiceInstance) {
     service.on('setAsForeground').listen((event) {
@@ -64,10 +80,43 @@ void onStart(ServiceInstance service) async {
     await DeviceLogBackgroundExtension.cargarConfiguracionHorario();
   });
 
+  // Helper callback para notificación unificada
+  void showGpsNotification() {
+    logger.w('CALLBACK: Disparando alerta de GPS desactivado');
+    flutterLocalNotificationsPlugin.show(
+      999,
+      '⚠️ GPS Desactivado',
+      'Activa la ubicación para que la app funcione correctamente.',
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          gpsChannel.id,
+          gpsChannel.name,
+          channelDescription: gpsChannel.description,
+          icon: '@mipmap/ic_launcher',
+          importance: Importance.max,
+          priority: Priority.max,
+          playSound: true,
+          enableVibration: true,
+          onlyAlertOnce: false,
+          category: AndroidNotificationCategory.alarm,
+          visibility: NotificationVisibility.public,
+        ),
+      ),
+    );
+  }
+
+  // Listen for GPS Alert trigger (Legacy/Backup)
+  service.on('showGpsAlert').listen((event) {
+    showGpsNotification();
+  });
+
   await Future.delayed(const Duration(seconds: 2));
 
-  // Inicializar lógica de logs
-  await DeviceLogBackgroundExtension.inicializar(verificarSesion: true);
+  await DeviceLogBackgroundExtension.inicializar(
+    verificarSesion: true,
+    serviceInstance: service,
+    onGpsAlert: showGpsNotification,
+  );
 
   // Watchdog & Notification Update Loop
   Timer.periodic(const Duration(seconds: 30), (timer) async {
@@ -100,7 +149,11 @@ void onStart(ServiceInstance service) async {
       // Check Watchdog
       if (!DeviceLogBackgroundExtension.estaActivo) {
         logger.w('Watchdog: Timer de logs inactivo. Reinicializando...');
-        await DeviceLogBackgroundExtension.inicializar(verificarSesion: true);
+        await DeviceLogBackgroundExtension.inicializar(
+          verificarSesion: true,
+          serviceInstance: service,
+          onGpsAlert: showGpsNotification,
+        );
       }
     } catch (e) {
       logger.e("Error en ciclo principal de background: $e");

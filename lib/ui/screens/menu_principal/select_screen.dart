@@ -1,4 +1,6 @@
+import 'package:permission_handler/permission_handler.dart'; // Add import
 import 'package:ada_app/ui/screens/menu_principal/pending_data_screen.dart';
+
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/services/api/auth_service.dart';
@@ -47,7 +49,7 @@ class _SelectScreenState extends State<SelectScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkBatteryOptimizationOnFirstLoad();
       _checkLocationPermissions();
-      // <--- Verificar notificaciones
+      _checkNotificationPermissions();
     });
   }
 
@@ -134,6 +136,16 @@ class _SelectScreenState extends State<SelectScreen> {
 
     // 🕵️‍♂️ NUEVO: Verificar ubicación simulada
     await _checkFakeGps();
+  }
+
+  Future<void> _checkNotificationPermissions() async {
+    try {
+      if (await Permission.notification.isDenied) {
+        await Permission.notification.request();
+      }
+    } catch (e) {
+      debugPrint('Error checking notification permissions: $e');
+    }
   }
 
   Future<void> _checkFakeGps() async {

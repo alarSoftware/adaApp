@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/services/device_log/device_log_background_extension.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 
 class WorkHoursSettingsScreen extends StatefulWidget {
   const WorkHoursSettingsScreen({super.key});
@@ -38,48 +39,54 @@ class _WorkHoursSettingsScreenState extends State<WorkHoursSettingsScreen> {
   }
 
   Future<void> _saveSettings() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    if (_startHour >= _endHour) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('La hora de inicio debe ser menor a la hora de fin'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
-      if (_startHour >= _endHour) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('La hora de inicio debe ser menor a la hora de fin'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-        return;
-      }
-
-      setState(() {
-        _isLoading = true;
-      });
-
       await DeviceLogBackgroundExtension.guardarConfiguracionHorario(
         _startHour,
         _endHour,
         intervaloMinutos: _intervalMinutes,
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Configuración guardada correctamente'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        Navigator.pop(context);
+      final service = FlutterBackgroundService();
+      if (await service.isRunning()) {
+        service.invoke("updateConfig");
       }
+
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Configuración guardada correctamente'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      navigator.pop();
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al guardar: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
       }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Error al guardar: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
     }
   }
 

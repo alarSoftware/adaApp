@@ -51,7 +51,7 @@ class AppServices {
     }
   }
 
-  // MÉTODO PARA INICIALIZAR DEVICE LOGGING DESPUÉS DE SINCRONIZACIÓN
+
   Future<void> inicializarDeviceLoggingDespuesDeSincronizacion() async {
     try {
       _logger.i(
@@ -170,17 +170,6 @@ class AppServices {
 
   // ==================== MÉTODOS DE UTILIDAD ====================
 
-  Future<void> ejecutarLoggingManual() async {
-    try {
-      if (!_isUserLoggedIn) {
-        _logger.w('No se puede ejecutar logging manual sin usuario logueado');
-        return;
-      }
-
-    } catch (e) {
-      _logger.e('Error en logging manual: $e');
-    }
-  }
 
   bool estaEnHorarioTrabajo() {
     return DeviceLogBackgroundExtension.estaEnHorarioTrabajo();

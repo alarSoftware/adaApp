@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:ada_app/repositories/device_log_repository.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/models/device_log.dart';
@@ -44,6 +45,7 @@ class DeviceLogBackgroundExtension {
   static Timer? _backgroundTimer;
   static bool _isInitialized = false;
   static bool _isExecuting = false;
+  static Function? _onGpsAlertListener;
 
   static Future<bool> _verificarSesionActiva() async {
     try {
@@ -64,7 +66,15 @@ class DeviceLogBackgroundExtension {
   }
 
   /// Inicializar servicio de logging en background
-  static Future<void> inicializar({bool verificarSesion = true}) async {
+  static Future<void> inicializar({
+    bool verificarSesion = true,
+    Function? onGpsAlert,
+    ServiceInstance?
+    serviceInstance, // Keeping for compatibility or just in case
+  }) async {
+    if (onGpsAlert != null) {
+      _onGpsAlertListener = onGpsAlert;
+    }
     try {
       _backgroundTimer?.cancel();
 
@@ -91,7 +101,7 @@ class DeviceLogBackgroundExtension {
     }
   }
 
-  /// 🕒 Cargar horarios e intervalo desde SharedPreferences
+  /// Cargar horarios e intervalo desde SharedPreferences
   static Future<void> cargarConfiguracionHorario() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -207,6 +217,17 @@ class DeviceLogBackgroundExtension {
         return;
       }
 
+      final isGpsEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!isGpsEnabled) {
+        _logger.w('LOGGING SKIPPED: GPS Desactivado - Enviando alerta');
+
+        // Llamada directa al callback si existe (Sin usar invoke)
+        if (_onGpsAlertListener != null) {
+          _onGpsAlertListener!();
+        }
+        return;
+      }
+
       final hasPermission = await Permission.location.isGranted;
       final hasAlways = await Permission.locationAlways.isGranted;
 
@@ -314,7 +335,6 @@ class DeviceLogBackgroundExtension {
     }
   }
 
-  /// 🔄 Marcar log como sincronizado en BD
   static Future<void> _marcarComoSincronizado(String logId) async {
     try {
       final db = await DatabaseHelper().database;
@@ -345,7 +365,6 @@ class DeviceLogBackgroundExtension {
       _logger.e('Error deteniendo extensión: $e');
     }
   }
-
 
   /// Método para inicializar desde login exitoso
   static Future<void> inicializarDespuesDeLogin() async {
