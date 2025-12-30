@@ -30,7 +30,8 @@ class SelectScreen extends StatefulWidget {
   State<SelectScreen> createState() => _SelectScreenState();
 }
 
-class _SelectScreenState extends State<SelectScreen> {
+class _SelectScreenState extends State<SelectScreen>
+    with WidgetsBindingObserver {
   late SelectScreenViewModel _viewModel;
   late StreamSubscription<UIEvent> _eventSubscription;
 
@@ -45,6 +46,7 @@ class _SelectScreenState extends State<SelectScreen> {
     _viewModel = SelectScreenViewModel();
     _setupEventListener();
     _startPendingDataMonitoring();
+    WidgetsBinding.instance.addObserver(this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkBatteryOptimizationOnFirstLoad();
@@ -55,6 +57,7 @@ class _SelectScreenState extends State<SelectScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _eventSubscription.cancel();
     _pendingDataTimer?.cancel();
     _viewModel.dispose();
@@ -136,6 +139,13 @@ class _SelectScreenState extends State<SelectScreen> {
 
     // 🕵️‍♂️ NUEVO: Verificar ubicación simulada
     await _checkFakeGps();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkLocationPermissions();
+    }
   }
 
   Future<void> _checkNotificationPermissions() async {

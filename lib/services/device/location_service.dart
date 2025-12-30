@@ -86,10 +86,18 @@ class LocationService {
   Future<bool> ensurePermissions() async {
     // Verificar servicios habilitados
     if (!await isLocationServiceEnabled()) {
-      throw const LocationException(
-        'Los servicios de ubicación están deshabilitados. Por favor, habilítalos en Configuración.',
-        LocationErrorType.serviceDisabled,
-      );
+      // Intentar "despertar" el diálogo de resolución de Android pidiendo ubicación
+      try {
+        await Geolocator.getCurrentPosition();
+      } catch (_) {}
+
+      // Verificar de nuevo
+      if (!await isLocationServiceEnabled()) {
+        throw const LocationException(
+          'Los servicios de ubicación están deshabilitados. Por favor, habilítalos en Configuración.',
+          LocationErrorType.serviceDisabled,
+        );
+      }
     }
 
     // Verificar permisos actuales
