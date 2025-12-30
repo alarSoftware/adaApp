@@ -12,9 +12,9 @@ class DeviceLogPostService {
 
   /// Enviar un device log individual
   static Future<Map<String, dynamic>> enviarDeviceLog(
-      DeviceLog log, {
-        String? userId,
-      }) async {
+    DeviceLog log, {
+    String? userId,
+  }) async {
     try {
       final fullUrl = await ApiConfigService.getFullUrl(_endpoint);
       _logger.i('Enviando device log a: $fullUrl');
@@ -26,13 +26,22 @@ class DeviceLogPostService {
       // ✅ Establecer userId (puede ser null)
       bodyConUserId['userId'] = userId;
 
-      // 🔥 CRÍTICO: Eliminar employeeId para evitar que se envíe
+      // ✅ Mapear employeeId al typo esperado por el servidor "emplyedId"
+      if (log.employeeId != null) {
+        bodyConUserId['emplyedId'] = log.employeeId;
+      }
+
+      // 🔥 CRÍTICO: Eliminar la clave original 'employeeId' para evitar duplicidad o errores,
+      // ya que enviamos 'emplyedId'
       bodyConUserId.remove('employeeId');
 
       // 🔍 DEBUG
       _logger.i('📤 Datos a enviar:');
       _logger.i('   userId: $userId');
-      _logger.i('   employeeId removido: ${!bodyConUserId.containsKey('employeeId')}');
+      _logger.i('   emplyedId (mapped): ${bodyConUserId['emplyedId']}');
+      _logger.i(
+        '   employeeId removido: ${!bodyConUserId.containsKey('employeeId')}',
+      );
 
       final resultado = await BasePostService.post(
         endpoint: _endpoint,
@@ -56,9 +65,9 @@ class DeviceLogPostService {
 
   /// Enviar múltiples device logs en batch
   static Future<Map<String, int>> enviarDeviceLogsBatch(
-      List<DeviceLog> logs, {
-        String? userId,
-      }) async {
+    List<DeviceLog> logs, {
+    String? userId,
+  }) async {
     int exitosos = 0;
     int fallidos = 0;
 
