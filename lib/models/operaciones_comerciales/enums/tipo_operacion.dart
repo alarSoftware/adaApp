@@ -55,8 +55,7 @@ extension TipoOperacionExtension on TipoOperacion {
 
   /// Valida si la unidad de medida es correcta para este tipo de operación
   /// Retorna null si es válido, o un mensaje de error si no lo es
-  /// Valida si la unidad de medida es correcta para este tipo de operación
-  /// Retorna null si es válido, o un mensaje de error si no lo es
+
   String? validarUnidadMedida(String unidadMedida) {
     // REGLA 1: Las notas de retiro SOLO pueden ser en unidades simples
     if (esNotaRetiro && !UnidadMedidaHelper.esUnidadSimple(unidadMedida)) {

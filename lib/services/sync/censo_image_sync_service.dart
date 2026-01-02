@@ -60,9 +60,7 @@ class CensusImageSyncService extends BaseSyncService {
         totalEnAPI: processedResult.length,
       );
     } on TimeoutException catch (timeoutError) {
-      BaseSyncService.logger.e('⏰ Timeout obteniendo imágenes: $timeoutError');
-
-      // 🚨 LOG ERROR: Timeout
+      // LOG ERROR: Timeout
       // await ErrorLogService.logNetworkError(
       //   tableName: 'censo_activo_foto',
       //   operation: 'sync_from_server',
@@ -77,9 +75,7 @@ class CensusImageSyncService extends BaseSyncService {
         itemsSincronizados: 0,
       );
     } on SocketException catch (socketError) {
-      BaseSyncService.logger.e('📡 Error de red: $socketError');
-
-      // 🚨 LOG ERROR: Sin conexión de red
+      // LOG ERROR: Sin conexión de red
       // await ErrorLogService.logNetworkError(
       //   tableName: 'censo_activo_foto',
       //   operation: 'sync_from_server',
@@ -94,9 +90,7 @@ class CensusImageSyncService extends BaseSyncService {
         itemsSincronizados: 0,
       );
     } catch (e) {
-      BaseSyncService.logger.e('💥 Error obteniendo imágenes de censos: $e');
-
-      // 🚨 LOG ERROR: Error general
+      // LOG ERROR: Error general
       // await ErrorLogService.logError(
       //   tableName: 'censo_activo_foto',
       //   operation: 'sync_from_server',
@@ -189,9 +183,7 @@ class CensusImageSyncService extends BaseSyncService {
             final parsed = jsonDecode(dataValue) as List;
             return parsed;
           } catch (e) {
-            BaseSyncService.logger.e('Error parseando data como JSON: $e');
-
-            // 🚨 LOG ERROR: Error de parsing
+            // LOG ERROR: Error de parsing
             await ErrorLogService.logError(
               tableName: 'censo_activo_foto',
               operation: 'parse_response',
@@ -213,9 +205,7 @@ class CensusImageSyncService extends BaseSyncService {
 
       return [];
     } catch (e) {
-      BaseSyncService.logger.e('Error parseando respuesta: $e');
-
-      // 🚨 LOG ERROR: Error de parsing general
+      // LOG ERROR: Error de parsing general
       await ErrorLogService.logError(
         tableName: 'censo_activo_foto',
         operation: 'parse_response',
@@ -233,10 +223,6 @@ class CensusImageSyncService extends BaseSyncService {
     List<dynamic> imagenesData,
     bool incluirBase64,
   ) async {
-    BaseSyncService.logger.i(
-      'Procesando ${imagenesData.length} imágenes del servidor',
-    );
-
     // Convertir datos del API al formato local
     final imagenesParaGuardar = <Map<String, dynamic>>[];
     final idsProcesados = <String>{}; // Para evitar duplicados de ID
@@ -253,9 +239,6 @@ class CensusImageSyncService extends BaseSyncService {
             final id = imagenParaGuardar['id']?.toString();
             if (id != null) {
               if (idsProcesados.contains(id)) {
-                BaseSyncService.logger.w(
-                  '⚠️ ID de imagen duplicado detectado: $id. Se usará la primera ocurrencia.',
-                );
                 continue;
               }
               idsProcesados.add(id);
@@ -263,10 +246,7 @@ class CensusImageSyncService extends BaseSyncService {
 
             imagenesParaGuardar.add(imagenParaGuardar);
           } catch (e) {
-            BaseSyncService.logger.e(
-              'Error procesando imagen ID ${imagen['id']}: $e',
-            );
-            // 🚨 LOG ERROR: Error procesando imagen individual
+            // LOG ERROR: Error procesando imagen individual
             await ErrorLogService.logError(
               tableName: 'censo_activo_foto',
               operation: 'process_item',
@@ -282,22 +262,10 @@ class CensusImageSyncService extends BaseSyncService {
     // Vaciar tabla e insertar todas las imágenes (incluso si está vacía, para limpiar)
     try {
       final dbHelper = DatabaseHelper();
-      BaseSyncService.logger.i(
-        'Intentando vaciar e insertar ${imagenesParaGuardar.length} imágenes en BD...',
-      );
 
-      final count = await dbHelper.vaciarEInsertar(
-        'censo_activo_foto',
-        imagenesParaGuardar,
-      );
-
-      BaseSyncService.logger.i(
-        '✅ Éxito: Se insertaron $count imágenes tras vaciar tabla.',
-      );
+      await dbHelper.vaciarEInsertar('censo_activo_foto', imagenesParaGuardar);
     } catch (e) {
-      BaseSyncService.logger.e('❌ Error CRÍTICO guardando imágenes en BD: $e');
-
-      // 🚨 LOG ERROR: Error de base de datos local
+      // LOG ERROR: Error de base de datos local
       await ErrorLogService.logDatabaseError(
         tableName: 'censo_activo_foto',
         operation: 'bulk_insert',

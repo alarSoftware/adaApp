@@ -1,9 +1,7 @@
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/api/auth_service.dart';
-import 'package:logger/logger.dart';
 
 class PermissionsService {
-  static final _logger = Logger();
   static final _dbHelper = DatabaseHelper();
   static final _authService = AuthService();
 
@@ -12,7 +10,7 @@ class PermissionsService {
     try {
       final user = await _authService.getCurrentUser();
       if (user == null) {
-        _logger.w('Verificación de permiso sin usuario logueado');
+        print('Verificación de permiso sin usuario logueado');
         return false;
       }
 
@@ -26,7 +24,7 @@ class PermissionsService {
 
       return result.isNotEmpty;
     } catch (e) {
-      _logger.e('Error verificando permiso para $moduleName: $e');
+      print('Error verificando permiso para $moduleName: $e');
       // En caso de error (ej: tabla no existe?), denegar por seguridad
       // O permitir si es el admin? Mejor denegar por defecto (fail-safe).
       return false;

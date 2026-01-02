@@ -6,8 +6,7 @@ import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
 class EquiposPendientesSyncService extends BaseSyncService {
-
-  // ✅ 1. Instancia del repositorio (El traductor)
+  // 1. Instancia del repositorio (El traductor)
   static final _repo = EquipoPendienteRepository();
 
   static Future<SyncResult> obtenerEquiposPendientes({
@@ -16,23 +15,21 @@ class EquiposPendientesSyncService extends BaseSyncService {
     String? currentEndpoint;
 
     try {
-      BaseSyncService.logger.i('🔄 Obteniendo equipos pendientes desde el servidor...');
-
       final Map<String, String> queryParams = {};
       if (employeeId != null) {
         queryParams['employeeId'] = employeeId;
       }
 
       final baseUrl = await BaseSyncService.getBaseUrl();
-      final uri = Uri.parse('$baseUrl/api/getEquipoPendiente')
-          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final uri = Uri.parse(
+        '$baseUrl/api/getEquipoPendiente',
+      ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       currentEndpoint = uri.toString();
 
-      final response = await http.get(
-        uri,
-        headers: BaseSyncService.headers,
-      ).timeout(BaseSyncService.timeout);
+      final response = await http
+          .get(uri, headers: BaseSyncService.headers)
+          .timeout(BaseSyncService.timeout);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         List<dynamic> equiposData = [];
@@ -40,7 +37,8 @@ class EquiposPendientesSyncService extends BaseSyncService {
         // --- PARSEO DE RESPUESTA ---
         try {
           final responseBody = jsonDecode(response.body);
-          if (responseBody is Map<String, dynamic> && responseBody.containsKey('data')) {
+          if (responseBody is Map<String, dynamic> &&
+              responseBody.containsKey('data')) {
             final dataValue = responseBody['data'];
             if (dataValue is String) {
               equiposData = jsonDecode(dataValue) as List;
@@ -54,13 +52,15 @@ class EquiposPendientesSyncService extends BaseSyncService {
           }
         } catch (parseError) {
           // ... Manejo de error de parseo ...
-          return SyncResult(exito: false, mensaje: 'Error parseando respuesta', itemsSincronizados: 0);
+          return SyncResult(
+            exito: false,
+            mensaje: 'Error parseando respuesta',
+            itemsSincronizados: 0,
+          );
         }
 
         // --- GUARDADO EN BD ---
         try {
-          BaseSyncService.logger.i('🔍 Datos recibidos: ${equiposData.length} registros');
-
           // 1. Limpiamos la lista para asegurarnos que son mapas
           final List<Map<String, dynamic>> listaMapeada = [];
           for (var item in equiposData) {
@@ -69,14 +69,10 @@ class EquiposPendientesSyncService extends BaseSyncService {
             }
           }
 
-          // ✅ 2. LA SOLUCIÓN: Usamos el método del repo para mapear y guardar
+          // 2. LA SOLUCIÓN: Usamos el método del repo para mapear y guardar
           // Esto evita el error de "Column Mismatch"
-          final guardados = await _repo.guardarEquiposPendientesDesdeServidor(listaMapeada);
-
-          BaseSyncService.logger.i('✅ Equipos pendientes guardados correctamente: $guardados');
-
+          await _repo.guardarEquiposPendientesDesdeServidor(listaMapeada);
         } catch (dbError) {
-          BaseSyncService.logger.e('❌ Error guardando en BD: $dbError');
           await ErrorLogService.logDatabaseError(
             tableName: 'equipos_pendientes',
             operation: 'insert_from_server',
@@ -90,7 +86,6 @@ class EquiposPendientesSyncService extends BaseSyncService {
           mensaje: 'Equipos pendientes obtenidos correctamente',
           itemsSincronizados: equiposData.length,
         );
-
       } else {
         // --- MANEJO DE ERROR HTTP ---
         final mensaje = BaseSyncService.extractErrorMessage(response);
@@ -102,14 +97,21 @@ class EquiposPendientesSyncService extends BaseSyncService {
         //   endpoint: currentEndpoint,
         //   userId: edfVendedorId,
         // );
-        return SyncResult(exito: false, mensaje: mensaje, itemsSincronizados: 0);
+        return SyncResult(
+          exito: false,
+          mensaje: mensaje,
+          itemsSincronizados: 0,
+        );
       }
-
     } catch (e) {
       // --- MANEJO DE EXCEPCIONES GENERALES ---
-      BaseSyncService.logger.e('💥 Error general: $e');
+
       //await ErrorLogService.logError(tableName: 'equipos_pendientes', operation: 'sync_from_server', errorMessage: 'Error general: $e', errorType: 'unknown', endpoint: currentEndpoint, userId: employeeId);
-      return SyncResult(exito: false, mensaje: BaseSyncService.getErrorMessage(e), itemsSincronizados: 0);
+      return SyncResult(
+        exito: false,
+        mensaje: BaseSyncService.getErrorMessage(e),
+        itemsSincronizados: 0,
+      );
     }
   }
 }

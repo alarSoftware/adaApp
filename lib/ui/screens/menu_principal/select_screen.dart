@@ -1432,7 +1432,6 @@ class _SelectScreenState extends State<SelectScreen>
                       ),
                       elevation: 2,
                       child: InkWell(
-                        onLongPress: _showDebugPermissionsDialog,
                         borderRadius: BorderRadius.circular(12),
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
@@ -1659,112 +1658,5 @@ class _SelectScreenState extends State<SelectScreen>
         );
       },
     );
-  }
-
-  Future<void> _showDebugPermissionsDialog() async {
-    showDialog(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('🕵️ Debug: Inyectar Permisos'),
-        children: [
-          SimpleDialogOption(
-            onPressed: () {
-              Navigator.pop(context);
-              _injectPermissions([
-                'VerClientes',
-                'VerFormularios',
-                'CrearCensoActivo',
-                'CrearOperacionComercial',
-              ]);
-            },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('✅ Acceso Total (Clientes + Forms + Ops)'),
-            ),
-          ),
-          SimpleDialogOption(
-            onPressed: () {
-              Navigator.pop(context);
-              _injectPermissions(['VerFormularios']);
-            },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('📝 Solo Formularios (Redirect Test)'),
-            ),
-          ),
-          SimpleDialogOption(
-            onPressed: () {
-              Navigator.pop(context);
-              _injectPermissions(['VerClientes']);
-            },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('👥 Solo Clientes'),
-            ),
-          ),
-          const Divider(),
-          SimpleDialogOption(
-            onPressed: () {
-              Navigator.pop(context);
-              _injectPermissions([]);
-            },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('🚫 Borrar Todos (Sin Acceso)'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _injectPermissions(List<String> modules) async {
-    try {
-      final user = await AuthService().getCurrentUser();
-      if (user == null || user.id == null) {
-        _mostrarError('No hay usuario logueado');
-        return;
-      }
-
-      final db = await DatabaseHelper().database;
-
-      await db.delete('app_routes', where: 'user_id = ?', whereArgs: [user.id]);
-
-      final batch = db.batch();
-      final now = DateTime.now().toIso8601String();
-      for (final module in modules) {
-        String routePath = '/home';
-        if (module == 'VerClientes') routePath = '/clienteLista';
-        if (module == 'VerFormularios') routePath = '/dynamicForms';
-        if (module == 'CrearOperacionComercial') routePath = '/operaciones';
-        if (module == 'CrearCensoActivo') routePath = '/censo';
-
-        batch.insert('app_routes', {
-          'user_id': user.id,
-          'module_name': module,
-          'route_path': routePath,
-          'fecha_sync': now,
-        });
-      }
-      await batch.commit(noResult: true);
-
-      setState(() {});
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Permisos actualizados: ${modules.isEmpty ? "NINGUNO" : modules.join(", ")}',
-          ),
-          backgroundColor: AppColors.success,
-        ),
-      );
-
-      // Si probamos redirect y estamos en solo forms, re-verify
-      if (modules.length == 1 && modules.contains('VerFormularios')) {
-        _checkAutoRedirect();
-      }
-    } catch (e) {
-      _mostrarError('Error inyectando permisos: $e');
-    }
   }
 }

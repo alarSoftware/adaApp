@@ -49,7 +49,7 @@ class AuthService {
 
   static final _dbHelper = DatabaseHelper();
 
-  // ✅ MÉTODO HELPER PARA CONSTRUIR EL NOMBRE DEL VENDEDOR
+  // Helper para construir el nombre del vendedor
   String _buildVendorDisplayName(Usuario usuario) {
     if (usuario.employeeName != null &&
         usuario.employeeName!.trim().isNotEmpty) {
@@ -374,7 +374,7 @@ class AuthService {
       final usuarioAuth = UsuarioAuth.fromUsuario(currentUser);
 
       if (currentUser.employeeId != null) {
-        // ✅ CORREGIDO: Usar el método helper para construir el nombre
+        // Usar el método helper para construir el nombre
         final nombreVendedor = _buildVendorDisplayName(currentUser);
 
         final syncValidation = await validateSyncRequirement(

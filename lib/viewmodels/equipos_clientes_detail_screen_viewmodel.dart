@@ -230,9 +230,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
           : null;
 
       if (estadoActual == null && tipoEstado == 'asignado') {
-        print("ESTOY");
         try {
-          print("antes");
           estadoActual = await _estadoEquipoRepository.obtenerUltimoEstado(
             codigoBarras,
             int.parse(clienteId.toString()),
@@ -243,7 +241,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
           }
         } catch (e) {
           //LOG ERROR
-          print("Error al obtener último estado: $e");
+          // debugPrint("Error al obtener último estado: $e");
         }
       }
 

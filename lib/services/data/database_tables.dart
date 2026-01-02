@@ -1,21 +1,18 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:logger/logger.dart';
-
-var logger = Logger();
 
 class DatabaseTables {
   Future<void> onCreate(Database db, int version) async {
-    logger.i('Creando tablas de base de datos v$version');
+    print('Creando tablas de base de datos v$version');
 
     await _crearTablasMaestras(db);
     await _crearTablasPrincipales(db);
     await _crearIndices(db);
 
-    logger.i('Todas las tablas e índices creados exitosamente');
+    print('Todas las tablas e índices creados exitosamente');
   }
 
   Future<void> onUpgrade(Database db, int oldVersion, int newVersion) async {
-    logger.i('Actualizando base de datos de v$oldVersion a v$newVersion');
+    print('Actualizando base de datos de v$oldVersion a v$newVersion');
     // Aquí irían las migraciones futuras
   }
 

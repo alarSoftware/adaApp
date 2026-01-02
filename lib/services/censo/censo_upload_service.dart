@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:ada_app/models/censo_activo.dart';
-import 'package:logger/logger.dart';
+
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
@@ -11,7 +11,6 @@ import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'censo_log_service.dart';
 
 class CensoUploadService {
-  final Logger _logger = Logger();
   final CensoActivoRepository censoActivoRepository;
   final CensoActivoFotoRepository _fotoRepository;
   final CensoLogService _logService;
@@ -51,7 +50,7 @@ class CensoUploadService {
     String? fullUrl;
 
     try {
-      _logger.i('Enviando censo unificado: $censoActivoId');
+      print('Enviando censo unificado: $censoActivoId');
 
       final baseUrl = await BaseSyncService.getBaseUrl();
 
@@ -70,7 +69,7 @@ class CensoUploadService {
       var estado = censoActivoMap['estado_censo']?.toString();
 
       if (estado == 'migrado') {
-        _logger.w('Censo ya migrado: $censoActivoId');
+        print('Censo ya migrado: $censoActivoId');
         return;
       }
 
@@ -101,9 +100,7 @@ class CensoUploadService {
       final yaAsignado = await _verificarEquipoAsignado(equipoId, clienteId);
       final crearPendiente = !yaAsignado;
 
-      _logger.i(
-        'Flags - Nuevo: $esNuevoEquipo, Crear pendiente: $crearPendiente',
-      );
+      print('Flags - Nuevo: $esNuevoEquipo, Crear pendiente: $crearPendiente');
 
       final pendienteExistente = await _equipoPendienteRepository.dbHelper
           .consultar(
@@ -140,10 +137,9 @@ class CensoUploadService {
         logo: censoActivoMap['logo']?.toString(),
         equipoDataMap: equipoDataMap,
       );
-    } catch (e, stackTrace) {
-      _logger.e('Error en enviarCensoUnificado: $e', stackTrace: stackTrace);
+    } catch (e) {
+      print('Error en enviarCensoUnificado: $e');
 
-      // ✅ REGISTRAR EL ERROR AQUÍ
       await censoActivoRepository.marcarComoError(
         censoActivoId,
         'Excepción: ${e.toString()}',
@@ -160,7 +156,7 @@ class CensoUploadService {
   }
 
   Future<Map<String, int>> sincronizarCensosNoMigrados(int usuarioId) async {
-    _logger.i('=== SINCRONIZACIÓN PERIÓDICA UNIFICADA ===');
+    print('=== SINCRONIZACIÓN PERIÓDICA UNIFICADA ===');
 
     int censosExitosos = 0;
     int totalFallidos = 0;
@@ -175,7 +171,7 @@ class CensoUploadService {
 
       final todosLosRegistros = [...registrosCreados, ...registrosErrorListos];
 
-      _logger.i('Total censos a procesar: ${todosLosRegistros.length}');
+      print('Total censos a procesar: ${todosLosRegistros.length}');
 
       final censoActivoList = todosLosRegistros.take(20);
 
@@ -186,11 +182,8 @@ class CensoUploadService {
             usuarioId,
           );
           censosExitosos++;
-        } catch (e, stacktrace) {
-          _logger.e(
-            'Error en censo ${censoActivo.id}: $e',
-            stackTrace: stacktrace,
-          );
+        } catch (e) {
+          print('Error en censo ${censoActivo.id}: $e');
           totalFallidos++;
           if (censoActivo.id != null) {
             await censoActivoRepository.marcarComoError(
@@ -209,20 +202,17 @@ class CensoUploadService {
         await Future.delayed(Duration(milliseconds: 500));
       }
 
-      _logger.i('=== SINCRONIZACIÓN COMPLETADA ===');
-      _logger.i('   - Exitosos: $censosExitosos');
-      _logger.i('   - Fallidos: $totalFallidos');
+      print('=== SINCRONIZACIÓN COMPLETADA ===');
+      print('   - Exitosos: $censosExitosos');
+      print('   - Fallidos: $totalFallidos');
 
       return {
         'censos_exitosos': censosExitosos,
         'fallidos': totalFallidos,
         'total': censosExitosos,
       };
-    } catch (e, stackTrace) {
-      _logger.e(
-        'Error en sincronización periódica: $e',
-        stackTrace: stackTrace,
-      );
+    } catch (e) {
+      print('Error en sincronización periódica: $e');
 
       await ErrorLogService.manejarExcepcion(
         e,
@@ -251,25 +241,10 @@ class CensoUploadService {
       final numeroIntento = intentosPrevios + 1;
 
       if (numeroIntento > maxIntentos) {
-        // await estadoEquipoRepository.marcarComoError(
-        //   censoActivoId,
-        //   'Fallo permanente: máximo de intentos alcanzado',
-        // );
-
-        // await ErrorLogService.logError(
-        //   tableName: _tableName,
-        //   operation: 'sincronizar_individual',
-        //   errorMessage: 'Máximo de intentos alcanzado ($maxIntentos)',
-        //   errorType: 'sync',
-        //   errorCode: 'MAX_RETRIES_EXCEEDED',
-        //   registroFailId: estadoId,
-        //   userId: usuarioId,
-        // );
-
         return;
       }
 
-      _logger.i(
+      print(
         'Sincronizando $censoActivoId (intento #$numeroIntento/$maxIntentos)',
       );
 
@@ -280,7 +255,6 @@ class CensoUploadService {
 
       await _actualizarUltimoIntento(censoActivoId, numeroIntento);
 
-      //==ESTOY PROCESANDO EN BACKGOUND==
       await enviarCensoUnificado(
         censoActivoId: censoActivoId,
         usuarioId: usuarioId,
@@ -300,7 +274,7 @@ class CensoUploadService {
     String message = '';
 
     try {
-      _logger.i('Reintento manual: $censoActivoId');
+      print('Reintento manual: $censoActivoId');
 
       if (employeeId == null || employeeId.isEmpty) {
         throw Exception('employeeId es requerido');
@@ -335,8 +309,8 @@ class CensoUploadService {
         success = false;
         message = censoActivoMap['error_mensaje'] ?? 'Error desconocido';
       }
-    } catch (e, stackTrace) {
-      _logger.e('Error en reintentarEnvioCenso: $e', stackTrace: stackTrace);
+    } catch (e) {
+      print('Error en reintentarEnvioCenso: $e');
       success = false;
       message = e.toString();
     }
@@ -385,10 +359,10 @@ class CensoUploadService {
         datosLocales['logo'] ??= infoEquipo['logo_nombre'];
         datosLocales['es_nuevo_equipo'] ??= (infoEquipo['app_insert'] == 1);
 
-        _logger.i('Datos enriquecidos desde equipos');
+        print('Datos enriquecidos desde equipos');
       }
     } catch (e) {
-      _logger.w('No se pudo enriquecer datos: $e');
+      print('No se pudo enriquecer datos: $e');
       rethrow;
     }
   }
@@ -425,44 +399,6 @@ class CensoUploadService {
     }
   }
 
-  // static void iniciarSincronizacionAutomatica(int usuarioId) {
-  //   if (_syncActivo && _usuarioActual == usuarioId) {
-  //     Logger().w('Sincronización ya activa para usuario $usuarioId');
-  //     return;
-  //   }
-  //
-  //   detenerSincronizacionAutomatica();
-  //
-  //   _usuarioActual = usuarioId;
-  //   _syncActivo = true;
-  //
-  //   Logger().i(
-  //     'Iniciando sincronización automática cada ${intervaloTimer.inMinutes} min',
-  //   );
-  //
-  //   _syncTimer = Timer.periodic(intervaloTimer, (timer) async {
-  //     await _ejecutarSincronizacionAutomatica();
-  //   });
-  //
-  //   Timer(const Duration(seconds: 15), () async {
-  //     await _ejecutarSincronizacionAutomatica();
-  //   });
-  // }
-
-  // static void detenerSincronizacionAutomatica() {
-  //   if (_syncTimer != null) {
-  //     _syncTimer!.cancel();
-  //     _syncTimer = null;
-  //     _syncActivo = false;
-  //     _syncEnProgreso = false;
-  //     _usuarioActual = null;
-  //     _censosEnProceso.clear();
-  //     Logger().i('Sincronización automática detenida');
-  //   }
-  // }
-
-  // static Future<void> _ejecutarSincronizacionAutomatica() async {
-  //   if (_syncEnProgreso || !_syncActivo || _usuarioActual == null) return;
   //
   //   _syncEnProgreso = true;
   //
@@ -530,7 +466,7 @@ class CensoUploadService {
           registrosListos.add(registro);
         }
       } catch (e) {
-        _logger.w('Error verificando ${registro.id}: $e');
+        print('Error verificando ${registro.id}: $e');
         registrosListos.add(registro);
       }
     }
@@ -567,7 +503,7 @@ class CensoUploadService {
       );
       return maps.isNotEmpty ? maps.first['intentos_sync'] as int? ?? 0 : 0;
     } catch (e) {
-      _logger.w('Error obteniendo intentos: $e');
+      print('Error obteniendo intentos: $e');
       return 0;
     }
   }
@@ -587,7 +523,7 @@ class CensoUploadService {
         }
       }
     } catch (e) {
-      _logger.w('Error obteniendo último intento: $e');
+      print('Error obteniendo último intento: $e');
       return null;
     }
     return null;
@@ -608,7 +544,7 @@ class CensoUploadService {
         whereArgs: [estadoId],
       );
     } catch (e) {
-      _logger.w('Error actualizando último intento: $e');
+      print('Error actualizando último intento: $e');
       rethrow;
     }
   }
@@ -628,7 +564,7 @@ class CensoUploadService {
           ? usuarioEncontrado.first['employee_id'] as String?
           : null;
     } catch (e) {
-      _logger.e('Error resolviendo employeeId: $e');
+      print('Error resolviendo employeeId: $e');
       rethrow;
     }
   }
@@ -645,7 +581,7 @@ class CensoUploadService {
         _convertirAInt(clienteId),
       );
     } catch (e) {
-      _logger.w('Error verificando asignación: $e');
+      print('Error verificando asignación: $e');
       rethrow;
     }
   }

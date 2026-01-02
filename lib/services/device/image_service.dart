@@ -3,10 +3,8 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
-import 'package:logger/logger.dart';
 
 class ImageService {
-  final Logger _logger = Logger();
   final ImagePicker _imagePicker = ImagePicker();
 
   /// Toma una foto usando la cámara
@@ -28,7 +26,7 @@ class ImageService {
       }
       return null;
     } catch (e) {
-      _logger.e('Error tomando foto: $e');
+      print('Error tomando foto: $e');
       rethrow;
     }
   }
@@ -52,7 +50,7 @@ class ImageService {
       }
       return null;
     } catch (e) {
-      _logger.e('Error seleccionando imagen: $e');
+      print('Error seleccionando imagen: $e');
       rethrow;
     }
   }
@@ -84,10 +82,10 @@ class ImageService {
       final String rutaDestino = path.join(imageDir.path, nombreArchivo);
       final File archivoDestino = await imagen.copy(rutaDestino);
 
-      _logger.i('Imagen guardada: $rutaDestino');
+      print('Imagen guardada: $rutaDestino');
       return archivoDestino;
     } catch (e) {
-      _logger.e('Error guardando imagen: $e');
+      print('Error guardando imagen: $e');
       rethrow;
     }
   }
@@ -97,12 +95,12 @@ class ImageService {
     try {
       if (await imagen.exists()) {
         await imagen.delete();
-        _logger.i('Imagen eliminada: ${imagen.path}');
+        print('Imagen eliminada: ${imagen.path}');
         return true;
       }
       return false;
     } catch (e) {
-      _logger.e('Error eliminando imagen: $e');
+      print('Error eliminando imagen: $e');
       return false;
     }
   }
@@ -129,7 +127,7 @@ class ImageService {
       final int bytes = await imagen.length();
       return bytes / (1024 * 1024); // Convertir a MB
     } catch (e) {
-      _logger.e('Error obteniendo tamaño de imagen: $e');
+      print('Error obteniendo tamaño de imagen: $e');
       return 0.0;
     }
   }

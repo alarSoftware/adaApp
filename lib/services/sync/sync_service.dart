@@ -37,9 +37,9 @@ class SyncService {
 
       if (validation.canDelete) {
         await _limpiarDatosSincronizados(db);
-        syncResult.mensaje += '\n\n✅ Base de datos limpiada exitosamente';
+        syncResult.mensaje += '\n\nBase de datos limpiada exitosamente';
       } else {
-        syncResult.mensaje += '\n\n⚠️ Advertencia: ${validation.message}';
+        syncResult.mensaje += '\n\nAdvertencia: ${validation.message}';
       }
 
       return syncResult;

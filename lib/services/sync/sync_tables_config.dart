@@ -1,5 +1,5 @@
 // lib/services/sync/sync_tables_config.dart
-import 'package:logger/logger.dart';
+
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 import 'package:ada_app/services/censo/censo_upload_service.dart';
@@ -45,7 +45,6 @@ class SyncTableConfig {
 
 /// Gestor centralizado de configuración de tablas de sincronización
 class SyncTablesConfig {
-  static final Logger _logger = Logger();
   static final DatabaseHelper _dbHelper = DatabaseHelper();
 
   /// Obtiene todas las configuraciones de tablas para sincronización
@@ -127,7 +126,7 @@ class SyncTablesConfig {
         );
         counts[config.tableName] = result.length;
       } catch (e) {
-        _logger.e('Error obteniendo conteo de ${config.tableName}: $e');
+        print('Error obteniendo conteo de ${config.tableName}: $e');
         counts[config.tableName] = 0;
       }
     }
@@ -176,7 +175,7 @@ class SyncTablesConfig {
         error: censosFallidos > 0 ? '$censosFallidos censos fallaron' : null,
       );
     } catch (e) {
-      _logger.e('Error sincronizando censos: $e');
+      print('Error sincronizando censos: $e');
       return TableSyncResult(
         success: false,
         itemsSent: 0,
@@ -199,7 +198,7 @@ class SyncTablesConfig {
         );
       }
 
-      _logger.i('📤 Reintentando ${items.length} operaciones comerciales...');
+      print('📤 Reintentando ${items.length} operaciones comerciales...');
 
       int sentCount = 0;
       final errors = <String>[];
@@ -223,7 +222,7 @@ class SyncTablesConfig {
 
             if (operacionActualizada?.syncStatus == 'migrado') {
               sentCount++;
-              _logger.i('✅ Operación $operacionId sincronizada');
+              print('✅ Operación $operacionId sincronizada');
             } else {
               errors.add(
                 'Operación $operacionId: ${operacionActualizada?.syncError ?? "Error desconocido"}',
@@ -231,7 +230,7 @@ class SyncTablesConfig {
             }
           }
         } catch (e) {
-          _logger.e('❌ Error sincronizando operación $operacionId: $e');
+          print('❌ Error sincronizando operación $operacionId: $e');
           errors.add('Operación $operacionId: $e');
         }
 
@@ -245,7 +244,7 @@ class SyncTablesConfig {
         error: errors.isNotEmpty ? errors.join('; ') : null,
       );
     } catch (e) {
-      _logger.e('Error sincronizando operaciones comerciales: $e');
+      print('Error sincronizando operaciones comerciales: $e');
       return TableSyncResult(
         success: false,
         itemsSent: 0,
