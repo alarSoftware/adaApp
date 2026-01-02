@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/material.dart';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:ada_app/models/usuario.dart';
@@ -228,6 +228,31 @@ class DatabaseHelper {
   ) async {
     final db = await database;
     return _sync.sincronizarUsuarioCliente(db, usuarioClienteAPI);
+  }
+
+  Future<void> sincronizarRutas(int userId, List<dynamic> rutas) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // 1. Limpiar rutas anteriores de este usuario
+      await txn.delete('app_routes', where: 'user_id = ?', whereArgs: [userId]);
+
+      // 2. Insertar nuevas rutas
+      final batch = txn.batch();
+      final now = DateTime.now().toIso8601String();
+
+      for (final ruta in rutas) {
+        if (ruta is Map) {
+          batch.insert('app_routes', {
+            'user_id': userId,
+            'module_name': ruta['nombre_modulo']?.toString() ?? '',
+            'route_path': ruta['ruta']?.toString() ?? '',
+            'fecha_sync': now,
+          });
+        }
+      }
+
+      await batch.commit(noResult: true);
+    });
   }
 
   Future<List<Map<String, dynamic>>> obtenerClientesConEquipos() async {

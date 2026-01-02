@@ -11,6 +11,7 @@ import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart'
 import 'package:ada_app/ui/screens/operaciones_comerciales/operacion_comercial_form_screen.dart';
 import 'package:ada_app/viewmodels/operaciones_comerciales/operaciones_comerciales_menu_viewmodel.dart';
 import 'package:ada_app/main.dart';
+import 'package:ada_app/services/permissions_service.dart';
 
 class OperacionesComercialesMenuScreen extends StatelessWidget {
   final Cliente cliente;
@@ -43,11 +44,25 @@ class _OperacionesComercialesMenuViewState
   late TabController _tabController;
   late List<_TabConfig> _availableTabs;
 
+  bool _canCreateOperacion = false;
+
   @override
   void initState() {
     super.initState();
+    _checkPermission();
     _availableTabs = _getAvailableTabs();
     _tabController = TabController(length: _availableTabs.length, vsync: this);
+  }
+
+  Future<void> _checkPermission() async {
+    final hasPerm = await PermissionsService.hasPermission(
+      'CrearOperacionComercial',
+    );
+    if (mounted) {
+      setState(() {
+        _canCreateOperacion = hasPerm;
+      });
+    }
   }
 
   @override
@@ -264,28 +279,32 @@ class _OperacionesComercialesMenuViewState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 16),
-              SizedBox(
-                height: 54,
-                child: ElevatedButton.icon(
-                  onPressed: () =>
-                      _navigateToCreateOperacion(tipoOperacion, viewModel),
-                  icon: const Icon(Icons.add_circle_outline_rounded),
-                  label: const Text(
-                    'Nueva Solicitud',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: color,
-                    foregroundColor: Colors.white,
-                    elevation: 4,
-                    shadowColor: color.withValues(alpha: 0.4),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+              if (_canCreateOperacion)
+                SizedBox(
+                  height: 54,
+                  child: ElevatedButton.icon(
+                    onPressed: () =>
+                        _navigateToCreateOperacion(tipoOperacion, viewModel),
+                    icon: const Icon(Icons.add_circle_outline_rounded),
+                    label: const Text(
+                      'Nueva Solicitud',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: color,
+                      foregroundColor: Colors.white,
+                      elevation: 4,
+                      shadowColor: color.withValues(alpha: 0.4),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
+              if (_canCreateOperacion) const SizedBox(height: 24),
               Row(
                 children: [
                   Icon(Icons.history, size: 20, color: AppColors.textSecondary),

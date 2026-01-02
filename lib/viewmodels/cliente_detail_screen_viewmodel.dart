@@ -4,6 +4,7 @@ import '../models/cliente.dart';
 import '../repositories/equipo_repository.dart';
 import '../repositories/equipo_pendiente_repository.dart';
 import '../repositories/censo_activo_repository.dart';
+import '../services/permissions_service.dart';
 
 abstract class ClienteDetailUIEvent {}
 
@@ -46,40 +47,52 @@ class ClienteDetailState {
     return ClienteDetailState(
       isLoading: isLoading ?? this.isLoading,
       equiposAsignadosList: equiposAsignadosList ?? this.equiposAsignadosList,
-      equiposPendientesList: equiposPendientesList ?? this.equiposPendientesList,
+      equiposPendientesList:
+          equiposPendientesList ?? this.equiposPendientesList,
       errorMessage: errorMessage,
     );
   }
 
   bool get hasError => errorMessage != null;
-  bool get isEmpty => equiposAsignadosList.isEmpty && equiposPendientesList.isEmpty && !isLoading && !hasError;
+  bool get isEmpty =>
+      equiposAsignadosList.isEmpty &&
+      equiposPendientesList.isEmpty &&
+      !isLoading &&
+      !hasError;
 
   int get equiposAsignadosCount => equiposAsignadosList.length;
   int get equiposPendientesCount => equiposPendientesList.length;
-  int get totalEquiposCount => equiposAsignadosList.length + equiposPendientesList.length;
+  int get totalEquiposCount =>
+      equiposAsignadosList.length + equiposPendientesList.length;
 
   bool get tieneEquiposAsignados => equiposAsignadosList.isNotEmpty;
   bool get tieneEquiposPendientes => equiposPendientesList.isNotEmpty;
 
-  List<Map<String, dynamic>> get equiposCompletos => [...equiposAsignadosList, ...equiposPendientesList];
+  List<Map<String, dynamic>> get equiposCompletos => [
+    ...equiposAsignadosList,
+    ...equiposPendientesList,
+  ];
 }
 
 class ClienteDetailScreenViewModel extends ChangeNotifier {
   final EquipoRepository _equipoRepository = EquipoRepository();
-  final EquipoPendienteRepository _equipoPendienteRepository = EquipoPendienteRepository();
+  final EquipoPendienteRepository _equipoPendienteRepository =
+      EquipoPendienteRepository();
   final CensoActivoRepository _estadoEquipoRepository = CensoActivoRepository();
 
   ClienteDetailState _state = ClienteDetailState();
   Cliente? _cliente;
 
   final StreamController<ClienteDetailUIEvent> _eventController =
-  StreamController<ClienteDetailUIEvent>.broadcast();
+      StreamController<ClienteDetailUIEvent>.broadcast();
   Stream<ClienteDetailUIEvent> get uiEvents => _eventController.stream;
 
   ClienteDetailState get state => _state;
   bool get isLoading => _state.isLoading;
-  List<Map<String, dynamic>> get equiposAsignadosList => _state.equiposAsignadosList;
-  List<Map<String, dynamic>> get equiposPendientesList => _state.equiposPendientesList;
+  List<Map<String, dynamic>> get equiposAsignadosList =>
+      _state.equiposAsignadosList;
+  List<Map<String, dynamic>> get equiposPendientesList =>
+      _state.equiposPendientesList;
   List<Map<String, dynamic>> get equiposCompletos => _state.equiposCompletos;
 
   String? get errorMessage => _state.errorMessage;
@@ -102,16 +115,19 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
     super.dispose();
   }
 
+  bool _canCreateCenso = false;
+  bool get canCreateCenso => _canCreateCenso;
+
   Future<void> initialize(Cliente cliente) async {
     _cliente = cliente;
+    _canCreateCenso = await PermissionsService.hasPermission(
+      'CrearCensoActivo',
+    );
     await cargarEquipos();
   }
 
   Future<void> cargarEquipos() async {
-    _updateState(_state.copyWith(
-      isLoading: true,
-      errorMessage: null,
-    ));
+    _updateState(_state.copyWith(isLoading: true, errorMessage: null));
 
     try {
       if (_cliente?.id == null) {
@@ -119,31 +135,40 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      final equiposAsignadosList = await _equipoRepository.obtenerEquiposAsignados(_cliente!.id!);
-      final equiposPendientesList = await _equipoPendienteRepository.obtenerEquiposPendientesPorCliente(_cliente!.id!);
+      final equiposAsignadosList = await _equipoRepository
+          .obtenerEquiposAsignados(_cliente!.id!);
+      final equiposPendientesList = await _equipoPendienteRepository
+          .obtenerEquiposPendientesPorCliente(_cliente!.id!);
 
-      _updateState(_state.copyWith(
-        isLoading: false,
-        equiposAsignadosList: equiposAsignadosList,
-        equiposPendientesList: equiposPendientesList,
-      ));
-
+      _updateState(
+        _state.copyWith(
+          isLoading: false,
+          equiposAsignadosList: equiposAsignadosList,
+          equiposPendientesList: equiposPendientesList,
+        ),
+      );
     } catch (e, stackTrace) {
-      _updateState(_state.copyWith(
-        isLoading: false,
-        errorMessage: 'Error cargando equipos: ${e.toString()}',
-      ));
+      _updateState(
+        _state.copyWith(
+          isLoading: false,
+          errorMessage: 'Error cargando equipos: ${e.toString()}',
+        ),
+      );
 
-      _eventController.add(ShowErrorEvent('Error cargando equipos: ${e.toString()}'));
+      _eventController.add(
+        ShowErrorEvent('Error cargando equipos: ${e.toString()}'),
+      );
     }
   }
 
   void _setEquiposVacios() {
-    _updateState(_state.copyWith(
-      isLoading: false,
-      equiposAsignadosList: [],
-      equiposPendientesList: [],
-    ));
+    _updateState(
+      _state.copyWith(
+        isLoading: false,
+        equiposAsignadosList: [],
+        equiposPendientesList: [],
+      ),
+    );
   }
 
   Future<void> refresh() async {
@@ -158,7 +183,9 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   void navegarADetalleEquipo(Map<String, dynamic> equipoData) {
-    bool isAsignado = _state.equiposAsignadosList.any((e) => e['id'] == equipoData['id']);
+    bool isAsignado = _state.equiposAsignadosList.any(
+      (e) => e['id'] == equipoData['id'],
+    );
 
     final equipoDataWithType = {
       ...equipoData,
@@ -208,7 +235,8 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
   }
 
   String getEquipoFechaCensado(Map<String, dynamic> equipoData) {
-    final fechaStr = equipoData['fecha_revision'] ??
+    final fechaStr =
+        equipoData['fecha_revision'] ??
         equipoData['censo_fecha_creacion'] ??
         equipoData['censo_fecha_actualizacion'];
 
@@ -216,8 +244,7 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
       try {
         final fecha = DateTime.parse(fechaStr).toLocal();
         return 'Censado: ${formatearFecha(fecha)}';
-      } catch (e) {
-      }
+      } catch (e) {}
     }
     return 'Fecha no disponible';
   }
@@ -259,35 +286,36 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>?> getEstadoCensoInfo(Map<String, dynamic> equipoData) async {
+  Future<Map<String, dynamic>?> getEstadoCensoInfo(
+    Map<String, dynamic> equipoData,
+  ) async {
     try {
       final clienteId = int.tryParse(_cliente?.id?.toString() ?? '');
       if (clienteId == null) {
         return null;
       }
 
-      final tipoEstado = equipoData['tipo_estado']?.toString() ??
+      final tipoEstado =
+          equipoData['tipo_estado']?.toString() ??
           equipoData['estado']?.toString();
 
       Map<String, dynamic>? resultado;
 
       if (tipoEstado == 'pendiente') {
-        final equipoId = equipoData['equipo_id']?.toString() ??
-            equipoData['id']?.toString();
+        final equipoId =
+            equipoData['equipo_id']?.toString() ?? equipoData['id']?.toString();
 
         if (equipoId != null && equipoId.isNotEmpty) {
-          final ultimoEstado = await _estadoEquipoRepository.obtenerUltimoEstado(
-            equipoId,
-            clienteId,
-          );
+          final ultimoEstado = await _estadoEquipoRepository
+              .obtenerUltimoEstado(equipoId, clienteId);
           resultado = ultimoEstado?.toMap();
         }
-
       } else if (tipoEstado == 'asignado') {
-        final equipoId = equipoData['equipo_id']?.toString() ??
-            equipoData['id']?.toString();
+        final equipoId =
+            equipoData['equipo_id']?.toString() ?? equipoData['id']?.toString();
         if (equipoId != null) {
-          final historial = await _estadoEquipoRepository.obtenerHistorialDirectoPorEquipoCliente(equipoId, clienteId);
+          final historial = await _estadoEquipoRepository
+              .obtenerHistorialDirectoPorEquipoCliente(equipoId, clienteId);
           if (historial.isNotEmpty) {
             resultado = historial.first.toMap();
           }
@@ -295,7 +323,6 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
       }
 
       return resultado;
-
     } catch (e) {
       return null;
     }
@@ -308,7 +335,8 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
   String getClienteAddress() => _cliente?.direccion ?? '';
 
   String getEmptyStateTitle() => 'Sin equipos censados';
-  String getEmptyStateSubtitle() => 'Este cliente no tiene equipos censados actualmente';
+  String getEmptyStateSubtitle() =>
+      'Este cliente no tiene equipos censados actualmente';
   String getErrorStateTitle() => 'Error al cargar equipos';
   String getLoadingMessage() => 'Cargando equipos...';
 
@@ -331,7 +359,9 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
 
   bool shouldShowTabLoading() => isLoading;
 
-  bool shouldShowEmptyAsignados() => !isLoading && !hasError && equiposAsignadosCount == 0;
+  bool shouldShowEmptyAsignados() =>
+      !isLoading && !hasError && equiposAsignadosCount == 0;
 
-  bool shouldShowEmptyPendientes() => !isLoading && !hasError && equiposPendientesCount == 0;
+  bool shouldShowEmptyPendientes() =>
+      !isLoading && !hasError && equiposPendientesCount == 0;
 }

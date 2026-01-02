@@ -65,6 +65,16 @@ class UserSyncService {
             BaseSyncService.logger.w('Usuario con ID null: $usuario');
           }
 
+          // 🆕 PROCESAR RUTAS 🆕
+          final rutas = usuario['rutas'];
+          if (rutas != null && rutas is List && usuarioId != null) {
+            _dbHelper.sincronizarRutas(usuarioId, rutas).catchError((e) {
+              BaseSyncService.logger.e(
+                'Error sincronizando rutas para usuario $usuarioId: $e',
+              );
+            });
+          }
+
           return {
             'id': usuarioId, // 👈 FIX: Asignar ID explícitamente a la PK
             'employee_id': usuario['employeeId']?.toString(),

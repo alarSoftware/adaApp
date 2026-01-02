@@ -43,6 +43,7 @@ class DatabaseTables {
     await db.execute(_sqlProductos());
     await db.execute(_sqlOperacionComercial());
     await db.execute(_sqlOperacionComercialDetalle());
+    await db.execute(_sqlAppRoutes());
   }
 
   String _sqlModelos() => '''
@@ -341,6 +342,17 @@ class DatabaseTables {
   )
 ''';
 
+  String _sqlAppRoutes() => '''
+  CREATE TABLE app_routes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    module_name TEXT NOT NULL,
+    route_path TEXT NOT NULL,
+    fecha_sync TEXT,
+    FOREIGN KEY (user_id) REFERENCES Users (id) ON DELETE CASCADE
+  )
+''';
+
   // ==================== ÍNDICES ====================
 
   Future<void> _crearIndices(Database db) async {
@@ -353,6 +365,7 @@ class DatabaseTables {
     await _crearIndicesDeviceLog(db);
     await _crearIndicesErrorLog(db);
     await _crearIndicesOperacionesComerciales(db);
+    await _crearIndicesAppRoutes(db);
   }
 
   Future<void> _crearIndicesClientes(Database db) async {
@@ -495,6 +508,17 @@ class DatabaseTables {
 
       'CREATE INDEX IF NOT EXISTS idx_productos_codigo ON productos (codigo)',
       'CREATE INDEX IF NOT EXISTS idx_productos_categoria ON productos (categoria)',
+    ];
+
+    for (final indice in indices) {
+      await db.execute(indice);
+    }
+  }
+
+  Future<void> _crearIndicesAppRoutes(Database db) async {
+    final indices = [
+      'CREATE INDEX IF NOT EXISTS idx_app_routes_user_id ON app_routes (user_id)',
+      'CREATE INDEX IF NOT EXISTS idx_app_routes_module_name ON app_routes (module_name)',
     ];
 
     for (final indice in indices) {

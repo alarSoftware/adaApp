@@ -11,9 +11,9 @@ import 'package:ada_app/services/api/auth_service.dart';
 
 /// Pantalla principal que muestra las respuestas guardadas
 class DynamicFormResponsesScreen extends StatefulWidget {
-  final Cliente cliente;
+  final Cliente? cliente;
 
-  const DynamicFormResponsesScreen({super.key, required this.cliente});
+  const DynamicFormResponsesScreen({super.key, this.cliente});
 
   @override
   State<DynamicFormResponsesScreen> createState() =>
@@ -42,7 +42,7 @@ class _DynamicFormResponsesScreenState
   Future<void> _loadData() async {
     await _viewModel.loadTemplates();
     await _viewModel.loadSavedResponsesWithSync(
-      clienteId: widget.cliente.id.toString(),
+      clienteId: widget.cliente?.id.toString(),
     );
   }
 
@@ -61,7 +61,7 @@ class _DynamicFormResponsesScreenState
         child: SafeArea(
           child: Column(
             children: [
-              _buildClientInfo(),
+              if (widget.cliente != null) _buildClientInfo(),
               _buildFilterChips(),
               _buildResponsesList(),
             ],
@@ -101,7 +101,7 @@ class _DynamicFormResponsesScreenState
   Widget _buildClientInfo() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0),
-      child: ClientInfoCard(cliente: widget.cliente),
+      child: ClientInfoCard(cliente: widget.cliente!),
     );
   }
 
@@ -575,7 +575,6 @@ class _DynamicFormResponsesScreenState
     final usuario = await AuthService().getCurrentUser();
     final employeeId = usuario?.employeeId ?? '';
 
-
     _showLoadingDialog();
 
     // PASO 1: Descargar templates
@@ -592,8 +591,7 @@ class _DynamicFormResponsesScreenState
         employeeId,
       );
       debugPrint('📝 Responses: $responsesSuccess');
-    } else {
-    }
+    } else {}
 
     if (!mounted) return;
     Navigator.pop(context);

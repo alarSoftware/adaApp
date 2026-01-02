@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/ui/screens/clientes/cliente_detail_screen.dart';
-// import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_responses_screen.dart';
+import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_responses_screen.dart';
 import 'package:ada_app/ui/screens/operaciones_comerciales/operaciones_comerciales_menu_screen.dart';
 import 'package:ada_app/ui/widgets/client_info_card.dart';
+import 'package:ada_app/services/permissions_service.dart';
 
 /// Pantalla de selección de opciones para un cliente
 class ClientOptionsScreen extends StatelessWidget {
@@ -54,30 +55,92 @@ class ClientOptionsScreen extends StatelessWidget {
                 ),
               ),
 
-              // Opciones
+              // Opciones con Permisos
               Expanded(
-                child: ListView(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    _buildOptionCard(
-                      context: context,
-                      title: 'Realizar Censo de Equipo',
-                      description: 'Censo de los equipos de frio del cliente',
-                      icon: Icons.barcode_reader,
-                      color: AppColors.primary,
-                      onTap: () => _navigateToCenso(context),
-                    ),
+                child: FutureBuilder<Map<String, bool>>(
+                  future: PermissionsService.checkPermissions([
+                    'CrearCensoActivo',
+                    'CrearOperacionComercial',
+                    'VerFormularios',
+                  ]),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator());
+                    }
 
-                    SizedBox(height: 12),
-                    _buildOptionCard(
-                      context: context,
-                      title: 'Operaciones Comerciales',
-                      description: 'Reposiciones y retiros',
-                      icon: Icons.receipt_long,
-                      color: AppColors.success,
-                      onTap: () => _navigateToOperacionesComerciales(context),
-                    ),
-                  ],
+                    final permissions = snapshot.data ?? {};
+                    final canCreateCenso =
+                        permissions['CrearCensoActivo'] ?? false;
+                    final canCreateOperacion =
+                        permissions['CrearOperacionComercial'] ?? false;
+                    final canViewForms = permissions['VerFormularios'] ?? false;
+
+                    return ListView(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        if (canCreateCenso)
+                          _buildOptionCard(
+                            context: context,
+                            title: 'Realizar Censo de Equipo',
+                            description:
+                                'Censo de los equipos de frio del cliente',
+                            icon: Icons.barcode_reader,
+                            color: AppColors.primary,
+                            onTap: () => _navigateToCenso(context),
+                          ),
+
+                        if (canCreateCenso) SizedBox(height: 12),
+
+                        if (canCreateOperacion)
+                          _buildOptionCard(
+                            context: context,
+                            title: 'Operaciones Comerciales',
+                            description: 'Reposiciones y retiros',
+                            icon: Icons.receipt_long,
+                            color: AppColors.success,
+                            onTap: () =>
+                                _navigateToOperacionesComerciales(context),
+                          ),
+
+                        if (canCreateOperacion && canViewForms)
+                          SizedBox(height: 12),
+
+                        if (canViewForms)
+                          _buildOptionCard(
+                            context: context,
+                            title: 'Formularios Dinámicos',
+                            description: 'Ver historial y completar nuevos',
+                            icon: Icons.assignment_turned_in,
+                            color: AppColors.secondary,
+                            onTap: () => _navigateToForms(context),
+                          ),
+
+                        if (!canCreateCenso &&
+                            !canCreateOperacion &&
+                            !canViewForms)
+                          Padding(
+                            padding: const EdgeInsets.all(32.0),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.lock_outline,
+                                  size: 48,
+                                  color: AppColors.textSecondary,
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  "No tienes permisos habilitados para este módulo.",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -165,14 +228,14 @@ class ClientOptionsScreen extends StatelessWidget {
     );
   }
 
-  // void _navigateToForms(BuildContext context) {
-  //   Navigator.push(
-  //     context,
-  //     MaterialPageRoute(
-  //       builder: (context) => DynamicFormResponsesScreen(cliente: cliente),
-  //     ),
-  //   );
-  // }
+  void _navigateToForms(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DynamicFormResponsesScreen(cliente: cliente),
+      ),
+    );
+  }
 
   void _navigateToOperacionesComerciales(BuildContext context) {
     Navigator.push(

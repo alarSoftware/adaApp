@@ -1,5 +1,10 @@
 import 'package:permission_handler/permission_handler.dart'; // Add import
+
 import 'package:ada_app/ui/screens/menu_principal/pending_data_screen.dart';
+import 'package:ada_app/services/permissions_service.dart';
+// import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_template_list_screen.dart';
+import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_responses_screen.dart';
+// import 'package:ada_app/viewmodels/dynamic_form_viewmodel.dart';
 
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
@@ -52,7 +57,28 @@ class _SelectScreenState extends State<SelectScreen>
       _checkBatteryOptimizationOnFirstLoad();
       _checkLocationPermissions();
       _checkNotificationPermissions();
+      _checkAutoRedirect();
     });
+  }
+
+  Future<void> _checkAutoRedirect() async {
+    final permissions = await PermissionsService.checkPermissions([
+      'VerClientes',
+      'VerFormularios',
+    ]);
+    final canViewClients = permissions['VerClientes'] ?? false;
+    final canViewForms = permissions['VerFormularios'] ?? false;
+
+    if (canViewForms && !canViewClients) {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const DynamicFormResponsesScreen(),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -1405,60 +1431,148 @@ class _SelectScreenState extends State<SelectScreen>
                         side: BorderSide(color: AppColors.border),
                       ),
                       elevation: 2,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: ListenableBuilder(
-                          listenable: _viewModel,
-                          builder: (context, child) {
-                            return Row(
-                              children: [
-                                if (_viewModel.isLoadingUser) ...[
-                                  SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        AppColors.primary,
+                      child: InkWell(
+                        onLongPress: _showDebugPermissionsDialog,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: ListenableBuilder(
+                            listenable: _viewModel,
+                            builder: (context, child) {
+                              return Row(
+                                children: [
+                                  if (_viewModel.isLoadingUser) ...[
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              AppColors.primary,
+                                            ),
                                       ),
                                     ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Cargando usuario...',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ] else
-                                  Expanded(
-                                    child: Text(
-                                      'Hola, ${_viewModel.userDisplayName}',
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Cargando usuario...',
                                       style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
-                                        color: AppColors.textPrimary,
+                                        color: AppColors.textSecondary,
                                       ),
-                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  ),
-                              ],
-                            );
-                          },
+                                  ] else
+                                    Expanded(
+                                      child: Text(
+                                        'Hola, ${_viewModel.userDisplayName}',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _buildMenuCard(
-                      label: 'Clientes',
-                      description: 'Lista de clientes y operaciones',
-                      icon: Icons.people,
-                      color: AppColors.primary,
-                      routeName: '/clienteLista',
+                    child: FutureBuilder<Map<String, bool>>(
+                      future: PermissionsService.checkPermissions([
+                        'VerClientes',
+                        'VerFormularios',
+                      ]),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        }
+
+                        final permissions = snapshot.data ?? {};
+                        // Fallback: If no permissions found at all (empty list/map), maybe default to Clientes?
+                        // For now, strict check: defaults to false if not present.
+                        // But to prevent breaking current users without DB sync, let's assume if NO permissions exist in DB, we allow Clientes.
+                        // This logic would need a specific check in PermissionsService.
+                        // For this task, assuming backend logic is key.
+
+                        final canViewClients =
+                            permissions['VerClientes'] ?? false;
+                        final canViewForms =
+                            permissions['VerFormularios'] ?? false;
+
+                        // Auto-redirect logic handling could be done here or in initState.
+                        // Doing it here risks rebuild loops if not careful.
+                        // Better to just render the buttons here.
+
+                        if (!canViewClients && !canViewForms) {
+                          return Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.lock_person,
+                                  size: 64,
+                                  color: AppColors.textSecondary,
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  "No tienes módulos asignados.",
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return Column(
+                          children: [
+                            if (canViewClients)
+                              _buildMenuCard(
+                                label: 'Clientes',
+                                description: 'Lista de clientes y operaciones',
+                                icon: Icons.people,
+                                color: AppColors.primary,
+                                routeName: '/clienteLista',
+                              ),
+
+                            if (canViewClients && canViewForms)
+                              SizedBox(height: 16),
+
+                            if (canViewForms)
+                              _buildMenuCard(
+                                label: 'Formularios Dinámicos',
+                                description: 'Completar y enviar formularios',
+                                icon: Icons.assignment,
+                                color: AppColors
+                                    .secondary, // Ensure this color exists or use another
+                                routeName:
+                                    '/dynamicForms', // Need to ensure this route exists or push manually
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const DynamicFormResponsesScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -1545,5 +1659,112 @@ class _SelectScreenState extends State<SelectScreen>
         );
       },
     );
+  }
+
+  Future<void> _showDebugPermissionsDialog() async {
+    showDialog(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('🕵️ Debug: Inyectar Permisos'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(context);
+              _injectPermissions([
+                'VerClientes',
+                'VerFormularios',
+                'CrearCensoActivo',
+                'CrearOperacionComercial',
+              ]);
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('✅ Acceso Total (Clientes + Forms + Ops)'),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(context);
+              _injectPermissions(['VerFormularios']);
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('📝 Solo Formularios (Redirect Test)'),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(context);
+              _injectPermissions(['VerClientes']);
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('👥 Solo Clientes'),
+            ),
+          ),
+          const Divider(),
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(context);
+              _injectPermissions([]);
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('🚫 Borrar Todos (Sin Acceso)'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _injectPermissions(List<String> modules) async {
+    try {
+      final user = await AuthService().getCurrentUser();
+      if (user == null || user.id == null) {
+        _mostrarError('No hay usuario logueado');
+        return;
+      }
+
+      final db = await DatabaseHelper().database;
+
+      await db.delete('app_routes', where: 'user_id = ?', whereArgs: [user.id]);
+
+      final batch = db.batch();
+      final now = DateTime.now().toIso8601String();
+      for (final module in modules) {
+        String routePath = '/home';
+        if (module == 'VerClientes') routePath = '/clienteLista';
+        if (module == 'VerFormularios') routePath = '/dynamicForms';
+        if (module == 'CrearOperacionComercial') routePath = '/operaciones';
+        if (module == 'CrearCensoActivo') routePath = '/censo';
+
+        batch.insert('app_routes', {
+          'user_id': user.id,
+          'module_name': module,
+          'route_path': routePath,
+          'fecha_sync': now,
+        });
+      }
+      await batch.commit(noResult: true);
+
+      setState(() {});
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Permisos actualizados: ${modules.isEmpty ? "NINGUNO" : modules.join(", ")}',
+          ),
+          backgroundColor: AppColors.success,
+        ),
+      );
+
+      // Si probamos redirect y estamos en solo forms, re-verify
+      if (modules.length == 1 && modules.contains('VerFormularios')) {
+        _checkAutoRedirect();
+      }
+    } catch (e) {
+      _mostrarError('Error inyectando permisos: $e');
+    }
   }
 }
