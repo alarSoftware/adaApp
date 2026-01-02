@@ -92,8 +92,64 @@ class _DynamicFormResponsesScreenState
           onPressed: _navigateToFormList,
           tooltip: 'Nuevo Formulario',
         ),
+        IconButton(
+          icon: Icon(Icons.logout, color: AppColors.onPrimary),
+          onPressed: _handleLogout,
+          tooltip: 'Cerrar Sesión',
+        ),
       ],
     );
+  }
+
+  Future<void> _handleLogout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Cerrar Sesión'),
+        content: Text('¿Seguro que deseas salir?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Salir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => Center(child: CircularProgressIndicator()),
+        );
+      }
+
+      await AuthService().logout();
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Close dialog
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      }
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al cerrar sesión: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   // ==================== CLIENT INFO ====================
