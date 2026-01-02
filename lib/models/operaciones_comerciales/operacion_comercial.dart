@@ -7,7 +7,7 @@ class OperacionComercial {
   final TipoOperacion tipoOperacion;
   final DateTime fechaCreacion;
   final DateTime? fechaRetiro;
-  final String? observaciones;
+  final String? snc;
   final int totalProductos;
   final int? usuarioId;
   final int? serverId;
@@ -15,6 +15,11 @@ class OperacionComercial {
   final String? syncError;
   final DateTime? syncedAt;
   final int syncRetryCount;
+  final String? employeeId;
+  final double? latitud;
+  final double? longitud;
+  final String? odooName;
+  final String? adaSequence;
 
   final List<OperacionComercialDetalle> detalles;
 
@@ -24,7 +29,7 @@ class OperacionComercial {
     required this.tipoOperacion,
     required this.fechaCreacion,
     this.fechaRetiro,
-    this.observaciones,
+    this.snc,
     this.totalProductos = 0,
     this.usuarioId,
     this.serverId,
@@ -32,6 +37,11 @@ class OperacionComercial {
     this.syncError,
     this.syncedAt,
     this.syncRetryCount = 0,
+    this.employeeId,
+    this.latitud,
+    this.longitud,
+    this.odooName,
+    this.adaSequence,
     this.detalles = const [],
   });
 
@@ -39,14 +49,16 @@ class OperacionComercial {
     return OperacionComercial(
       id: map['id'] as String?,
       clienteId: map['cliente_id'] as int? ?? 0,
-      tipoOperacion: TipoOperacionExtension.fromString(map['tipo_operacion'] as String?),
+      tipoOperacion: TipoOperacionExtension.fromString(
+        map['tipo_operacion'] as String?,
+      ),
       fechaCreacion: map['fecha_creacion'] != null
           ? DateTime.parse(map['fecha_creacion'] as String)
           : DateTime.now(),
       fechaRetiro: map['fecha_retiro'] != null
           ? DateTime.parse(map['fecha_retiro'] as String)
           : null,
-      observaciones: map['observaciones'] as String?,
+      snc: map['snc'] as String?,
       totalProductos: map['total_productos'] as int? ?? 0,
       usuarioId: map['usuario_id'] as int?,
       serverId: map['server_id'] as int?,
@@ -56,6 +68,11 @@ class OperacionComercial {
           ? DateTime.parse(map['synced_at'] as String)
           : null,
       syncRetryCount: map['sync_retry_count'] as int? ?? 0,
+      employeeId: map['employee_id'] as String?,
+      latitud: map['latitud'] as double?,
+      longitud: map['longitud'] as double?,
+      odooName: map['odoo_name'] as String?,
+      adaSequence: map['ada_sequence'] as String?,
     );
   }
 
@@ -66,7 +83,7 @@ class OperacionComercial {
       'tipo_operacion': tipoOperacion.valor,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_retiro': fechaRetiro?.toIso8601String(),
-      'observaciones': observaciones,
+      if (snc != null) 'snc': snc,
       'total_productos': totalProductos,
       'usuario_id': usuarioId,
       'server_id': serverId,
@@ -74,6 +91,11 @@ class OperacionComercial {
       'sync_error': syncError,
       'synced_at': syncedAt?.toIso8601String(),
       'sync_retry_count': syncRetryCount,
+      'employee_id': employeeId,
+      'latitud': latitud,
+      'longitud': longitud,
+      'odoo_name': odooName,
+      'ada_sequence': adaSequence,
     };
   }
 
@@ -84,7 +106,12 @@ class OperacionComercial {
       'tipo_operacion': tipoOperacion.valor,
       'fecha_creacion': fechaCreacion.toIso8601String(),
       'fecha_retiro': fechaRetiro?.toIso8601String(),
-      'observaciones': observaciones,
+      if (snc != null) 'snc': snc,
+      'employee_id': employeeId,
+      'latitud': latitud,
+      'longitud': longitud,
+      'odoo_name': odooName,
+      'ada_sequence': adaSequence,
       'detalles': detalles.map((d) => d.toJson()).toList(),
     };
   }
@@ -95,7 +122,7 @@ class OperacionComercial {
     TipoOperacion? tipoOperacion,
     DateTime? fechaCreacion,
     DateTime? fechaRetiro,
-    String? observaciones,
+    String? snc,
     int? totalProductos,
     int? usuarioId,
     int? serverId,
@@ -103,6 +130,11 @@ class OperacionComercial {
     String? syncError,
     DateTime? syncedAt,
     int? syncRetryCount,
+    String? employeeId,
+    double? latitud,
+    double? longitud,
+    String? odooName,
+    String? adaSequence,
     List<OperacionComercialDetalle>? detalles,
   }) {
     return OperacionComercial(
@@ -111,7 +143,7 @@ class OperacionComercial {
       tipoOperacion: tipoOperacion ?? this.tipoOperacion,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
       fechaRetiro: fechaRetiro ?? this.fechaRetiro,
-      observaciones: observaciones ?? this.observaciones,
+      snc: snc ?? this.snc,
       totalProductos: totalProductos ?? this.totalProductos,
       usuarioId: usuarioId ?? this.usuarioId,
       serverId: serverId ?? this.serverId,
@@ -119,6 +151,11 @@ class OperacionComercial {
       syncError: syncError ?? this.syncError,
       syncedAt: syncedAt ?? this.syncedAt,
       syncRetryCount: syncRetryCount ?? this.syncRetryCount,
+      employeeId: employeeId ?? this.employeeId,
+      latitud: latitud ?? this.latitud,
+      longitud: longitud ?? this.longitud,
+      odooName: odooName ?? this.odooName,
+      adaSequence: adaSequence ?? this.adaSequence,
       detalles: detalles ?? this.detalles,
     );
   }
@@ -130,7 +167,7 @@ class OperacionComercial {
   bool get tieneDetalles => detalles.isNotEmpty;
   bool get necesitaFechaRetiro =>
       tipoOperacion == TipoOperacion.notaRetiro ||
-          tipoOperacion == TipoOperacion.notaRetiroDiscontinuos;
+      tipoOperacion == TipoOperacion.notaRetiroDiscontinuos;
 
   String get displayTipo => tipoOperacion.displayName;
   String get displaySyncStatus {
@@ -149,17 +186,17 @@ class OperacionComercial {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-          other is OperacionComercial &&
-              runtimeType == other.runtimeType &&
-              id == other.id &&
-              clienteId == other.clienteId &&
-              tipoOperacion == other.tipoOperacion;
+      other is OperacionComercial &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          clienteId == other.clienteId &&
+          tipoOperacion == other.tipoOperacion;
 
   @override
   int get hashCode => id.hashCode ^ clienteId.hashCode ^ tipoOperacion.hashCode;
 
   @override
   String toString() {
-    return 'OperacionComercial{id: $id, tipo: ${tipoOperacion.valor}, cliente: $clienteId, detalles: ${detalles.length}, sync: $syncStatus, retries: $syncRetryCount}';
+    return 'OperacionComercial{id: $id, tipo: ${tipoOperacion.valor}, cliente: $clienteId, snc: $snc, detalles: ${detalles.length}, sync: $syncStatus, retries: $syncRetryCount}';
   }
 }

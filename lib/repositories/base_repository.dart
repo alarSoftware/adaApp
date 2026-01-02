@@ -1,5 +1,5 @@
 import 'package:sqflite/sqflite.dart';
-import '../services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 
 abstract class BaseRepository<T> {
   final DatabaseHelper dbHelper = DatabaseHelper();
@@ -80,7 +80,7 @@ abstract class BaseRepository<T> {
         Sqflite.firstIntValue(
           await db.rawQuery('SELECT COUNT(*) FROM $tableName'),
         ) ??
-            0;
+        0;
 
     return {
       'total${getEntityName()}s': total,
@@ -157,8 +157,8 @@ abstract class BaseRepository<T> {
   Future<int> contar() async {
     final db = await dbHelper.database;
     return Sqflite.firstIntValue(
-      await db.rawQuery('SELECT COUNT(*) FROM $tableName'),
-    ) ??
+          await db.rawQuery('SELECT COUNT(*) FROM $tableName'),
+        ) ??
         0;
   }
 

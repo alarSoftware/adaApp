@@ -1,18 +1,26 @@
-import 'package:ada_app/ui/screens/pending_data_screen.dart';
+import 'package:permission_handler/permission_handler.dart'; // Add import
+import 'package:ada_app/ui/screens/menu_principal/pending_data_screen.dart';
+
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
-import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
 import 'package:ada_app/ui/widgets/app_connection_indicator.dart';
-import 'package:ada_app/ui/screens/equipos_screen.dart';
-import 'package:ada_app/ui/screens/modelos_screen.dart';
-import 'package:ada_app/ui/screens/logo_screen.dart';
-import 'package:ada_app/ui/screens/marca_screen.dart';
+import 'package:ada_app/ui/screens/menu_principal/equipos_screen.dart';
+import 'package:ada_app/ui/screens/menu_principal/modelos_screen.dart';
+import 'package:ada_app/ui/screens/menu_principal/logo_screen.dart';
+import 'package:ada_app/ui/screens/menu_principal/marca_screen.dart';
 import 'package:ada_app/viewmodels/select_screen_viewmodel.dart';
 import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
-import 'package:ada_app/services/database_validation_service.dart';
-import 'package:ada_app/services/database_helper.dart';
-import 'package:ada_app/ui/screens/productos_screen.dart';
+import 'package:ada_app/services/data/database_validation_service.dart';
+import 'package:ada_app/services/data/database_helper.dart';
+import 'package:ada_app/ui/screens/menu_principal/productos_screen.dart';
+import 'package:ada_app/ui/screens/menu_principal/about_screen.dart';
+import 'package:ada_app/ui/screens/device_log_screen.dart';
+import 'package:ada_app/ui/screens/error_log_screen.dart';
+import 'package:ada_app/repositories/device_log_repository.dart'; // Needed for DeviceLogScreen
+import 'package:ada_app/services/device/location_service.dart';
+import 'package:ada_app/ui/screens/settings/work_hours_settings_screen.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -22,7 +30,8 @@ class SelectScreen extends StatefulWidget {
   State<SelectScreen> createState() => _SelectScreenState();
 }
 
-class _SelectScreenState extends State<SelectScreen> {
+class _SelectScreenState extends State<SelectScreen>
+    with WidgetsBindingObserver {
   late SelectScreenViewModel _viewModel;
   late StreamSubscription<UIEvent> _eventSubscription;
 
@@ -37,14 +46,18 @@ class _SelectScreenState extends State<SelectScreen> {
     _viewModel = SelectScreenViewModel();
     _setupEventListener();
     _startPendingDataMonitoring();
+    WidgetsBinding.instance.addObserver(this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkBatteryOptimizationOnFirstLoad();
+      _checkLocationPermissions();
+      _checkNotificationPermissions();
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _eventSubscription.cancel();
     _pendingDataTimer?.cancel();
     _viewModel.dispose();
@@ -95,6 +108,7 @@ class _SelectScreenState extends State<SelectScreen> {
         });
       }
     } catch (e) {
+      debugPrint('Error checking pending data: $e');
     }
   }
 
@@ -107,7 +121,135 @@ class _SelectScreenState extends State<SelectScreen> {
         context,
       );
     } catch (e) {
+      debugPrint('Error checking battery optimization: $e');
     }
+  }
+
+  Future<void> _checkLocationPermissions() async {
+    try {
+      // Solicitar permisos de ubicación si no están otorgados
+      await LocationService().ensurePermissions();
+    } catch (e) {
+      if (mounted) {
+        _mostrarError(
+          'Se requieren permisos de ubicación para el funcionamiento correcto.',
+        );
+      }
+    }
+
+    // 🕵️‍♂️ NUEVO: Verificar ubicación simulada
+    await _checkFakeGps();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkLocationPermissions();
+    }
+  }
+
+  Future<void> _checkNotificationPermissions() async {
+    try {
+      if (await Permission.notification.isDenied) {
+        await Permission.notification.request();
+      }
+    } catch (e) {
+      debugPrint('Error checking notification permissions: $e');
+    }
+  }
+
+  Future<void> _checkFakeGps() async {
+    try {
+      final isMocked = await LocationService().checkForMockLocation();
+      if (isMocked) {
+        if (mounted) {
+          _mostrarDialogoFakeLocation();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking fake GPS: $e');
+    }
+  }
+
+  Future<void> _mostrarDialogoFakeLocation() async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // NO SE PUEDE CERRAR TOCANDO AFUERA
+      builder: (BuildContext context) {
+        return PopScope(
+          canPop: false, // NO SE PUEDE CERRAR CON BACK BUTTON
+          child: AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: Row(
+              children: [
+                Icon(Icons.location_off, color: AppColors.error, size: 28),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Ubicación Simulada Detectada',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.error.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Text(
+                    'Se ha detectado el uso de una aplicación para simular la ubicación (Fake GPS).',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Por motivos de seguridad y control, no es posible utilizar la aplicación con ubicaciones falsas.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Por favor, desactiva cualquier aplicación de ubicación falsa y vuelve a intentar.',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  // Reintentar verificación
+                  await _checkFakeGps();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                child: Text('Reintentar'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _handleLogout() async {
@@ -141,11 +283,7 @@ class _SelectScreenState extends State<SelectScreen> {
       if (mounted) Navigator.of(context).pop();
 
       if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/login',
-              (route) => false,
-        );
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
       }
     } catch (e) {
       if (mounted) Navigator.of(context).pop();
@@ -405,8 +543,8 @@ class _SelectScreenState extends State<SelectScreen> {
   }
 
   Future<void> _handleDeleteValidationFailed(
-      DatabaseValidationResult validation,
-      ) async {
+    DatabaseValidationResult validation,
+  ) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -730,7 +868,7 @@ class _SelectScreenState extends State<SelectScreen> {
   void _mostrarError(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$mensaje'),
+        content: Text(mensaje),
         backgroundColor: AppColors.error,
         duration: Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
@@ -742,7 +880,7 @@ class _SelectScreenState extends State<SelectScreen> {
   void _mostrarExito(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$mensaje'),
+        content: Text(mensaje),
         backgroundColor: AppColors.success,
         duration: Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
@@ -771,8 +909,8 @@ class _SelectScreenState extends State<SelectScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap:
-        onTap ??
-                () {
+            onTap ??
+            () {
               if (routeName != null) {
                 Navigator.pushNamed(context, routeName);
               } else if (page != null) {
@@ -894,6 +1032,235 @@ class _SelectScreenState extends State<SelectScreen> {
     );
   }
 
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
+            decoration: BoxDecoration(color: AppColors.primary),
+            child: ListenableBuilder(
+              listenable: _viewModel,
+              builder: (context, child) {
+                if (_viewModel.isLoadingUser) {
+                  return Text(
+                    'Cargando...',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _viewModel.userDisplayName,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(
+                          'Panel de Control',
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
+                        SizedBox(width: 12),
+                        _buildConnectionStatus(),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _buildDrawerItem(
+                  icon: Icons.kitchen,
+                  label: 'Equipos',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const EquipoListScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.widgets,
+                  label: 'Modelos',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ModelosScreen()),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.local_offer,
+                  label: 'Logos',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LogosScreen()),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.domain,
+                  label: 'Marcas',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MarcaScreen()),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.inventory_2,
+                  label: 'Productos',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ProductosScreen(),
+                      ),
+                    );
+                  },
+                ),
+                Divider(),
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
+                  child: Text(
+                    'Sistema',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                _buildDrawerItem(
+                  icon: Icons.history,
+                  label: 'Device Logs',
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final db = await DatabaseHelper().database;
+                    if (context.mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DeviceLogScreen(
+                            repository: DeviceLogRepository(db),
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.bug_report,
+                  label: 'Log de Errores',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ErrorLogScreen()),
+                    );
+                  },
+                ),
+                Divider(),
+                _buildDrawerItem(
+                  icon: Icons.logout,
+                  label: 'Cerrar Sesión',
+                  color: AppColors.error,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _handleLogout();
+                  },
+                ),
+                if (_viewModel.userDisplayName.toLowerCase().contains(
+                      'admin',
+                    ) ||
+                    _viewModel.userDisplayName.toLowerCase().contains(
+                      'sistemas',
+                    )) ...[
+                  _buildDrawerItem(
+                    icon: Icons.settings_applications,
+                    label: 'Configurar Horario',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const WorkHoursSettingsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+                _buildDrawerItem(
+                  icon: Icons.access_time, // Icono válido
+                  label: 'Horario de Trabajo',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const WorkHoursSettingsScreen(),
+                      ),
+                    );
+                  },
+                ),
+                Divider(),
+              ], // Closing the children list
+            ), // Closing the ListView
+          ), // Closing the Expanded
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'Versión 1.0.0', // You might want to get this dynamically
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color? color,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: color ?? AppColors.textSecondary),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: color ?? AppColors.textPrimary,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      onTap: onTap,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -912,15 +1279,15 @@ class _SelectScreenState extends State<SelectScreen> {
                 onPressed: _viewModel.isSyncing ? null : _viewModel.requestSync,
                 icon: _viewModel.isSyncing
                     ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppColors.onPrimary,
-                    ),
-                  ),
-                )
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.onPrimary,
+                          ),
+                        ),
+                      )
                     : Icon(Icons.sync, color: AppColors.onPrimary),
                 tooltip: _viewModel.isSyncing
                     ? 'Sincronizando...'
@@ -929,7 +1296,6 @@ class _SelectScreenState extends State<SelectScreen> {
             },
           ),
           _buildPendingDataButton(),
-          _buildConnectionStatus(),
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {
@@ -942,27 +1308,33 @@ class _SelectScreenState extends State<SelectScreen> {
                     case 'borrar_bd':
                       _viewModel.requestDeleteDatabase();
                       break;
+                    case 'acerca_de':
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => AboutScreen()),
+                      );
+                      break;
                   }
                 },
                 itemBuilder: (BuildContext context) => [
                   PopupMenuItem<String>(
                     value: 'probar_conexion',
                     enabled:
-                    !_viewModel.isTestingConnection &&
+                        !_viewModel.isTestingConnection &&
                         !_viewModel.isSyncing,
                     child: Row(
                       children: [
                         _viewModel.isTestingConnection
                             ? SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              AppColors.success,
-                            ),
-                          ),
-                        )
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.success,
+                                  ),
+                                ),
+                              )
                             : Icon(Icons.wifi_find, color: AppColors.success),
                         SizedBox(width: 8),
                         Text(
@@ -977,7 +1349,7 @@ class _SelectScreenState extends State<SelectScreen> {
                   PopupMenuItem<String>(
                     value: 'borrar_bd',
                     enabled:
-                    !_viewModel.isSyncing &&
+                        !_viewModel.isSyncing &&
                         !_viewModel.isTestingConnection,
                     child: Row(
                       children: [
@@ -990,12 +1362,26 @@ class _SelectScreenState extends State<SelectScreen> {
                       ],
                     ),
                   ),
+                  PopupMenuItem<String>(
+                    value: 'acerca_de',
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: AppColors.primary),
+                        SizedBox(width: 8),
+                        Text(
+                          'Acerca de',
+                          style: TextStyle(color: AppColors.textPrimary),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               );
             },
           ),
         ],
       ),
+      drawer: _buildDrawer(context),
       body: Stack(
         children: [
           SafeArea(
@@ -1047,12 +1433,15 @@ class _SelectScreenState extends State<SelectScreen> {
                                     ),
                                   ),
                                 ] else
-                                  Text(
-                                    'Hola, ${_viewModel.userDisplayName}',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textPrimary,
+                                  Expanded(
+                                    child: Text(
+                                      'Hola, ${_viewModel.userDisplayName}',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                               ],
@@ -1062,75 +1451,14 @@ class _SelectScreenState extends State<SelectScreen> {
                       ),
                     ),
                   ),
-
-                  Expanded(
-                    child: ListView(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      children: [
-                        _buildMenuCard(
-                          label: 'Clientes',
-                          description: 'Lista de clientes',
-                          icon: Icons.people,
-                          color: AppColors.primary,
-                          routeName: '/clienteLista',
-                        ),
-                        SizedBox(height: 12),
-                        _buildMenuCard(
-                          label: 'Equipos',
-                          description: 'Lista de equipos de frío',
-                          icon: Icons.kitchen,
-                          color: AppColors.primary,
-                          page: const EquipoListScreen(),
-                        ),
-                        SizedBox(height: 12),
-                        _buildMenuCard(
-                          label: 'Modelos',
-                          description: 'Catálogo de modelos de equipos',
-                          icon: Icons.branding_watermark,
-                          color: AppColors.primary,
-                          page: const ModelosScreen(),
-                        ),
-                        SizedBox(height: 12),
-                        _buildMenuCard(
-                          label: 'Logos',
-                          description: 'Lista de los logos de la empresa',
-                          icon: Icons.newspaper,
-                          color: AppColors.primary,
-                          page: const LogosScreen(),
-                        ),
-                        SizedBox(height: 12),
-                        _buildMenuCard(
-                          label: 'Marcas',
-                          description: 'Lista de las Marcas',
-                          icon: Icons.domain,
-                          color: AppColors.primary,
-                          page: const MarcaScreen(),
-                        ),
-                        SizedBox(height: 12),
-                        _buildMenuCard(
-                          label: 'Productos',
-                          description: 'Catálogo completo de productos',
-                          icon: Icons.inventory_2,
-                          color: AppColors.primary,
-                          page: const ProductosScreen(),
-                        ),
-                        SizedBox(height: 12),
-                      ],
-                    ),
-                  ),
-
                   Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: TextButton.icon(
-                      onPressed: _handleLogout,
-                      icon: Icon(Icons.logout, color: AppColors.textSecondary),
-                      label: Text(
-                        'Cerrar Sesión',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 16,
-                        ),
-                      ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: _buildMenuCard(
+                      label: 'Clientes',
+                      description: 'Lista de clientes y operaciones',
+                      icon: Icons.people,
+                      color: AppColors.primary,
+                      routeName: '/clienteLista',
                     ),
                   ),
                 ],
@@ -1159,8 +1487,8 @@ class _SelectScreenState extends State<SelectScreen> {
   }
 
   Future<void> _mostrarDialogoSincronizacionObligatoria(
-      RequiredSyncEvent event,
-      ) async {
+    RequiredSyncEvent event,
+  ) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,

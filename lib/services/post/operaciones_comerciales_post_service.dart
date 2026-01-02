@@ -2,12 +2,13 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 import 'package:ada_app/config/constants/server_response.dart';
-import 'package:ada_app/repositories/operacion_comercial_repository.dart';
+
+import 'package:ada_app/repositories/producto_repository.dart';
 import 'package:http/http.dart' as http;
 
-import 'package:ada_app/services/api_config_service.dart';
+import 'package:ada_app/services/api/api_config_service.dart';
 import 'package:ada_app/config/constants/server_constants.dart';
-import 'package:ada_app/services/error_log/error_log_service.dart';
+
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
@@ -16,9 +17,10 @@ class OperacionesComercialesPostService {
   static const String _endpoint =
       '/operacionComercial/insertOperacionComercial';
 
-  static Future<void> enviarOperacion(
+  static Future<ServerResponse> enviarOperacion(
     OperacionComercial operacion, {
     int timeoutSegundos = 60,
+    ProductoRepository? productoRepository,
   }) async {
     String? fullUrl;
     try {
@@ -29,7 +31,9 @@ class OperacionesComercialesPostService {
         throw Exception('La operación debe tener al menos un detalle');
       }
 
-      final payload = _construirPayload(operacion);
+      final repo = productoRepository ?? ProductoRepositoryImpl();
+      final payload = await _construirPayload(operacion, repo);
+
       final baseUrl = await ApiConfigService.getBaseUrl();
       final cleanBaseUrl = baseUrl.endsWith('/')
           ? baseUrl.substring(0, baseUrl.length - 1)
@@ -56,34 +60,36 @@ class OperacionesComercialesPostService {
         }
       }
 
-      // Éxito
-      if (resultObject.success || resultObject.isDuplicate) {}
+      return resultObject;
     } catch (e) {
-      await ErrorLogService.manejarExcepcion(
-        e,
-        operacion.id,
-        fullUrl,
-        operacion.usuarioId,
-        'operacion_comercial',
-      );
       rethrow;
     }
   }
 
-  static Map<String, dynamic> _construirPayload(OperacionComercial operacion) {
+  static Future<Map<String, dynamic>> _construirPayload(
+    OperacionComercial operacion,
+    ProductoRepository productoRepository,
+  ) async {
     final operacionComercialData = {
       'id': operacion.id,
       'clienteId': operacion.clienteId,
       'tipoOperacion': operacion.tipoOperacion.valor,
       'fechaCreacion': operacion.fechaCreacion.toIso8601String(),
       'fechaRetiro': operacion.fechaRetiro?.toIso8601String(),
+      if (operacion.snc != null) 'snc': operacion.snc,
       'usuarioId': operacion.usuarioId,
       'totalProductos': operacion.totalProductos,
+      'employeeId': operacion.employeeId,
+      'latitud': operacion.latitud,
+      'longitud': operacion.longitud,
     };
 
-    final detalles = operacion.detalles
-        .map((d) => _construirDetalle(d, operacion.tipoOperacion))
-        .toList();
+    final detalles = await Future.wait(
+      operacion.detalles.map(
+        (d) =>
+            _construirDetalle(d, operacion.tipoOperacion, productoRepository),
+      ),
+    );
 
     return {
       'operacionComercial': operacionComercialData,
@@ -92,30 +98,45 @@ class OperacionesComercialesPostService {
     };
   }
 
-  static Map<String, dynamic> _construirDetalle(
+  static Future<Map<String, dynamic>> _construirDetalle(
     OperacionComercialDetalle detalle,
     TipoOperacion tipoOperacion,
-  ) {
+    ProductoRepository productoRepository,
+  ) async {
+    final producto = await productoRepository.obtenerProductoPorId(
+      detalle.productoId!,
+    );
+
+    if (producto == null) {
+      throw Exception('Producto con ID ${detalle.productoId} no encontrado');
+    }
+
     final detalleBase = {
-      'productoCodigo': detalle.productoCodigo,
-      'productoDescripcion': detalle.productoDescripcion,
-      'productoCategoria': detalle.productoCategoria,
+      'productoCodigo': producto.codigo,
+      'productoDescripcion': producto.nombre,
+      'productoCategoria': producto.categoria,
       'productoId': detalle.productoId,
       'cantidad': detalle.cantidad,
-      'unidadMedida': detalle.unidadMedida,
+      'unidadMedida': producto.unidadMedida,
     };
 
     if (tipoOperacion == TipoOperacion.notaRetiroDiscontinuos &&
         detalle.productoReemplazoId != null) {
-      detalleBase['productoIntercambio'] = [
-        {
-          'productoId': detalle.productoReemplazoId,
-          'productoCodigo': detalle.productoReemplazoCodigo,
-          'productoDescripcion': detalle.productoReemplazoDescripcion,
-          'productoCategoria': detalle.productoReemplazoCategoria,
-          'cantidad': detalle.cantidad,
-        },
-      ];
+      final productoReemplazo = await productoRepository.obtenerProductoPorId(
+        detalle.productoReemplazoId!,
+      );
+
+      if (productoReemplazo != null) {
+        detalleBase['productoIntercambio'] = [
+          {
+            'productoId': detalle.productoReemplazoId,
+            'productoCodigo': productoReemplazo.codigo,
+            'productoDescripcion': productoReemplazo.nombre,
+            'productoCategoria': productoReemplazo.categoria,
+            'cantidad': detalle.cantidad,
+          },
+        ];
+      }
     }
 
     return detalleBase;

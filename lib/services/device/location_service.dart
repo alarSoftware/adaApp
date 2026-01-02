@@ -13,13 +13,7 @@ class LocationException implements Exception {
   String toString() => 'LocationException: $message';
 }
 
-enum LocationErrorType {
-  permissionDenied,
-  serviceDisabled,
-  timeout,
-  unknown,
-}
-
+enum LocationErrorType { permissionDenied, serviceDisabled, timeout, unknown }
 
 /// Servicio centralizado para manejo de ubicación GPS
 class LocationService {
@@ -42,10 +36,7 @@ class LocationService {
       timeout: timeout,
     );
 
-    return {
-      'latitud': position.latitude,
-      'longitud': position.longitude,
-    };
+    return {'latitud': position.latitude, 'longitud': position.longitude};
   }
 
   /// Verificar si los servicios de ubicación están habilitados en el dispositivo
@@ -95,10 +86,18 @@ class LocationService {
   Future<bool> ensurePermissions() async {
     // Verificar servicios habilitados
     if (!await isLocationServiceEnabled()) {
-      throw const LocationException(
-        'Los servicios de ubicación están deshabilitados. Por favor, habilítalos en Configuración.',
-        LocationErrorType.serviceDisabled,
-      );
+      // Intentar "despertar" el diálogo de resolución de Android pidiendo ubicación
+      try {
+        await Geolocator.getCurrentPosition();
+      } catch (_) {}
+
+      // Verificar de nuevo
+      if (!await isLocationServiceEnabled()) {
+        throw const LocationException(
+          'Los servicios de ubicación están deshabilitados. Por favor, habilítalos en Configuración.',
+          LocationErrorType.serviceDisabled,
+        );
+      }
     }
 
     // Verificar permisos actuales
@@ -147,9 +146,10 @@ class LocationService {
         timeLimit: timeout,
       );
 
-      _logger.i('Ubicación obtenida: ${position.latitude}, ${position.longitude} (precisión: ${position.accuracy}m)');
+      _logger.i(
+        'Ubicación obtenida: ${position.latitude}, ${position.longitude} (precisión: ${position.accuracy}m)',
+      );
       return position;
-
     } catch (e) {
       _logger.w('No se pudo obtener ubicación: $e');
       return null;
@@ -183,7 +183,6 @@ class LocationService {
         throw const LocationException(
           'No hay permisos de ubicación válidos',
           LocationErrorType.permissionDenied,
-
         );
       }
 
@@ -194,9 +193,10 @@ class LocationService {
         forceAndroidLocationManager: true,
       );
 
-      _logger.i('Ubicación obtenida exitosamente: ${position.latitude}, ${position.longitude}');
+      _logger.i(
+        'Ubicación obtenida exitosamente: ${position.latitude}, ${position.longitude}',
+      );
       return position;
-
     } on TimeoutException {
       throw const LocationException(
         'Tiempo agotado obteniendo ubicación GPS. Intenta en un lugar con mejor señal.',
@@ -245,7 +245,9 @@ class LocationService {
           );
           positions.add(position);
 
-          _logger.i('Muestra ${i + 1}/$samples: ${position.latitude}, ${position.longitude}');
+          _logger.i(
+            'Muestra ${i + 1}/$samples: ${position.latitude}, ${position.longitude}',
+          );
 
           if (i < samples - 1) {
             await Future.delayed(delayBetweenSamples);
@@ -261,11 +263,19 @@ class LocationService {
       }
 
       // Calcular promedio
-      final avgLat = positions.map((p) => p.latitude).reduce((a, b) => a + b) / positions.length;
-      final avgLng = positions.map((p) => p.longitude).reduce((a, b) => a + b) / positions.length;
-      final avgAccuracy = positions.map((p) => p.accuracy).reduce((a, b) => a + b) / positions.length;
+      final avgLat =
+          positions.map((p) => p.latitude).reduce((a, b) => a + b) /
+          positions.length;
+      final avgLng =
+          positions.map((p) => p.longitude).reduce((a, b) => a + b) /
+          positions.length;
+      final avgAccuracy =
+          positions.map((p) => p.accuracy).reduce((a, b) => a + b) /
+          positions.length;
 
-      _logger.i('Ubicación promediada: $avgLat, $avgLng (precisión promedio: ${avgAccuracy.toStringAsFixed(1)}m)');
+      _logger.i(
+        'Ubicación promediada: $avgLat, $avgLng (precisión promedio: ${avgAccuracy.toStringAsFixed(1)}m)',
+      );
 
       // Retornar usando la primera posición como base pero con coordenadas promediadas
       return Position(
@@ -280,7 +290,6 @@ class LocationService {
         altitudeAccuracy: positions.first.altitudeAccuracy,
         headingAccuracy: positions.first.headingAccuracy,
       );
-
     } catch (e) {
       _logger.e('Error obteniendo ubicación promediada: $e');
       return null;
@@ -340,5 +349,27 @@ class LocationService {
     final distance = calculateDistance(center, target);
     return distance <= radiusMeters;
   }
-}
 
+  /// 🕵️‍♂️ Detectar si la ubicación es simulada (Fake GPS)
+  Future<bool> checkForMockLocation() async {
+    try {
+      if (!await hasValidPermissions()) {
+        return false; // Sin permisos no podemos saber
+      }
+
+      // Obtener última posición conocida o actual
+      Position? position = await Geolocator.getLastKnownPosition();
+      position ??= await Geolocator.getCurrentPosition();
+
+      if (position.isMocked) {
+        _logger.w('⚠️ ALERTA: Ubicación simulada detectada (Fake GPS)');
+        return true;
+      }
+
+      return false;
+    } catch (e) {
+      _logger.e('Error verificando ubicación simulada: $e');
+      return false;
+    }
+  }
+}

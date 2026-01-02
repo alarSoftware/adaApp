@@ -7,7 +7,7 @@ import 'package:ada_app/ui/widgets/login/login_form.dart';
 import 'package:ada_app/ui/widgets/login/biometric_button.dart';
 import 'package:ada_app/ui/widgets/login/login_appbar.dart';
 import 'package:ada_app/ui/widgets/login/delete_users_dialog.dart';
-import 'package:ada_app/ui/widgets/login/sync_dialog.dart'; // ✅ AGREGAR ESTE
+import 'package:ada_app/ui/widgets/login/sync_dialog.dart';
 import 'package:ada_app/ui/common/snackbar_helper.dart';
 import 'dart:async';
 
@@ -16,7 +16,6 @@ class LoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ PROVIDER AQUÍ ARRIBA
     return ChangeNotifierProvider(
       create: (_) => LoginScreenViewModel(),
       child: const _LoginScreenContent(),
@@ -24,7 +23,6 @@ class LoginScreen extends StatelessWidget {
   }
 }
 
-// ✅ CONTENIDO SEPARADO
 class _LoginScreenContent extends StatefulWidget {
   const _LoginScreenContent();
 
@@ -32,7 +30,8 @@ class _LoginScreenContent extends StatefulWidget {
   State<_LoginScreenContent> createState() => _LoginScreenContentState();
 }
 
-class _LoginScreenContentState extends State<_LoginScreenContent> with TickerProviderStateMixin {
+class _LoginScreenContentState extends State<_LoginScreenContent>
+    with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   StreamSubscription? _eventSubscription;
 
@@ -50,7 +49,7 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _setupEventListener();  // ✅ AHORA SÍ HAY PROVIDER DISPONIBLE
+    _setupEventListener();
   }
 
   void _setupAnimations() {
@@ -64,21 +63,14 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeOutCubic,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeOutCubic),
+    );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.2),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
 
     _fadeController.forward();
     _slideController.forward();
@@ -116,11 +108,7 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
   }
 
   void _handleShowSuccess(String message, IconData? icon) {
-    SnackbarHelper.showSuccess(
-      context,
-      message,
-      icon ?? Icons.check,
-    );
+    SnackbarHelper.showSuccess(context, message, icon ?? Icons.check);
   }
 
   void _handleNavigateToHome() {
@@ -141,7 +129,8 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => _buildPendingRecordsDialog(event.validationResult),
+      builder: (dialogContext) =>
+          _buildPendingRecordsDialog(event.validationResult),
     );
   }
 
@@ -151,6 +140,8 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
   }
 
   void _handleSyncCompleted(SyncCompletedEvent event) {
+    // El evento de completado se maneja en el ViewModel
+    // Este método está disponible por si necesitas hacer algo adicional en la UI
   }
 
   // ========== ACCIONES DE UI ==========
@@ -184,20 +175,26 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
 
   Widget _buildPendingRecordsDialog(dynamic validationResult) {
     return AlertDialog(
+      backgroundColor: AppColors.surface,
       title: Row(
         children: [
-          Icon(Icons.warning_amber, color: Colors.orange, size: 28),
+          Icon(Icons.warning_amber, color: AppColors.warning, size: 28),
           const SizedBox(width: 12),
-          const Text('Registros Pendientes'),
+          Expanded(
+            child: Text(
+              'Registros Pendientes',
+              style: TextStyle(color: AppColors.textPrimary),
+            ),
+          ),
         ],
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Hay registros que aún no han sido sincronizados con el servidor:',
-            style: TextStyle(fontSize: 15),
+            style: TextStyle(fontSize: 15, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 16),
           if (validationResult.pendingEquipments > 0)
@@ -222,20 +219,21 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.red.shade50,
+              color: AppColors.error.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.red.shade200),
+              border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
-                Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                Icon(Icons.error_outline, color: AppColors.error, size: 20),
                 const SizedBox(width: 8),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Sincronice estos registros antes de continuar',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
+                      color: AppColors.error,
                     ),
                   ),
                 ),
@@ -246,38 +244,54 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
       ),
       actions: [
         TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            final viewModel = Provider.of<LoginScreenViewModel>(
+              context,
+              listen: false,
+            );
+            viewModel.uploadPendingData();
+          },
+          child: Text(
+            'Intentar Enviar Pendientes',
+            style: TextStyle(color: AppColors.primary),
+          ),
+        ),
+        TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Entendido'),
+          child: Text(
+            'Entendido',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
         ),
       ],
     );
   }
-
 
   Widget _buildPendingItem(IconData icon, String label, int count) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: Colors.orange),
+          Icon(icon, size: 20, color: AppColors.warning),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(fontSize: 14),
+              style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
             ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.orange.shade100,
+              color: AppColors.warning.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               count.toString(),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Colors.orange.shade900,
+                color: AppColors.warning,
                 fontSize: 13,
               ),
             ),
@@ -330,12 +344,10 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
                           const SizedBox(height: 24),
                           _buildDivider(),
                           const SizedBox(height: 24),
-                          BiometricButton(
-                            onPressed: _handleBiometricLogin,
-                          ),
+                          BiometricButton(onPressed: _handleBiometricLogin),
                         ],
                         const SizedBox(height: 40),
-                        _buildFooter(),
+                        // _buildFooter(),
                       ],
                     );
                   },
@@ -368,19 +380,19 @@ class _LoginScreenContentState extends State<_LoginScreenContent> with TickerPro
     );
   }
 
-  Widget _buildFooter() {
-    return Column(
-      children: [
-        Text(
-          '© 2025 Alarsoftware. Todos los derechos reservados.',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 12,
-            fontWeight: FontWeight.w400,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
+  // Widget _buildFooter() {
+  //   return Column(
+  //     children: [
+  //       Text(
+  //         '© 2025 Alarsoftware. Todos los derechos reservados.',
+  //         style: TextStyle(
+  //           color: AppColors.textSecondary,
+  //           fontSize: 12,
+  //           fontWeight: FontWeight.w400,
+  //         ),
+  //         textAlign: TextAlign.center,
+  //       ),
+  //     ],
+  //   );
+  // }
 }

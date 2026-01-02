@@ -1,4 +1,4 @@
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/sync/equipment_sync_service.dart';
 
@@ -6,10 +6,7 @@ class Modelo {
   final int? id;
   final String nombre;
 
-  Modelo({
-    this.id,
-    required this.nombre,
-  });
+  Modelo({this.id, required this.nombre});
 
   factory Modelo.fromMap(Map<String, dynamic> map) {
     return Modelo(
@@ -19,10 +16,7 @@ class Modelo {
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'nombre': nombre.trim(),
-    };
+    return {'id': id, 'nombre': nombre.trim()};
   }
 }
 
@@ -125,10 +119,7 @@ class ModeloRepository {
         'ultima_actualizacion': DateTime.now().toIso8601String(),
       };
     } catch (e) {
-      return {
-        'error': e.toString(),
-        'total_modelos': 0,
-      };
+      return {'error': e.toString(), 'total_modelos': 0};
     }
   }
 

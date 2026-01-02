@@ -30,8 +30,6 @@ class DynamicFormApiAdapter {
     return DynamicFormTemplate.fromApiJson(formJson, detailsJson);
   }
 
-  // ==================== HELPERS PRIVADOS ====================
-
   /// Parser genérico para respuestas del API
   static List<Map<String, dynamic>> _parseApiResponse(
       String jsonResponse,

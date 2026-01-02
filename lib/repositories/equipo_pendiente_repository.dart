@@ -2,7 +2,7 @@ import 'package:ada_app/models/equipos_pendientes.dart';
 import 'base_repository.dart';
 import 'package:uuid/uuid.dart';
 
-import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
 import 'package:sqflite/sqflite.dart';
 
 class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
@@ -35,8 +35,8 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
 
   /// Obtener equipos PENDIENTES de un cliente
   Future<List<Map<String, dynamic>>> obtenerEquiposPendientesPorCliente(
-    int clienteId,
-  ) async {
+      int clienteId,
+      ) async {
     try {
       final sql = '''
     SELECT DISTINCT
@@ -97,51 +97,26 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
   }
 
   /// Procesar escaneo de censo - crear registro pendiente
-  /// ✅ COMPATIBLE con nuevo sistema unificado
   Future<String> procesarEscaneoCenso({
     required dynamic equipoId,
     required int clienteId,
     int? usuarioId,
-    String? edfVendedorId,
+    String? employeeId,
   }) async {
     try {
       final now = DateTime.now();
       final equipoIdString = equipoId.toString();
 
-      // ✅ Obtener usuario actual si no se proporcionó
       final authService = AuthService();
       final usuario = await authService.getCurrentUser();
       final usuarioCensoId = usuarioId ?? usuario?.id ?? 1;
 
-      // Verificar si ya existe por equipo_id + cliente_id
-      final existente = await dbHelper.consultar(
+      await dbHelper.eliminar(
         tableName,
         where: 'equipo_id = ? AND cliente_id = ?',
         whereArgs: [equipoIdString, clienteId],
-        limit: 1,
       );
 
-      if (existente.isNotEmpty) {
-        final registroId = existente.first['id'].toString();
-
-        // ✅ Actualizar con usuario correcto
-        await dbHelper.actualizar(
-          tableName,
-          {
-            'fecha_censo': now.toIso8601String(),
-            'fecha_actualizacion': now.toIso8601String(),
-            'usuario_censo_id': usuarioCensoId,
-            'sincronizado':
-                0, // Marcar para sincronización por CensoActivoPostService
-          },
-          where: 'id = ?',
-          whereArgs: [registroId],
-        );
-
-        return registroId;
-      }
-
-      // Crear nuevo registro con UUID
       final uuid = Uuid().v4();
       final datos = {
         'id': uuid,
@@ -151,7 +126,8 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
         'usuario_censo_id': usuarioCensoId,
         'fecha_creacion': now.toIso8601String(),
         'fecha_actualizacion': now.toIso8601String(),
-        'edf_vendedor_id': edfVendedorId,
+        'employee_id': employeeId,
+        'sincronizado': 0,
       };
 
       await dbHelper.insertar(tableName, datos);
@@ -165,9 +141,9 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
   /// Marcar equipos pendientes como sincronizados
   /// ✅ Llamado desde CensoActivoPostService cuando la sincronización unificada es exitosa
   Future<int> marcarSincronizadosPorCenso(
-    String equipoId,
-    int clienteId,
-  ) async {
+      String equipoId,
+      int clienteId,
+      ) async {
     try {
       final actualizados = await dbHelper.actualizar(
         tableName,
@@ -333,8 +309,8 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
   }
 
   Future<int> guardarEquiposPendientesDesdeServidor(
-    List<Map<String, dynamic>> equiposAPI,
-  ) async {
+      List<Map<String, dynamic>> equiposAPI,
+      ) async {
     final db = await dbHelper.database;
     int guardados = 0;
 
@@ -352,12 +328,12 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
             'fecha_actualizacion': DateTime.now().toIso8601String(),
             'fecha_censo': equipoAPI['creationDate'],
             'usuario_censo_id':
-                equipoAPI['usuarioId'] ?? equipoAPI['usuario']?['id'] ?? 1,
+            equipoAPI['usuarioId'] ?? equipoAPI['usuario']?['id'] ?? 1,
 
             // --- CORRECCIÓN AQUÍ: Guardar edf_vendedor_id ---
-            'edf_vendedor_id':
-                equipoAPI['edfVendedorSucursalId'] ??
-                equipoAPI['edfVendedorId'],
+            'employee_id':
+            equipoAPI['edfVendedorSucursalId'] ??
+                equipoAPI['employeeId'],
 
             // ------------------------------------------------
             'sincronizado': 1,
@@ -378,7 +354,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
     return guardados;
   }
 
-  // ================================
-  // MÉTODOS DE DEBUG Y VERIFICACIÓN
-  // ================================
+// ================================
+// MÉTODOS DE DEBUG Y VERIFICACIÓN
+// ================================
 }

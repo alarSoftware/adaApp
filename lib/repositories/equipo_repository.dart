@@ -1,12 +1,9 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:ada_app/models/equipos.dart';
-import 'package:ada_app/services/auth_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import '../repositories/base_repository.dart';
 
 class EquipoRepository extends BaseRepository<Equipo> {
-  final AuthService _authService = AuthService();
-
   @override
   String get tableName => 'equipos';
 
@@ -32,28 +29,17 @@ class EquipoRepository extends BaseRepository<Equipo> {
   @override
   String getEntityName() => 'Equipo';
 
-  // ==============================================================
-  // 🔥 NUEVO MÉTODO DE SINCRONIZACIÓN MASIVA (VACIAR E INSERTAR)
-  // ==============================================================
-
-  /// Vacía la tabla de equipos e inserta los nuevos datos provenientes del servidor.
-  /// Usa Batch para máximo rendimiento.
-
   @override
   Future<void> limpiarYSincronizar(List<dynamic> items) async {
     try {
-      // 1. Convertimos la lista dinámica a la lista de mapas que necesitamos
-      // Esto soluciona el error de override
       final List<Map<String, dynamic>> equipos = items
           .cast<Map<String, dynamic>>();
 
       final db = await dbHelper.database;
 
       await db.transaction((txn) async {
-        // 2. Vaciar la tabla completamente
         await txn.delete(tableName);
 
-        // 3. Preparar inserción masiva (Batch)
         final batch = txn.batch();
 
         for (final equipo in equipos) {
@@ -64,7 +50,6 @@ class EquipoRepository extends BaseRepository<Equipo> {
           );
         }
 
-        // 4. Ejecutar todas las inserciones
         await batch.commit(noResult: true);
       });
     } catch (e) {
@@ -72,9 +57,37 @@ class EquipoRepository extends BaseRepository<Equipo> {
     }
   }
 
-  // ================================
-  // MÉTODOS PARA EQUIPOS ASIGNADOS
-  // ================================
+  Future<void> limpiarYSincronizarEnChunks(
+    List<Map<String, dynamic>> equipos, {
+    int chunkSize = 500,
+  }) async {
+    try {
+      final db = await dbHelper.database;
+
+      await db.transaction((txn) async {
+        await txn.delete(tableName);
+
+        for (var i = 0; i < equipos.length; i += chunkSize) {
+          final end = (i + chunkSize < equipos.length)
+              ? i + chunkSize
+              : equipos.length;
+          final chunk = equipos.sublist(i, end);
+
+          final batch = txn.batch();
+          for (var equipo in chunk) {
+            batch.insert(
+              tableName,
+              equipo,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+          await batch.commit(noResult: true);
+        }
+      });
+    } catch (e) {
+      rethrow;
+    }
+  }
 
   Future<List<Map<String, dynamic>>> obtenerEquiposAsignados(
     int clienteId,
@@ -176,10 +189,6 @@ class EquipoRepository extends BaseRepository<Equipo> {
     }
   }
 
-  // ================================
-  // MÉTODOS DE VERIFICACIÓN
-  // ================================
-
   Future<bool> verificarAsignacionEquipoCliente(
     String equipoId,
     int clienteId,
@@ -213,6 +222,34 @@ class EquipoRepository extends BaseRepository<Equipo> {
     }
   }
 
+  /// Verifica si un equipo está asignado usando la misma lógica estricta que obtenerEquiposAsignados
+  /// Es decir: Está en 'equipos' Y NO está en 'equipos_pendientes'
+  Future<bool> verificarAsignacionEstricta(
+    String equipoId,
+    int clienteId,
+  ) async {
+    try {
+      final query = '''
+        SELECT e.id 
+        FROM equipos e
+        LEFT JOIN equipos_pendientes ep 
+          ON CAST(e.id AS TEXT) = CAST(ep.equipo_id AS TEXT) 
+          AND CAST(e.cliente_id AS TEXT) = CAST(ep.cliente_id AS TEXT)
+        WHERE e.id = ? 
+          AND e.cliente_id = ?
+          AND ep.id IS NULL
+        LIMIT 1
+      ''';
+
+      final db = await dbHelper.database;
+      final result = await db.rawQuery(query, [equipoId, clienteId]);
+
+      return result.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> obtenerEquiposDisponibles() async {
     try {
       final sql = '''
@@ -235,10 +272,6 @@ class EquipoRepository extends BaseRepository<Equipo> {
     }
   }
 
-  // ================================
-  // BÚSQUEDA CON DETALLES
-  // ================================
-
   Future<List<Map<String, dynamic>>> buscarConDetalles(String query) async {
     if (query.trim().isEmpty) {
       return await obtenerCompletos();
@@ -255,19 +288,22 @@ class EquipoRepository extends BaseRepository<Equipo> {
              WHEN e.cliente_id IS NOT NULL AND e.cliente_id != '' AND e.cliente_id != '0' THEN 'Asignado'
              ELSE 'Disponible'
            END as estado_asignacion,
-           c.nombre as cliente_nombre
+           c.nombre as cliente_nombre,
+           (SELECT MAX(ca.fecha_creacion) 
+            FROM censo_activo ca 
+            WHERE ca.equipo_id = e.id) as ultima_fecha_censo
     FROM equipos e
     LEFT JOIN marcas m ON e.marca_id = m.id
     LEFT JOIN modelos mo ON e.modelo_id = mo.id
     LEFT JOIN logo l ON e.logo_id = l.id
-    LEFT JOIN clientes c ON e.cliente_id = c.id
+    LEFT JOIN clientes c ON CAST(e.cliente_id AS INTEGER) = c.id
     WHERE LOWER(TRIM(e.cod_barras)) LIKE ? OR
           LOWER(TRIM(m.nombre)) LIKE ? OR
           LOWER(TRIM(mo.nombre)) LIKE ? OR
           LOWER(TRIM(l.nombre)) LIKE ? OR
           LOWER(TRIM(e.numero_serie)) LIKE ? OR
           LOWER(TRIM(c.nombre)) LIKE ?
-    ORDER BY e.id DESC
+    ORDER BY CASE WHEN c.nombre IS NOT NULL AND c.nombre != '' THEN 0 ELSE 1 END, e.id DESC
     ''';
 
     return await dbHelper.consultarPersonalizada(sql, [
@@ -290,21 +326,20 @@ class EquipoRepository extends BaseRepository<Equipo> {
                WHEN e.cliente_id IS NOT NULL AND e.cliente_id != '' AND e.cliente_id != '0' THEN 'Asignado'
                ELSE 'Disponible'
              END as estado_asignacion,
-             c.nombre as cliente_nombre
+             c.nombre as cliente_nombre,
+             (SELECT MAX(ca.fecha_creacion) 
+              FROM censo_activo ca 
+              WHERE ca.equipo_id = e.id) as ultima_fecha_censo
       FROM equipos e
       LEFT JOIN marcas m ON e.marca_id = m.id
       LEFT JOIN modelos mo ON e.modelo_id = mo.id
       LEFT JOIN logo l ON e.logo_id = l.id
-      LEFT JOIN clientes c ON e.cliente_id = c.id
-      ORDER BY e.id DESC
+      LEFT JOIN clientes c ON CAST(e.cliente_id AS INTEGER) = c.id
+      ORDER BY CASE WHEN c.nombre IS NOT NULL AND c.nombre != '' THEN 0 ELSE 1 END, e.id DESC
     ''';
 
     return await dbHelper.consultarPersonalizada(sql);
   }
-
-  // ================================
-  // CREACIÓN DE EQUIPOS
-  // ================================
 
   Future<String> crearEquipoNuevo({
     required String codigoBarras,
@@ -387,10 +422,6 @@ class EquipoRepository extends BaseRepository<Equipo> {
     }
   }
 
-  // ================================
-  // MÉTODOS AUXILIARES
-  // ================================
-
   Future<void> marcarEquipoComoSincronizado(String equipoId) async {
     await dbHelper.actualizar(
       tableName,
@@ -420,7 +451,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
       LEFT JOIN marcas m ON e.marca_id = m.id
       LEFT JOIN modelos mo ON e.modelo_id = mo.id
       LEFT JOIN logo l ON e.logo_id = l.id
-      LEFT JOIN clientes c ON e.cliente_id = c.id
+      LEFT JOIN clientes c ON CAST(e.cliente_id AS INTEGER) = c.id
       WHERE UPPER(e.cod_barras) = ?
       LIMIT 1
     ''';
@@ -462,7 +493,6 @@ class EquipoRepository extends BaseRepository<Equipo> {
       int.tryParse(equipoId.toString()) ?? 0,
     );
     if (result == null && equipoId is String) {
-      // Fallback si es String ID
       final list = await dbHelper.consultar(
         tableName,
         where: 'id = ?',

@@ -8,7 +8,8 @@ class ClientInfoCard extends StatelessWidget {
   final List<ClientInfoRow>? additionalInfo;
   final EdgeInsets? padding;
   final VoidCallback? onTap;
-  final bool showFullDetails; // Nueva opción para mostrar detalles completos
+  final bool showFullDetails;
+  final Widget? bottomContent; // Nuevo campo
 
   const ClientInfoCard({
     super.key,
@@ -17,6 +18,7 @@ class ClientInfoCard extends StatelessWidget {
     this.padding,
     this.onTap,
     this.showFullDetails = true,
+    this.bottomContent,
   });
 
   @override
@@ -49,40 +51,64 @@ class ClientInfoCard extends StatelessWidget {
 
               // RUC/CI
               if (cliente.rucCi.isNotEmpty)
-                _buildInfoRow(ClientInfoRow(
-                  icon: Icons.badge_outlined,
-                  label: cliente.tipoDocumento,
-                  value: cliente.rucCi,
-                )),
+                _buildInfoRow(
+                  ClientInfoRow(
+                    icon: Icons.badge_outlined,
+                    label: cliente.tipoDocumento,
+                    value: cliente.rucCi,
+                  ),
+                ),
+
+
+              // Condición de Venta
+              if (cliente.condicionVenta != null && cliente.condicionVenta!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _buildInfoRow(
+                  ClientInfoRow(
+                    icon: cliente.esCredito ? Icons.credit_card_outlined : cliente.esContado
+                        ? Icons.payments_outlined : null,
+                    label: 'Condición de Venta',
+                    value: cliente.displayCondicionVenta,
+                    valueColor: cliente.esCredito ? Colors.orange.shade700
+                        : cliente.esContado? Colors.green.shade700:null,
+                  ),
+                ),
+              ],
 
               // Propietario
               if (cliente.propietario.isNotEmpty) ...[
                 const SizedBox(height: 10),
-                _buildInfoRow(ClientInfoRow(
-                  icon: Icons.person_outline,
-                  label: 'Propietario',
-                  value: cliente.propietario,
-                )),
+                _buildInfoRow(
+                  ClientInfoRow(
+                    icon: Icons.person_outline,
+                    label: 'Propietario',
+                    value: cliente.propietario,
+                  ),
+                ),
               ],
 
               // Teléfono
               if (cliente.telefono.isNotEmpty) ...[
                 const SizedBox(height: 10),
-                _buildInfoRow(ClientInfoRow(
-                  icon: Icons.phone_outlined,
-                  label: 'Teléfono',
-                  value: cliente.telefono,
-                )),
+                _buildInfoRow(
+                  ClientInfoRow(
+                    icon: Icons.phone_outlined,
+                    label: 'Teléfono',
+                    value: cliente.telefono,
+                  ),
+                ),
               ],
 
               // Dirección
               if (cliente.direccion.isNotEmpty) ...[
                 const SizedBox(height: 10),
-                _buildInfoRow(ClientInfoRow(
-                  icon: Icons.location_on_outlined,
-                  label: 'Dirección',
-                  value: cliente.direccion,
-                )),
+                _buildInfoRow(
+                  ClientInfoRow(
+                    icon: Icons.location_on_outlined,
+                    label: 'Dirección',
+                    value: cliente.direccion,
+                  ),
+                ),
               ],
             ],
 
@@ -91,10 +117,20 @@ class ClientInfoCard extends StatelessWidget {
               const SizedBox(height: 12),
               const Divider(height: 1),
               const SizedBox(height: 12),
-              ...additionalInfo!.map((info) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _buildInfoRow(info),
-              )),
+              ...additionalInfo!.map(
+                (info) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _buildInfoRow(info),
+                ),
+              ),
+            ],
+
+            // Contenido personalizado al final (Widget arbitrario)
+            if (bottomContent != null) ...[
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              bottomContent!,
             ],
           ],
         ),
@@ -124,11 +160,7 @@ class ClientInfoCard extends StatelessWidget {
             color: AppColors.neutral300,
             borderRadius: BorderRadius.circular(6),
           ),
-          child: Icon(
-            info.icon,
-            size: 16,
-            color: AppColors.textSecondary,
-          ),
+          child: Icon(info.icon, size: 16, color: AppColors.textSecondary),
         ),
         const SizedBox(width: 10),
 
@@ -157,7 +189,7 @@ class ClientInfoCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimary,
+                  color: info.valueColor ?? AppColors.textPrimary,
                   height: 1.2,
                 ),
               ),
@@ -171,13 +203,15 @@ class ClientInfoCard extends StatelessWidget {
 
 /// Clase para definir filas de información adicional
 class ClientInfoRow {
-  final IconData icon;
+  final IconData? icon;
   final String? label;
   final String value;
+  final Color? valueColor;
 
   ClientInfoRow({
     required this.icon,
     this.label,
     required this.value,
+    this.valueColor,
   });
 }

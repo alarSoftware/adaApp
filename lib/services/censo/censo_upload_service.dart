@@ -46,8 +46,7 @@ class CensoUploadService {
   Future<void> enviarCensoUnificado({
     required String censoActivoId,
     required int usuarioId,
-    required String edfVendedorId,
-    required bool guardarLog,
+    required String employeeId,
   }) async {
     String? fullUrl;
 
@@ -125,21 +124,20 @@ class CensoUploadService {
         numeroSerie: censoActivoMap['numero_serie']?.toString(),
         esNuevoEquipo: esNuevoEquipo,
         clienteId: clienteId,
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
         crearPendiente: crearPendiente,
         pendienteExistente: pendienteExistente,
         usuarioId: usuarioId,
         latitud: censoActivoMap['latitud']?.toDouble() ?? 0.0,
         longitud: censoActivoMap['longitud']?.toDouble() ?? 0.0,
         observaciones: censoActivoMap['observaciones']?.toString(),
-        enLocal: censoActivoMap['en_local'] == true,
+        enLocal: censoActivoMap['en_local'] == 1,
         estadoCenso: yaAsignado ? 'asignado' : 'pendiente',
         fotos: fotos,
         clienteNombre: censoActivoMap['cliente_nombre']?.toString(),
         marca: censoActivoMap['marca_nombre']?.toString(),
         modelo: censoActivoMap['modelo']?.toString(),
         logo: censoActivoMap['logo']?.toString(),
-        guardarLog: guardarLog,
         equipoDataMap: equipoDataMap,
       );
     } catch (e, stackTrace) {
@@ -158,8 +156,6 @@ class CensoUploadService {
         usuarioId,
         _tableName,
       );
-
-      rethrow;
     }
   }
 
@@ -277,11 +273,9 @@ class CensoUploadService {
         'Sincronizando $censoActivoId (intento #$numeroIntento/$maxIntentos)',
       );
 
-      final edfVendedorId = await _obtenerEdfVendedorIdDesdeUsuarioId(
-        usuarioId,
-      );
-      if (edfVendedorId == null || edfVendedorId.isEmpty) {
-        throw Exception('edfVendedorId no encontrado');
+      final employeeId = await _obtenerEmployeeIdDesdeUsuarioId(usuarioId);
+      if (employeeId == null || employeeId.isEmpty) {
+        throw Exception('employeeId no encontrado');
       }
 
       await _actualizarUltimoIntento(censoActivoId, numeroIntento);
@@ -290,8 +284,7 @@ class CensoUploadService {
       await enviarCensoUnificado(
         censoActivoId: censoActivoId,
         usuarioId: usuarioId,
-        edfVendedorId: edfVendedorId,
-        guardarLog: false,
+        employeeId: employeeId,
       );
     } catch (e) {
       rethrow;
@@ -301,7 +294,7 @@ class CensoUploadService {
   Future<Map<String, dynamic>> reintentarEnvioCenso(
     String censoActivoId,
     int usuarioId,
-    String? edfVendedorId,
+    String? employeeId,
   ) async {
     bool success = false;
     String message = '';
@@ -309,15 +302,14 @@ class CensoUploadService {
     try {
       _logger.i('Reintento manual: $censoActivoId');
 
-      if (edfVendedorId == null || edfVendedorId.isEmpty) {
-        throw Exception('edfVendedorId es requerido');
+      if (employeeId == null || employeeId.isEmpty) {
+        throw Exception('employeeId es requerido');
       }
 
       await enviarCensoUnificado(
         censoActivoId: censoActivoId,
         usuarioId: usuarioId,
-        edfVendedorId: edfVendedorId,
-        guardarLog: true,
+        employeeId: employeeId,
       );
 
       final censoActivoMapList = await censoActivoRepository.dbHelper.consultar(
@@ -506,7 +498,6 @@ class CensoUploadService {
   //   }
   // }
 
-
   // static bool get esSincronizacionActiva => _syncActivo;
   // static bool get estaEnProgreso => _syncEnProgreso;
 
@@ -622,7 +613,7 @@ class CensoUploadService {
     }
   }
 
-  Future<String?> _obtenerEdfVendedorIdDesdeUsuarioId(int? usuarioId) async {
+  Future<String?> _obtenerEmployeeIdDesdeUsuarioId(int? usuarioId) async {
     try {
       if (usuarioId == null) return null;
 
@@ -634,10 +625,10 @@ class CensoUploadService {
       );
 
       return usuarioEncontrado.isNotEmpty
-          ? usuarioEncontrado.first['edf_vendedor_id'] as String?
+          ? usuarioEncontrado.first['employee_id'] as String?
           : null;
     } catch (e) {
-      _logger.e('Error resolviendo edfVendedorId: $e');
+      _logger.e('Error resolviendo employeeId: $e');
       rethrow;
     }
   }

@@ -1,32 +1,27 @@
 import 'package:ada_app/models/producto.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
 abstract class ProductoRepository {
-  /// Obtener todos los productos disponibles
   Future<List<Producto>> obtenerProductosDisponibles();
 
-  /// Buscar productos por término (código, nombre o código de barras)
   Future<List<Producto>> buscarProductos(String searchTerm);
 
-  /// Obtener producto por código específico
   Future<Producto?> obtenerProductoPorCodigo(String codigo);
 
-  /// Obtener productos por categoría (para productos de reemplazo)
+  Future<Producto?> obtenerProductoPorId(int id);
+
   Future<List<Producto>> obtenerProductosPorCategoria(
     String categoria, {
     int? excluirId,
-  }); // 👈 CAMBIO: usar ID
+  });
 
-  /// Obtener total de productos
   Future<int> contarProductos();
 
-  /// Guardar productos desde el servidor
   Future<int> guardarProductosDesdeServidor(
     List<Map<String, dynamic>> productos,
   );
 
-  /// Limpiar todos los productos locales
   Future<void> limpiarProductosLocales();
 }
 
@@ -35,7 +30,6 @@ class ProductoRepositoryImpl implements ProductoRepository {
 
   ProductoRepositoryImpl({DatabaseHelper? dbHelper})
     : _dbHelper = dbHelper ?? DatabaseHelper();
-
 
   @override
   Future<List<Producto>> obtenerProductosDisponibles() async {
@@ -128,14 +122,43 @@ class ProductoRepositoryImpl implements ProductoRepository {
   }
 
   @override
+  Future<Producto?> obtenerProductoPorId(int id) async {
+    try {
+      final db = await _dbHelper.database;
+
+      final List<Map<String, dynamic>> maps = await db.query(
+        'productos',
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+
+      if (maps.isEmpty) {
+        return null;
+      }
+
+      final producto = Producto.fromMap(maps.first);
+
+      return producto;
+    } catch (e) {
+      await ErrorLogService.logDatabaseError(
+        tableName: 'productos',
+        operation: 'obtener_por_id',
+        errorMessage: 'Error obteniendo producto por ID $id: $e',
+      );
+
+      return null;
+    }
+  }
+
+  @override
   Future<List<Producto>> obtenerProductosPorCategoria(
     String categoria, {
-    int? excluirId, // 👈 CAMBIO: Usar ID en lugar de código
+    int? excluirId,
   }) async {
     try {
       final db = await _dbHelper.database;
 
-      // ✅ Construir query dinámicamente
       String whereClause = 'categoria = ?';
       List<dynamic> whereArgs = [categoria];
 
@@ -198,7 +221,6 @@ class ProductoRepositoryImpl implements ProductoRepository {
     }
 
     try {
-      // Usar vaciarEInsertar para reemplazar todos los datos
       await _dbHelper.vaciarEInsertar('productos', productos);
 
       return productos.length;
@@ -230,9 +252,6 @@ class ProductoRepositoryImpl implements ProductoRepository {
     }
   }
 
-  // ========== MÉTODOS ADICIONALES DE UTILIDAD ==========
-
-  /// Verificar si existe un producto con el código dado
   Future<bool> existeProductoConCodigo(String codigo) async {
     try {
       final producto = await obtenerProductoPorCodigo(codigo);
@@ -242,7 +261,6 @@ class ProductoRepositoryImpl implements ProductoRepository {
     }
   }
 
-  /// Obtener producto por código de barras
   Future<Producto?> obtenerProductoPorCodigoBarras(String codigoBarras) async {
     try {
       final db = await _dbHelper.database;
@@ -273,7 +291,6 @@ class ProductoRepositoryImpl implements ProductoRepository {
     }
   }
 
-  /// Obtener productos por lista de códigos
   Future<List<Producto>> obtenerProductosPorCodigos(
     List<String> codigos,
   ) async {
@@ -298,7 +315,6 @@ class ProductoRepositoryImpl implements ProductoRepository {
     }
   }
 
-  /// Obtener categorías disponibles
   Future<List<String>> obtenerCategorias() async {
     try {
       final db = await _dbHelper.database;
@@ -315,36 +331,6 @@ class ProductoRepositoryImpl implements ProductoRepository {
       return categorias;
     } catch (e) {
       return [];
-    }
-  }
-
-  /// 👈 NUEVO: Obtener producto por ID
-  Future<Producto?> obtenerProductoPorId(int id) async {
-    try {
-      final db = await _dbHelper.database;
-
-      final List<Map<String, dynamic>> maps = await db.query(
-        'productos',
-        where: 'id = ?',
-        whereArgs: [id],
-        limit: 1,
-      );
-
-      if (maps.isEmpty) {
-        return null;
-      }
-
-      final producto = Producto.fromMap(maps.first);
-
-      return producto;
-    } catch (e) {
-      await ErrorLogService.logDatabaseError(
-        tableName: 'productos',
-        operation: 'obtener_por_id',
-        errorMessage: 'Error obteniendo producto por ID $id: $e',
-      );
-
-      return null;
     }
   }
 }

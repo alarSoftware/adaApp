@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../repositories/marca_repository.dart';
-import '../../services/sync/equipment_sync_service.dart';
+import '../../../repositories/marca_repository.dart';
+import '../../../services/sync/equipment_sync_service.dart';
 
 
 

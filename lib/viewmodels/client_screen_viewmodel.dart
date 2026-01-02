@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'dart:async';
+import 'package:intl/intl.dart';
 import '../models/cliente.dart';
 import '../repositories/cliente_repository.dart';
 
@@ -24,6 +25,10 @@ class ClienteListState {
   final int currentPage;
   final int totalCount;
   final String? error;
+  final String? filterMode;
+  final int countTodayRoute;
+  final int countVisitedToday;
+  final int countAll;
 
   ClienteListState({
     this.isLoading = false,
@@ -34,6 +39,10 @@ class ClienteListState {
     this.currentPage = 0,
     this.totalCount = 0,
     this.error,
+    this.filterMode = 'all',
+    this.countTodayRoute = 0,
+    this.countVisitedToday = 0,
+    this.countAll = 0,
   });
 
   ClienteListState copyWith({
@@ -47,6 +56,10 @@ class ClienteListState {
     int? currentPage,
     int? totalCount,
     String? error,
+    String? filterMode,
+    int? countTodayRoute,
+    int? countVisitedToday,
+    int? countAll,
   }) {
     return ClienteListState(
       isLoading: isLoading ?? this.isLoading,
@@ -57,6 +70,10 @@ class ClienteListState {
       currentPage: currentPage ?? this.currentPage,
       totalCount: totalCount ?? this.totalCount,
       error: error ?? this.error,
+      filterMode: filterMode ?? this.filterMode,
+      countTodayRoute: countTodayRoute ?? this.countTodayRoute,
+      countVisitedToday: countVisitedToday ?? this.countVisitedToday,
+      countAll: countAll ?? this.countAll,
     );
   }
 }
@@ -65,7 +82,7 @@ class ClienteListScreenViewModel extends ChangeNotifier {
   final ClienteRepository _repository = ClienteRepository();
 
   static const int clientesPorPagina = 10;
-  static const Duration searchDelay = Duration(milliseconds: 500);
+  static const Duration searchDelay = Duration(milliseconds: 100);
 
   ClienteListState _state = ClienteListState();
   List<Cliente> _allClientes = [];
@@ -73,7 +90,7 @@ class ClienteListScreenViewModel extends ChangeNotifier {
   Timer? _searchTimer;
 
   final StreamController<ClienteListUIEvent> _eventController =
-  StreamController<ClienteListUIEvent>.broadcast();
+      StreamController<ClienteListUIEvent>.broadcast();
   Stream<ClienteListUIEvent> get uiEvents => _eventController.stream;
 
   ClienteListState get state => _state;
@@ -102,19 +119,71 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     _applyFilters();
   }
 
+  void setFilterMode(String mode) {
+    if (_state.filterMode == mode) return;
+    _updateState(_state.copyWith(filterMode: mode));
+    _applyFilters();
+  }
+
   Future<void> _applyFilters() async {
     try {
-      final resultados = await _repository.buscarConFiltros(
-        query: _state.searchQuery,
-      );
+      List<Cliente> resultados;
+      final query = _state.searchQuery.toLowerCase().trim();
+      List<Cliente> baseList = _allClientes;
+
+      // 1. Filtrar por Modo (Ruta de Hoy / Visitados Hoy / Todos)
+      if (_state.filterMode == 'today_route') {
+        final now = DateTime.now();
+        // Obtener nombre del día en español (ej: "lunes", "martes")
+        final diaHoy = DateFormat(
+          'EEEE',
+          'es',
+        ).format(now).toLowerCase().trim();
+
+        baseList = baseList.where((c) {
+          if (c.rutaDia == null || c.rutaDia!.isEmpty) return false;
+
+          final rutasCliente = c.rutaDia!.toLowerCase();
+          // Casos: "Sábado", "Martes, Viernes"
+          // Dividir por comas si existen
+          final dias = rutasCliente.split(',').map((d) {
+            return d.trim();
+          }).toList();
+
+          return dias.contains(diaHoy);
+        }).toList();
+      } else if (_state.filterMode == 'visited_today') {
+        baseList = baseList.where((c) {
+          return c.tieneCensoHoy ||
+              c.tieneOperacionComercialHoy ||
+              c.tieneFormularioCompleto;
+        }).toList();
+      }
+
+      // 2. Filtrar por Búsqueda
+      if (query.isEmpty) {
+        resultados = List.from(baseList);
+      } else {
+        resultados = baseList.where((cliente) {
+          final nombreMatches = cliente.nombre.toLowerCase().contains(query);
+          final rucMatches = cliente.rucCi.toLowerCase().contains(query);
+          final codigoMatches = cliente.codigo.toString().contains(query);
+          final propMatches = cliente.propietario.toLowerCase().contains(query);
+
+          return nombreMatches || rucMatches || codigoMatches || propMatches;
+        }).toList();
+      }
 
       _filteredClientes = resultados;
-      _updateState(_state.copyWith(
-        currentPage: 0,
-        displayedClientes: [],
-        hasMoreData: true,
-        totalCount: resultados.length,
-      ));
+      _updateState(
+        _state.copyWith(
+          currentPage: 0,
+          displayedClientes: [],
+          hasMoreData: true,
+          totalCount: resultados.length,
+          error: null, // Limpiar error si hubo
+        ),
+      );
 
       await _loadNextPage();
     } catch (e) {
@@ -122,45 +191,78 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     }
   }
 
+  void _calculateCount() {
+    final now = DateTime.now();
+    final diaHoy = DateFormat('EEEE', 'es').format(now).toLowerCase().trim();
+
+    final rutaHoyCount = _allClientes.where((c) {
+      if (c.rutaDia == null || c.rutaDia!.isEmpty) return false;
+      return c.rutaDia!.toLowerCase().contains(diaHoy);
+    }).length;
+
+    final visitadosCount = _allClientes.where((c) {
+      return c.tieneCensoHoy ||
+          c.tieneOperacionComercialHoy ||
+          c.tieneFormularioCompleto;
+    }).length;
+
+    final totalCount = _allClientes.length;
+
+    _state = _state.copyWith(
+      countTodayRoute: rutaHoyCount,
+      countVisitedToday: visitadosCount,
+      countAll: totalCount,
+    );
+    notifyListeners();
+  }
+
   Future<void> loadClientes() async {
-    _updateState(_state.copyWith(
-      isLoading: true,
-      currentPage: 0,
-      displayedClientes: [],
-      error: null,
-    ));
+    _updateState(
+      _state.copyWith(
+        isLoading: true,
+        currentPage: 0,
+        displayedClientes: [],
+        error: null,
+      ),
+    );
 
     try {
-      final clientesDB = await _repository.buscarConFiltros(
-        query: _state.searchQuery,
-      );
+      // Cargar TODOS los clientes una sola vez
+      final clientesDB = await _repository.buscarConFiltros(query: '');
 
       _allClientes = clientesDB;
       _filteredClientes = clientesDB;
 
-      _updateState(_state.copyWith(
-        isLoading: false,
-        totalCount: clientesDB.length,
-        hasMoreData: true,
-      ));
+      _calculateCount();
+
+      // Si hay un query pendiente (ej: recharge), aplicar filtro
+      if (_state.searchQuery.isNotEmpty) {
+        await _applyFilters();
+      }
+
+      _updateState(
+        _state.copyWith(
+          isLoading: false,
+          totalCount: _filteredClientes.length, // Usar filtrados, no total DB
+          hasMoreData: true,
+        ),
+      );
 
       await _loadNextPage();
     } catch (e, stackTrace) {
-      _updateState(_state.copyWith(
-        isLoading: false,
-        error: 'Error al cargar clientes: $e',
-      ));
+      _updateState(
+        _state.copyWith(
+          isLoading: false,
+          error: 'Error al cargar clientes: $e',
+        ),
+      );
 
       _eventController.add(ShowErrorEvent('Error al cargar clientes: $e'));
     }
   }
 
   Future<void> refresh() async {
-    if (_state.searchQuery.isNotEmpty) {
-      await _applyFilters();
-    } else {
-      await loadClientes();
-    }
+    await loadClientes();
   }
 
   Future<void> _loadNextPage() async {
@@ -181,23 +283,23 @@ class ClienteListScreenViewModel extends ChangeNotifier {
           .take(clientesPorPagina)
           .toList();
 
-      final updatedDisplayedClientes = List<Cliente>.from(_state.displayedClientes)
-        ..addAll(nuevosClientes);
+      final updatedDisplayedClientes = List<Cliente>.from(
+        _state.displayedClientes,
+      )..addAll(nuevosClientes);
 
       final newHasMoreData = endIndex < _filteredClientes.length;
       final newCurrentPage = _state.currentPage + 1;
 
-      _updateState(_state.copyWith(
-        displayedClientes: updatedDisplayedClientes,
-        currentPage: newCurrentPage,
-        hasMoreData: newHasMoreData,
-        isLoadingMore: false,
-      ));
+      _updateState(
+        _state.copyWith(
+          displayedClientes: updatedDisplayedClientes,
+          currentPage: newCurrentPage,
+          hasMoreData: newHasMoreData,
+          isLoadingMore: false,
+        ),
+      );
     } else {
-      _updateState(_state.copyWith(
-        hasMoreData: false,
-        isLoadingMore: false,
-      ));
+      _updateState(_state.copyWith(hasMoreData: false, isLoadingMore: false));
     }
   }
 
@@ -285,6 +387,5 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     };
   }
 
-  void logDebugInfo() {
-  }
+  void logDebugInfo() {}
 }

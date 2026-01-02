@@ -1,6 +1,5 @@
-// lib/screens/api_settings_screen.dart
 import 'package:flutter/material.dart';
-import 'package:ada_app/services/api_config_service.dart';
+import 'package:ada_app/services/api/api_config_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 
 class ApiSettingsScreen extends StatefulWidget {
@@ -47,10 +46,7 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
       _connectionSuccess = result.exito;
     });
 
-    _showMessage(
-      result.mensaje,
-      isError: !result.exito,
-    );
+    _showMessage(result.mensaje, isError: !result.exito);
   }
 
   Future<void> _saveUrl() async {
@@ -62,7 +58,10 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
     }
 
     if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
-      _showMessage('La URL debe comenzar con http:// o https://', isError: true);
+      _showMessage(
+        'La URL debe comenzar con http:// o https://',
+        isError: true,
+      );
       return;
     }
 
@@ -145,13 +144,13 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
               onPressed: _isSaving ? null : _saveUrl,
               icon: _isSaving
                   ? const SizedBox(
-                height: 16,
-                width: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Icon(Icons.save),
               label: const Text('Guardar', style: TextStyle(fontSize: 16)),
               style: ElevatedButton.styleFrom(
@@ -166,10 +165,10 @@ class _ApiSettingsScreenState extends State<ApiSettingsScreen> {
               onPressed: _isTesting ? null : _testConnection,
               icon: _isTesting
                   ? const SizedBox(
-                height: 16,
-                width: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : const Icon(Icons.wifi_find),
               label: const Text('Probar Conexión'),
               style: OutlinedButton.styleFrom(

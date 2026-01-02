@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:ada_app/viewmodels/pending_data_viewmodel.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/ui/screens/operaciones_comerciales/operacion_comercial_form_screen.dart';
 import 'package:ada_app/repositories/cliente_repository.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';

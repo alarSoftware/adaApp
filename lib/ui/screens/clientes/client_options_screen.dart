@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
-import 'package:ada_app/ui/screens/cliente_detail_screen.dart';
-import 'package:ada_app/ui/screens/dynamic_form_responses_screen.dart';
+import 'package:ada_app/ui/screens/clientes/cliente_detail_screen.dart';
+// import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_responses_screen.dart';
 import 'package:ada_app/ui/screens/operaciones_comerciales/operaciones_comerciales_menu_screen.dart';
 import 'package:ada_app/ui/widgets/client_info_card.dart';
 
@@ -67,15 +67,7 @@ class ClientOptionsScreen extends StatelessWidget {
                       color: AppColors.primary,
                       onTap: () => _navigateToCenso(context),
                     ),
-                    SizedBox(height: 12),
-                    _buildOptionCard(
-                      context: context,
-                      title: 'Formularios',
-                      description: 'Completar formularios personalizados',
-                      icon: Icons.assignment_outlined,
-                      color: AppColors.info,
-                      onTap: () => _navigateToForms(context),
-                    ),
+
                     SizedBox(height: 12),
                     _buildOptionCard(
                       context: context,
@@ -173,14 +165,14 @@ class ClientOptionsScreen extends StatelessWidget {
     );
   }
 
-  void _navigateToForms(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => DynamicFormResponsesScreen(cliente: cliente),
-      ),
-    );
-  }
+  // void _navigateToForms(BuildContext context) {
+  //   Navigator.push(
+  //     context,
+  //     MaterialPageRoute(
+  //       builder: (context) => DynamicFormResponsesScreen(cliente: cliente),
+  //     ),
+  //   );
+  // }
 
   void _navigateToOperacionesComerciales(BuildContext context) {
     Navigator.push(

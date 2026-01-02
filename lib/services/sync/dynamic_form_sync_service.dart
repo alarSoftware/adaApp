@@ -1,17 +1,21 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/repositories/dynamic_form_repository.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 
 class DynamicFormSyncService extends BaseSyncService {
-
   static const String _getDynamicFormEndpoint = '/api/getDynamicForm';
-  static const String _getDynamicFormDetailEndpoint = '/api/getDynamicFormDetail';
-  static const String _getDynamicFormResponseEndpoint = '/api/getDynamicFormResponse';
-  static const String _getDynamicFormResponseImageEndpoint = '/api/getDynamicFormResponseImage';
+  static const String _getDynamicFormDetailEndpoint =
+      '/api/getDynamicFormDetail';
+  static const String _getDynamicFormResponseEndpoint =
+      '/api/getDynamicFormResponse';
+  static const String _getDynamicFormResponseImageEndpoint =
+      '/api/getDynamicFormResponseImage';
 
   static Future<SyncResult> obtenerFormulariosDinamicos({
     String? estado,
@@ -32,16 +36,27 @@ class DynamicFormSyncService extends BaseSyncService {
       }
 
       if (formulariosData.isEmpty) {
+        // CORRECCIÓN: Limpiar tablas si no hay formularios
+        try {
+          final db = DatabaseHelper();
+          await db.eliminar('dynamic_form');
+          await db.eliminar('dynamic_form_detail');
+        } catch (e) {
+          print('Error limpiando formularios: $e');
+        }
+
         return SyncResult(
           exito: true,
-          mensaje: 'No hay formularios disponibles',
+          mensaje: 'No hay formularios disponibles (Tablas limpiadas)',
           itemsSincronizados: 0,
         );
       }
 
       try {
         final repo = DynamicFormRepository();
-        final guardados = await repo.templates.saveTemplatesFromServer(formulariosData);
+        final guardados = await repo.templates.saveTemplatesFromServer(
+          formulariosData,
+        );
       } catch (dbError) {
         await ErrorLogService.logDatabaseError(
           tableName: 'dynamic_form',
@@ -58,7 +73,6 @@ class DynamicFormSyncService extends BaseSyncService {
         itemsSincronizados: formulariosData.length,
         totalEnAPI: formulariosData.length,
       );
-
     } catch (e) {
       await ErrorLogService.logError(
         tableName: 'dynamic_form',
@@ -83,10 +97,9 @@ class DynamicFormSyncService extends BaseSyncService {
       final baseUrl = await BaseSyncService.getBaseUrl();
       currentEndpoint = '$baseUrl/api/getFormularios/$formId';
 
-      final response = await http.get(
-        Uri.parse(currentEndpoint),
-        headers: BaseSyncService.headers,
-      ).timeout(BaseSyncService.timeout);
+      final response = await http
+          .get(Uri.parse(currentEndpoint), headers: BaseSyncService.headers)
+          .timeout(BaseSyncService.timeout);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final responseData = jsonDecode(response.body);
@@ -135,7 +148,6 @@ class DynamicFormSyncService extends BaseSyncService {
           itemsSincronizados: 0,
         );
       }
-
     } on TimeoutException catch (timeoutError) {
       await ErrorLogService.logNetworkError(
         tableName: 'dynamic_form',
@@ -150,7 +162,6 @@ class DynamicFormSyncService extends BaseSyncService {
         mensaje: 'Timeout de conexión',
         itemsSincronizados: 0,
       );
-
     } on SocketException catch (socketError) {
       await ErrorLogService.logNetworkError(
         tableName: 'dynamic_form',
@@ -165,7 +176,6 @@ class DynamicFormSyncService extends BaseSyncService {
         mensaje: 'Sin conexión de red',
         itemsSincronizados: 0,
       );
-
     } catch (e) {
       await ErrorLogService.logError(
         tableName: 'dynamic_form',
@@ -189,15 +199,15 @@ class DynamicFormSyncService extends BaseSyncService {
 
     try {
       final baseUrl = await BaseSyncService.getBaseUrl();
-      currentEndpoint = '$baseUrl$_getDynamicFormDetailEndpoint?dynamicFormId=$formId';
+      currentEndpoint =
+          '$baseUrl$_getDynamicFormDetailEndpoint?dynamicFormId=$formId';
 
-      final response = await http.get(
-        Uri.parse(currentEndpoint),
-        headers: BaseSyncService.headers,
-      ).timeout(BaseSyncService.timeout);
+      final response = await http
+          .get(Uri.parse(currentEndpoint), headers: BaseSyncService.headers)
+          .timeout(BaseSyncService.timeout);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        final detallesData = _parseListResponse(response.body);
+        final detallesData = await _parseListResponse(response.body);
 
         if (detallesData == null) {
           await ErrorLogService.logError(
@@ -226,7 +236,9 @@ class DynamicFormSyncService extends BaseSyncService {
 
         try {
           final repo = DynamicFormRepository();
-          final guardados = await repo.templates.saveDetailsFromServer(detallesData);
+          final guardados = await repo.templates.saveDetailsFromServer(
+            detallesData,
+          );
 
           return SyncResult(
             exito: true,
@@ -263,7 +275,6 @@ class DynamicFormSyncService extends BaseSyncService {
           itemsSincronizados: 0,
         );
       }
-
     } on TimeoutException catch (timeoutError) {
       await ErrorLogService.logNetworkError(
         tableName: 'dynamic_form_detail',
@@ -277,7 +288,6 @@ class DynamicFormSyncService extends BaseSyncService {
         mensaje: 'Timeout de conexión',
         itemsSincronizados: 0,
       );
-
     } on SocketException catch (socketError) {
       await ErrorLogService.logNetworkError(
         tableName: 'dynamic_form_detail',
@@ -291,7 +301,6 @@ class DynamicFormSyncService extends BaseSyncService {
         mensaje: 'Sin conexión de red',
         itemsSincronizados: 0,
       );
-
     } catch (e) {
       await ErrorLogService.logError(
         tableName: 'dynamic_form_detail',
@@ -317,13 +326,12 @@ class DynamicFormSyncService extends BaseSyncService {
       final uri = Uri.parse('$baseUrl$_getDynamicFormDetailEndpoint');
       currentEndpoint = uri.toString();
 
-      final response = await http.get(
-        uri,
-        headers: BaseSyncService.headers,
-      ).timeout(BaseSyncService.timeout);
+      final response = await http
+          .get(uri, headers: BaseSyncService.headers)
+          .timeout(BaseSyncService.timeout);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        final detallesData = _parseListResponse(response.body);
+        final detallesData = await _parseListResponse(response.body);
 
         if (detallesData == null) {
           await ErrorLogService.logError(
@@ -343,16 +351,25 @@ class DynamicFormSyncService extends BaseSyncService {
         }
 
         if (detallesData.isEmpty) {
+          try {
+            final db = DatabaseHelper();
+            await db.eliminar('dynamic_form_detail');
+          } catch (e) {
+            print('Error limpiando detalles: $e');
+          }
+
           return SyncResult(
             exito: true,
-            mensaje: 'No hay detalles disponibles',
+            mensaje: 'No hay detalles disponibles (Tabla limpiada)',
             itemsSincronizados: 0,
           );
         }
 
         try {
           final repo = DynamicFormRepository();
-          final guardados = await repo.templates.saveDetailsFromServer(detallesData);
+          final guardados = await repo.templates.saveDetailsFromServer(
+            detallesData,
+          );
 
           return SyncResult(
             exito: true,
@@ -390,7 +407,6 @@ class DynamicFormSyncService extends BaseSyncService {
           itemsSincronizados: 0,
         );
       }
-
     } on TimeoutException catch (timeoutError) {
       await ErrorLogService.logNetworkError(
         tableName: 'dynamic_form_detail',
@@ -404,7 +420,6 @@ class DynamicFormSyncService extends BaseSyncService {
         mensaje: 'Timeout de conexión',
         itemsSincronizados: 0,
       );
-
     } on SocketException catch (socketError) {
       await ErrorLogService.logNetworkError(
         tableName: 'dynamic_form_detail',
@@ -418,7 +433,6 @@ class DynamicFormSyncService extends BaseSyncService {
         mensaje: 'Sin conexión de red',
         itemsSincronizados: 0,
       );
-
     } catch (e) {
       await ErrorLogService.logError(
         tableName: 'dynamic_form_detail',
@@ -440,7 +454,7 @@ class DynamicFormSyncService extends BaseSyncService {
     String? contactoId,
     String? dynamicFormId,
     String? estado,
-    String? edfvendedorId,
+    String? employeeId,
   }) async {
     String? currentEndpoint;
 
@@ -449,21 +463,21 @@ class DynamicFormSyncService extends BaseSyncService {
         contactoId: contactoId,
         dynamicFormId: dynamicFormId,
         estado: estado,
-        edfvendedorId: edfvendedorId,
+        employeeId: employeeId,
       );
 
       final baseUrl = await BaseSyncService.getBaseUrl();
-      final uri = Uri.parse('$baseUrl$_getDynamicFormResponseEndpoint')
-          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final uri = Uri.parse(
+        '$baseUrl$_getDynamicFormResponseEndpoint',
+      ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
       currentEndpoint = uri.toString();
 
-      final response = await http.get(
-        uri,
-        headers: BaseSyncService.headers,
-      ).timeout(BaseSyncService.timeout);
+      final response = await http
+          .get(uri, headers: BaseSyncService.headers)
+          .timeout(BaseSyncService.timeout);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        final responsesData = _parseListResponse(response.body);
+        final responsesData = await _parseListResponse(response.body);
 
         if (responsesData == null) {
           return SyncResult(
@@ -474,16 +488,27 @@ class DynamicFormSyncService extends BaseSyncService {
         }
 
         if (responsesData.isEmpty) {
+          try {
+            final db = DatabaseHelper();
+            await db.eliminar('dynamic_form_response');
+            await db.eliminar('dynamic_form_response_detail');
+            await db.eliminar('dynamic_form_response_image');
+          } catch (e) {
+            print('Error limpiando respuestas: $e');
+          }
+
           return SyncResult(
             exito: true,
-            mensaje: 'No hay respuestas disponibles',
+            mensaje: 'No hay respuestas disponibles (Tablas limpiadas)',
             itemsSincronizados: 0,
           );
         }
 
         try {
           final repo = DynamicFormRepository();
-          final guardados = await repo.responses.saveResponsesFromServer(responsesData);
+          final guardados = await repo.responses.saveResponsesFromServer(
+            responsesData,
+          );
 
           return SyncResult(
             exito: true,
@@ -513,21 +538,18 @@ class DynamicFormSyncService extends BaseSyncService {
           itemsSincronizados: 0,
         );
       }
-
     } on TimeoutException {
       return SyncResult(
         exito: false,
         mensaje: 'Timeout de conexión',
         itemsSincronizados: 0,
       );
-
     } on SocketException {
       return SyncResult(
         exito: false,
         mensaje: 'Sin conexión de red',
         itemsSincronizados: 0,
       );
-
     } catch (e) {
       return SyncResult(
         exito: false,
@@ -538,7 +560,7 @@ class DynamicFormSyncService extends BaseSyncService {
   }
 
   static Future<SyncResult> obtenerImagenesRespuestasFormularios({
-    String? edfvendedorId,
+    String? employeeId,
     String? contactoId,
     String? dynamicFormId,
     String? dynamicFormResponseId,
@@ -547,24 +569,24 @@ class DynamicFormSyncService extends BaseSyncService {
 
     try {
       final queryParams = _buildQueryParams(
-        edfvendedorId: edfvendedorId,
+        employeeId: employeeId,
         contactoId: contactoId,
         dynamicFormId: dynamicFormId,
         dynamicFormResponseId: dynamicFormResponseId,
       );
 
       final baseUrl = await BaseSyncService.getBaseUrl();
-      final uri = Uri.parse('$baseUrl$_getDynamicFormResponseImageEndpoint')
-          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final uri = Uri.parse(
+        '$baseUrl$_getDynamicFormResponseImageEndpoint',
+      ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
       currentEndpoint = uri.toString();
 
-      final response = await http.get(
-        uri,
-        headers: BaseSyncService.headers,
-      ).timeout(BaseSyncService.timeout);
+      final response = await http
+          .get(uri, headers: BaseSyncService.headers)
+          .timeout(BaseSyncService.timeout);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        final imagenesData = _parseListResponse(response.body);
+        final imagenesData = await _parseListResponse(response.body);
 
         if (imagenesData == null) {
           return SyncResult(
@@ -584,7 +606,9 @@ class DynamicFormSyncService extends BaseSyncService {
 
         try {
           final repo = DynamicFormRepository();
-          final guardados = await repo.responses.saveResponseImagesFromServer(imagenesData);
+          final guardados = await repo.responses.saveResponseImagesFromServer(
+            imagenesData,
+          );
 
           return SyncResult(
             exito: true,
@@ -614,21 +638,18 @@ class DynamicFormSyncService extends BaseSyncService {
           itemsSincronizados: 0,
         );
       }
-
     } on TimeoutException {
       return SyncResult(
         exito: false,
         mensaje: 'Timeout de conexión',
         itemsSincronizados: 0,
       );
-
     } on SocketException {
       return SyncResult(
         exito: false,
         mensaje: 'Sin conexión de red',
         itemsSincronizados: 0,
       );
-
     } catch (e) {
       return SyncResult(
         exito: false,
@@ -638,23 +659,21 @@ class DynamicFormSyncService extends BaseSyncService {
     }
   }
 
-  static Future<SyncResult> obtenerRespuestasPorVendedor(String edfvendedorId) {
-    return obtenerRespuestasFormularios(edfvendedorId: edfvendedorId);
+  static Future<SyncResult> obtenerRespuestasPorVendedor(String employeeId) {
+    return obtenerRespuestasFormularios(employeeId: employeeId);
   }
 
-  static Future<SyncResult> obtenerImagenesPorVendedor(String edfvendedorId) {
-    return obtenerImagenesRespuestasFormularios(edfvendedorId: edfvendedorId);
+  static Future<SyncResult> obtenerImagenesPorVendedor(String employeeId) {
+    return obtenerImagenesRespuestasFormularios(employeeId: employeeId);
   }
 
-  static Future<SyncResult> obtenerImagenesFormularios({
-    String? edfVendedorId,
-  }) {
-    return obtenerImagenesRespuestasFormularios(edfvendedorId: edfVendedorId);
+  static Future<SyncResult> obtenerImagenesFormularios({String? employeeId}) {
+    return obtenerImagenesRespuestasFormularios(employeeId: employeeId);
   }
 
-  static Future<SyncResult> obtenerRespuestasCompletadas({String? edfvendedorId}) {
+  static Future<SyncResult> obtenerRespuestasCompletadas({String? employeeId}) {
     return obtenerRespuestasFormularios(
-      edfvendedorId: edfvendedorId,
+      employeeId: employeeId,
       estado: 'completed',
     );
   }
@@ -668,10 +687,10 @@ class DynamicFormSyncService extends BaseSyncService {
   }
 
   static Future<List<Map<String, dynamic>>?> _fetchFormularios(
-      String? estado,
-      int? limit,
-      int? offset,
-      ) async {
+    String? estado,
+    int? limit,
+    int? offset,
+  ) async {
     String? currentEndpoint;
 
     try {
@@ -682,17 +701,17 @@ class DynamicFormSyncService extends BaseSyncService {
       );
 
       final baseUrl = await BaseSyncService.getBaseUrl();
-      final uri = Uri.parse('$baseUrl$_getDynamicFormEndpoint')
-          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final uri = Uri.parse(
+        '$baseUrl$_getDynamicFormEndpoint',
+      ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
       currentEndpoint = uri.toString();
 
-      final response = await http.get(
-        uri,
-        headers: BaseSyncService.headers,
-      ).timeout(BaseSyncService.timeout);
+      final response = await http
+          .get(uri, headers: BaseSyncService.headers)
+          .timeout(BaseSyncService.timeout);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        return _parseListResponse(response.body);
+        return await _parseListResponse(response.body);
       } else {
         final mensaje = BaseSyncService.extractErrorMessage(response);
 
@@ -706,7 +725,6 @@ class DynamicFormSyncService extends BaseSyncService {
 
         return null;
       }
-
     } on TimeoutException catch (timeoutError) {
       await ErrorLogService.logNetworkError(
         tableName: 'dynamic_form',
@@ -715,7 +733,6 @@ class DynamicFormSyncService extends BaseSyncService {
         endpoint: currentEndpoint,
       );
       return null;
-
     } on SocketException catch (socketError) {
       await ErrorLogService.logNetworkError(
         tableName: 'dynamic_form',
@@ -724,7 +741,6 @@ class DynamicFormSyncService extends BaseSyncService {
         endpoint: currentEndpoint,
       );
       return null;
-
     } catch (e) {
       await ErrorLogService.logError(
         tableName: 'dynamic_form',
@@ -745,17 +761,18 @@ class DynamicFormSyncService extends BaseSyncService {
       final uriDetalles = Uri.parse('$baseUrl$_getDynamicFormDetailEndpoint');
       currentEndpoint = uriDetalles.toString();
 
-      final responseDetalles = await http.get(
-        uriDetalles,
-        headers: BaseSyncService.headers,
-      ).timeout(BaseSyncService.timeout);
+      final responseDetalles = await http
+          .get(uriDetalles, headers: BaseSyncService.headers)
+          .timeout(BaseSyncService.timeout);
 
-      if (responseDetalles.statusCode >= 200 && responseDetalles.statusCode < 300) {
-        final detallesData = _parseListResponse(responseDetalles.body);
+      if (responseDetalles.statusCode >= 200 &&
+          responseDetalles.statusCode < 300) {
+        final detallesData = await _parseListResponse(responseDetalles.body);
 
         if (detallesData != null && detallesData.isNotEmpty) {
           try {
-            final detallesGuardados = await repo.templates.saveDetailsFromServer(detallesData);
+            final detallesGuardados = await repo.templates
+                .saveDetailsFromServer(detallesData);
             return detallesGuardados;
           } catch (dbError) {
             await ErrorLogService.logDatabaseError(
@@ -777,7 +794,6 @@ class DynamicFormSyncService extends BaseSyncService {
       }
 
       return 0;
-
     } on TimeoutException catch (timeoutError) {
       await ErrorLogService.logNetworkError(
         tableName: 'dynamic_form_detail',
@@ -786,7 +802,6 @@ class DynamicFormSyncService extends BaseSyncService {
         endpoint: currentEndpoint,
       );
       return 0;
-
     } on SocketException catch (socketError) {
       await ErrorLogService.logNetworkError(
         tableName: 'dynamic_form_detail',
@@ -795,7 +810,6 @@ class DynamicFormSyncService extends BaseSyncService {
         endpoint: currentEndpoint,
       );
       return 0;
-
     } catch (e) {
       await ErrorLogService.logError(
         tableName: 'dynamic_form_detail',
@@ -808,33 +822,37 @@ class DynamicFormSyncService extends BaseSyncService {
     }
   }
 
-  static List<Map<String, dynamic>>? _parseListResponse(String responseBody) {
-    try {
-      final parsed = jsonDecode(responseBody);
+  static Future<List<Map<String, dynamic>>?> _parseListResponse(
+    String responseBody,
+  ) async {
+    return await Isolate.run(() {
+      try {
+        final parsed = jsonDecode(responseBody);
 
-      if (parsed is List) {
-        return parsed.cast<Map<String, dynamic>>();
-      }
+        if (parsed is List) {
+          return parsed.cast<Map<String, dynamic>>();
+        }
 
-      if (parsed is Map && parsed.containsKey('data')) {
-        final dataValue = parsed['data'];
+        if (parsed is Map && parsed.containsKey('data')) {
+          final dataValue = parsed['data'];
 
-        if (dataValue is String) {
-          final decoded = jsonDecode(dataValue);
-          if (decoded is List) {
-            return decoded.cast<Map<String, dynamic>>();
+          if (dataValue is String) {
+            final decoded = jsonDecode(dataValue);
+            if (decoded is List) {
+              return decoded.cast<Map<String, dynamic>>();
+            }
+          }
+
+          if (dataValue is List) {
+            return dataValue.cast<Map<String, dynamic>>();
           }
         }
 
-        if (dataValue is List) {
-          return dataValue.cast<Map<String, dynamic>>();
-        }
+        return null;
+      } catch (e) {
+        return null;
       }
-
-      return null;
-    } catch (e) {
-      return null;
-    }
+    });
   }
 
   static Map<String, String> _buildQueryParams({
@@ -842,7 +860,7 @@ class DynamicFormSyncService extends BaseSyncService {
     String? dynamicFormId,
     String? dynamicFormResponseId,
     String? estado,
-    String? edfvendedorId,
+    String? employeeId,
     String? limit,
     String? offset,
   }) {
@@ -850,9 +868,10 @@ class DynamicFormSyncService extends BaseSyncService {
 
     if (contactoId != null) params['contactoId'] = contactoId;
     if (dynamicFormId != null) params['dynamicFormId'] = dynamicFormId;
-    if (dynamicFormResponseId != null) params['dynamicFormResponseId'] = dynamicFormResponseId;
+    if (dynamicFormResponseId != null)
+      params['dynamicFormResponseId'] = dynamicFormResponseId;
     if (estado != null) params['estado'] = estado;
-    if (edfvendedorId != null) params['edfvendedorId'] = edfvendedorId;
+    if (employeeId != null) params['employeeId'] = employeeId;
     if (limit != null) params['limit'] = limit;
     if (offset != null) params['offset'] = offset;
 

@@ -1,14 +1,16 @@
+import 'package:ada_app/viewmodels/preview_screen_viewmodel.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import '../repositories/censo_activo_repository.dart';
-import 'package:ada_app/services/post/censo_activo_post_service.dart';
 import '../repositories/equipo_repository.dart';
 import '../models/censo_activo.dart';
-import '../services/location_service.dart';
+import 'package:ada_app/services/device/location_service.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
+import 'package:uuid/uuid.dart';
 
-// ========== EVENTOS PARA LA UI ==========
+final Uuid _uuid = const Uuid();
+
 abstract class EquiposClienteDetailUIEvent {}
 
 class ShowMessageEvent extends EquiposClienteDetailUIEvent {
@@ -24,7 +26,6 @@ class ShowRetireConfirmationDialogEvent extends EquiposClienteDetailUIEvent {
 
 enum MessageType { error, success, info, warning }
 
-// ========== ESTADO PURO ==========
 class EquiposClienteDetailState {
   final dynamic equipoCliente;
   final bool isProcessing;
@@ -39,7 +40,7 @@ class EquiposClienteDetailState {
     this.historialCambios = const [],
     this.historialUltimos5 = const [],
   }) : equipoEnLocal =
-      equipoEnLocal ?? (equipoCliente['tipo_estado'] == 'asignado');
+           equipoEnLocal ?? (equipoCliente['tipo_estado'] == 'asignado');
 
   EquiposClienteDetailState copyWith({
     dynamic equipoCliente,
@@ -58,37 +59,32 @@ class EquiposClienteDetailState {
   }
 }
 
-// ========== VIEWMODEL LIMPIO ==========
 class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   final CensoActivoRepository _estadoEquipoRepository;
   final EquipoRepository _equipoRepository;
+
   final LocationService _locationService = LocationService();
 
-  // ========== ESTADO INTERNO ==========
   EquiposClienteDetailState _state;
 
-  // ========== NUEVOS CAMPOS PARA DROPDOWN ==========
   bool? _estadoUbicacionEquipo;
   bool _hasUnsavedChanges = false;
   int _estadoLocalActual;
 
-  // ========== STREAMS PARA EVENTOS ==========
   final StreamController<EquiposClienteDetailUIEvent> _eventController =
-  StreamController<EquiposClienteDetailUIEvent>.broadcast();
+      StreamController<EquiposClienteDetailUIEvent>.broadcast();
   Stream<EquiposClienteDetailUIEvent> get uiEvents => _eventController.stream;
 
-  // ========== CONSTRUCTOR ==========
   EquiposClienteDetailScreenViewModel(
-      dynamic equipoCliente,
-      this._estadoEquipoRepository,
-      this._equipoRepository,
-      ) : _state = EquiposClienteDetailState(equipoCliente: equipoCliente),
-        _estadoLocalActual = _determinarEstadoInicial(equipoCliente) {
+    dynamic equipoCliente,
+    this._estadoEquipoRepository,
+    this._equipoRepository,
+  ) : _state = EquiposClienteDetailState(equipoCliente: equipoCliente),
+      _estadoLocalActual = _determinarEstadoInicial(equipoCliente) {
     _initializeState();
-    _loadInitialState();
+    _verificarEstadoReal();
   }
 
-  // ========== HELPER METHOD ==========
   static int _determinarEstadoInicial(dynamic equipoCliente) {
     final tipoEstado = equipoCliente['tipo_estado']?.toString();
     if (tipoEstado == 'asignado') {
@@ -98,10 +94,16 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== MÉTODOS PARA VALIDACIÓN DE DÍA DE RUTA ==========
-
   String _getDiaActual() {
-    final diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    final diasSemana = [
+      'Lunes',
+      'Martes',
+      'Miércoles',
+      'Jueves',
+      'Viernes',
+      'Sábado',
+      'Domingo',
+    ];
     final now = DateTime.now();
     return diasSemana[now.weekday - 1];
   }
@@ -132,18 +134,68 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         'Hoy es: $diaActual';
   }
 
-  // ============================================================
-
-  // ========== INICIALIZAR ESTADO DEL DROPDOWN ==========
   void _initializeState() {
     _estadoUbicacionEquipo = null;
     _hasUnsavedChanges = false;
   }
 
+  // VALIDAR ESTADO REAL CON REPOSITORIOS (ASIGNADO vs PENDIENTE)
+  Future<void> _verificarEstadoReal() async {
+    try {
+      final equipoId = equipoCliente['equipo_id'] ?? equipoCliente['id'];
+      final clienteId = equipoCliente['cliente_id'];
+
+      if (equipoId == null || clienteId == null) {
+        _loadInitialState();
+        return;
+      }
+
+      final cId = int.tryParse(clienteId.toString());
+      if (cId == null) {
+        _loadInitialState();
+        return;
+      }
+
+      String nuevoTipoEstado;
+
+      // Usar la lógica estricta de "Asignado" que usa la pantalla de Cliente
+      final esAsignado = await _equipoRepository.verificarAsignacionEstricta(
+        equipoId.toString(),
+        cId,
+      );
+
+      if (esAsignado) {
+        nuevoTipoEstado = 'asignado';
+      } else {
+        // Si no pasa la validación estricta de asignado, asumimos pendiente
+        // (ya que debería estar en una de las dos listas)
+        nuevoTipoEstado = 'pendiente';
+      }
+
+      // Actualizar el estado local si cambió
+      if (nuevoTipoEstado != equipoCliente['tipo_estado']) {
+        final nuevoEquipoCliente = Map<String, dynamic>.from(equipoCliente);
+        nuevoEquipoCliente['tipo_estado'] = nuevoTipoEstado;
+
+        _state = _state.copyWith(equipoCliente: nuevoEquipoCliente);
+
+        // Recalcular estado local based on new type
+        _estadoLocalActual = _determinarEstadoInicial(nuevoEquipoCliente);
+
+        // Notificar cambio
+        notifyListeners();
+      }
+
+      // Finalmente cargar historial
+      await _loadInitialState();
+    } catch (e) {
+      _loadInitialState();
+    }
+  }
+
   // CARGAR ESTADO INICIAL Y HISTORIAL
   Future<void> _loadInitialState() async {
     try {
-      // ✅ USAR CÓDIGO DE BARRAS para buscar historial
       final codigoBarras = equipoCliente['cod_barras']?.toString();
       final clienteId = equipoCliente['cliente_id'];
 
@@ -158,16 +210,16 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       try {
         historialCompleto = await _estadoEquipoRepository
             .obtenerHistorialDirectoPorEquipoCliente(
-          codigoBarras,
-          int.parse(clienteId.toString()),
-        );
+              codigoBarras,
+              int.parse(clienteId.toString()),
+            );
       } catch (e) {
         try {
           historialCompleto = await _estadoEquipoRepository
               .obtenerHistorialCompleto(
-            codigoBarras,
-            int.parse(clienteId.toString()),
-          );
+                codigoBarras,
+                int.parse(clienteId.toString()),
+              );
         } catch (e2) {
           historialCompleto = [];
         }
@@ -178,7 +230,9 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
           : null;
 
       if (estadoActual == null && tipoEstado == 'asignado') {
+        print("ESTOY");
         try {
+          print("antes");
           estadoActual = await _estadoEquipoRepository.obtenerUltimoEstado(
             codigoBarras,
             int.parse(clienteId.toString()),
@@ -188,7 +242,8 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
             historialCompleto = [estadoActual];
           }
         } catch (e) {
-          // Error al obtener estado individual
+          //LOG ERROR
+          print("Error al obtener último estado: $e");
         }
       }
 
@@ -256,10 +311,9 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   void cambiarUbicacionEquipo(bool? nuevaUbicacion) {
     // VALIDAR DÍA DE RUTA ANTES DE PERMITIR CAMBIOS
     if (!_validarDiaRuta()) {
-      _eventController.add(ShowMessageEvent(
-        obtenerMensajeRestriccionDia(),
-        MessageType.error,
-      ));
+      _eventController.add(
+        ShowMessageEvent(obtenerMensajeRestriccionDia(), MessageType.error),
+      );
       return;
     }
 
@@ -286,9 +340,9 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
       historialCompleto = await _estadoEquipoRepository
           .obtenerHistorialCompleto(
-        equipoId.toString(),
-        int.parse(clienteId.toString()),
-      );
+            equipoId.toString(),
+            int.parse(clienteId.toString()),
+          );
 
       final ultimos5 = historialCompleto.take(5).toList();
 
@@ -303,14 +357,13 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== GUARDAR CAMBIOS ==========
+  // ========== GUARDAR CAMBIOS DESDE EQUIPO FUERA DE LOCAL ==========
   Future<void> saveAllChanges() async {
     // VALIDAR DÍA DE RUTA ANTES DE GUARDAR
     if (!_validarDiaRuta()) {
-      _eventController.add(ShowMessageEvent(
-        obtenerMensajeRestriccionDia(),
-        MessageType.error,
-      ));
+      _eventController.add(
+        ShowMessageEvent(obtenerMensajeRestriccionDia(), MessageType.error),
+      );
       return;
     }
 
@@ -349,60 +402,65 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
         throw Exception('Código de barras o cliente no disponible');
       }
 
-      final nuevoEstado = await _estadoEquipoRepository.crearCensoActivo(
-        equipoId: codigoBarras,
-        clienteId: int.parse(clienteId.toString()),
-        enLocal: _estadoUbicacionEquipo!,
-        fechaRevision: DateTime.now(),
-        latitud: position.latitude,
-        longitud: position.longitude,
+      // Obtener usuario actual antes de crear el registro
+      final currentUser = await AuthService().getCurrentUser();
+
+      Map<String, dynamic> datos = {};
+      final processId = _uuid.v4();
+
+      datos['es_nuevo_equipo'] = false;
+      datos['cliente'] = {'id': int.parse(clienteId.toString())};
+
+      // CORRECCIÓN: equipo_completo debe ser un Map, no un ID
+      datos['equipo_completo'] = {
+        'id': equipoCliente['id'],
+        'cod_barras': codigoBarras,
+        'numero_serie': equipoCliente['numero_serie'],
+        'marca_id': equipoCliente['marca_id'],
+        'modelo_id': equipoCliente['modelo_id'],
+        'logo_id': equipoCliente['logo_id'],
+        'marca_nombre': equipoCliente['marca_nombre'],
+        'modelo_nombre': equipoCliente['modelo_nombre'],
+        'logo_nombre': equipoCliente['logo_nombre'],
+        'cliente_id': clienteId,
+        'tipo_estado':
+            'asignado', // Asumimos asignado al guardar cambios de ubicación
+      };
+
+      datos['codigo_barras'] = codigoBarras;
+      datos['numero_serie'] = equipoCliente['numero_serie'];
+      datos['modelo_id'] = equipoCliente['modelo_id'];
+      datos['logo_id'] = equipoCliente['logo_id'];
+      datos['marca_id'] = equipoCliente['marca_id'];
+      datos['marca_nombre'] = equipoCliente['marca_nombre'];
+      datos['modelo'] = equipoCliente['modelo_nombre'];
+      datos['logo'] = equipoCliente['logo_nombre'];
+      datos['latitud'] = position.latitude;
+      datos['longitud'] = position.longitude;
+      datos['observaciones'] = '';
+      datos['usuario_id'] = currentUser?.id;
+      datos['equipo_id'] = equipoCliente['id'];
+
+      // Asignar el valor seleccionado en el dropdown
+      datos['en_local'] = _estadoUbicacionEquipo;
+
+      final result = await PreviewScreenViewModel.insertarEnviarCensoActivo(
+        datos,
+        processId,
       );
 
-      // 2. Sincronizar con el servidor
-      try {
-        final currentUser = await AuthService().getCurrentUser();
-        if (currentUser != null &&
-            currentUser.id != null &&
-            currentUser.edfVendedorId != null) {
-          final resultadoSync = await CensoActivoPostService.enviarCambioEstado(
-            codigoBarras: codigoBarras,
-            clienteId: int.parse(clienteId.toString()),
-            enLocal: _estadoUbicacionEquipo!,
-            position: position,
-            observaciones: nuevoEstado.observaciones,
-            equipoId: equipoCliente['equipo_id']?.toString() ?? codigoBarras,
-            clienteNombre: equipoCliente['cliente_nombre']?.toString() ?? '',
-            numeroSerie: equipoCliente['numero_serie']?.toString() ?? '',
-            modelo: equipoCliente['modelo_nombre']?.toString() ?? '',
-            marca: equipoCliente['marca_nombre']?.toString() ?? '',
-            logo: equipoCliente['logo_nombre']?.toString() ?? '',
-            usuarioId: currentUser.id!,
-            edfVendedorId: currentUser.edfVendedorId!,
-          );
-
-          if (resultadoSync['exito']) {
-            if (nuevoEstado.id != null) {
-              await _estadoEquipoRepository.marcarComoMigrado(nuevoEstado.id!);
-            }
-          }
-        }
-      } catch (syncError) {
-        // El guardado local ya se hizo, así que continuamos
+      if (result['success'] != true) {
+        throw result['error'] ?? 'Error desconocido';
       }
 
       _estadoLocalActual = _estadoUbicacionEquipo! ? 1 : 0;
       _estadoUbicacionEquipo = null;
       _hasUnsavedChanges = false;
 
-      final historialActualizado = [nuevoEstado, ..._state.historialCambios];
-      final ultimos5Actualizado = historialActualizado.take(5).toList();
+      // Recargar historial para reflejar cambios
+      await recargarHistorial();
 
-      _state = _state.copyWith(
-        equipoEnLocal: _estadoLocalActual == 1,
-        historialCambios: historialActualizado,
-        historialUltimos5: ultimos5Actualizado,
-        isProcessing: false,
-      );
+      _state = _state.copyWith(isProcessing: false);
 
       notifyListeners();
 
@@ -534,7 +592,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       'equipoNombre': getNombreCompletoEquipo(),
       'equipoCodigo': equipoCliente['cod_barras'] ?? 'Sin código',
       'clienteNombre':
-      'Cliente ID: ${equipoCliente['cliente_id'] ?? "No asignado"}',
+          'Cliente ID: ${equipoCliente['cliente_id'] ?? "No asignado"}',
     };
   }
 

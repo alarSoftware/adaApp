@@ -1,6 +1,6 @@
 import '../models/dynamic_form/dynamic_form_template.dart';
 import '../services/sync/dynamic_form_sync_service.dart';
-import '../services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 
 class DynamicFormTemplateRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper();
@@ -289,6 +289,7 @@ class DynamicFormTemplateRepository {
           'respuestaCorrectaText': detalle['respuesta_correcta']?.toString(),
           'percentage': detalle['percentage'],
           'dynamicForm': {'id': formId},
+          'is_required': _parseBooleanFromDb(detalle['is_required']) == true,
         });
       }
 
@@ -341,6 +342,10 @@ class DynamicFormTemplateRepository {
       'label': apiData['label']?.toString() ?? '',
       'parent_id': parentId,
       'percentage': apiData['percentage'],
+      'is_required':
+          (apiData['required'] == true || apiData['is_required'] == true)
+          ? 1
+          : 0,
     };
   }
 

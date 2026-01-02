@@ -4,10 +4,10 @@ import 'package:ada_app/viewmodels/dynamic_form_viewmodel.dart';
 import 'package:ada_app/models/dynamic_form/dynamic_form_response.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/ui/widgets/client_info_card.dart';
-import 'package:ada_app/ui/screens/dynamic_form_template_list_screen.dart';
+import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_template_list_screen.dart';
 import 'package:intl/intl.dart';
-import 'package:ada_app/ui/screens/dynamic_form_fill_screen.dart';
-import 'package:ada_app/services/auth_service.dart';
+import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_fill_screen.dart';
+import 'package:ada_app/services/api/auth_service.dart';
 
 /// Pantalla principal que muestra las respuestas guardadas
 class DynamicFormResponsesScreen extends StatefulWidget {
@@ -573,9 +573,8 @@ class _DynamicFormResponsesScreenState
 
     // ✅ Obtener usuario actual (igual que cuando creas formularios)
     final usuario = await AuthService().getCurrentUser();
-    final edfvendedorId = usuario?.edfVendedorId ?? '';
+    final employeeId = usuario?.employeeId ?? '';
 
-    debugPrint('🔍 edfVendedorId: $edfvendedorId');
 
     _showLoadingDialog();
 
@@ -588,13 +587,12 @@ class _DynamicFormResponsesScreenState
     debugPrint('📥 [2/2] Descargando respuestas...');
     bool responsesSuccess = false;
 
-    if (edfvendedorId.isNotEmpty) {
+    if (employeeId.isNotEmpty) {
       responsesSuccess = await _viewModel.downloadResponsesFromServer(
-        edfvendedorId,
+        employeeId,
       );
       debugPrint('📝 Responses: $responsesSuccess');
     } else {
-      debugPrint('⚠️ Sin edfVendedorId - saltando descarga de respuestas');
     }
 
     if (!mounted) return;
@@ -607,7 +605,7 @@ class _DynamicFormResponsesScreenState
     String message;
     Color backgroundColor;
 
-    if (edfvendedorId.isEmpty) {
+    if (employeeId.isEmpty) {
       message = templatesSuccess
           ? '✅ Formularios: $templatesCount\n⚠️ Respuestas no descargadas (sin vendedor)'
           : '❌ Error descargando formularios';

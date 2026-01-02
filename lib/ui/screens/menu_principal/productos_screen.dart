@@ -500,7 +500,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
   Widget _buildProductoCard(Map<String, dynamic> producto) {
     final searchQuery = _searchController.text.toLowerCase();
     final nombre = producto['nombre'] ?? 'Sin nombre';
-    final codigo = producto['codigo'];
+    final codigo = producto['codigo'] ?? 'S/C';
     final codigoBarras = producto['codigo_barras'];
     final categoria = producto['categoria'] ?? 'Sin categoría';
 
@@ -534,34 +534,15 @@ class _ProductosScreenState extends State<ProductosScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildHighlightedText(
-                      nombre,
-                      searchQuery,
-                      const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
+                    // CAMBIO AQUI: Mostrar [CODIGO] Nombre
+                    _buildHighlightedRichText(
+                      codigo: codigo,
+                      nombre: nombre,
+                      searchQuery: searchQuery,
                     ),
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        if (codigo != null && codigo.isNotEmpty) ...[
-                          _buildHighlightedText(
-                            'Código: $codigo',
-                            searchQuery,
-                            TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '•',
-                            style: TextStyle(color: Colors.grey[400]),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
                         _buildHighlightedText(
                           'ID: ${producto['id']}',
                           searchQuery,
@@ -575,7 +556,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                     if (codigoBarras != null && codigoBarras.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       _buildHighlightedText(
-                        'Código de barras: $codigoBarras',
+                        'CB: $codigoBarras',
                         searchQuery,
                         TextStyle(
                           fontSize: 12,
@@ -604,6 +585,149 @@ class _ProductosScreenState extends State<ProductosScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // NUEVO METODO: Para mostrar [CODIGO] Nombre con highlight
+  Widget _buildHighlightedRichText({
+    required String codigo,
+    required String nombre,
+    required String searchQuery,
+  }) {
+    final codigoConCorchetes = '[$codigo] ';
+    final textoCompleto = codigoConCorchetes + nombre;
+    final lowerTextoCompleto = textoCompleto.toLowerCase();
+
+    if (searchQuery.isEmpty || !lowerTextoCompleto.contains(searchQuery)) {
+      // Sin highlight
+      return RichText(
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        text: TextSpan(
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+          children: [
+            TextSpan(
+              text: codigoConCorchetes,
+              style: TextStyle(
+                color: Colors.grey[700],
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextSpan(
+              text: nombre,
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Con highlight
+    final startIndex = lowerTextoCompleto.indexOf(searchQuery);
+    final endIndex = startIndex + searchQuery.length;
+
+    // Calcular dónde están las partes
+    final codigoLength = codigoConCorchetes.length;
+
+    List<TextSpan> spans = [];
+
+    // Parte del código
+    if (startIndex < codigoLength) {
+      // El highlight está en el código
+      if (endIndex <= codigoLength) {
+        // Todo el highlight está en el código
+        spans.addAll([
+          TextSpan(
+            text: codigoConCorchetes.substring(0, startIndex),
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          TextSpan(
+            text: codigoConCorchetes.substring(startIndex, endIndex),
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontWeight: FontWeight.bold,
+              backgroundColor: Colors.yellow[200],
+            ),
+          ),
+          TextSpan(
+            text: codigoConCorchetes.substring(endIndex),
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          TextSpan(text: nombre),
+        ]);
+      } else {
+        // El highlight empieza en el código y termina en el nombre
+        spans.addAll([
+          TextSpan(
+            text: codigoConCorchetes.substring(0, startIndex),
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          TextSpan(
+            text: codigoConCorchetes.substring(startIndex),
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontWeight: FontWeight.bold,
+              backgroundColor: Colors.yellow[200],
+            ),
+          ),
+          TextSpan(
+            text: nombre.substring(0, endIndex - codigoLength),
+            style: const TextStyle(
+              backgroundColor: Colors.yellow,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          TextSpan(text: nombre.substring(endIndex - codigoLength)),
+        ]);
+      }
+    } else {
+      // El highlight está completamente en el nombre
+      final nombreStartIndex = startIndex - codigoLength;
+      final nombreEndIndex = endIndex - codigoLength;
+
+      spans.addAll([
+        TextSpan(
+          text: codigoConCorchetes,
+          style: TextStyle(
+            color: Colors.grey[700],
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        TextSpan(text: nombre.substring(0, nombreStartIndex)),
+        TextSpan(
+          text: nombre.substring(nombreStartIndex, nombreEndIndex),
+          style: const TextStyle(
+            backgroundColor: Colors.yellow,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        TextSpan(text: nombre.substring(nombreEndIndex)),
+      ]);
+    }
+
+    return RichText(
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
+        ),
+        children: spans,
       ),
     );
   }

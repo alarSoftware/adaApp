@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/viewmodels/cliente_detail_screen_viewmodel.dart';
-import 'package:ada_app/ui/screens/equipos_clientes_detail_screen.dart';
+import 'package:ada_app/ui/screens/menu_principal/equipos_clientes_detail_screen.dart';
 import 'package:ada_app/ui/widgets/client_info_card.dart';
-import 'forms_screen.dart';
+import '../censo_activo/forms_screen.dart';
 import 'dart:async';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/main.dart';
@@ -154,6 +154,8 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
           color: AppColors.surface,
           child: TabBar(
             controller: _tabController,
+            // Usamos colores específicos para cada tab si es necesario,
+            // pero aquí definimos el estilo general.
             labelColor: AppColors.primary,
             unselectedLabelColor: AppColors.textSecondary,
             indicatorColor: AppColors.primary,
@@ -171,13 +173,18 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.check_circle_outline, size: 16),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text('Asignados', overflow: TextOverflow.ellipsis),
+                    Icon(
+                      Icons.check_circle_outline,
+                      size: 18,
+                      color: AppColors.success,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Asignado',
+                      style: TextStyle(color: AppColors.success),
                     ),
                     if (_viewModel.equiposAsignadosCount > 0) ...[
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 6),
                       _buildCountBadge(
                         _viewModel.equiposAsignadosCount,
                         AppColors.success,
@@ -190,16 +197,11 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.pending_outlined, size: 16),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        'Pendientes',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
+                    Icon(Icons.pending_outlined, size: 18),
+                    const SizedBox(width: 8),
+                    Text('No Asignado'),
                     if (_viewModel.equiposPendientesCount > 0) ...[
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 6),
                       _buildCountBadge(
                         _viewModel.equiposPendientesCount,
                         AppColors.warning,
@@ -255,7 +257,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
               isAsignado: true,
               emptyTitle: 'Sin equipos asignados',
               emptySubtitle:
-              'Este cliente no tiene equipos asignados actualmente',
+                  'Este cliente no tiene equipos asignados actualmente',
               emptyIcon: Icons.check_circle_outline,
             ),
             _buildEquiposTab(
@@ -359,9 +361,9 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   }
 
   Widget _buildEquipoCard(
-      Map<String, dynamic> equipoData, {
-        required bool isAsignado,
-      }) {
+    Map<String, dynamic> equipoData, {
+    required bool isAsignado,
+  }) {
     final equipoColor = isAsignado ? AppColors.success : AppColors.warning;
     final borderColor = isAsignado
         ? AppColors.borderSuccess
@@ -537,9 +539,9 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
 
           final sincronizado =
               estadoInfo['sincronizado']?.toString() == '1' ||
-                  estadoInfo['sincronizado'] == 1 ||
-                  estadoInfo['sincronizado'] == true ||
-                  estadoInfo['esta_sincronizado'] == true;
+              estadoInfo['sincronizado'] == 1 ||
+              estadoInfo['sincronizado'] == true ||
+              estadoInfo['esta_sincronizado'] == true;
 
           if (estadoCenso == 'migrado' || sincronizado) {
             iconColor = AppColors.success;

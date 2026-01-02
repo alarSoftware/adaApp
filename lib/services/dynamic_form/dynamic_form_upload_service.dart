@@ -82,14 +82,14 @@ class DynamicFormUploadService {
       _logger.e('❌ Error en envío: $e');
 
       // 🚨 LOG: Error general en envío
-      // await ErrorLogService.logError(
-      //   tableName: 'dynamic_form_response',
-      //   operation: 'enviar_respuesta',
-      //   errorMessage: 'Error de conexión: $e',
-      //   errorType: 'upload',
-      //   registroFailId: responseId,
-      //   userId: userId,
-      // );
+      await ErrorLogService.logError(
+        tableName: 'dynamic_form_response',
+        operation: 'enviar_respuesta',
+        errorMessage: 'Error de conexión: $e',
+        errorType: 'upload',
+        registroFailId: responseId,
+        userId: int.tryParse(userId ?? ''),
+      );
 
       return {'exito': false, 'mensaje': 'Error de conexión: $e'};
     }
@@ -147,14 +147,14 @@ class DynamicFormUploadService {
         _logger.e('💥 Excepción en sincronización: $e');
 
         // 🚨 LOG: Excepción en background sync
-        // await ErrorLogService.logError(
-        //   tableName: 'dynamic_form_response',
-        //   operation: 'sync_background',
-        //   errorMessage: 'Excepción en sincronización: $e',
-        //   errorType: 'exception',
-        //   registroFailId: responseId,
-        //   userId: userId,
-        // );
+        await ErrorLogService.logError(
+          tableName: 'dynamic_form_response',
+          operation: 'sync_background',
+          errorMessage: 'Excepción en sincronización: $e',
+          errorType: 'exception',
+          registroFailId: responseId,
+          userId: int.tryParse(userId ?? ''),
+        );
 
         await _syncRepository.markResponseAsError(responseId, 'Excepción: $e');
       }
@@ -198,14 +198,14 @@ class DynamicFormUploadService {
           _logger.e('❌ Error: $e');
 
           // 🚨 LOG: Error en sincronización individual
-          // await ErrorLogService.logError(
-          //   tableName: 'dynamic_form_response',
-          //   operation: 'sync_pendientes',
-          //   errorMessage: 'Error sincronizando respuesta: $e',
-          //   errorType: 'sync_batch',
-          //   registroFailId: respuesta['id'] as String?,
-          //   userId: usuarioId,
-          // );
+          await ErrorLogService.logError(
+            tableName: 'dynamic_form_response',
+            operation: 'sync_pendientes',
+            errorMessage: 'Error sincronizando respuesta: $e',
+            errorType: 'sync_batch',
+            registroFailId: respuesta['id'] as String?,
+            userId: int.tryParse(usuarioId),
+          );
 
           fallidos++;
         }
@@ -233,13 +233,13 @@ class DynamicFormUploadService {
       _logger.e('💥 Error en sincronización: $e');
 
       // 🚨 LOG: Error general en sincronización batch
-      // await ErrorLogService.logError(
-      //   tableName: 'dynamic_form_response',
-      //   operation: 'sync_pendientes',
-      //   errorMessage: 'Error en sincronización masiva: $e',
-      //   errorType: 'sync_batch',
-      //   userId: usuarioId,
-      // );
+      await ErrorLogService.logError(
+        tableName: 'dynamic_form_response',
+        operation: 'sync_pendientes',
+        errorMessage: 'Error en sincronización masiva: $e',
+        errorType: 'sync_batch',
+        userId: int.tryParse(usuarioId),
+      );
 
       return {'exitosos': 0, 'fallidos': 0, 'total': 0};
     }
@@ -295,14 +295,14 @@ class DynamicFormUploadService {
       _logger.e('💥 Error en reintento: $e');
 
       // 🚨 LOG: Excepción en reintento
-      // await ErrorLogService.logError(
-      //   tableName: 'dynamic_form_response',
-      //   operation: 'RETRY_POST',
-      //   errorMessage: 'Excepción en reintento: $e',
-      //   errorType: 'retry_exception',
-      //   registroFailId: responseId,
-      //   userId: userId,
-      // );
+      await ErrorLogService.logError(
+        tableName: 'dynamic_form_response',
+        operation: 'RETRY_POST',
+        errorMessage: 'Excepción en reintento: $e',
+        errorType: 'retry_exception',
+        registroFailId: responseId,
+        userId: int.tryParse(userId ?? ''),
+      );
 
       await _syncRepository.markResponseAsError(responseId, 'Excepción: $e');
       return {'success': false, 'error': 'Error: $e'};
@@ -448,7 +448,7 @@ class DynamicFormUploadService {
         'id': respuesta['id'],
         'dynamicFormId': respuesta['dynamic_form_id'],
         'contactoId': respuesta['contacto_id'],
-        'edfvendedorId': respuesta['edf_vendedor_id'],
+        'employeeId': respuesta['employee_id'],
         'usuarioId': respuesta['usuario_id'] != null
             ? int.tryParse(respuesta['usuario_id'].toString())
             : null,

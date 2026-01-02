@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
@@ -17,10 +17,9 @@ class UserSyncService {
       final baseUrl = await BaseSyncService.getBaseUrl();
       currentEndpoint = '$baseUrl/api/getUsers';
 
-      final response = await http.get(
-        Uri.parse(currentEndpoint),
-        headers: BaseSyncService.headers,
-      ).timeout(BaseSyncService.timeout);
+      final response = await http
+          .get(Uri.parse(currentEndpoint), headers: BaseSyncService.headers)
+          .timeout(BaseSyncService.timeout);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final responseData = jsonDecode(response.body);
@@ -36,9 +35,18 @@ class UserSyncService {
         BaseSyncService.logger.i('Usuarios API count: ${usuariosAPI.length}');
 
         if (usuariosAPI.isEmpty) {
+          // Si no hay usuarios en el servidor, limpiar la tabla local
+          try {
+            await _dbHelper.sincronizarUsuarios([]);
+          } catch (dbError) {
+            BaseSyncService.logger.e(
+              'Error limpiando usuarios en BD: $dbError',
+            );
+          }
+
           return SyncResult(
             exito: true,
-            mensaje: 'No hay usuarios en el servidor',
+            mensaje: 'No hay usuarios en el servidor (Tabla limpiada)',
             itemsSincronizados: 0,
           );
         }
@@ -58,8 +66,8 @@ class UserSyncService {
           }
 
           return {
-            'edf_vendedor_id': usuario['edfVendedorId']?.toString(),
-            // 👇 NUEVA LÍNEA AGREGADA:
+            'id': usuarioId, // 👈 FIX: Asignar ID explícitamente a la PK
+            'employee_id': usuario['employeeId']?.toString(),
             'edfVendedorNombre': usuario['edfVendedorNombre']?.toString(),
             'code': usuarioId,
             'username': usuario['username'],
@@ -73,7 +81,9 @@ class UserSyncService {
 
         BaseSyncService.logger.i('=== DATOS PROCESADOS PARA DB ===');
         for (int i = 0; i < usuariosProcesados.length; i++) {
-          BaseSyncService.logger.i('Usuario ${i + 1}: ${usuariosProcesados[i]}');
+          BaseSyncService.logger.i(
+            'Usuario ${i + 1}: ${usuariosProcesados[i]}',
+          );
         }
 
         try {
@@ -113,9 +123,10 @@ class UserSyncService {
           itemsSincronizados: 0,
         );
       }
-
     } on TimeoutException catch (timeoutError) {
-      BaseSyncService.logger.e('⏰ Timeout sincronizando usuarios: $timeoutError');
+      BaseSyncService.logger.e(
+        '⏰ Timeout sincronizando usuarios: $timeoutError',
+      );
 
       await ErrorLogService.logNetworkError(
         tableName: 'Users',
@@ -129,7 +140,6 @@ class UserSyncService {
         mensaje: 'Timeout de conexión al servidor',
         itemsSincronizados: 0,
       );
-
     } on SocketException catch (socketError) {
       BaseSyncService.logger.e('📡 Error de red: $socketError');
 
@@ -145,7 +155,6 @@ class UserSyncService {
         mensaje: 'Sin conexión de red',
         itemsSincronizados: 0,
       );
-
     } catch (e) {
       BaseSyncService.logger.e('💥 Error en sincronizarUsuarios: $e');
 
@@ -196,7 +205,7 @@ class UserSyncService {
   }
 
   // MANTENEMOS TUS MÉTODOS EXISTENTES ABAJO
-  static Future<String?> obtenerEdfVendedorIdUsuarioActual() async {
+  static Future<String?> obtenerEmployeeIdUsuarioActual() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final username = prefs.getString('current_user');
@@ -205,39 +214,42 @@ class UserSyncService {
         BaseSyncService.logger.e('No hay usuario logueado');
         await ErrorLogService.logValidationError(
           tableName: 'Users',
-          operation: 'get_edf_vendedor_id',
+          operation: 'get_employee_id',
           errorMessage: 'No hay usuario logueado',
         );
         return null;
       }
 
-      BaseSyncService.logger.i('Buscando edf_vendedor_id para usuario: $username');
+      BaseSyncService.logger.i('Buscando employee_id para usuario: $username');
 
       final db = await _dbHelper.database;
       final result = await db.query(
         'Users',
-        columns: ['edf_vendedor_id'],
+        columns: ['employee_id'],
         where: 'LOWER(username) = ?',
         whereArgs: [username.toLowerCase()],
         limit: 1,
       );
 
       if (result.isEmpty) {
-        BaseSyncService.logger.e('Usuario $username no encontrado en base de datos local');
+        BaseSyncService.logger.e(
+          'Usuario $username no encontrado en base de datos local',
+        );
         await ErrorLogService.logDatabaseError(
           tableName: 'Users',
           operation: 'query_user',
-          errorMessage: 'Usuario $username no encontrado en base de datos local',
+          errorMessage:
+              'Usuario $username no encontrado en base de datos local',
         );
         return null;
       }
 
-      final edfVendedorId = result.first['edf_vendedor_id'] as String?;
+      final employeeId = result.first['employee_id'] as String?;
 
       BaseSyncService.logger.i('Usuario encontrado: $username');
-      BaseSyncService.logger.i('edf_vendedor_id: $edfVendedorId');
+      BaseSyncService.logger.i('employee_id: $employeeId');
 
-      if (edfVendedorId == null || edfVendedorId.trim().isEmpty) {
+      if (employeeId == null || employeeId.trim().isEmpty) {
         // await ErrorLogService.logValidationError(
         //   tableName: 'Users',
         //   operation: 'get_edf_vendedor_id',
@@ -246,42 +258,40 @@ class UserSyncService {
         // );
       }
 
-      return edfVendedorId;
-
+      return employeeId;
     } catch (e) {
-      BaseSyncService.logger.e('Error obteniendo edf_vendedor_id: $e');
+      BaseSyncService.logger.e('Error obteniendo employee_id: $e');
       await ErrorLogService.logError(
         tableName: 'Users',
-        operation: 'get_edf_vendedor_id',
-        errorMessage: 'Error obteniendo edf_vendedor_id: $e',
+        operation: 'get_employee_id',
+        errorMessage: 'Error obteniendo employee_id: $e',
         errorType: 'database',
       );
       return null;
     }
   }
 
-  static Future<String?> obtenerEdfVendedorIdDirecto(String username) async {
+  static Future<String?> obtenerEmployeeIdIdDirecto(String username) async {
     try {
       final db = await _dbHelper.database;
       final result = await db.rawQuery(
-          'SELECT edf_vendedor_id FROM Users WHERE LOWER(username) = ? LIMIT 1',
-          [username.toLowerCase()]
+        'SELECT employee_id FROM Users WHERE LOWER(username) = ? LIMIT 1',
+        [username.toLowerCase()],
       );
 
-      if (result.isNotEmpty && result.first['edf_vendedor_id'] != null) {
-        return result.first['edf_vendedor_id'].toString();
+      if (result.isNotEmpty && result.first['employee_id'] != null) {
+        return result.first['employee_id'].toString();
       }
 
       await ErrorLogService.logDatabaseError(
         tableName: 'Users',
         operation: 'query_user_direct',
-        errorMessage: 'Usuario $username no encontrado o sin edf_vendedor_id',
+        errorMessage: 'Usuario $username no encontrado o sin employee_id',
       );
 
       return null;
-
     } catch (e) {
-      BaseSyncService.logger.e('Error en obtenerEdfVendedorIdDirecto: $e');
+      BaseSyncService.logger.e('Error en obtenerEmployeeIdDirecto: $e');
       await ErrorLogService.logError(
         tableName: 'Users',
         operation: 'query_user_direct',

@@ -2,9 +2,10 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/sync/sync_service.dart';
 import 'package:ada_app/services/sync/sync_tables_config.dart';
+import 'package:ada_app/repositories/censo_activo_repository.dart';
 
 import 'dart:async';
 
@@ -550,6 +551,22 @@ class PendingDataViewModel extends ChangeNotifier {
 
       return operaciones;
     } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Eliminar un censo manualmente
+  Future<void> deleteCenso(String censoId) async {
+    try {
+      final repo = CensoActivoRepository();
+      await repo.eliminarCenso(censoId);
+
+      // Recargar datos para actualizar contadores
+      await loadPendingData();
+
+      _eventController.add(ShowSuccessEvent('Censo eliminado correctamente'));
+    } catch (e) {
+      _eventController.add(ShowErrorEvent('Error eliminando censo: $e'));
       rethrow;
     }
   }

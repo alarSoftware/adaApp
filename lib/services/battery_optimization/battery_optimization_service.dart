@@ -34,9 +34,9 @@ class BatteryOptimizationService {
       final bool result = await _channel.invokeMethod('requestIgnoreBatteryOptimizations');
 
       if (result) {
-        logger.i('✅ Usuario aceptó deshabilitar optimización de batería');
+        logger.i('Usuario aceptó deshabilitar optimización de batería');
       } else {
-        logger.w('❌ Usuario rechazó deshabilitar optimización de batería');
+        logger.w(' Usuario rechazó deshabilitar optimización de batería');
       }
 
       return result;

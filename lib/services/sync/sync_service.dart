@@ -1,4 +1,6 @@
+import 'package:ada_app/services/sync/operacion_comercial_sync_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
+import 'package:ada_app/services/sync/producto_sync_service.dart';
 import 'package:ada_app/services/sync/user_sync_service.dart';
 import 'package:ada_app/services/sync/client_sync_service.dart';
 import 'package:ada_app/services/sync/equipment_sync_service.dart';
@@ -8,10 +10,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ada_app/services/sync/equipos_pendientes_sync_service.dart';
 import 'package:ada_app/services/sync/dynamic_form_sync_service.dart';
 import 'package:ada_app/services/sync/censo_image_sync_service.dart';
-import 'package:ada_app/services/database_validation_service.dart';
+import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:sqflite/sqflite.dart';
-import '../database_helper.dart';
+import '../data/database_helper.dart';
+import 'package:ada_app/services/censo/censo_upload_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
+import 'package:ada_app/services/device_log/device_log_upload_service.dart'; // 🆕 AGREGAR
 
 class SyncService {
   static final _clienteRepo = ClienteRepository();
@@ -38,7 +43,6 @@ class SyncService {
       }
 
       return syncResult;
-
     } catch (e) {
       await ErrorLogService.logError(
         tableName: 'sync_general',
@@ -81,41 +85,39 @@ class SyncService {
   static Future<void> _limpiarDatosSincronizados(Database db) async {
     await db.transaction((txn) async {
       await txn.delete(
-          'dynamic_form_response',
-          where: 'sync_status = ?',
-          whereArgs: ['synced']
+        'dynamic_form_response',
+        where: 'sync_status = ?',
+        whereArgs: ['synced'],
       );
 
       await txn.delete(
-          'dynamic_form_response_detail',
-          where: 'sync_status = ?',
-          whereArgs: ['synced']
+        'dynamic_form_response_detail',
+        where: 'sync_status = ?',
+        whereArgs: ['synced'],
       );
 
       await txn.delete(
-          'dynamic_form_response_image',
-          where: 'sync_status = ?',
-          whereArgs: ['synced']
+        'dynamic_form_response_image',
+        where: 'sync_status = ?',
+        whereArgs: ['synced'],
       );
 
       await txn.delete(
-          'equipos_pendientes',
-          where: 'sincronizado = ?',
-          whereArgs: [1]
+        'equipos_pendientes',
+        where: 'sincronizado = ?',
+        whereArgs: [1],
       );
 
       await txn.delete('censo_activo');
       await txn.delete('censo_activo_foto');
 
-      await txn.delete(
-          'device_log',
-          where: 'sincronizado = ?',
-          whereArgs: [1]
-      );
+      await txn.delete('device_log', where: 'sincronizado = ?', whereArgs: [1]);
     });
   }
 
-  static Future<SyncResultUnificado> sincronizarTodosLosDatos() async {
+  static Future<SyncResultUnificado> sincronizarTodosLosDatos({
+    Function(double progress, String message)? onProgress,
+  }) async {
     final resultado = SyncResultUnificado();
 
     try {
@@ -135,21 +137,68 @@ class SyncService {
 
       resultado.conexionOK = true;
 
-      String edfVendedorId;
+      String employeeId;
       try {
-        edfVendedorId = await obtenerEdfVendedorId();
+        employeeId = await obtenerEmployeeId();
       } catch (e) {
         resultado.exito = false;
-        resultado.mensaje = 'Error: No se pudo obtener información del usuario. $e';
+        resultado.mensaje =
+            'Error: No se pudo obtener información del usuario. $e';
         return resultado;
       }
 
+      // ==================== DEVICE LOGS (Upload & Clean) - START ====================
+      try {
+        onProgress?.call(
+          0.02,
+          'Limpiando logs del dispositivo...',
+        ); // Changed message
+        // (REMOVED) Subir pendientes - User requested removal to avoid log generation loop
+        // await DeviceLogUploadService.sincronizarDeviceLogsPendientes();
+
+        // 2. Limpiar sincronizados (0 días = borrar todo lo enviado)
+        await DeviceLogUploadService.limpiarLogsSincronizadosAntiguos(
+          diasAntiguos: 0,
+        );
+      } catch (e) {
+        await ErrorLogService.logError(
+          tableName: 'device_log',
+          operation: 'sync_general_cleanup',
+          errorMessage: 'Error processing device logs in general sync: $e',
+          errorType: 'cleanup',
+        );
+      }
+      // ==============================================================================
+
+      // 1. Intentar subir censos pendientes (REINTENTO)
+      try {
+        final currentUser = await AuthService().getCurrentUser();
+        if (currentUser != null && currentUser.id != null) {
+          onProgress?.call(0.05, 'Subiendo censos pendientes...');
+          final censoUploadService = CensoUploadService();
+          await censoUploadService.sincronizarCensosNoMigrados(currentUser.id!);
+        }
+      } catch (e) {
+        // No interrumpimos la sincronización general, pero logueamos
+        await ErrorLogService.logError(
+          tableName: 'censo_activo',
+          operation: 'retry_sync_upload',
+          errorMessage: 'Error subiendo pendientes: $e',
+          errorType: 'upload_error',
+        );
+      }
+
+      onProgress?.call(0.1, 'Sincronizando marcas...');
       await EquipmentSyncService.sincronizarMarcas();
+      onProgress?.call(0.15, 'Sincronizando modelos...');
       await EquipmentSyncService.sincronizarModelos();
+      onProgress?.call(0.2, 'Sincronizando logos...');
       await EquipmentSyncService.sincronizarLogos();
 
       try {
-        final resultadoClientes = await ClientSyncService.sincronizarClientesDelUsuario();
+        onProgress?.call(0.25, 'Sincronizando clientes...');
+        final resultadoClientes =
+            await ClientSyncService.sincronizarClientesDelUsuario();
         resultado.clientesSincronizados = resultadoClientes.itemsSincronizados;
         resultado.clientesExito = resultadoClientes.exito;
 
@@ -163,7 +212,9 @@ class SyncService {
       }
 
       try {
-        final resultadoEquipos = await EquipmentSyncService.sincronizarEquipos();
+        onProgress?.call(0.35, 'Sincronizando equipos...');
+        final resultadoEquipos =
+            await EquipmentSyncService.sincronizarEquipos();
         resultado.equiposSincronizados = resultadoEquipos.itemsSincronizados;
         resultado.equiposExito = resultadoEquipos.exito;
 
@@ -177,8 +228,25 @@ class SyncService {
       }
 
       try {
+        onProgress?.call(0.45, 'Sincronizando productos...');
+        final resultadoProductos = await ProductoSyncService.obtenerProductos();
+        resultado.productosSincronizados =
+            resultadoProductos.itemsSincronizados;
+        resultado.productosExito = resultadoProductos.exito;
+
+        if (!resultadoProductos.exito) {
+          resultado.erroresProductos = resultadoProductos.mensaje;
+        }
+      } catch (e) {
+        resultado.productosExito = false;
+        resultado.erroresProductos = 'Error al sincronizar productos: $e';
+        resultado.productosSincronizados = 0;
+      }
+
+      try {
+        onProgress?.call(0.55, 'Sincronizando censos...');
         final resultadoCensos = await CensusSyncService.obtenerCensosActivos(
-          edfVendedorId: edfVendedorId,
+          employeeId: employeeId,
         );
         resultado.censosSincronizados = resultadoCensos.itemsSincronizados;
         resultado.censosExito = resultadoCensos.exito;
@@ -192,12 +260,15 @@ class SyncService {
         resultado.censosSincronizados = 0;
       }
 
-      if (resultado.censosExito && resultado.censosSincronizados > 0) {
+      if (resultado.censosExito) {
         try {
-          final resultadoImagenes = await CensusImageSyncService.obtenerFotosCensos(
-            edfVendedorId: edfVendedorId,
-          );
-          resultado.imagenesCensosSincronizadas = resultadoImagenes.itemsSincronizados;
+          onProgress?.call(0.60, 'Descargando imágenes de censos...');
+          final resultadoImagenes =
+              await CensusImageSyncService.obtenerFotosCensos(
+                employeeId: employeeId,
+              );
+          resultado.imagenesCensosSincronizadas =
+              resultadoImagenes.itemsSincronizados;
           resultado.imagenesCensosExito = resultadoImagenes.exito;
 
           if (!resultadoImagenes.exito) {
@@ -205,7 +276,8 @@ class SyncService {
           }
         } catch (e) {
           resultado.imagenesCensosExito = false;
-          resultado.erroresImagenesCensos = 'Error al sincronizar imágenes de censos: $e';
+          resultado.erroresImagenesCensos =
+              'Error al sincronizar imágenes de censos: $e';
           resultado.imagenesCensosSincronizadas = 0;
         }
       } else {
@@ -215,10 +287,13 @@ class SyncService {
       }
 
       try {
-        final resultadoPendientes = await EquiposPendientesSyncService.obtenerEquiposPendientes(
-          edfVendedorId: edfVendedorId,
-        );
-        resultado.equiposPendientesSincronizados = resultadoPendientes.itemsSincronizados;
+        onProgress?.call(0.65, 'Sincronizando equipos pendientes...');
+        final resultadoPendientes =
+            await EquiposPendientesSyncService.obtenerEquiposPendientes(
+              employeeId: employeeId,
+            );
+        resultado.equiposPendientesSincronizados =
+            resultadoPendientes.itemsSincronizados;
         resultado.equiposPendientesExito = resultadoPendientes.exito;
 
         if (!resultadoPendientes.exito) {
@@ -226,13 +301,17 @@ class SyncService {
         }
       } catch (e) {
         resultado.equiposPendientesExito = false;
-        resultado.erroresEquiposPendientes = 'Error al sincronizar equipos pendientes: $e';
+        resultado.erroresEquiposPendientes =
+            'Error al sincronizar equipos pendientes: $e';
         resultado.equiposPendientesSincronizados = 0;
       }
 
       try {
-        final resultadoFormularios = await DynamicFormSyncService.obtenerFormulariosDinamicos();
-        resultado.formulariosSincronizados = resultadoFormularios.itemsSincronizados;
+        onProgress?.call(0.70, 'Sincronizando formularios...');
+        final resultadoFormularios =
+            await DynamicFormSyncService.obtenerFormulariosDinamicos();
+        resultado.formulariosSincronizados =
+            resultadoFormularios.itemsSincronizados;
         resultado.formulariosExito = resultadoFormularios.exito;
 
         if (!resultadoFormularios.exito) {
@@ -248,8 +327,13 @@ class SyncService {
       resultado.detallesFormulariosExito = true;
 
       try {
-        final resultadoRespuestas = await DynamicFormSyncService.obtenerRespuestasPorVendedor(edfVendedorId);
-        resultado.respuestasFormulariosSincronizadas = resultadoRespuestas.itemsSincronizados;
+        onProgress?.call(0.75, 'Sincronizando respuestas...');
+        final resultadoRespuestas =
+            await DynamicFormSyncService.obtenerRespuestasPorVendedor(
+              employeeId,
+            );
+        resultado.respuestasFormulariosSincronizadas =
+            resultadoRespuestas.itemsSincronizados;
         resultado.respuestasFormulariosExito = resultadoRespuestas.exito;
 
         if (!resultadoRespuestas.exito) {
@@ -257,24 +341,31 @@ class SyncService {
         }
       } catch (e) {
         resultado.respuestasFormulariosExito = false;
-        resultado.erroresRespuestasFormularios = 'Error al sincronizar respuestas: $e';
+        resultado.erroresRespuestasFormularios =
+            'Error al sincronizar respuestas: $e';
         resultado.respuestasFormulariosSincronizadas = 0;
       }
 
-      if (resultado.respuestasFormulariosExito && resultado.respuestasFormulariosSincronizadas > 0) {
+      if (resultado.respuestasFormulariosExito) {
         try {
-          final resultadoImagenesFormularios = await DynamicFormSyncService.obtenerImagenesFormularios(
-            edfVendedorId: edfVendedorId,
-          );
-          resultado.imagenesFormulariosSincronizadas = resultadoImagenesFormularios.itemsSincronizados;
-          resultado.imagenesFormulariosExito = resultadoImagenesFormularios.exito;
+          onProgress?.call(0.80, 'Descargando imágenes de formularios...');
+          final resultadoImagenesFormularios =
+              await DynamicFormSyncService.obtenerImagenesFormularios(
+                employeeId: employeeId,
+              );
+          resultado.imagenesFormulariosSincronizadas =
+              resultadoImagenesFormularios.itemsSincronizados;
+          resultado.imagenesFormulariosExito =
+              resultadoImagenesFormularios.exito;
 
           if (!resultadoImagenesFormularios.exito) {
-            resultado.erroresImagenesFormularios = resultadoImagenesFormularios.mensaje;
+            resultado.erroresImagenesFormularios =
+                resultadoImagenesFormularios.mensaje;
           }
         } catch (e) {
           resultado.imagenesFormulariosExito = false;
-          resultado.erroresImagenesFormularios = 'Error al sincronizar imágenes de formularios: $e';
+          resultado.erroresImagenesFormularios =
+              'Error al sincronizar imágenes de formularios: $e';
           resultado.imagenesFormulariosSincronizadas = 0;
         }
       } else {
@@ -283,9 +374,49 @@ class SyncService {
         resultado.erroresImagenesFormularios = null;
       }
 
+      try {
+        onProgress?.call(0.85, 'Sincronizando operaciones comerciales...');
+        final resultadoOperaciones =
+            await OperacionComercialSyncService.obtenerOperacionesPorVendedor(
+              employeeId,
+            );
+        resultado.operacionesComercialesSincronizadas =
+            resultadoOperaciones.itemsSincronizados;
+        resultado.operacionesComercialesExito = resultadoOperaciones.exito;
+
+        if (!resultadoOperaciones.exito) {
+          resultado.erroresOperacionesComerciales =
+              resultadoOperaciones.mensaje;
+        }
+      } catch (e) {
+        resultado.operacionesComercialesExito = false;
+        resultado.erroresOperacionesComerciales =
+            'Error al sincronizar operaciones comerciales: $e';
+        resultado.operacionesComercialesSincronizadas = 0;
+      }
+
+      // ==================== DEVICE LOGS (Upload & Clean) ====================
+      try {
+        onProgress?.call(0.90, 'Procesando logs del dispositivo...');
+        // 1. Subir pendientes
+        await DeviceLogUploadService.sincronizarDeviceLogsPendientes();
+        // 2. Limpiar sincronizados (0 días = borrar todo lo enviado)
+        await DeviceLogUploadService.limpiarLogsSincronizadosAntiguos(
+          diasAntiguos: 0,
+        );
+      } catch (e) {
+        await ErrorLogService.logError(
+          tableName: 'device_log',
+          operation: 'sync_general_cleanup',
+          errorMessage: 'Error processing device logs in general sync: $e',
+          errorType: 'cleanup',
+        );
+      }
+
       final exitosos = [
         resultado.clientesExito,
         resultado.equiposExito,
+        resultado.productosExito,
         resultado.censosExito,
         resultado.imagenesCensosExito,
         resultado.equiposPendientesExito,
@@ -293,34 +424,25 @@ class SyncService {
         resultado.detallesFormulariosExito,
         resultado.respuestasFormulariosExito,
         resultado.imagenesFormulariosExito,
-        resultado.asignacionesExito
+        resultado.asignacionesExito,
+        resultado.operacionesComercialesExito,
       ];
       final totalExitosos = exitosos.where((e) => e).length;
 
       if (totalExitosos >= 7) {
         resultado.exito = true;
-        resultado.mensaje = 'Sincronización completa: ${resultado.clientesSincronizados} clientes, ${resultado.equiposSincronizados} equipos, ${resultado.censosSincronizados} censos, ${resultado.imagenesCensosSincronizadas} imágenes de censos, ${resultado.equiposPendientesSincronizados} equipos pendientes, ${resultado.formulariosSincronizados} formularios, ${resultado.detallesFormulariosSincronizados} detalles, ${resultado.respuestasFormulariosSincronizadas} respuestas, ${resultado.imagenesFormulariosSincronizadas} imágenes de formularios y ${resultado.asignacionesSincronizadas} asignaciones';
+        resultado.mensaje =
+            'Sincronización completa: ${resultado.resumenCompacto}';
       } else if (totalExitosos > 0) {
         resultado.exito = true;
-        final partes = <String>[];
-        if (resultado.clientesExito) partes.add('${resultado.clientesSincronizados} clientes');
-        if (resultado.equiposExito) partes.add('${resultado.equiposSincronizados} equipos');
-        if (resultado.censosExito) partes.add('${resultado.censosSincronizados} censos');
-        if (resultado.imagenesCensosExito && resultado.imagenesCensosSincronizadas > 0) partes.add('${resultado.imagenesCensosSincronizadas} imágenes de censos');
-        if (resultado.equiposPendientesExito) partes.add('${resultado.equiposPendientesSincronizados} equipos pendientes');
-        if (resultado.formulariosExito) partes.add('${resultado.formulariosSincronizados} formularios');
-        if (resultado.detallesFormulariosExito) partes.add('${resultado.detallesFormulariosSincronizados} detalles');
-        if (resultado.respuestasFormulariosExito) partes.add('${resultado.respuestasFormulariosSincronizadas} respuestas');
-        if (resultado.imagenesFormulariosExito && resultado.imagenesFormulariosSincronizadas > 0) partes.add('${resultado.imagenesFormulariosSincronizadas} imágenes de formularios');
-        if (resultado.asignacionesExito) partes.add('${resultado.asignacionesSincronizadas} asignaciones');
-        resultado.mensaje = 'Sincronización parcial: ${partes.join(', ')}';
+        resultado.mensaje =
+            'Sincronización parcial: ${resultado.resumenCompacto}';
       } else {
         resultado.exito = false;
         resultado.mensaje = 'Error: no se pudo sincronizar ningún dato';
       }
 
       return resultado;
-
     } catch (e) {
       await ErrorLogService.logError(
         tableName: 'sync_general',
@@ -336,31 +458,44 @@ class SyncService {
     }
   }
 
-  static Future<SyncResult> sincronizarUsuarios() => UserSyncService.sincronizarUsuarios();
+  static Future<SyncResult> sincronizarUsuarios() =>
+      UserSyncService.sincronizarUsuarios();
 
-  static Future<SyncResult> sincronizarClientes({String? edfVendedorId}) {
-    if (edfVendedorId != null) {
-      return ClientSyncService.sincronizarClientesPorVendedor(edfVendedorId);
+  static Future<SyncResult> sincronizarClientes({String? employeeId}) {
+    if (employeeId != null) {
+      return ClientSyncService.sincronizarClientesPorVendedor(employeeId);
     }
     return ClientSyncService.sincronizarClientesDelUsuario();
   }
 
-  static Future<SyncResult> sincronizarEquipos() => EquipmentSyncService.sincronizarEquipos();
+  static Future<SyncResult> sincronizarEquipos() =>
+      EquipmentSyncService.sincronizarEquipos();
 
-  static Future<SyncResult> sincronizarEquiposPendientes({String? edfVendedorId}) =>
-      EquiposPendientesSyncService.obtenerEquiposPendientes(edfVendedorId: edfVendedorId);
+  static Future<SyncResult> sincronizarProductos() =>
+      ProductoSyncService.obtenerProductos();
 
-  static Future<SyncResult> sincronizarImagenesCensos({String? edfVendedorId}) =>
-      CensusImageSyncService.obtenerFotosCensos(edfVendedorId: edfVendedorId);
+  static Future<SyncResult> sincronizarEquiposPendientes({
+    String? employeeId,
+  }) => EquiposPendientesSyncService.obtenerEquiposPendientes(
+    employeeId: employeeId,
+  );
 
-  static Future<SyncResult> sincronizarImagenesFormularios({String? edfVendedorId}) =>
-      DynamicFormSyncService.obtenerImagenesFormularios(edfVendedorId: edfVendedorId);
+  static Future<SyncResult> sincronizarImagenesCensos({String? employeeId}) =>
+      CensusImageSyncService.obtenerFotosCensos(employeeId: employeeId);
+
+  static Future<SyncResult> sincronizarImagenesFormularios({
+    String? employeeId,
+  }) =>
+      DynamicFormSyncService.obtenerImagenesFormularios(employeeId: employeeId);
 
   static Future<SyncResult> sincronizarFormulariosDinamicos() =>
       DynamicFormSyncService.obtenerFormulariosDinamicos();
 
-  static Future<SyncResult> sincronizarRespuestasFormularios({String? edfVendedorId}) =>
-      DynamicFormSyncService.obtenerRespuestasFormularios(edfvendedorId: edfVendedorId);
+  static Future<SyncResult> sincronizarRespuestasFormularios({
+    String? employeeId,
+  }) => DynamicFormSyncService.obtenerRespuestasFormularios(
+    employeeId: employeeId,
+  );
 
   static Future<SyncResult> obtenerCensosActivos({
     int? clienteId,
@@ -371,7 +506,7 @@ class SyncService {
     bool? enLocal,
     int? limit,
     int? offset,
-    String? edfVendedorId,
+    String? employeeId,
   }) => CensusSyncService.obtenerCensosActivos(
     clienteId: clienteId,
     equipoId: equipoId,
@@ -381,7 +516,7 @@ class SyncService {
     enLocal: enLocal,
     limit: limit,
     offset: offset,
-    edfVendedorId: edfVendedorId,
+    employeeId: employeeId,
   );
 
   static Future<SyncResult> obtenerCensoPorId(int censoId) =>
@@ -399,9 +534,10 @@ class SyncService {
   static Future<SyncResult> obtenerCensosPendientes() =>
       CensusSyncService.obtenerCensosPendientes();
 
-  static Future<ApiResponse> probarConexion() => BaseSyncService.testConnection();
+  static Future<ApiResponse> probarConexion() =>
+      BaseSyncService.testConnection();
 
-  static Future<String> obtenerEdfVendedorId() async {
+  static Future<String> obtenerEmployeeId() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final currentUsername = prefs.getString('current_user');
@@ -409,7 +545,7 @@ class SyncService {
       if (currentUsername == null || currentUsername.isEmpty) {
         await ErrorLogService.logValidationError(
           tableName: 'Users',
-          operation: 'obtener_edf_vendedor_id',
+          operation: 'obtener_employee_id',
           errorMessage: 'No hay usuario logueado en el sistema',
         );
         throw 'No hay usuario logueado en el sistema';
@@ -417,34 +553,34 @@ class SyncService {
 
       final dbHelper = DatabaseHelper();
       final resultado = await dbHelper.consultarPersonalizada(
-          'SELECT edf_vendedor_id FROM Users WHERE username = ? LIMIT 1',
-          [currentUsername]
+        'SELECT employee_id FROM Users WHERE username = ? LIMIT 1',
+        [currentUsername],
       );
 
       if (resultado.isEmpty) {
         await ErrorLogService.logDatabaseError(
           tableName: 'Users',
-          operation: 'obtener_edf_vendedor_id',
-          errorMessage: 'Usuario $currentUsername no encontrado en la base de datos',
+          operation: 'obtener_employee_id',
+          errorMessage:
+              'Usuario $currentUsername no encontrado en la base de datos',
         );
         throw 'Usuario $currentUsername no encontrado en la base de datos';
       }
 
-      final edfVendedorId = resultado.first['edf_vendedor_id']?.toString();
+      final employeeId = resultado.first['employee_id']?.toString();
 
-      if (edfVendedorId == null || edfVendedorId.isEmpty) {
-        throw 'Usuario $currentUsername no tiene edf_vendedor_id configurado';
+      if (employeeId == null || employeeId.isEmpty) {
+        throw 'Usuario $currentUsername no tiene employee_id configurado';
       }
 
-      return edfVendedorId;
-
+      return employeeId;
     } catch (e) {
-      if (!e.toString().contains('no tiene edf_vendedor_id') &&
+      if (!e.toString().contains('no tiene employee_id') &&
           !e.toString().contains('no encontrado') &&
           !e.toString().contains('No hay usuario')) {
         await ErrorLogService.logError(
           tableName: 'Users',
-          operation: 'obtener_edf_vendedor_id',
+          operation: 'obtener_employee_id',
           errorMessage: e.toString(),
           errorType: 'unknown',
         );
@@ -486,6 +622,14 @@ class SyncService {
   }
 }
 
+/// Clase helper para representar un paso de sincronización
+class SyncStep {
+  final String summary;
+  final String description;
+
+  SyncStep(this.summary, this.description);
+}
+
 class SyncResultUnificado {
   bool exito = false;
   String mensaje = '';
@@ -500,6 +644,10 @@ class SyncResultUnificado {
   bool equiposExito = false;
   int equiposSincronizados = 0;
   String? erroresEquipos;
+
+  bool productosExito = false;
+  int productosSincronizados = 0;
+  String? erroresProductos;
 
   bool censosExito = false;
   int censosSincronizados = 0;
@@ -533,8 +681,123 @@ class SyncResultUnificado {
   int asignacionesSincronizadas = 0;
   String? erroresAsignaciones;
 
+  bool operacionesComercialesExito = false;
+  int operacionesComercialesSincronizadas = 0;
+  String? erroresOperacionesComerciales;
+
+  int get totalItemsSincronizados {
+    return clientesSincronizados +
+        equiposSincronizados +
+        productosSincronizados +
+        censosSincronizados +
+        imagenesCensosSincronizadas +
+        equiposPendientesSincronizados +
+        formulariosSincronizados +
+        detallesFormulariosSincronizados +
+        respuestasFormulariosSincronizadas +
+        imagenesFormulariosSincronizadas +
+        asignacionesSincronizadas +
+        operacionesComercialesSincronizadas;
+  }
+
+  List<SyncStep> get syncSteps {
+    return [
+      if (clientesSincronizados > 0)
+        SyncStep('$clientesSincronizados clientes', 'Clientes descargados'),
+      if (equiposSincronizados > 0)
+        SyncStep('$equiposSincronizados equipos', 'Equipos descargados'),
+      if (productosSincronizados > 0)
+        SyncStep('$productosSincronizados productos', 'Productos descargados'),
+      if (censosSincronizados > 0)
+        SyncStep('$censosSincronizados censos', 'Censos descargados'),
+      if (imagenesCensosSincronizadas > 0)
+        SyncStep(
+          '$imagenesCensosSincronizadas imágenes de censos',
+          'Imágenes de censos descargadas',
+        ),
+      if (equiposPendientesSincronizados > 0)
+        SyncStep(
+          '$equiposPendientesSincronizados equipos pendientes',
+          'Equipos pendientes descargados',
+        ),
+      if (formulariosSincronizados > 0)
+        SyncStep(
+          '$formulariosSincronizados formularios',
+          'Formularios descargados',
+        ),
+      if (detallesFormulariosSincronizados > 0)
+        SyncStep(
+          '$detallesFormulariosSincronizados detalles',
+          'Detalles descargados',
+        ),
+      if (respuestasFormulariosSincronizadas > 0)
+        SyncStep(
+          '$respuestasFormulariosSincronizadas respuestas',
+          'Respuestas descargadas',
+        ),
+      if (imagenesFormulariosSincronizadas > 0)
+        SyncStep(
+          '$imagenesFormulariosSincronizadas imágenes de formularios',
+          'Imágenes de formularios descargadas',
+        ),
+      SyncStep(
+        '$asignacionesSincronizadas asignaciones',
+        'Asignaciones descargadas',
+      ),
+      if (operacionesComercialesSincronizadas > 0)
+        SyncStep(
+          '$operacionesComercialesSincronizadas operaciones comerciales',
+          'Operaciones comerciales descargadas',
+        ),
+    ];
+  }
+
+  /// Resumen compacto para mensajes
+  String get resumenCompacto {
+    final partes = <String>[];
+    if (clientesSincronizados > 0) {
+      partes.add('$clientesSincronizados clientes');
+    }
+    if (equiposSincronizados > 0) {
+      partes.add('$equiposSincronizados equipos');
+    }
+    if (productosSincronizados > 0) {
+      partes.add('$productosSincronizados productos');
+    }
+    if (censosSincronizados > 0) {
+      partes.add('$censosSincronizados censos');
+    }
+    if (imagenesCensosSincronizadas > 0) {
+      partes.add('$imagenesCensosSincronizadas imágenes de censos');
+    }
+    if (equiposPendientesSincronizados > 0) {
+      partes.add('$equiposPendientesSincronizados equipos pendientes');
+    }
+    if (formulariosSincronizados > 0) {
+      partes.add('$formulariosSincronizados formularios');
+    }
+    if (detallesFormulariosSincronizados > 0) {
+      partes.add('$detallesFormulariosSincronizados detalles');
+    }
+    if (respuestasFormulariosSincronizadas > 0) {
+      partes.add('$respuestasFormulariosSincronizadas respuestas');
+    }
+    if (imagenesFormulariosSincronizadas > 0) {
+      partes.add('$imagenesFormulariosSincronizadas imágenes de formularios');
+    }
+    if (asignacionesSincronizadas > 0) {
+      partes.add('$asignacionesSincronizadas asignaciones');
+    }
+    if (operacionesComercialesSincronizadas > 0) {
+      partes.add(
+        '$operacionesComercialesSincronizadas operaciones comerciales',
+      );
+    }
+    return partes.join(', ');
+  }
+
   @override
   String toString() {
-    return 'SyncResultUnificado(exito: $exito, clientes: $clientesSincronizados, equipos: $equiposSincronizados, censos: $censosSincronizados, imagenes: $imagenesCensosSincronizadas, equiposPendientes: $equiposPendientesSincronizados, formularios: $formulariosSincronizados, detalles: $detallesFormulariosSincronizados, respuestas: $respuestasFormulariosSincronizadas, imagenesFormularios: $imagenesFormulariosSincronizadas, asignaciones: $asignacionesSincronizadas, mensaje: $mensaje)';
+    return 'SyncResultUnificado(exito: $exito, total: $totalItemsSincronizados, mensaje: $mensaje)';
   }
 }

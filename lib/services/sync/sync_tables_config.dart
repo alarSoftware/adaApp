@@ -1,6 +1,6 @@
 // lib/services/sync/sync_tables_config.dart
 import 'package:logger/logger.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 import 'package:ada_app/services/censo/censo_upload_service.dart';
 import 'package:ada_app/services/post/dynamic_form_post_service.dart';
@@ -30,7 +30,8 @@ class SyncTableConfig {
   final String description;
   final String whereClause;
   final List<dynamic> whereArgs;
-  final Future<TableSyncResult> Function(List<Map<String, dynamic>> items) syncFunction;
+  final Future<TableSyncResult> Function(List<Map<String, dynamic>> items)
+  syncFunction;
 
   SyncTableConfig({
     required this.tableName,
@@ -139,7 +140,9 @@ class SyncTablesConfig {
   // ═══════════════════════════════════════════════════════════════════
 
   /// Sincroniza censos activos
-  static Future<TableSyncResult> _syncCensos(List<Map<String, dynamic>> items) async {
+  static Future<TableSyncResult> _syncCensos(
+    List<Map<String, dynamic>> items,
+  ) async {
     try {
       final db = await _dbHelper.database;
 
@@ -157,7 +160,9 @@ class SyncTablesConfig {
 
       // Usar el servicio unificado
       final censoService = CensoUploadService();
-      final resultado = await censoService.sincronizarCensosNoMigrados(usuarioId);
+      final resultado = await censoService.sincronizarCensosNoMigrados(
+        usuarioId,
+      );
 
       final censosExitosos = resultado['censos_exitosos'] ?? 0;
       final censosFallidos = resultado['fallidos'] ?? 0;
@@ -183,7 +188,8 @@ class SyncTablesConfig {
 
   /// Sincroniza operaciones comerciales
   static Future<TableSyncResult> _syncOperacionesComerciales(
-      List<Map<String, dynamic>> items) async {
+    List<Map<String, dynamic>> items,
+  ) async {
     try {
       if (items.isEmpty) {
         return TableSyncResult(
@@ -205,18 +211,23 @@ class SyncTablesConfig {
 
         try {
           await repository.marcarPendienteSincronizacion(operacionId);
-          final operacionCompleta = await repository.obtenerOperacionPorId(operacionId);
+          final operacionCompleta = await repository.obtenerOperacionPorId(
+            operacionId,
+          );
 
           if (operacionCompleta != null) {
             // await repository.sincronizarOperacionesPendientes();
-            final operacionActualizada = await repository.obtenerOperacionPorId(operacionId);
+            final operacionActualizada = await repository.obtenerOperacionPorId(
+              operacionId,
+            );
 
             if (operacionActualizada?.syncStatus == 'migrado') {
               sentCount++;
               _logger.i('✅ Operación $operacionId sincronizada');
             } else {
               errors.add(
-                  'Operación $operacionId: ${operacionActualizada?.syncError ?? "Error desconocido"}');
+                'Operación $operacionId: ${operacionActualizada?.syncError ?? "Error desconocido"}',
+              );
             }
           }
         } catch (e) {
@@ -245,7 +256,9 @@ class SyncTablesConfig {
   }
 
   /// Sincroniza formularios dinámicos
-  static Future<TableSyncResult> _syncFormularios(List<Map<String, dynamic>> items) async {
+  static Future<TableSyncResult> _syncFormularios(
+    List<Map<String, dynamic>> items,
+  ) async {
     try {
       if (items.isEmpty) {
         return TableSyncResult(
@@ -262,10 +275,11 @@ class SyncTablesConfig {
       for (final form in items) {
         try {
           final respuesta = await _prepareFormResponse(form);
-          final response = await DynamicFormPostService.enviarRespuestaFormulario(
-            respuesta: respuesta,
-            incluirLog: true,
-          );
+          final response =
+              await DynamicFormPostService.enviarRespuestaFormulario(
+                respuesta: respuesta,
+                incluirLog: true,
+              );
 
           if (response['exito'] == true) {
             await db.update(
@@ -288,7 +302,9 @@ class SyncTablesConfig {
 
             sentCount++;
           } else {
-            errors.add('Formulario ${form['id']}: ${response['mensaje'] ?? "Error desconocido"}');
+            errors.add(
+              'Formulario ${form['id']}: ${response['mensaje'] ?? "Error desconocido"}',
+            );
           }
         } catch (e) {
           errors.add('Formulario ${form['id']}: $e');
@@ -312,7 +328,9 @@ class SyncTablesConfig {
   }
 
   /// Sincroniza imágenes
-  static Future<TableSyncResult> _syncImagenes(List<Map<String, dynamic>> items) async {
+  static Future<TableSyncResult> _syncImagenes(
+    List<Map<String, dynamic>> items,
+  ) async {
     try {
       if (items.isEmpty) {
         return TableSyncResult(
@@ -332,7 +350,8 @@ class SyncTablesConfig {
             endpoint: '/api/upload-image',
             body: {
               'image_id': image['id'],
-              'dynamic_form_response_detail_id': image['dynamic_form_response_detail_id'],
+              'dynamic_form_response_detail_id':
+                  image['dynamic_form_response_detail_id'],
               'imagen_base64': image['imagen_base64'],
               'mime_type': image['mime_type'],
               'orden': image['orden'],
@@ -349,7 +368,9 @@ class SyncTablesConfig {
             );
             sentCount++;
           } else {
-            errors.add('Imagen ${image['id']}: ${response['mensaje'] ?? "Error desconocido"}');
+            errors.add(
+              'Imagen ${image['id']}: ${response['mensaje'] ?? "Error desconocido"}',
+            );
           }
         } catch (e) {
           errors.add('Imagen ${image['id']}: $e');
@@ -373,7 +394,9 @@ class SyncTablesConfig {
   }
 
   /// Sincroniza logs de dispositivo
-  static Future<TableSyncResult> _syncLogs(List<Map<String, dynamic>> items) async {
+  static Future<TableSyncResult> _syncLogs(
+    List<Map<String, dynamic>> items,
+  ) async {
     try {
       if (items.isEmpty) {
         return TableSyncResult(
@@ -384,9 +407,13 @@ class SyncTablesConfig {
       }
 
       final db = await _dbHelper.database;
-      final pendingLogs = items.map((logData) => DeviceLog.fromMap(logData)).toList();
+      final pendingLogs = items
+          .map((logData) => DeviceLog.fromMap(logData))
+          .toList();
 
-      final resultado = await DeviceLogPostService.enviarDeviceLogsBatch(pendingLogs);
+      final resultado = await DeviceLogPostService.enviarDeviceLogsBatch(
+        pendingLogs,
+      );
 
       final sentCount = resultado['exitosos'] ?? 0;
       final failedCount = resultado['fallidos'] ?? 0;
@@ -403,7 +430,8 @@ class SyncTablesConfig {
       return TableSyncResult(
         success: sentCount > 0,
         itemsSent: sentCount,
-        message: '$sentCount de ${items.length} logs enviados${failedCount > 0 ? ' ($failedCount fallaron)' : ''}',
+        message:
+            '$sentCount de ${items.length} logs enviados${failedCount > 0 ? ' ($failedCount fallaron)' : ''}',
         error: failedCount > 0 ? '$failedCount logs fallaron' : null,
       );
     } catch (e) {
@@ -420,7 +448,9 @@ class SyncTablesConfig {
   // HELPERS
   // ═══════════════════════════════════════════════════════════════════
 
-  static Future<Map<String, dynamic>> _prepareFormResponse(Map<String, Object?> form) async {
+  static Future<Map<String, dynamic>> _prepareFormResponse(
+    Map<String, Object?> form,
+  ) async {
     final db = await _dbHelper.database;
 
     final details = await db.query(
@@ -429,18 +459,21 @@ class SyncTablesConfig {
       whereArgs: [form['id']],
     );
 
-    final images = await db.rawQuery('''
+    final images = await db.rawQuery(
+      '''
       SELECT dri.* FROM dynamic_form_response_image dri
       INNER JOIN dynamic_form_response_detail drd ON dri.dynamic_form_response_detail_id = drd.id
       WHERE drd.dynamic_form_response_id = ?
-    ''', [form['id']]);
+    ''',
+      [form['id']],
+    );
 
     return {
       'id': form['id'],
       'dynamic_form_id': form['dynamic_form_id'],
       'usuario_id': form['usuario_id'],
       'contacto_id': form['contacto_id'],
-      'edf_vendedor_id': form['edf_vendedor_id'],
+      'employee_id': form['employee_id'],
       'creation_date': form['creation_date'],
       'last_update_date': form['last_update_date'],
       'estado': form['estado'],

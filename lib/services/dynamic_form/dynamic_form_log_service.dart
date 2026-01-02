@@ -168,7 +168,7 @@ class DynamicFormLogService {
     buffer.writeln('Form ID: ${body['id'] ?? 'N/A'}');
     buffer.writeln('Template ID: ${body['dynamicFormId'] ?? 'N/A'}');
     buffer.writeln('Contacto ID: ${body['contactoId'] ?? 'N/A'}');
-    buffer.writeln('Vendedor ID: ${body['edfvendedorId'] ?? 'N/A'}');
+    buffer.writeln('Vendedor ID: ${body['employeeId'] ?? 'N/A'}');
     buffer.writeln('Usuario ID: ${body['usuarioId'] ?? 'N/A'}');
     buffer.writeln('Estado: ${body['estado'] ?? 'N/A'}');
     buffer.writeln('Fecha creación: ${body['creationDate'] ?? 'N/A'}');

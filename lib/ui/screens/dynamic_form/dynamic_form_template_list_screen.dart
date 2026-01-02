@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/dynamic_form_viewmodel.dart';
 import 'package:ada_app/models/dynamic_form/dynamic_form_template.dart';
-import 'package:ada_app/ui/screens/dynamic_form_fill_screen.dart';
+import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_fill_screen.dart';
 import 'package:ada_app/models/cliente.dart';
-import 'package:ada_app/services/auth_service.dart'; // ← AGREGAR IMPORT
+import 'package:ada_app/services/api/auth_service.dart';
 
 /// Pantalla que muestra la lista de formularios dinámicos disponibles (templates)
 class DynamicFormTemplateListScreen extends StatefulWidget {
@@ -349,7 +349,7 @@ class _DynamicFormTemplateListScreenState
       template.id,
       contactoId: widget.cliente.id.toString(),
       userId: usuario?.id?.toString(),
-      edfVendedorId: usuario?.edfVendedorId,
+      employeeId: usuario?.employeeId,
     );
 
     // ✅ Guardar inmediatamente en la BD como borrador

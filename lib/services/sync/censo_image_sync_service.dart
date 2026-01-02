@@ -3,16 +3,15 @@ import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
 /// Servicio para sincronización de imágenes de censos
 /// Simplificado para solo traer fotos del API y guardarlas
 class CensusImageSyncService extends BaseSyncService {
-
   /// Método principal: Obtiene y guarda fotos de censos
   static Future<SyncResult> obtenerFotosCensos({
-    String? edfVendedorId,
+    String? employeeId,
     int? censoActivoId,
     String? uuid,
     int? limit,
@@ -23,7 +22,7 @@ class CensusImageSyncService extends BaseSyncService {
 
     try {
       final queryParams = _buildQueryParams(
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
         censoActivoId: censoActivoId,
         uuid: uuid,
         limit: limit,
@@ -49,7 +48,10 @@ class CensusImageSyncService extends BaseSyncService {
       }
 
       final imagenesData = await _parseImageResponse(response);
-      final processedResult = await _processAndSaveImages(imagenesData, incluirBase64);
+      final processedResult = await _processAndSaveImages(
+        imagenesData,
+        incluirBase64,
+      );
 
       return SyncResult(
         exito: true,
@@ -57,7 +59,6 @@ class CensusImageSyncService extends BaseSyncService {
         itemsSincronizados: processedResult.length,
         totalEnAPI: processedResult.length,
       );
-
     } on TimeoutException catch (timeoutError) {
       BaseSyncService.logger.e('⏰ Timeout obteniendo imágenes: $timeoutError');
 
@@ -75,7 +76,6 @@ class CensusImageSyncService extends BaseSyncService {
         mensaje: 'Timeout de conexión al servidor',
         itemsSincronizados: 0,
       );
-
     } on SocketException catch (socketError) {
       BaseSyncService.logger.e('📡 Error de red: $socketError');
 
@@ -93,7 +93,6 @@ class CensusImageSyncService extends BaseSyncService {
         mensaje: 'Sin conexión de red',
         itemsSincronizados: 0,
       );
-
     } catch (e) {
       BaseSyncService.logger.e('💥 Error obteniendo imágenes de censos: $e');
 
@@ -120,7 +119,7 @@ class CensusImageSyncService extends BaseSyncService {
 
   /// Construir parámetros de consulta
   static Map<String, String> _buildQueryParams({
-    String? edfVendedorId,
+    String? employeeId,
     int? censoActivoId,
     String? uuid,
     int? limit,
@@ -129,8 +128,9 @@ class CensusImageSyncService extends BaseSyncService {
   }) {
     final Map<String, String> queryParams = {};
 
-    if (edfVendedorId != null) queryParams['edfvendedorId'] = edfVendedorId;
-    if (censoActivoId != null) queryParams['censoActivoId'] = censoActivoId.toString();
+    if (employeeId != null) queryParams['employeeId'] = employeeId;
+    if (censoActivoId != null)
+      queryParams['censoActivoId'] = censoActivoId.toString();
     if (limit != null) queryParams['limit'] = limit.toString();
     if (offset != null) queryParams['offset'] = offset.toString();
     if (uuid != null) queryParams['uuid'] = uuid;
@@ -140,15 +140,17 @@ class CensusImageSyncService extends BaseSyncService {
   }
 
   /// Realizar petición HTTP
-  static Future<http.Response> _makeHttpRequest(Map<String, String> queryParams) async {
+  static Future<http.Response> _makeHttpRequest(
+    Map<String, String> queryParams,
+  ) async {
     final baseUrl = await BaseSyncService.getBaseUrl();
-    final uri = Uri.parse('$baseUrl/api/getCensoActivoFoto')
-        .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+    final uri = Uri.parse(
+      '$baseUrl/api/getCensoActivoFoto',
+    ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
-    return await http.get(
-      uri,
-      headers: BaseSyncService.headers,
-    ).timeout(BaseSyncService.timeout);
+    return await http
+        .get(uri, headers: BaseSyncService.headers)
+        .timeout(BaseSyncService.timeout);
   }
 
   /// Verificar si el código de estado es exitoso
@@ -167,7 +169,9 @@ class CensusImageSyncService extends BaseSyncService {
   }
 
   /// Parsear respuesta de imágenes
-  static Future<List<dynamic>> _parseImageResponse(http.Response response) async {
+  static Future<List<dynamic>> _parseImageResponse(
+    http.Response response,
+  ) async {
     try {
       final responseBody = jsonDecode(response.body);
 
@@ -226,40 +230,72 @@ class CensusImageSyncService extends BaseSyncService {
 
   /// Procesar y guardar imágenes en la tabla censo_activo_foto
   static Future<List<Map<String, dynamic>>> _processAndSaveImages(
-      List<dynamic> imagenesData,
-      bool incluirBase64,
-      ) async {
-    if (imagenesData.isEmpty) return [];
+    List<dynamic> imagenesData,
+    bool incluirBase64,
+  ) async {
+    BaseSyncService.logger.i(
+      'Procesando ${imagenesData.length} imágenes del servidor',
+    );
 
     // Convertir datos del API al formato local
     final imagenesParaGuardar = <Map<String, dynamic>>[];
+    final idsProcesados = <String>{}; // Para evitar duplicados de ID
 
-    for (final imagen in imagenesData) {
-      if (imagen is Map<String, dynamic>) {
-        try {
-          final imagenParaGuardar = _mapApiToLocalFormat(imagen, incluirBase64);
-          imagenesParaGuardar.add(imagenParaGuardar);
-        } catch (e) {
-          BaseSyncService.logger.e('Error procesando imagen ID ${imagen['id']}: $e');
+    if (imagenesData.isNotEmpty) {
+      for (final imagen in imagenesData) {
+        if (imagen is Map<String, dynamic>) {
+          try {
+            final imagenParaGuardar = _mapApiToLocalFormat(
+              imagen,
+              incluirBase64,
+            );
 
-          // 🚨 LOG ERROR: Error procesando imagen individual
-          await ErrorLogService.logError(
-            tableName: 'censo_activo_foto',
-            operation: 'process_item',
-            errorMessage: 'Error procesando imagen: $e',
-            errorType: 'database',
-            registroFailId: imagen['id']?.toString(),
-          );
+            final id = imagenParaGuardar['id']?.toString();
+            if (id != null) {
+              if (idsProcesados.contains(id)) {
+                BaseSyncService.logger.w(
+                  '⚠️ ID de imagen duplicado detectado: $id. Se usará la primera ocurrencia.',
+                );
+                continue;
+              }
+              idsProcesados.add(id);
+            }
+
+            imagenesParaGuardar.add(imagenParaGuardar);
+          } catch (e) {
+            BaseSyncService.logger.e(
+              'Error procesando imagen ID ${imagen['id']}: $e',
+            );
+            // 🚨 LOG ERROR: Error procesando imagen individual
+            await ErrorLogService.logError(
+              tableName: 'censo_activo_foto',
+              operation: 'process_item',
+              errorMessage: 'Error procesando imagen: $e',
+              errorType: 'database',
+              registroFailId: imagen['id']?.toString(),
+            );
+          }
         }
       }
     }
 
-    // Vaciar tabla e insertar todas las imágenes
+    // Vaciar tabla e insertar todas las imágenes (incluso si está vacía, para limpiar)
     try {
       final dbHelper = DatabaseHelper();
-      await dbHelper.vaciarEInsertar('censo_activo_foto', imagenesParaGuardar);
+      BaseSyncService.logger.i(
+        'Intentando vaciar e insertar ${imagenesParaGuardar.length} imágenes en BD...',
+      );
+
+      final count = await dbHelper.vaciarEInsertar(
+        'censo_activo_foto',
+        imagenesParaGuardar,
+      );
+
+      BaseSyncService.logger.i(
+        '✅ Éxito: Se insertaron $count imágenes tras vaciar tabla.',
+      );
     } catch (e) {
-      BaseSyncService.logger.e('❌ Error guardando imágenes en BD: $e');
+      BaseSyncService.logger.e('❌ Error CRÍTICO guardando imágenes en BD: $e');
 
       // 🚨 LOG ERROR: Error de base de datos local
       await ErrorLogService.logDatabaseError(
@@ -275,7 +311,10 @@ class CensusImageSyncService extends BaseSyncService {
   }
 
   /// Mapear campos del API al formato de la tabla local censo_activo_foto
-  static Map<String, dynamic> _mapApiToLocalFormat(Map<String, dynamic> apiImage, bool incluirBase64) {
+  static Map<String, dynamic> _mapApiToLocalFormat(
+    Map<String, dynamic> apiImage,
+    bool incluirBase64,
+  ) {
     final censoActivo = apiImage['censoActivo'] as Map<String, dynamic>?;
     final censoActivoId = censoActivo?['id']?.toString();
 

@@ -1,5 +1,3 @@
-// lib/repositories/device_log_repository.dart
-
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'package:ada_app/models/device_log.dart';
@@ -13,15 +11,16 @@ class DeviceLogRepository {
   // ==================== MÉTODOS EXISTENTES ====================
 
   Future<String> guardarLog({
-    String? edfVendedorId,
+    String? id, // <--- ID opcional
+    String? employeeId,
     required double latitud,
     required double longitud,
     required int bateria,
     required String modelo,
   }) async {
     final log = DeviceLog(
-      id: _uuid.v4(),
-      edfVendedorId: edfVendedorId,
+      id: id ?? _uuid.v4(), // <--- Usar ID si se provee
+      employeeId: employeeId,
       latitudLongitud: '$latitud,$longitud',
       bateria: bateria,
       modelo: modelo,
@@ -42,16 +41,16 @@ class DeviceLogRepository {
   // ==================== 🆕 NUEVOS MÉTODOS ANTI-DUPLICADOS ====================
 
   /// 🆕 Obtener el último log de un vendedor
-  Future<DeviceLog?> obtenerUltimoLog(String? edfVendedorId) async {
+  Future<DeviceLog?> obtenerUltimoLog(String? employeeId) async {
     try {
       // Si no hay vendedor, buscar el último log sin filtro
       final List<Map<String, dynamic>> maps;
 
-      if (edfVendedorId != null) {
+      if (employeeId != null) {
         maps = await db.query(
           'device_log',
-          where: 'edf_vendedor_id = ?',
-          whereArgs: [edfVendedorId],
+          where: 'employee_id = ?',
+          whereArgs: [employeeId],
           orderBy: 'fecha_registro DESC',
           limit: 1,
         );
@@ -72,11 +71,12 @@ class DeviceLogRepository {
 
   /// 🆕 Verificar si existe un log muy reciente (prevenir duplicados)
   Future<bool> existeLogReciente(
-    String? edfVendedorId, {
-    int minutos = 8,
+    String? employeeId, {
+    int minutos = 0,
+    int segundos = 0,
   }) async {
     try {
-      final ultimoLog = await obtenerUltimoLog(edfVendedorId);
+      final ultimoLog = await obtenerUltimoLog(employeeId);
 
       if (ultimoLog == null) return false;
 
@@ -84,9 +84,17 @@ class DeviceLogRepository {
         DateTime.parse(ultimoLog.fechaRegistro),
       );
 
-      final esReciente = tiempoDesdeUltimo.inMinutes < minutos;
+      // Calcular el umbral total en segundos
+      final umbralSegundos = (minutos * 60) + segundos;
 
-      if (esReciente) {}
+      // Si no se especifica umbral, asumimos 0 y devolvemos false (siempre permite)
+      if (umbralSegundos <= 0) return false;
+
+      final esReciente = tiempoDesdeUltimo.inSeconds < umbralSegundos;
+
+      if (esReciente) {
+        // print('Log bloqueado: Último hace ${tiempoDesdeUltimo.inSeconds}s (Umbral: ${umbralSegundos}s)');
+      }
 
       return esReciente;
     } catch (e) {
@@ -168,12 +176,12 @@ class DeviceLogRepository {
   }
 
   /// Obtener logs por vendedor
-  Future<List<DeviceLog>> obtenerPorVendedor(String edfVendedorId) async {
+  Future<List<DeviceLog>> obtenerPorVendedor(String employeeId) async {
     try {
       final maps = await db.query(
         'device_log',
-        where: 'edf_vendedor_id = ?',
-        whereArgs: [edfVendedorId],
+        where: 'employee_id = ?',
+        whereArgs: [employeeId],
         orderBy: 'fecha_registro DESC',
       );
 

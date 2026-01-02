@@ -40,7 +40,8 @@ class ClienteRepository extends BaseRepository<Cliente> {
     String? rutaDia,
   }) async {
     try {
-      String sql = '''
+      String sql =
+          '''
         SELECT 
           c.*,
           CASE 
@@ -58,7 +59,15 @@ class ClienteRepository extends BaseRepository<Cliente> {
               AND date(creation_date) = date('now', 'localtime')
               AND estado = 'completed'
             ) THEN 1 ELSE 0 
-          END as tiene_formulario_completo
+          END as tiene_formulario_completo,
+          
+          CASE 
+            WHEN EXISTS(
+              SELECT 1 FROM operacion_comercial 
+              WHERE cliente_id = c.id 
+              AND date(fecha_creacion) = date('now', 'localtime')
+            ) THEN 1 ELSE 0 
+          END as tiene_operacion_comercial_hoy
            
         FROM $tableName c
         WHERE 1=1
@@ -83,7 +92,6 @@ class ClienteRepository extends BaseRepository<Cliente> {
       final db = await dbHelper.database;
       final List<Map<String, dynamic>> rows = await db.rawQuery(sql, params);
 
-
       return rows.map((row) => fromMap(row)).toList();
     } catch (e) {
       throw Exception('Error al buscar ${getEntityName().toLowerCase()}s: $e');
@@ -103,7 +111,8 @@ class ClienteRepository extends BaseRepository<Cliente> {
   @override
   Future<Cliente?> obtenerPorId(dynamic id) async {
     try {
-      final sql = '''
+      final sql =
+          '''
         SELECT 
           c.*,
           CASE 
@@ -121,7 +130,15 @@ class ClienteRepository extends BaseRepository<Cliente> {
               AND date(creation_date) = date('now', 'localtime')
               AND estado = 'completed'
             ) THEN 1 ELSE 0 
-          END as tiene_formulario_completo
+          END as tiene_formulario_completo,
+          
+          CASE 
+            WHEN EXISTS(
+              SELECT 1 FROM operacion_comercial 
+              WHERE cliente_id = c.id 
+              AND date(fecha_creacion) = date('now', 'localtime')
+            ) THEN 1 ELSE 0 
+          END as tiene_operacion_comercial_hoy
            
         FROM $tableName c
         WHERE c.id = ?
@@ -140,7 +157,8 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
   Future<List<Cliente>> obtenerConCensoPendiente() async {
     try {
-      final sql = '''
+      final sql =
+          '''
         SELECT 
           c.*,
           0 as tiene_censo_hoy,
@@ -151,7 +169,15 @@ class ClienteRepository extends BaseRepository<Cliente> {
               AND date(creation_date) = date('now', 'localtime')
               AND estado = 'completed'
             ) THEN 1 ELSE 0 
-          END as tiene_formulario_completo
+          END as tiene_formulario_completo,
+          
+          CASE 
+            WHEN EXISTS(
+              SELECT 1 FROM operacion_comercial 
+              WHERE cliente_id = c.id 
+              AND date(fecha_creacion) = date('now', 'localtime')
+            ) THEN 1 ELSE 0 
+          END as tiene_operacion_comercial_hoy
            
         FROM $tableName c
         WHERE NOT EXISTS(
@@ -171,7 +197,8 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
   Future<List<Cliente>> obtenerConFormularioPendiente() async {
     try {
-      final sql = '''
+      final sql =
+          '''
         SELECT 
           c.*,
           CASE 
@@ -182,7 +209,15 @@ class ClienteRepository extends BaseRepository<Cliente> {
             ) THEN 1 ELSE 0 
           END as tiene_censo_hoy,
           
-          0 as tiene_formulario_completo
+          0 as tiene_formulario_completo,
+          
+          CASE 
+            WHEN EXISTS(
+              SELECT 1 FROM operacion_comercial 
+              WHERE cliente_id = c.id 
+              AND date(fecha_creacion) = date('now', 'localtime')
+            ) THEN 1 ELSE 0 
+          END as tiene_operacion_comercial_hoy
            
         FROM $tableName c
         WHERE NOT EXISTS(
@@ -203,11 +238,20 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
   Future<List<Cliente>> obtenerCompletados() async {
     try {
-      final sql = '''
+      final sql =
+          '''
         SELECT 
           c.*,
           1 as tiene_censo_hoy,
-          1 as tiene_formulario_completo
+          1 as tiene_formulario_completo,
+
+          CASE 
+            WHEN EXISTS(
+              SELECT 1 FROM operacion_comercial 
+              WHERE cliente_id = c.id 
+              AND date(fecha_creacion) = date('now', 'localtime')
+            ) THEN 1 ELSE 0 
+          END as tiene_operacion_comercial_hoy
            
         FROM $tableName c
         WHERE EXISTS(
@@ -236,7 +280,8 @@ class ClienteRepository extends BaseRepository<Cliente> {
     try {
       final statsBase = await super.obtenerEstadisticas();
 
-      final sql = '''
+      final sql =
+          '''
         SELECT 
           COUNT(*) as total_clientes,
           
@@ -269,7 +314,15 @@ class ClienteRepository extends BaseRepository<Cliente> {
               AND date(creation_date) = date('now', 'localtime')
               AND estado = 'completed'
             ) THEN 1 ELSE 0 
-          END) as completados_hoy
+          END) as completados_hoy,
+
+          SUM(CASE 
+            WHEN EXISTS(
+              SELECT 1 FROM operacion_comercial 
+              WHERE cliente_id = clientes.id 
+              AND date(fecha_creacion) = date('now', 'localtime')
+            ) THEN 1 ELSE 0 
+          END) as con_operacion_comercial_hoy
           
         FROM $tableName
       ''';
@@ -281,9 +334,10 @@ class ClienteRepository extends BaseRepository<Cliente> {
         ...statsBase,
         'conCensoHoy': row['con_censo_hoy'] as int,
         'conFormularioHoy': row['con_formulario_hoy'] as int,
+        'conOperacionComercialHoy': row['con_operacion_comercial_hoy'] as int,
         'completadosHoy': row['completados_hoy'] as int,
         'pendientesHoy':
-        (row['total_clientes'] as int) - (row['completados_hoy'] as int),
+            (row['total_clientes'] as int) - (row['completados_hoy'] as int),
       };
     } catch (e) {
       throw Exception('Error al obtener estadísticas: $e');

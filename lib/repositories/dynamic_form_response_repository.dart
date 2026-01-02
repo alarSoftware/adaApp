@@ -6,7 +6,7 @@ import '../models/dynamic_form/dynamic_form_response.dart';
 import '../models/dynamic_form/dynamic_form_response_detail.dart';
 import '../models/dynamic_form/dynamic_form_response_image.dart';
 import 'package:path_provider/path_provider.dart';
-import '../services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 
 class DynamicFormResponseRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper();
@@ -447,7 +447,7 @@ class DynamicFormResponseRepository {
       'id': response.id,
       'version': 1,
       'contacto_id': response.contactoId ?? '',
-      'edf_vendedor_id': response.edfVendedorId,
+      'employee_id': response.employeeId,
       'last_update_user_id': null,
       'dynamic_form_id': response.formTemplateId,
       'usuario_id': response.userId != null
@@ -468,7 +468,7 @@ class DynamicFormResponseRepository {
       'id': data['id'].toString(),
       'version': 1,
       'contacto_id': data['contactoId']?.toString() ?? '',
-      'edf_vendedor_id': data['edfVendedorId']?.toString(),
+      'employee_id': data['employeeId']?.toString(),
       'last_update_user_id': null,
       'dynamic_form_id': data['dynamicFormId'].toString(),
       'usuario_id': data['usuarioId'] != null
@@ -752,7 +752,7 @@ class DynamicFormResponseRepository {
         status: map['estado']?.toString() ?? 'draft',
         userId: map['usuario_id']?.toString(),
         contactoId: map['contacto_id']?.toString(),
-        edfVendedorId: map['edf_vendedor_id']?.toString(),
+        employeeId: map['employee_id']?.toString(),
         errorMessage: map['mensaje_error_sync']?.toString(),
       );
     } catch (e) {

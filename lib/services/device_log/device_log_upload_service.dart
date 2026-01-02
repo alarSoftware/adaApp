@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'package:logger/logger.dart';
-import 'package:sqflite/sqflite.dart';
+
 import 'package:ada_app/repositories/device_log_repository.dart';
 import 'package:ada_app/services/post/device_log_post_service.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
+import 'package:ada_app/services/api/auth_service.dart'; // 🆕 AGREGAR
 import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
-import 'package:ada_app/services/api_config_service.dart'; // 🆕 AGREGAR
+import 'package:ada_app/services/api/api_config_service.dart'; // 🆕 AGREGAR
 
 class DeviceLogUploadService {
   final Logger _logger = Logger();
@@ -40,10 +41,26 @@ class DeviceLogUploadService {
 
       for (final log in logsPendientes) {
         try {
+          // 🕵️‍♂️ Obtener usuario actual para userId
+          final currentUser = await AuthService().getCurrentUser();
+          String? userIdFromAuth = currentUser?.id?.toString();
+
+          // 🔄 Fallback: Si no hay sesión activa, buscar el usuario por employeeId del log
+          if (userIdFromAuth == null && log.employeeId != null) {
+            userIdFromAuth = await obtenerUserIdPorEmployeeId(log.employeeId!);
+          }
+
+          logger.i('🔍 Debug UserId:');
+          logger.i('   currentUser: ${currentUser?.username}');
+          logger.i('   currentUser.id: ${currentUser?.id}');
+          logger.i('   log.employeeId: ${log.employeeId}');
+          logger.i('   userId a enviar: ${userIdFromAuth ?? log.employeeId}');
+
           // ✅ Usar el servicio unificado con logging automático
           final resultado = await DeviceLogPostService.enviarDeviceLog(
             log,
-            userId: log.edfVendedorId,
+            userId:
+                userIdFromAuth, // 👈 FIX: No enviar log.employeeId como fallback si no se encuentra usuario
           );
 
           if (resultado['exito'] == true) {
@@ -56,16 +73,6 @@ class DeviceLogUploadService {
           }
         } catch (e) {
           logger.e('❌ Error enviando ${log.id}: $e');
-
-          // 🔥 Log adicional solo si no fue capturado por BasePostService
-          // await ErrorLogService.logError(
-          //   tableName: 'device_log',
-          //   operation: 'sync_batch',
-          //   errorMessage: 'Error en sincronización batch: $e',
-          //   errorType: 'upload',
-          //   registroFailId: log.id,
-          //   userId: log.edfVendedorId,
-          // );
 
           fallidos++;
         }
@@ -108,13 +115,19 @@ class DeviceLogUploadService {
       logger.i('📤 Enviando batch de ${logs.length} device logs...');
       logger.i('🌐 URL destino: $urlCompleta');
 
-      // Obtener userId del primer log (asumiendo que todos son del mismo usuario)
-      final userId = logs.isNotEmpty ? logs.first.edfVendedorId : null;
+      // Obtener userId del usuario actual (User.id)
+      final currentUser = await AuthService().getCurrentUser();
+      String? userId = currentUser?.id?.toString();
+
+      // 🔄 Fallback: Si no hay sesión, buscar por el employeeId del primer log
+      if (userId == null && logs.isNotEmpty && logs.first.employeeId != null) {
+        userId = await obtenerUserIdPorEmployeeId(logs.first.employeeId!);
+      }
 
       // ✅ Usar el servicio unificado
       final resultado = await DeviceLogPostService.enviarDeviceLogsBatch(
         logs,
-        userId: userId,
+        userId: userId, // 👈 FIX: Solo enviar si se encontró usuario válido
       );
 
       // 🔄 Marcar como sincronizados los exitosos
@@ -323,6 +336,38 @@ class DeviceLogUploadService {
       logger.i("✅ DeviceLogUploadService inicializado correctamente");
     } catch (e) {
       logger.e("💥 Error inicializando DeviceLogUploadService: $e");
+    }
+  }
+
+  /// 🔍 Busca el ID interno (Users.id) dado un employee_id
+  static Future<String?> obtenerUserIdPorEmployeeId(String employeeId) async {
+    try {
+      final db = await DatabaseHelper().database;
+      final result = await db.rawQuery(
+        'SELECT id FROM Users WHERE employee_id = ? LIMIT 1',
+        [employeeId],
+      );
+
+      if (result.isNotEmpty) {
+        final id = result.first['id'];
+        return id?.toString();
+      } else {
+        // 🔍 DEBUG: Si falla, inspeccionar qué hay en la tabla
+        Logger().w('⚠️ No se encontró usuario con employee_id "$employeeId".');
+        final allUsers = await db.rawQuery(
+          'SELECT id, employee_id, username FROM Users',
+        );
+        Logger().i('📋 Dump de tabla Users (${allUsers.length} registros):');
+        for (final u in allUsers) {
+          Logger().i(
+            '   User: id=${u['id']}, empId=${u['employee_id']}, user=${u['username']}',
+          );
+        }
+      }
+      return null;
+    } catch (e) {
+      Logger().w('⚠️ Error buscando userId para employeeId $employeeId: $e');
+      return null;
     }
   }
 }

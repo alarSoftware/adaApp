@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/viewmodels/login_screen_viewmodel.dart';
-import 'package:ada_app/services/auth_service.dart';
-import 'package:ada_app/services/database_helper.dart';
-import 'package:ada_app/services/database_validation_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
+import 'package:ada_app/services/data/database_helper.dart';
+import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/sync/full_sync_service.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/ui/common/snackbar_helper.dart';
@@ -64,7 +64,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
             children: [
               _buildReasonContainer(),
               const SizedBox(height: 12),
-              _buildVendorInfo(), // 👈 Aquí se mostrarán los nombres
+              _buildVendorInfo(),
               const SizedBox(height: 12),
               _buildWarningContainer(),
               if (_isSyncing) ...[
@@ -141,7 +141,6 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
     );
   }
 
-  // ✅ MODIFICADO: Muestra el NOMBRE en lugar del ID
   Widget _buildVendorInfo() {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -271,7 +270,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
     try {
       // ✅ AQUÍ USAMOS LOS ID PARA LA LÓGICA DE SINCRONIZACIÓN (LA API PIDE IDs)
       final result = await FullSyncService.syncAllDataWithProgress(
-        edfVendedorId: widget.validation.vendedorActualId, // Usamos ID
+        employeeId: widget.validation.vendedorActualId, // Usamos ID
         previousVendedorId: widget.validation.vendedorAnteriorId, // Usamos ID
         onProgress:
             ({

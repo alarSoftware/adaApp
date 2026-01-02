@@ -5,12 +5,14 @@ import 'package:logger/logger.dart';
 var logger = Logger();
 
 class DatabaseSync {
-
   // ================================================================
   // SINCRONIZACIÓN SIMPLIFICADA CON TEMPLATE METHOD PATTERN
   // ================================================================
 
-  Future<void> sincronizarClientes(Database db, List<dynamic> clientesAPI) async {
+  Future<void> sincronizarClientes(
+    Database db,
+    List<dynamic> clientesAPI,
+  ) async {
     await _sincronizarEntidades<dynamic>(
       db: db,
       tabla: 'clientes',
@@ -22,7 +24,10 @@ class DatabaseSync {
     );
   }
 
-  Future<void> sincronizarUsuarios(Database db, List<Map<String, dynamic>> usuariosMapas) async {
+  Future<void> sincronizarUsuarios(
+    Database db,
+    List<Map<String, dynamic>> usuariosMapas,
+  ) async {
     await _sincronizarEntidades<Map<String, dynamic>>(
       db: db,
       tabla: 'Users',
@@ -74,7 +79,10 @@ class DatabaseSync {
     );
   }
 
-  Future<void> sincronizarUsuarioCliente(Database db, List<dynamic> usuarioClienteAPI) async {
+  Future<void> sincronizarUsuarioCliente(
+    Database db,
+    List<dynamic> usuarioClienteAPI,
+  ) async {
     await _sincronizarEntidades<dynamic>(
       db: db,
       tabla: 'usuario_cliente',
@@ -130,20 +138,27 @@ class DatabaseSync {
           }
 
           if (usarReplace) {
-            await txn.insert(tabla, mapa, conflictAlgorithm: ConflictAlgorithm.replace);
+            await txn.insert(
+              tabla,
+              mapa,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
           } else {
             await txn.insert(tabla, mapa);
           }
 
           sincronizados++;
-
         } catch (e) {
-          logger.e('Error insertando ${nombreEntidad.toLowerCase()} ${i + 1}: $e');
+          logger.e(
+            'Error insertando ${nombreEntidad.toLowerCase()} ${i + 1}: $e',
+          );
           omitidos++;
         }
       }
 
-      logger.i('$nombreEntidad: $sincronizados sincronizados, $omitidos omitidos');
+      logger.i(
+        '$nombreEntidad: $sincronizados sincronizados, $omitidos omitidos',
+      );
     });
 
     logger.i('=== SINCRONIZACIÓN DE $nombreEntidad COMPLETADA ===');
@@ -154,7 +169,8 @@ class DatabaseSync {
   // ================================================================
 
   Map<String, dynamic>? _mapearCliente(dynamic clienteData) {
-    if (clienteData['nombre'] == null || clienteData['nombre'].toString().trim().isEmpty) {
+    if (clienteData['nombre'] == null ||
+        clienteData['nombre'].toString().trim().isEmpty) {
       return null;
     }
 
@@ -179,8 +195,10 @@ class DatabaseSync {
     }
 
     return {
-      'id': usuarioMapa['id'],  // ✅ AGREGAR ESTA LÍNEA
-      'edf_vendedor_id': usuarioMapa['edf_vendedor_id'],
+      'id': usuarioMapa['id'],
+      'employee_id': usuarioMapa['employee_id'],
+      'employee_name': usuarioMapa['employeeName']
+          ?.toString(), // Corrigiendo mapeo
       'code': usuarioMapa['code'],
       'username': usuarioMapa['username'],
       'password': usuarioMapa['password'],
@@ -191,14 +209,12 @@ class DatabaseSync {
   Map<String, dynamic>? _mapearMarca(dynamic marcaData) {
     if (marcaData['marca'] == null) return null;
 
-    return {
-      'id': marcaData['id'],
-      'nombre': marcaData['marca'],
-    };
+    return {'id': marcaData['id'], 'nombre': marcaData['marca']};
   }
 
   Map<String, dynamic>? _mapearModelo(dynamic modeloData) {
-    if (modeloData['nombre'] == null || modeloData['nombre'].toString().trim().isEmpty) {
+    if (modeloData['nombre'] == null ||
+        modeloData['nombre'].toString().trim().isEmpty) {
       return null;
     }
 
@@ -211,10 +227,7 @@ class DatabaseSync {
   Map<String, dynamic>? _mapearLogo(dynamic logoData) {
     if (logoData['logo'] == null) return null;
 
-    return {
-      'id': logoData['id'],
-      'nombre': logoData['logo'],
-    };
+    return {'id': logoData['id'], 'nombre': logoData['logo']};
   }
 
   Map<String, dynamic>? _mapearUsuarioCliente(dynamic data) {

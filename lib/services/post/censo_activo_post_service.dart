@@ -1,15 +1,18 @@
 import 'dart:convert';
 import 'dart:async';
-import 'dart:io';
-import 'package:ada_app/repositories/censo_activo_repository.dart';
+
 import 'package:http/http.dart' as http;
 
 import 'package:uuid/uuid.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:ada_app/services/api_config_service.dart';
+
+import 'package:ada_app/services/api/api_config_service.dart';
+import 'package:ada_app/config/app_config.dart';
 
 import '../../config/constants/server_response.dart';
 import '../censo/censo_upload_service.dart';
+import '../../repositories/censo_activo_repository.dart';
+import '../error_log/error_log_service.dart';
+import '../../models/censo_activo.dart';
 
 class CensoActivoPostService {
   static const String _tableName = 'censo_activo';
@@ -26,7 +29,7 @@ class CensoActivoPostService {
     String? numeroSerie,
     bool esNuevoEquipo = false,
     required int clienteId,
-    required String edfVendedorId,
+    required String employeeId,
     bool crearPendiente = false,
     dynamic pendienteExistente,
     required int usuarioId,
@@ -41,14 +44,14 @@ class CensoActivoPostService {
     String? modelo,
     String? logo,
     int timeoutSegundos = 60,
-    bool guardarLog = false,
+
     var equipoDataMap,
   }) async {
     String? fullUrl;
 
     try {
       final now = DateTime.now().toLocal();
-      final censoIdFinal = censoId ?? now.millisecondsSinceEpoch.toString();
+      final censoIdFinal = censoId.toString();
 
       if (censoId != null) {}
 
@@ -64,7 +67,7 @@ class CensoActivoPostService {
         numeroSerie: numeroSerie,
         esNuevoEquipo: esNuevoEquipo,
         clienteId: clienteId,
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
         crearPendiente: crearPendiente,
         pendienteExistente: pendienteExistente,
         censoId: censoIdFinal,
@@ -85,14 +88,6 @@ class CensoActivoPostService {
 
       final baseUrl = await ApiConfigService.getBaseUrl();
       fullUrl = '$baseUrl$_endpoint';
-
-      if (guardarLog) {
-        await _guardarLogSimple(
-          url: fullUrl,
-          payload: payloadUnificado,
-          timestamp: now.toIso8601String(),
-        );
-      }
 
       final response = await http
           .post(
@@ -134,232 +129,6 @@ class CensoActivoPostService {
     }
   }
 
-  static Future<void> _guardarLogSimple({
-    required String url,
-    required Map<String, dynamic> payload,
-    required String timestamp,
-  }) async {
-    try {
-      final file = await _obtenerArchivoLog();
-
-      if (file == null) {
-        return;
-      }
-
-      final contenido = _generarContenidoLogSimple(
-        url: url,
-        payload: payload,
-        timestamp: timestamp,
-        filePath: file.path,
-      );
-
-      await file.writeAsString(contenido);
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  static String _generarContenidoLogSimple({
-    required String url,
-    required Map<String, dynamic> payload,
-    required String timestamp,
-    required String filePath,
-  }) {
-    final buffer = StringBuffer();
-    final separador = '=' * 80;
-    final divisor = '-' * 40;
-
-    buffer.writeln(separador);
-    buffer.writeln('CENSO ACTIVO - POST REQUEST LOG');
-    buffer.writeln(separador);
-    buffer.writeln('Timestamp: $timestamp');
-    buffer.writeln('URL: $url');
-    buffer.writeln('Archivo: $filePath');
-    buffer.writeln('');
-
-    buffer.writeln(divisor);
-    buffer.writeln('HEADERS:');
-    buffer.writeln(divisor);
-    buffer.writeln('Content-Type: application/json');
-    buffer.writeln('Accept: application/json');
-    buffer.writeln('ngrok-skip-browser-warning: true');
-    buffer.writeln('');
-
-    buffer.writeln(divisor);
-    buffer.writeln('RESUMEN DEL CENSO:');
-    buffer.writeln(divisor);
-    _agregarResumenSimple(buffer, payload);
-    buffer.writeln('');
-
-    buffer.writeln(divisor);
-    buffer.writeln('REQUEST BODY (JSON):');
-    buffer.writeln(divisor);
-    _agregarBodyJson(buffer, payload);
-    buffer.writeln('');
-
-    buffer.writeln(separador);
-    buffer.writeln('FIN DEL LOG - ${DateTime.now().toLocal()}');
-    buffer.writeln(separador);
-
-    return buffer.toString();
-  }
-
-  static void _agregarResumenSimple(
-    StringBuffer buffer,
-    Map<String, dynamic> payload,
-  ) {
-    final censo = payload['censo_activo'] != null
-        ? Map<String, dynamic>.from(payload['censo_activo'] as Map)
-        : null;
-    final equipo = payload['equipo'] != null
-        ? Map<String, dynamic>.from(payload['equipo'] as Map)
-        : null;
-    final pendiente = payload['equipo_pendiente'] != null
-        ? Map<String, dynamic>.from(payload['equipo_pendiente'] as Map)
-        : null;
-
-    if (censo != null && censo.isNotEmpty) {
-      buffer.writeln('Equipo ID: ${censo['edfEquipoId'] ?? 'N/A'}');
-      buffer.writeln('Cliente ID: ${censo['edfClienteId'] ?? 'N/A'}');
-      buffer.writeln('Usuario ID: ${censo['usuarioId'] ?? 'N/A'}');
-      buffer.writeln('Latitud: ${censo['latitud'] ?? 'N/A'}');
-      buffer.writeln('Longitud: ${censo['longitud'] ?? 'N/A'}');
-    }
-
-    final equipoCompleto = equipo != null && equipo.isNotEmpty;
-    final pendienteCompleto = pendiente != null && pendiente.isNotEmpty;
-
-    buffer.writeln(
-      'Sección equipo: ${equipoCompleto ? 'COMPLETA (nuevo equipo)' : 'VACÍA (equipo existente)'}',
-    );
-    buffer.writeln(
-      'Sección equipo_pendiente: ${pendienteCompleto ? 'COMPLETA (crear asignación)' : 'VACÍA (ya asignado)'}',
-    );
-
-    if (pendienteCompleto && pendiente != null) {
-      buffer.writeln(
-        'UUID Pendiente (BD): ${pendiente['uuid'] ?? 'NO DISPONIBLE'}',
-      );
-    }
-
-    buffer.writeln('Sección censo_activo: COMPLETA (siempre)');
-
-    if (censo != null && censo.isNotEmpty) {
-      final fotosArray = censo['fotos'] as List<dynamic>?;
-      final totalFotos = fotosArray?.length ?? 0;
-      final tieneImagen1 = censo['tieneImagen'] == true;
-      final tieneImagen2 = censo['tieneImagen2'] == true;
-
-      buffer.writeln('Tiene imagen 1: $tieneImagen1');
-      buffer.writeln('Tiene imagen 2: $tieneImagen2');
-      buffer.writeln('Total fotos: $totalFotos');
-
-      if (censo['imageBase64_1'] != null) {
-        final tamano1 = censo['imageBase64_1'].toString().length;
-        buffer.writeln(
-          'Tamaño imagen 1: ${(tamano1 / 1024).toStringAsFixed(1)} KB',
-        );
-      }
-      if (censo['imageBase64_2'] != null) {
-        final tamano2 = censo['imageBase64_2'].toString().length;
-        buffer.writeln(
-          'Tamaño imagen 2: ${(tamano2 / 1024).toStringAsFixed(1)} KB',
-        );
-      }
-
-      buffer.writeln('Observaciones: ${censo['observaciones'] ?? 'N/A'}');
-      buffer.writeln('Estado censo: ${censo['estadoCenso'] ?? 'N/A'}');
-      buffer.writeln('Fecha revisión: ${censo['fechaRevision'] ?? 'N/A'}');
-    }
-  }
-
-  static void _agregarBodyJson(
-    StringBuffer buffer,
-    Map<String, dynamic> payload,
-  ) {
-    final payloadSimplificado = Map<String, dynamic>.from(payload);
-
-    if (payloadSimplificado.containsKey('censo_activo')) {
-      final censo = Map<String, dynamic>.from(
-        payloadSimplificado['censo_activo'],
-      );
-
-      if (censo.containsKey('imageBase64_1')) {
-        final tamano1 = censo['imageBase64_1']?.toString().length ?? 0;
-        censo['imageBase64_1'] =
-            '[BASE64 - ${(tamano1 / 1024).toStringAsFixed(1)} KB]';
-      }
-      if (censo.containsKey('imageBase64_2')) {
-        final tamano2 = censo['imageBase64_2']?.toString().length ?? 0;
-        censo['imageBase64_2'] =
-            '[BASE64 - ${(tamano2 / 1024).toStringAsFixed(1)} KB]';
-      }
-
-      if (censo.containsKey('fotos') && censo['fotos'] is List) {
-        final fotosCount = (censo['fotos'] as List).length;
-        censo['fotos'] = '[${fotosCount} fotos - contenido omitido del log]';
-      }
-
-      payloadSimplificado['censo_activo'] = censo;
-    }
-
-    final prettyJson = JsonEncoder.withIndent(
-      '  ',
-    ).convert(payloadSimplificado);
-    buffer.writeln(prettyJson);
-  }
-
-  static Future<File?> _obtenerArchivoLog() async {
-    try {
-      final downloadsDir = await _obtenerDirectorioDescargas();
-
-      if (downloadsDir == null) {
-        return null;
-      }
-
-      if (!await downloadsDir.exists()) {}
-
-      final now = DateTime.now();
-      final fechaFormateada =
-          '${now.year}${now.month.toString().padLeft(2, '0')}'
-          '${now.day.toString().padLeft(2, '0')}_'
-          '${now.hour.toString().padLeft(2, '0')}'
-          '${now.minute.toString().padLeft(2, '0')}_'
-          '${now.second.toString().padLeft(2, '0')}';
-
-      final fileName = 'censo_activo_post_$fechaFormateada.txt';
-      final filePath = '${downloadsDir.path}/$fileName';
-
-      return File(filePath);
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  static Future<Directory?> _obtenerDirectorioDescargas() async {
-    try {
-      if (Platform.isAndroid) {
-        var downloadsDir = Directory('/storage/emulated/0/Download');
-
-        if (!await downloadsDir.exists()) {
-          final externalDir = await getExternalStorageDirectory();
-
-          downloadsDir = Directory('${externalDir?.path}/Download');
-        } else {}
-
-        return downloadsDir;
-      } else if (Platform.isIOS) {
-        final appDocDir = await getApplicationDocumentsDirectory();
-
-        return appDocDir;
-      }
-
-      return null;
-    } catch (e) {
-      rethrow;
-    }
-  }
-
   static Map<String, dynamic> _construirPayloadUnificado({
     required String equipoId,
     required String codigoBarras,
@@ -369,7 +138,7 @@ class CensoActivoPostService {
     String? numeroSerie,
     required bool esNuevoEquipo,
     required int clienteId,
-    required String edfVendedorId,
+    required String employeeId,
     required bool crearPendiente,
     dynamic pendienteExistente,
     required String censoId,
@@ -412,7 +181,7 @@ class CensoActivoPostService {
         equipoId: equipoId,
         clienteId: clienteId,
         usuarioId: usuarioId,
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
         latitud: latitud,
         longitud: longitud,
         observaciones: observaciones,
@@ -461,7 +230,7 @@ class CensoActivoPostService {
   ) {
     var pendienteExistente = pendienteExistenteList[0];
     String id = pendienteExistente['id'];
-    var edfVendedorId = pendienteExistente['edf_vendedor_id'];
+    var employeeId = pendienteExistente['employee_id'];
     var equipoId = pendienteExistente['equipo_id'];
     var codigoBarras = pendienteExistente['codigo_barras'];
     var clienteId = pendienteExistente['cliente_id'];
@@ -470,8 +239,8 @@ class CensoActivoPostService {
     var marcaId = pendienteExistente['marca_id'];
     var modeloId = pendienteExistente['modelo_id'];
     var logoId = pendienteExistente['logo_id'];
-    final partes = edfVendedorId.split('_');
-    final vendedorIdValue = partes.isNotEmpty ? partes[0] : edfVendedorId;
+    final partes = employeeId.split('_');
+    final vendedorIdValue = partes.isNotEmpty ? partes[0] : employeeId;
     int? sucursalIdValue;
     if (partes.length > 1) {
       sucursalIdValue = int.tryParse(partes[1]);
@@ -483,8 +252,8 @@ class CensoActivoPostService {
       'edfClienteId': clienteId.toString(),
       'id': id,
       'estado': estado,
-      'edfVendedorSucursalId': edfVendedorId,
-      'edfVendedorId': vendedorIdValue,
+      'edfVendedorSucursalId': employeeId,
+      'employeeId': vendedorIdValue,
       'edfSerie': numeroSerie,
       'edfMarcaId': marcaId?.toString(),
       'edfModeloId': modeloId,
@@ -503,7 +272,7 @@ class CensoActivoPostService {
     required String equipoId,
     required int clienteId,
     required int usuarioId,
-    required String edfVendedorId,
+    required String employeeId,
     required double latitud,
     required double longitud,
     String? observaciones,
@@ -526,10 +295,10 @@ class CensoActivoPostService {
 
     final censo = {
       'id': censoId,
-      'edfVendedorSucursalId': edfVendedorId,
+      'edfVendedorSucursalId': employeeId,
+      'employeeId': employeeId, // Añadido para consistencia
       'edfEquipoId': equipoId,
       'usuarioId': usuarioId,
-      'edfClienteId': clienteId,
       'fechaRevision': formatearFechaLocal(now),
       'latitud': latitud,
       'longitud': longitud,
@@ -551,7 +320,7 @@ class CensoActivoPostService {
       'enLocal': enLocal,
       'dispositivo': 'android',
       'esCenso': true,
-      'versionApp': '1.0.0',
+      'versionApp': AppConfig.currentAppVersion,
     };
 
     if (fotos != null && fotos.isNotEmpty) {
@@ -578,52 +347,5 @@ class CensoActivoPostService {
     }
 
     return censo;
-  }
-
-  static Future<Map<String, dynamic>> enviarCambioEstado({
-    required String codigoBarras,
-    required int clienteId,
-    required bool enLocal,
-    required dynamic position, // Geolocator Position
-    String? observaciones,
-    required String equipoId,
-    required String clienteNombre,
-    required String numeroSerie,
-    required String modelo,
-    required String marca,
-    required String logo,
-    required int usuarioId,
-    required String edfVendedorId,
-  }) async {
-    try {
-      await enviarCensoActivo(
-        censoId: DateTime.now().millisecondsSinceEpoch.toString(),
-        equipoId: equipoId,
-        codigoBarras: codigoBarras,
-        clienteId: clienteId,
-        usuarioId: usuarioId,
-        edfVendedorId: edfVendedorId,
-        latitud: position.latitude,
-        longitud: position.longitude,
-        observaciones: observaciones,
-        enLocal: enLocal,
-        estadoCenso: 'migrado', // Se asume migrado si se envía directo
-        esNuevoEquipo: false,
-        crearPendiente: false,
-        clienteNombre: clienteNombre,
-        numeroSerie: numeroSerie,
-        modelo: modelo,
-        marca: marca,
-        logo: logo,
-        guardarLog: true,
-      );
-
-      return {'exito': true, 'mensaje': 'Estado actualizado correctamente'};
-    } catch (e) {
-      return {
-        'exito': false,
-        'mensaje': e.toString().replaceAll('Exception: ', ''),
-      };
-    }
   }
 }

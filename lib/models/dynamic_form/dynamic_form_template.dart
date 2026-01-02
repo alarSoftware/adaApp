@@ -26,9 +26,9 @@ class DynamicFormTemplate {
   });
 
   factory DynamicFormTemplate.fromApiJson(
-      Map<String, dynamic> formJson,
-      List<Map<String, dynamic>> detailsJson,
-      ) {
+    Map<String, dynamic> formJson,
+    List<Map<String, dynamic>> detailsJson,
+  ) {
     final sortedDetailsJson = List<Map<String, dynamic>>.from(detailsJson);
     sortedDetailsJson.sort((a, b) {
       final idA = _extractNumericId(a['id']);
@@ -83,7 +83,9 @@ class DynamicFormTemplate {
     return idA.compareTo(idB);
   }
 
-  static List<DynamicFormField> _organizeFieldsKeepingHierarchy(List<DynamicFormField> allFields) {
+  static List<DynamicFormField> _organizeFieldsKeepingHierarchy(
+    List<DynamicFormField> allFields,
+  ) {
     final Map<String, DynamicFormField> fieldsById = {};
     for (final field in allFields) {
       fieldsById[field.id] = field;
@@ -102,13 +104,17 @@ class DynamicFormTemplate {
 
     DynamicFormField buildTree(DynamicFormField field) {
       final children = childrenMap[field.id] ?? [];
-      final childrenWithTheirChildren = children.map((child) => buildTree(child)).toList();
+      final childrenWithTheirChildren = children
+          .map((child) => buildTree(child))
+          .toList();
       return field.withChildren(childrenWithTheirChildren);
     }
 
     final rootFields = allFields.where((f) => f.parentId == null).toList();
     rootFields.sort(_compareFields);
-    final fieldsWithChildren = rootFields.map((root) => buildTree(root)).toList();
+    final fieldsWithChildren = rootFields
+        .map((root) => buildTree(root))
+        .toList();
 
     final List<DynamicFormField> topLevelFields = [];
 
@@ -119,13 +125,16 @@ class DynamicFormTemplate {
           if (child.type == 'radio_button' ||
               child.type == 'checkbox' ||
               child.type == 'resp_abierta' ||
-              child.type == 'resp_abierta_larga') {
+              child.type == 'resp_abierta_larga' ||
+              child.type == 'image') {
             topLevelFields.add(child);
           }
         }
       } else if (root.type == 'radio_button' || root.type == 'checkbox') {
         topLevelFields.add(root);
-      } else if (root.type == 'resp_abierta' || root.type == 'resp_abierta_larga') {
+      } else if (root.type == 'resp_abierta' ||
+          root.type == 'resp_abierta_larga' ||
+          root.type == 'image') {
         topLevelFields.add(root);
       }
     }
