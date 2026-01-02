@@ -2,12 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 
-enum InlineNotificationType {
-  success,
-  error,
-  warning,
-  info,
-}
+enum InlineNotificationType { success, error, warning, info }
 
 class InlineNotification extends StatelessWidget {
   final String message;
@@ -26,13 +21,13 @@ class InlineNotification extends StatelessWidget {
   Color _getBackgroundColor() {
     switch (type) {
       case InlineNotificationType.success:
-        return AppColors.success.withOpacity(0.1);
+        return AppColors.success.withValues(alpha: 0.1);
       case InlineNotificationType.error:
-        return AppColors.error.withOpacity(0.1);
+        return AppColors.error.withValues(alpha: 0.1);
       case InlineNotificationType.warning:
-        return AppColors.warning.withOpacity(0.1);
+        return AppColors.warning.withValues(alpha: 0.1);
       case InlineNotificationType.info:
-        return AppColors.info.withOpacity(0.1);
+        return AppColors.info.withValues(alpha: 0.1);
     }
   }
 
@@ -76,53 +71,49 @@ class InlineNotification extends StatelessWidget {
         duration: const Duration(milliseconds: 300),
         child: visible
             ? Container(
-          margin: const EdgeInsets.only(top: 8, bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: _getBackgroundColor(),
-            border: Border.all(
-              color: _getBorderColor(),
-              width: 1,
-            ),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                _getIcon(),
-                color: _getIconColor(),
-                size: 20,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  message,
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
+                margin: const EdgeInsets.only(top: 8, bottom: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
                 ),
-              ),
-              if (onDismiss != null) ...[
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: onDismiss,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(2),
-                    child: Icon(
-                      Icons.close,
-                      size: 16,
-                      color: AppColors.textSecondary,
+                decoration: BoxDecoration(
+                  color: _getBackgroundColor(),
+                  border: Border.all(color: _getBorderColor(), width: 1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(_getIcon(), color: _getIconColor(), size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        message,
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
                     ),
-                  ),
+                    if (onDismiss != null) ...[
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: onDismiss,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: Icon(
+                            Icons.close,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-              ],
-            ],
-          ),
-        )
+              )
             : const SizedBox.shrink(),
       ),
     );

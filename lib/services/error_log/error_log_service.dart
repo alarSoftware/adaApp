@@ -1,23 +1,24 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ffi';
 import 'dart:io';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
+import 'package:synchronized/synchronized.dart';
 
 class ErrorLogService {
   static final Logger _logger = Logger();
   static const _uuid = Uuid();
 
-  // Configuración de reintentos
+  static final _locksByKey = <String, Lock>{};
+  static final _mainLock = Lock();
+
   static const int _maxRetriesBeforeBackoff = 5;
   static const Duration _baseRetryDelay = Duration(minutes: 5);
   static const Duration _maxRetryDelay = Duration(hours: 24);
 
-  // ==================== REGISTRO DE ERRORES LOCAL ====================
   static Future<void> logError({
     required String tableName,
     required String operation,
@@ -30,106 +31,170 @@ class ErrorLogService {
     String? endpoint,
   }) async {
     try {
-      final errorId = _uuid.v4();
       final now = DateTime.now();
+      _logger.i('INICIANDO logError para $tableName - $operation');
+      _logger.w('Error detectado: $tableName - $errorMessage');
 
-      _logger.i('🔍 INICIANDO logError para $tableName - $operation');
-      _logger.i('   registro_fail_id: $registroFailId');
-      _logger.i('   error_message: $errorMessage');
-
-      final errorLog = {
-        'id': errorId,
-        'timestamp': now.toIso8601String(),
-        'table_name': tableName,
-        'operation': operation,
-        'registro_fail_id': registroFailId,
-        'error_code': errorCode,
-        'error_message': errorMessage,
-        'error_type': errorType ?? 'unknown',
-        'sync_attempt': syncAttempt,
-        'user_id': userId,
-        'endpoint': endpoint,
-        'retry_count': 0,
-        'last_retry_at': null,
-        'next_retry_at': now.toIso8601String(),
-        'sincronizado': 0,
-        'fecha_sincronizacion': null,
-      };
-
-      _logger.w('🚨 Error detectado: $tableName - $errorMessage');
-
-      // 🔥 SIEMPRE GUARDAR EN BD LOCAL PRIMERO
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
 
-      _logger.i('💾 INTENTANDO insertar en error_log...');
-      await db.insert('error_log', errorLog);
-      _logger.i('✅ Error log guardado localmente con ID: $errorId');
+      final lockKey = '$tableName:$errorMessage';
+      final lock = await _mainLock.synchronized(() {
+        return _locksByKey.putIfAbsent(lockKey, () => Lock());
+      });
 
-      // Verificar que se guardó
-      final verificacion = await db.query(
-        'error_log',
-        where: 'id = ?',
-        whereArgs: [errorId],
-      );
-      _logger.i('🔍 VERIFICACIÓN: Registro encontrado: ${verificacion.isNotEmpty}');
-      if (verificacion.isNotEmpty) {
-        _logger.i('   Datos: ${verificacion.first}');
-      }
+      await lock.synchronized(() async {
+        String? errorId;
 
-      // 🎯 INTENTO INMEDIATO DE ENVÍO AL SERVIDOR
-      final enviadoExitosamente = await _enviarErrorLogIndividual(errorLog);
+        await db.transaction((txn) async {
+          // MODIFICADO: Buscamos coincidencias incluyendo registro_fail_id y SIN filtrar por sincronizado
+          // Esto permite encontrar logs previos aunque ya se hayan enviado, para solo actualizar el contador.
+          final existente = await txn.rawQuery(
+            '''
+          SELECT id, retry_count 
+          FROM error_log 
+          WHERE table_name = ? 
+            AND error_message = ? 
+            AND (registro_fail_id = ? OR (? IS NULL AND registro_fail_id IS NULL))
+          LIMIT 1
+        ''',
+            [tableName, errorMessage, registroFailId, registroFailId],
+          );
 
-      if (enviadoExitosamente) {
-        _logger.i('✅ Error log enviado inmediatamente al servidor');
-        // 🆕 Marcar como enviado pero NO eliminar
-        final updated = await db.update(
-          'error_log',
-          {
-            'sincronizado': 1,
-            'fecha_sincronizacion': DateTime.now().toIso8601String(),
-          },
-          where: 'id = ?',
-          whereArgs: [errorId],
-        );
-        _logger.i('✅ Marcado como sincronizado. Filas actualizadas: $updated');
-      } else {
-        _logger.w('⚠️ Error log NO enviado, programado para reintentos automáticos');
-      }
+          if (existente.isNotEmpty) {
+            errorId = existente.first['id'] as String;
+            final nuevoRetryCount =
+                ((existente.first['retry_count'] as int?) ?? 0) + 1;
 
+            _logger.i(
+              'Error pendiente encontrado. Actualizando retry_count a $nuevoRetryCount',
+            );
+
+            // MODIFICADO: Al actualizar, reseteamos 'sincronizado' a 0 para que se vuelva a enviar
+            await txn.rawUpdate(
+              '''
+            UPDATE error_log 
+            SET retry_count = ?,
+                last_retry_at = ?,
+                next_retry_at = ?,
+                timestamp = ?,
+                sincronizado = 0,
+                fecha_sincronizacion = NULL
+            WHERE id = ?
+          ''',
+              [
+                nuevoRetryCount,
+                now.toIso8601String(),
+                now.toIso8601String(),
+                now.toIso8601String(),
+                errorId,
+              ],
+            );
+
+            _logger.i('Error log actualizado con ID: $errorId');
+          } else {
+            errorId = _uuid.v4();
+
+            await txn.rawInsert(
+              '''
+            INSERT INTO error_log (
+              id, timestamp, table_name, operation, registro_fail_id,
+              error_code, error_message, error_type, sync_attempt, user_id,
+              endpoint, retry_count, last_retry_at, next_retry_at,
+              sincronizado, fecha_sincronizacion
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ''',
+              [
+                errorId,
+                now.toIso8601String(),
+                tableName,
+                operation,
+                registroFailId,
+                errorCode,
+                errorMessage,
+                errorType ?? 'unknown',
+                syncAttempt,
+                userId,
+                endpoint,
+                0,
+                null,
+                now.toIso8601String(),
+                0,
+                null,
+              ],
+            );
+
+            _logger.i('Error log nuevo guardado con ID: $errorId');
+          }
+        });
+
+        // El bloque de envío inmediato se mantiene igual, pero ahora actuará también sobre actualizaciones
+        if (errorId != null) {
+          final verificacion = await db.rawQuery(
+            '''
+          SELECT * FROM error_log 
+          WHERE id = ?
+        ''',
+            [errorId],
+          );
+
+          if (verificacion.isNotEmpty) {
+            _logger.i('VERIFICACION: Registro encontrado para envío inmediato');
+
+            final enviadoExitosamente = await _enviarErrorLogIndividual(
+              verificacion.first,
+            );
+
+            if (enviadoExitosamente) {
+              _logger.i('Error log enviado inmediatamente al servidor');
+              await db.rawUpdate(
+                '''
+              UPDATE error_log 
+              SET sincronizado = 1,
+                  fecha_sincronizacion = ?
+              WHERE id = ?
+            ''',
+                [DateTime.now().toIso8601String(), errorId],
+              );
+              _logger.i('Marcado como sincronizado');
+            }
+          }
+        }
+      });
     } catch (e, stackTrace) {
-      _logger.e('❌ Error en logError: $e');
+      _logger.e('Error en logError: $e');
       _logger.e('Stack trace: $stackTrace');
-      // No re-throw para evitar loops infinitos de errores
     }
   }
 
-  static void manejarExcepcion(dynamic excepcion, String? elementId,
-      String? fullUrl, int? userId, String tableName) async {
+  static Future<void> manejarExcepcion(
+    dynamic excepcion,
+    String? elementId,
+    String? fullUrl,
+    int? userId,
+    String tableName,
+  ) async {
     String tipoError;
     String codigoError;
     String mensajeUsuario;
     String mensajeDetallado;
     int timeoutSegundos = 60;
-    // 🎯 CLASIFICAR EXCEPCIÓN AUTOMÁTICAMENTE
+
     if (excepcion is SocketException) {
       tipoError = 'network';
       codigoError = 'NETWORK_CONNECTION_ERROR';
       mensajeUsuario = 'Sin conexión de red';
       mensajeDetallado = 'Error de conexión de red: ${excepcion.message}';
-
     } else if (excepcion is TimeoutException) {
       tipoError = 'network';
       codigoError = 'REQUEST_TIMEOUT_ERROR';
       mensajeUsuario = 'Tiempo de espera agotado';
       mensajeDetallado = 'Timeout tras ${timeoutSegundos}s: $excepcion';
-
     } else if (excepcion is http.ClientException) {
       tipoError = 'network';
       codigoError = 'HTTP_CLIENT_ERROR';
       mensajeUsuario = 'Error de red: ${excepcion.message}';
       mensajeDetallado = 'Error HTTP del cliente: ${excepcion.message}';
-
     } else {
       tipoError = 'crash';
       codigoError = 'UNEXPECTED_EXCEPTION';
@@ -138,18 +203,9 @@ class ErrorLogService {
     }
 
     String operacion = '';
-    if(tableName=='censo_activo'){
-      // await _estadoEquipoRepository.marcarComoError(
-      //   elementId,
-      //   'Excepción en reintento: ${e.toString()}',
-      // );
-    }else if(tableName=='operacion_comercial'){
-      // await _estadoEquipoRepository.marcarComoError(
-      //   elementId,
-      //   'Excepción en reintento: ${e.toString()}',
-      // );
-    }
-    // 🔥 REGISTRO AUTOMÁTICO UNIFICADO
+    if (tableName == 'censo_activo') {
+    } else if (tableName == 'operacion_comercial') {}
+
     await ErrorLogService.logError(
       tableName: tableName,
       operation: 'EXCEPTION',
@@ -162,21 +218,16 @@ class ErrorLogService {
     );
   }
 
-  // ==================== ENVÍO AL SERVIDOR CON REINTENTOS ====================
-
-  /// Envía todos los error logs pendientes al servidor
-  /// Incluye lógica de reintentos INFINITOS con backoff exponencial
   static Future<SyncErrorLogsResult> enviarErrorLogsAlServidor({
     int limit = 50,
   }) async {
     try {
-      _logger.i('📤 Iniciando envío de error logs pendientes...');
+      _logger.i('Iniciando envío de error logs pendientes...');
 
-      // 1. Obtener errores LISTOS para reintento (respetando next_retry_at)
       final errores = await _getErrorsReadyForRetry(limit: limit);
 
       if (errores.isEmpty) {
-        _logger.i('✅ No hay error logs pendientes para enviar');
+        _logger.i('No hay error logs pendientes para enviar');
         return SyncErrorLogsResult(
           exito: true,
           mensaje: 'No hay error logs pendientes',
@@ -184,9 +235,8 @@ class ErrorLogService {
         );
       }
 
-      _logger.i('📊 Encontrados ${errores.length} error logs para reintento');
+      _logger.i('Encontrados ${errores.length} error logs para reintento');
 
-      // 2. Enviar cada error al servidor
       int enviados = 0;
       int fallidos = 0;
       final erroresEnviados = <String>[];
@@ -200,34 +250,25 @@ class ErrorLogService {
             erroresEnviados.add(error['id'] as String);
           } else {
             fallidos++;
-            // Actualizar para el siguiente reintento
             await _actualizarParaReintento(error);
           }
         } catch (e) {
           fallidos++;
-          _logger.e('Error reenviando log ${error['id']}: $e');
-          // Actualizar para el siguiente reintento
           await _actualizarParaReintento(error);
         }
       }
 
-      // 3. Marcar errores enviados exitosamente (NO eliminar)
       if (erroresEnviados.isNotEmpty) {
         await _marcarErrorsComoEnviados(erroresEnviados);
-        _logger.i('✅ Marcados $enviados error logs como sincronizados');
       }
-
-      _logger.i('✅ Reintento completado: $enviados enviados, $fallidos programados para próximo reintento');
-
       return SyncErrorLogsResult(
         exito: true,
-        mensaje: 'Error logs: $enviados enviados, $fallidos programados para reintento',
+        mensaje:
+            'Error logs: $enviados enviados, $fallidos programados para reintento',
         logsEnviados: enviados,
         logsFallidos: fallidos,
       );
-
     } catch (e) {
-      _logger.e('💥 Error general en reintentos: $e');
       return SyncErrorLogsResult(
         exito: false,
         mensaje: 'Error en reintentos: $e',
@@ -236,7 +277,6 @@ class ErrorLogService {
     }
   }
 
-  /// Obtiene error logs que están listos para ser enviados (respetando next_retry_at)
   static Future<List<Map<String, dynamic>>> _getErrorsReadyForRetry({
     required int limit,
   }) async {
@@ -248,23 +288,23 @@ class ErrorLogService {
 
       final result = await db.query(
         'error_log',
-        where: 'next_retry_at <= ? AND error_type != ? AND (sincronizado IS NULL OR sincronizado = 0)', // 🆕 Ignorar sincronizados
+        where:
+            'next_retry_at <= ? AND error_type != ? AND (sincronizado IS NULL OR sincronizado = 0)',
         whereArgs: [now, 'resuelto'],
-        orderBy: 'next_retry_at ASC', // Los más antiguos primero
+        orderBy: 'next_retry_at ASC',
         limit: limit,
       );
 
       return result;
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo errores listos: $e');
+      _logger.e('Error obteniendo errores listos: $e');
       return [];
     }
   }
 
-  /// Actualiza el error log para el siguiente reintento con backoff exponencial
-  /// ♾️ REINTENTOS INFINITOS - nunca se descarta
-  static Future<void> _actualizarParaReintento(Map<String, dynamic> error) async {
+  static Future<void> _actualizarParaReintento(
+    Map<String, dynamic> error,
+  ) async {
     try {
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
@@ -272,16 +312,16 @@ class ErrorLogService {
       final retryCount = (error['retry_count'] as int? ?? 0) + 1;
       final now = DateTime.now();
 
-      // Calcular el siguiente tiempo de reintento con backoff exponencial
       Duration delay;
 
       if (retryCount <= _maxRetriesBeforeBackoff) {
-        // Primeros 5 intentos: cada 5 minutos
         delay = _baseRetryDelay;
       } else {
-        // Después de 5 intentos: backoff exponencial con límite de 24 horas
-        final exponentialDelay = _baseRetryDelay * (1 << (retryCount - _maxRetriesBeforeBackoff));
-        delay = exponentialDelay > _maxRetryDelay ? _maxRetryDelay : exponentialDelay;
+        final exponentialDelay =
+            _baseRetryDelay * (1 << (retryCount - _maxRetriesBeforeBackoff));
+        delay = exponentialDelay > _maxRetryDelay
+            ? _maxRetryDelay
+            : exponentialDelay;
       }
 
       final nextRetryAt = now.add(delay);
@@ -297,20 +337,21 @@ class ErrorLogService {
         whereArgs: [error['id']],
       );
 
-      _logger.d('🔄 Error log ${error['id']} programado para reintento #$retryCount en ${delay.inMinutes} minutos');
-
+      _logger.d(
+        'Error log ${error['id']} programado para reintento #$retryCount en ${delay.inMinutes} minutos',
+      );
     } catch (e) {
-      _logger.e('❌ Error actualizando para reintento: $e');
+      _logger.e('Error actualizando para reintento: $e');
     }
   }
 
-  /// Envía un error log individual al servidor
-  static Future<bool> _enviarErrorLogIndividual(Map<String, dynamic> errorLog) async {
+  static Future<bool> _enviarErrorLogIndividual(
+    Map<String, dynamic> errorLog,
+  ) async {
     try {
       final baseUrl = await BaseSyncService.getBaseUrl();
       final endpoint = '$baseUrl/appErrorLog/insertAppErrorLog';
 
-      // Preparar el JSON interno con todos los datos del error
       final jsonData = {
         'id': errorLog['id'],
         'timestamp': errorLog['timestamp'],
@@ -327,38 +368,36 @@ class ErrorLogService {
         'lastRetryAt': errorLog['last_retry_at'],
       };
 
-      // 🎯 Payload según formato Groovy: todo dentro de "jsonData"
-      final payload = {
-        'jsonData': jsonEncode(jsonData),
-      };
+      final payload = {'jsonData': jsonEncode(jsonData)};
 
-      _logger.d('📤 Enviando error log: ${errorLog['id']}');
+      _logger.d('Enviando error log: ${errorLog['id']}');
 
-      final response = await http.post(
-        Uri.parse(endpoint),
-        headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode(payload),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            Uri.parse(endpoint),
+            headers: {
+              'Content-Type': 'application/json; charset=UTF-8',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        _logger.d('✅ Error log enviado exitosamente');
+        _logger.d('Error log enviado exitosamente');
         return true;
       } else {
-        _logger.w('⚠️ Error del servidor: ${response.statusCode} - ${response.body}');
+        _logger.w(
+          'Error del servidor: ${response.statusCode} - ${response.body}',
+        );
         return false;
       }
-
     } catch (e) {
-      _logger.e('❌ Error enviando log: $e');
+      _logger.e('Error enviando log: $e');
       return false;
     }
   }
 
-  /// Marca error logs como enviados exitosamente AL SERVIDOR
-  /// ⚠️ NO los elimina, solo los marca como sincronizados para mantener historial
   static Future<void> _marcarErrorsComoEnviados(List<String> ids) async {
     try {
       final dbHelper = DatabaseHelper();
@@ -366,28 +405,20 @@ class ErrorLogService {
 
       final now = DateTime.now().toIso8601String();
 
-      // 🆕 MARCAR como sincronizado en lugar de eliminar
       final placeholders = List.filled(ids.length, '?').join(',');
       await db.update(
         'error_log',
-        {
-          'sincronizado': 1,
-          'fecha_sincronizacion': now,
-        },
+        {'sincronizado': 1, 'fecha_sincronizacion': now},
         where: 'id IN ($placeholders)',
         whereArgs: ids,
       );
 
-      _logger.i('✅ ${ids.length} error logs marcados como sincronizados');
+      _logger.i('${ids.length} error logs marcados como sincronizados');
     } catch (e) {
-      _logger.e('❌ Error marcando logs como enviados: $e');
+      _logger.e('Error marcando logs como enviados: $e');
     }
   }
 
-  // ==================== LIMPIEZA POR SINCRONIZACIÓN EXITOSA ====================
-
-  /// Marca los errores como "resueltos" cuando el registro original se sincroniza exitosamente
-  /// NO los elimina, solo actualiza su estado para que no se reintenten más
   static Future<void> marcarErroresComoResueltos({
     required String registroFailId,
     required String tableName,
@@ -396,30 +427,27 @@ class ErrorLogService {
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
 
-      // Actualizar los errores relacionados con este registro
       final updated = await db.update(
         'error_log',
         {
-          'error_type': 'resuelto', // Cambiar el tipo a "resuelto"
-          'next_retry_at': null, // Ya no necesita reintentar
+          'error_status': 'done',
+          'next_retry_at': null,
           'last_retry_at': DateTime.now().toIso8601String(),
         },
-        where: 'registro_fail_id = ? AND table_name = ? AND error_type != ?',
-        whereArgs: [registroFailId, tableName, 'resuelto'], // No actualizar si ya está resuelto
+        where: 'registro_fail_id = ? AND table_name = ? AND error_status != ?',
+        whereArgs: [registroFailId, tableName, 'done'],
       );
 
       if (updated > 0) {
-        _logger.i('✅ $updated error(es) marcado(s) como resuelto(s) para $tableName:$registroFailId');
+        _logger.i(
+          '$updated error(es) marcado(s) como resuelto(s) para $tableName:$registroFailId',
+        );
       }
-
     } catch (e) {
-      _logger.e('❌ Error marcando errores como resueltos: $e');
+      _logger.e('Error marcando errores como resueltos: $e');
     }
   }
 
-  // ==================== CONSULTAS LOCALES ====================
-
-  /// Obtiene todos los errores pendientes (no resueltos ni sincronizados)
   static Future<List<Map<String, dynamic>>> getAllErrors({int? limit}) async {
     try {
       final dbHelper = DatabaseHelper();
@@ -434,15 +462,15 @@ class ErrorLogService {
       );
 
       return result;
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo errores: $e');
+      _logger.e('Error obteniendo errores: $e');
       return [];
     }
   }
 
-  /// Obtiene TODOS los errores incluyendo resueltos y sincronizados (para historial completo)
-  static Future<List<Map<String, dynamic>>> getAllErrorsIncludingResolved({int? limit}) async {
+  static Future<List<Map<String, dynamic>>> getAllErrorsIncludingResolved({
+    int? limit,
+  }) async {
     try {
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
@@ -454,15 +482,15 @@ class ErrorLogService {
       );
 
       return result;
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo errores: $e');
+      _logger.e('Error obteniendo errores: $e');
       return [];
     }
   }
 
-  /// Obtiene errores por tabla
-  static Future<List<Map<String, dynamic>>> getErrorsByTable(String tableName) async {
+  static Future<List<Map<String, dynamic>>> getErrorsByTable(
+    String tableName,
+  ) async {
     try {
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
@@ -476,15 +504,15 @@ class ErrorLogService {
       );
 
       return result;
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo errores de tabla $tableName: $e');
+      _logger.e('Error obteniendo errores de tabla $tableName: $e');
       return [];
     }
   }
 
-  /// Obtiene errores por tipo
-  static Future<List<Map<String, dynamic>>> getErrorsByType(String errorType) async {
+  static Future<List<Map<String, dynamic>>> getErrorsByType(
+    String errorType,
+  ) async {
     try {
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
@@ -498,20 +526,17 @@ class ErrorLogService {
       );
 
       return result;
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo errores por tipo $errorType: $e');
+      _logger.e('Error obteniendo errores por tipo $errorType: $e');
       return [];
     }
   }
 
-  /// Obtiene estadísticas de errores
   static Future<Map<String, dynamic>> getErrorStats() async {
     try {
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
 
-      // Total de errores pendientes (no resueltos ni sincronizados)
       final totalResult = await db.rawQuery('''
         SELECT COUNT(*) as total 
         FROM error_log 
@@ -519,7 +544,6 @@ class ErrorLogService {
       ''');
       final total = (totalResult.first['total'] as int?) ?? 0;
 
-      // Total de errores resueltos
       final resolvedResult = await db.rawQuery('''
         SELECT COUNT(*) as resolved 
         FROM error_log 
@@ -527,7 +551,6 @@ class ErrorLogService {
       ''');
       final resolved = (resolvedResult.first['resolved'] as int?) ?? 0;
 
-      // Total de errores sincronizados al servidor
       final syncedResult = await db.rawQuery('''
         SELECT COUNT(*) as synced 
         FROM error_log 
@@ -535,7 +558,6 @@ class ErrorLogService {
       ''');
       final synced = (syncedResult.first['synced'] as int?) ?? 0;
 
-      // Errores por tipo
       final typeResult = await db.rawQuery('''
         SELECT error_type, COUNT(*) as count 
         FROM error_log 
@@ -543,7 +565,6 @@ class ErrorLogService {
         ORDER BY count DESC
       ''');
 
-      // Errores por tabla
       final tableResult = await db.rawQuery('''
         SELECT table_name, COUNT(*) as count 
         FROM error_log 
@@ -551,15 +572,14 @@ class ErrorLogService {
         ORDER BY count DESC
       ''');
 
-      // Errores con más de 10 reintentos
       final highRetryResult = await db.rawQuery('''
         SELECT COUNT(*) as high_retry_count 
         FROM error_log 
         WHERE retry_count >= 10 AND error_type != 'resuelto'
       ''');
-      final highRetryCount = (highRetryResult.first['high_retry_count'] as int?) ?? 0;
+      final highRetryCount =
+          (highRetryResult.first['high_retry_count'] as int?) ?? 0;
 
-      // Próximo reintento programado
       final nextRetryResult = await db.rawQuery('''
         SELECT MIN(next_retry_at) as next_retry
         FROM error_log
@@ -576,9 +596,8 @@ class ErrorLogService {
         'errors_by_type': typeResult,
         'errors_by_table': tableResult,
       };
-
     } catch (e) {
-      _logger.e('❌ Error obteniendo estadísticas: $e');
+      _logger.e('Error obteniendo estadísticas: $e');
       return {
         'total_pending_errors': 0,
         'total_resolved_errors': 0,
@@ -591,10 +610,6 @@ class ErrorLogService {
     }
   }
 
-  // ==================== LIMPIEZA ====================
-
-  /// Limpia errores antiguos que ya fueron resueltos Y sincronizados
-  /// Solo elimina registros con más de 30 días
   static Future<int> cleanOldResolvedErrors({int daysOld = 30}) async {
     try {
       final dbHelper = DatabaseHelper();
@@ -609,32 +624,38 @@ class ErrorLogService {
       );
 
       if (deleted > 0) {
-        _logger.i('🧹 Eliminados $deleted error logs antiguos resueltos y sincronizados');
+        _logger.i(
+          'Eliminados $deleted error logs antiguos resueltos y sincronizados',
+        );
       }
 
       return deleted;
-
     } catch (e) {
-      _logger.e('❌ Error en limpieza: $e');
+      _logger.e('Error en limpieza: $e');
       return 0;
     }
   }
 
-  /// Limpia TODOS los errores (usar con precaución - solo para debugging)
   static Future<void> clearAllErrors() async {
     try {
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
 
       await db.delete('error_log');
-      _logger.i('🗑️ ⚠️ Todos los error logs eliminados (USAR SOLO PARA DEBUG)');
-
+      _logger.i('Todos los error logs eliminados (USAR SOLO PARA DEBUG)');
     } catch (e) {
-      _logger.e('❌ Error limpiando todos los errores: $e');
+      _logger.e('Error limpiando todos los errores: $e');
     }
   }
 
-  // ==================== MÉTODOS DE CONVENIENCIA ====================
+  /// Alias para mantener consistencia con UI
+  static Future<void> limpiarLogsAntiguos({int diasAntiguedad = 0}) async {
+    if (diasAntiguedad <= 0) {
+      await clearAllErrors();
+    } else {
+      await cleanOldResolvedErrors(daysOld: diasAntiguedad);
+    }
+  }
 
   static Future<void> logNetworkError({
     required String tableName,
@@ -712,10 +733,6 @@ class ErrorLogService {
   }
 }
 
-
-
-// ==================== CLASE DE RESULTADO ====================
-
 class SyncErrorLogsResult {
   final bool exito;
   final String mensaje;
@@ -733,5 +750,4 @@ class SyncErrorLogsResult {
   String toString() {
     return 'SyncErrorLogsResult(exito: $exito, mensaje: $mensaje, enviados: $logsEnviados, fallidos: $logsFallidos)';
   }
-
 }

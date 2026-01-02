@@ -12,11 +12,12 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  intl: ^0.20.0
   # Dependencias principales
   sqflite: ^2.3.0
   path: ^1.8.3
   logger: ^2.4.0
-  geolocator: ^9.0.2
+  geolocator: ^13.0.0
   barcode_scan2: ^4.2.3
   connectivity_plus: ^6.1.4
   local_auth: ^2.1.8
@@ -32,8 +33,9 @@ dependencies:
   battery_plus: ^6.0.0
   device_info_plus: ^10.0.0
   permission_handler: ^11.0.0
+  synchronized: ^3.1.0
   #workmanager: ^0.5.2
-  flutter_background_service: ^5.0.5
+
 
   # Para peticiones HTTP
   http: ^1.2.0
@@ -44,6 +46,9 @@ dependencies:
   # Iconos de Cupertino
   cupertino_icons: ^1.0.8
   workmanager: ^0.9.0+3
+  flutter_background_service: ^5.0.5
+  flutter_background_service_android: ^6.1.1
+  flutter_local_notifications: ^19.5.0
 
 dev_dependencies:
   flutter_test:

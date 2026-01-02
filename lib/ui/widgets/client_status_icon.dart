@@ -6,6 +6,7 @@ import 'package:ada_app/ui/theme/colors.dart';
 class ClientStatusIcons extends StatelessWidget {
   final bool tieneCensoHoy;
   final bool tieneFormularioCompleto;
+  final bool tieneOperacionComercialHoy;
   final double iconSize;
   final bool showTooltips;
 
@@ -13,6 +14,7 @@ class ClientStatusIcons extends StatelessWidget {
     super.key,
     required this.tieneCensoHoy,
     required this.tieneFormularioCompleto,
+    this.tieneOperacionComercialHoy = false,
     this.iconSize = 16,
     this.showTooltips = true,
   });
@@ -20,7 +22,9 @@ class ClientStatusIcons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Si no hay ningún indicador, no mostrar nada
-    if (!tieneCensoHoy && !tieneFormularioCompleto) {
+    if (!tieneCensoHoy &&
+        !tieneFormularioCompleto &&
+        !tieneOperacionComercialHoy) {
       return const SizedBox.shrink();
     }
 
@@ -31,9 +35,9 @@ class ClientStatusIcons extends StatelessWidget {
         if (tieneCensoHoy) ...[
           _buildStatusIcon(
             context: context,
-            icon: Icons.fact_check,
+            icon: Icons.kitchen,
             color: AppColors.success,
-            tooltip: 'Cliente ya recibió censo hoy',
+            tooltip: 'Censo de Visicooler realizado hoy',
           ),
           if (tieneFormularioCompleto) const SizedBox(width: 6),
         ],
@@ -45,6 +49,18 @@ class ClientStatusIcons extends StatelessWidget {
             icon: Icons.assignment_turned_in,
             color: AppColors.primary,
             tooltip: 'Cliente tiene formulario completado',
+          ),
+        ],
+
+        // Icono de Operación Comercial del día
+        if (tieneOperacionComercialHoy) ...[
+          if (tieneCensoHoy || tieneFormularioCompleto)
+            const SizedBox(width: 6),
+          _buildStatusIcon(
+            context: context,
+            icon: Icons.shopping_cart,
+            color: Colors.orange, // U otro color distintivo
+            tooltip: 'Operación comercial realizada hoy',
           ),
         ],
       ],
@@ -60,28 +76,18 @@ class ClientStatusIcons extends StatelessWidget {
     Widget iconWidget = Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: color.withOpacity(0.3),
-          width: 0.5,
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 0.5),
       ),
-      child: Icon(
-        icon,
-        size: iconSize,
-        color: color,
-      ),
+      child: Icon(icon, size: iconSize, color: color),
     );
 
     if (!showTooltips) {
       return iconWidget;
     }
 
-    return Tooltip(
-      message: tooltip,
-      child: iconWidget,
-    );
+    return Tooltip(message: tooltip, child: iconWidget);
   }
 }
 
@@ -92,6 +98,7 @@ class ClientListTile extends StatelessWidget {
   final String? clienteDireccion;
   final bool tieneCensoHoy;
   final bool tieneFormularioCompleto;
+  final bool tieneOperacionComercialHoy;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
 
@@ -102,6 +109,7 @@ class ClientListTile extends StatelessWidget {
     this.clienteDireccion,
     required this.tieneCensoHoy,
     required this.tieneFormularioCompleto,
+    this.tieneOperacionComercialHoy = false,
     this.onTap,
     this.onLongPress,
   });
@@ -128,9 +136,11 @@ class ClientListTile extends StatelessWidget {
               // Avatar del cliente
               CircleAvatar(
                 radius: 24,
-                backgroundColor: AppColors.primary.withOpacity(0.1),
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                 child: Text(
-                  clienteNombre.isNotEmpty ? clienteNombre[0].toUpperCase() : '?',
+                  clienteNombre.isNotEmpty
+                      ? clienteNombre[0].toUpperCase()
+                      : '?',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -159,7 +169,11 @@ class ClientListTile extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.badge, size: 14, color: AppColors.textTertiary),
+                          Icon(
+                            Icons.badge,
+                            size: 14,
+                            color: AppColors.textTertiary,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'CI: $clienteCI',
@@ -171,11 +185,16 @@ class ClientListTile extends StatelessWidget {
                         ],
                       ),
                     ],
-                    if (clienteDireccion != null && clienteDireccion!.isNotEmpty) ...[
+                    if (clienteDireccion != null &&
+                        clienteDireccion!.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          Icon(Icons.location_on, size: 14, color: AppColors.textTertiary),
+                          Icon(
+                            Icons.location_on,
+                            size: 14,
+                            color: AppColors.textTertiary,
+                          ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
@@ -201,6 +220,7 @@ class ClientListTile extends StatelessWidget {
               ClientStatusIcons(
                 tieneCensoHoy: tieneCensoHoy,
                 tieneFormularioCompleto: tieneFormularioCompleto,
+                tieneOperacionComercialHoy: tieneOperacionComercialHoy,
                 iconSize: 14,
               ),
 

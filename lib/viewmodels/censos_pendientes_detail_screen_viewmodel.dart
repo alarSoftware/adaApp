@@ -1,18 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:ada_app/services/database_helper.dart';
-import 'package:ada_app/services/post/censo_activo_post_service.dart';
+import 'package:ada_app/services/data/database_helper.dart';
+
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:logger/logger.dart';
 
 /// Estados de carga para el ViewModel
-enum CensosLoadingState {
-  initial,
-  loading,
-  loaded,
-  error,
-  retrying,
-}
+enum CensosLoadingState { initial, loading, loaded, error, retrying }
 
 /// Modelo para representar un censo fallido
 class CensoFallido {
@@ -53,7 +47,7 @@ class CensoFallido {
     this.ultimoIntento,
     this.errorMensaje,
     this.fotosCount = 0,
-    this.estadoCenso
+    this.estadoCenso,
   });
 
   factory CensoFallido.fromMap(Map<String, dynamic> map) {
@@ -101,7 +95,9 @@ class CensoFallido {
 
     if (ultimoIntento != null) {
       final minutosEspera = _calcularEsperaMinutos(intentosSync);
-      final proximoIntento = ultimoIntento!.add(Duration(minutes: minutosEspera));
+      final proximoIntento = ultimoIntento!.add(
+        Duration(minutes: minutosEspera),
+      );
       return DateTime.now().isAfter(proximoIntento);
     }
 
@@ -110,11 +106,16 @@ class CensoFallido {
 
   int _calcularEsperaMinutos(int intentos) {
     switch (intentos) {
-      case 0: return 0;
-      case 1: return 1;
-      case 2: return 5;
-      case 3: return 10;
-      default: return 30;
+      case 0:
+        return 0;
+      case 1:
+        return 1;
+      case 2:
+        return 5;
+      case 3:
+        return 10;
+      default:
+        return 30;
     }
   }
 }
@@ -184,7 +185,6 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
       _logger.i('✅ Censos pendientes cargados: ${_censos.length}');
 
       _setState(CensosLoadingState.loaded);
-
     } catch (e) {
       _logger.e('❌ Error cargando censos pendientes: $e');
       _errorMessage = 'Error al cargar censos: ${e.toString()}';
@@ -211,8 +211,6 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
         );
       }
 
-
-
       // 2. Obtener usuario_id
       final usuarioId = censoData['usuario_id'] as int?;
       if (usuarioId == null) {
@@ -223,7 +221,7 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
         );
       }
 
-      // 3. Obtener edf_vendedor_id
+      // 3. Obtener employee_id
       final usuariosList = await db.query(
         'Users',
         where: 'id = ?',
@@ -239,12 +237,11 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
         );
       }
 
-      final edfVendedorId = usuariosList.first['edf_vendedor_id'] as String?;
-      if (edfVendedorId == null || edfVendedorId.isEmpty) {
-        _logger.e('❌ edf_vendedor_id vacío');
+      final employeeId = usuariosList.first['employee_id'] as String?;
+      if (employeeId == null || employeeId.isEmpty) {
         return SyncResult(
           success: false,
-          error: 'edf_vendedor_id no disponible',
+          error: 'employee_id no disponible',
         );
       }
 
@@ -331,46 +328,39 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
           success: true,
           message: 'Censo migrado correctamente',
         );
-
       } else {
         final errorMessage = response['mensaje'] ?? 'Error desconocido';
 
-        await db.rawUpdate('''
+        await db.rawUpdate(
+          '''
           UPDATE censo_activo 
           SET intentos_sync = intentos_sync + 1,
               ultimo_intento = ?,
               error_mensaje = ?,
               estado_censo = 'error'
           WHERE id = ?
-        ''', [
-          DateTime.now().toIso8601String(),
-          errorMessage,
-          censoId,
-        ]);
-
-        return SyncResult(
-          success: false,
-          error: errorMessage,
+        ''',
+          [DateTime.now().toIso8601String(), errorMessage, censoId],
         );
-      }
 
+        return SyncResult(success: false, error: errorMessage);
+      }
     } catch (e) {
       _logger.e('💥 Excepción al reintentar censo: $e');
 
       try {
         final db = await _dbHelper.database;
-        await db.rawUpdate('''
+        await db.rawUpdate(
+          '''
           UPDATE censo_activo 
           SET intentos_sync = intentos_sync + 1,
               ultimo_intento = ?,
               error_mensaje = ?,
               estado_censo = 'error'
           WHERE id = ?
-        ''', [
-          DateTime.now().toIso8601String(),
-          'Error interno: $e',
-          censoId,
-        ]);
+        ''',
+          [DateTime.now().toIso8601String(), 'Error interno: $e', censoId],
+        );
       } catch (dbError) {
         _logger.e('Error registrando fallo: $dbError');
       }
@@ -379,7 +369,6 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
         success: false,
         error: 'Error interno: ${e.toString()}',
       );
-
     } finally {
       _retryingCensoId = null;
       if (_state == CensosLoadingState.retrying) {
@@ -391,10 +380,7 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
   /// Reintenta sincronizar todos los censos pendientes
   Future<SyncResult> reintentarTodosCensos() async {
     if (_censos.isEmpty) {
-      return SyncResult(
-        success: true,
-        message: 'No hay censos pendientes',
-      );
+      return SyncResult(success: true, message: 'No hay censos pendientes');
     }
 
     _setState(CensosLoadingState.retrying);
@@ -435,7 +421,8 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
       } else if (exitosos > 0) {
         return SyncResult(
           success: true,
-          message: 'Sincronización parcial: $exitosos exitosos, $fallidos fallidos',
+          message:
+              'Sincronización parcial: $exitosos exitosos, $fallidos fallidos',
           exitosos: exitosos,
           fallidos: fallidos,
         );
@@ -447,7 +434,6 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
           fallidos: fallidos,
         );
       }
-
     } catch (e) {
       return SyncResult(
         success: false,
@@ -458,14 +444,14 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
     }
   }
 
-
-
   void _setState(CensosLoadingState newState) {
     _state = newState;
     notifyListeners();
   }
 
-  Future<List<Map<String, dynamic>>> _getCensosPendientesFromDB(Database db) async {
+  Future<List<Map<String, dynamic>>> _getCensosPendientesFromDB(
+    Database db,
+  ) async {
     const sql = '''
     SELECT 
       ca.*,
@@ -484,7 +470,10 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
     return await db.rawQuery(sql);
   }
 
-  Future<Map<String, dynamic>?> _obtenerCensoCompleto(Database db, String censoId) async {
+  Future<Map<String, dynamic>?> _obtenerCensoCompleto(
+    Database db,
+    String censoId,
+  ) async {
     final result = await db.query(
       'censo_activo',
       where: 'id = ?',

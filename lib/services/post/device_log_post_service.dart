@@ -2,63 +2,80 @@
 
 import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/post/base_post_service.dart';
-import 'package:ada_app/services/api_config_service.dart';
+import 'package:ada_app/services/api/api_config_service.dart';
 import 'package:logger/logger.dart';
 
 class DeviceLogPostService {
   static final Logger _logger = Logger();
-  static const String _endpoint = '/appDeviceLog/insertAppDeviceLog';  // 🔥 ENDPOINT CORRECTO
+  static const String _endpoint = '/appDeviceLog/insertAppDeviceLog';
   static const String _tableName = 'device_log';
 
   /// Enviar un device log individual
   static Future<Map<String, dynamic>> enviarDeviceLog(
-      DeviceLog log, {
-        String? userId,
-      }) async {
+    DeviceLog log, {
+    String? userId,
+  }) async {
     try {
-      // 🔍 MOSTRAR URL COMPLETA para debugging
       final fullUrl = await ApiConfigService.getFullUrl(_endpoint);
-      _logger.i('📤 Enviando device log a: $fullUrl');
-      _logger.i('📦 Log ID: ${log.id}');
+      _logger.i('Enviando device log a: $fullUrl');
+      _logger.i('Log ID: ${log.id}');
+
+      // ✅ Crear body desde el log
+      final Map<String, dynamic> bodyConUserId = Map.from(log.toMap());
+
+      // ✅ Establecer userId (puede ser null)
+      bodyConUserId['userId'] = userId;
+
+      // ✅ Mapear employeeId al typo esperado por el servidor "emplyedId"
+      if (log.employeeId != null) {
+        bodyConUserId['emplyedId'] = log.employeeId;
+      }
+
+      // 🔥 CRÍTICO: Eliminar la clave original 'employeeId' para evitar duplicidad o errores,
+      // ya que enviamos 'emplyedId'
+      bodyConUserId.remove('employeeId');
+
+      // 🔍 DEBUG
+      _logger.i('📤 Datos a enviar:');
+      _logger.i('   userId: $userId');
+      _logger.i('   emplyedId (mapped): ${bodyConUserId['emplyedId']}');
+      _logger.i(
+        '   employeeId removido: ${!bodyConUserId.containsKey('employeeId')}',
+      );
 
       final resultado = await BasePostService.post(
         endpoint: _endpoint,
-        body: log.toMap(),
-        tableName: _tableName,                           // ✅ Activa el logging de errores
-        registroId: log.id,                              // ✅ Para tracking
-        userId: userId ?? log.edfVendedorId,             // ✅ Para logging
+        body: bodyConUserId,
+        tableName: _tableName,
+        registroId: log.id,
       );
 
       if (resultado['exito'] == true) {
         _logger.i('✅ Device log enviado: ${log.id}');
       } else {
-        _logger.w('⚠️ Error enviando device log: ${resultado['mensaje']}');
+        _logger.w('❌ Error enviando device log: ${resultado['mensaje']}');
       }
 
       return resultado;
     } catch (e) {
-      _logger.e('❌ Error en enviarDeviceLog: $e');
-      return {
-        'exito': false,
-        'success': false,
-        'mensaje': 'Error: $e',
-      };
+      _logger.e('💥 Error en enviarDeviceLog: $e');
+      return {'exito': false, 'success': false, 'mensaje': 'Error: $e'};
     }
   }
 
   /// Enviar múltiples device logs en batch
   static Future<Map<String, int>> enviarDeviceLogsBatch(
-      List<DeviceLog> logs, {
-        String? userId,
-      }) async {
+    List<DeviceLog> logs, {
+    String? userId,
+  }) async {
     int exitosos = 0;
     int fallidos = 0;
 
-    _logger.i('📤 Enviando batch de ${logs.length} device logs...');
+    _logger.i('Enviando batch de ${logs.length} device logs...');
 
-    // 🔍 Mostrar URL para el batch
     final fullUrl = await ApiConfigService.getFullUrl(_endpoint);
-    _logger.i('🌐 URL destino: $fullUrl');
+    _logger.i('URL destino: $fullUrl');
+    _logger.i('userId para batch: $userId');
 
     for (final log in logs) {
       try {
@@ -70,23 +87,19 @@ class DeviceLogPostService {
           fallidos++;
         }
 
-        // 📊 Log progreso cada 10 logs
+        // Log progreso cada 10 logs
         if ((exitosos + fallidos) % 10 == 0) {
-          _logger.i('📊 Progreso: ${exitosos + fallidos}/${logs.length}');
+          _logger.i('Progreso: ${exitosos + fallidos}/${logs.length}');
         }
       } catch (e) {
-        _logger.e('❌ Error enviando log ${log.id}: $e');
+        _logger.e('Error enviando log ${log.id}: $e');
         fallidos++;
       }
     }
 
-    _logger.i('✅ Batch completado - Exitosos: $exitosos, Fallidos: $fallidos');
+    _logger.i('Batch completado - Exitosos: $exitosos, Fallidos: $fallidos');
 
-    return {
-      'exitosos': exitosos,
-      'fallidos': fallidos,
-      'total': logs.length,
-    };
+    return {'exitosos': exitosos, 'fallidos': fallidos, 'total': logs.length};
   }
 
   /// Verificar configuración actual del servicio
@@ -105,27 +118,22 @@ class DeviceLogPostService {
   /// Método para debugging - mostrar configuración
   static Future<void> mostrarConfiguracion() async {
     final config = await verificarConfiguracion();
-    _logger.i("═══════════════════════════════════════");
-    _logger.i("🔧 CONFIGURACIÓN DEVICE LOG SERVICE");
-    _logger.i("═══════════════════════════════════════");
-    _logger.i("🌐 Base URL: ${config['base_url']}");
-    _logger.i("📍 Endpoint: ${config['endpoint']}");
-    _logger.i("🔗 URL Completa: ${config['full_url']}");
-    _logger.i("🗃️ Tabla: ${config['tabla']}");
-    _logger.i("═══════════════════════════════════════");
+    _logger.i(
+      "Device Log Service Config: Base=${config['base_url']}, Endpoint=${config['endpoint']}",
+    );
   }
 
   /// Método de conveniencia para testing
   static Future<void> testearConexion() async {
     try {
-      _logger.i("🧪 Probando conexión del servicio...");
+      _logger.i("Probando conexión del servicio...");
       await mostrarConfiguracion();
 
       final config = await verificarConfiguracion();
-      _logger.i("✅ Configuración obtenida correctamente");
-      _logger.i("🎯 Listo para enviar device logs a: ${config['full_url']}");
+      _logger.i("Configuración obtenida correctamente");
+      _logger.i("Listo para enviar device logs a: ${config['full_url']}");
     } catch (e) {
-      _logger.e("❌ Error probando conexión: $e");
+      _logger.e("Error probando conexión: $e");
     }
   }
 }

@@ -1,26 +1,27 @@
-// lib/ui/screens/operaciones_comerciales/widgets/productos_seleccionados_widget.dart
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
+import 'package:ada_app/models/producto.dart';
+import 'package:ada_app/repositories/producto_repository.dart';
 
-/// Widget para mostrar y manejar productos seleccionados
-/// Incluye funcionalidad específica para productos discontinuos con reemplazos
 class ProductosSeleccionadosWidget extends StatelessWidget {
   final List<OperacionComercialDetalle> productosSeleccionados;
   final TipoOperacion tipoOperacion;
   final Function(int) onEliminarProducto;
   final Function(int, double) onActualizarCantidad;
   final Function(int, dynamic)? onSeleccionarReemplazo;
+  final ProductoRepository _productoRepository;
 
-  const ProductosSeleccionadosWidget({
-    Key? key,
+  ProductosSeleccionadosWidget({
+    super.key,
     required this.productosSeleccionados,
     required this.tipoOperacion,
     required this.onEliminarProducto,
     required this.onActualizarCantidad,
     this.onSeleccionarReemplazo,
-  }) : super(key: key);
+    ProductoRepository? productoRepository,
+  }) : _productoRepository = productoRepository ?? ProductoRepositoryImpl();
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +38,6 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
         ),
         const SizedBox(height: 12),
 
-        // Lista de productos seleccionados
         if (productosSeleccionados.isEmpty)
           _buildEmptyState()
         else
@@ -69,10 +69,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             'Busca productos arriba para agregarlos',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppColors.textTertiary,
-            ),
+            style: TextStyle(fontSize: 13, color: AppColors.textTertiary),
             textAlign: TextAlign.center,
           ),
         ],
@@ -90,11 +87,10 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Header de la tabla
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(8),
                 topRight: Radius.circular(8),
@@ -130,14 +126,13 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
             ),
           ),
 
-          // Filas de productos
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: productosSeleccionados.length,
             separatorBuilder: (context, index) => Divider(
               height: 1,
-              color: AppColors.border.withOpacity(0.5),
+              color: AppColors.border.withValues(alpha: 0.5),
             ),
             itemBuilder: (context, index) {
               return _buildProductRow(context, index);
@@ -152,41 +147,46 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     final detalle = productosSeleccionados[index];
     final esDiscontinuos = tipoOperacion == TipoOperacion.notaRetiroDiscontinuos;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      child: Column(
-        children: [
-          Row(
+    return FutureBuilder<Producto?>(
+      future: _productoRepository.obtenerProductoPorId(detalle.productoId!),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Padding(
+            padding: const EdgeInsets.all(12),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final producto = snapshot.data!;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Column(
             children: [
-              // Información del producto
-              Expanded(
-                flex: 5,
-                child: _buildProductInfo(detalle, esDiscontinuos),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: _buildProductInfo(producto, esDiscontinuos),
+                  ),
+                  const SizedBox(width: 8),
+                  if (!esDiscontinuos) _buildQuantityField(index, detalle),
+                  if (!esDiscontinuos) const SizedBox(width: 8),
+                  _buildDeleteButton(index),
+                ],
               ),
-
-              const SizedBox(width: 8),
-
-              // Campo de cantidad (solo para no discontinuos)
-              if (!esDiscontinuos) _buildQuantityField(index, detalle),
-
-              if (!esDiscontinuos) const SizedBox(width: 8),
-
-              // Botón eliminar
-              _buildDeleteButton(index),
+              if (esDiscontinuos) ...[
+                const SizedBox(height: 12),
+                _buildExchangeSection(context, index, detalle),
+              ],
             ],
           ),
-
-          // Sección de intercambio para discontinuos
-          if (esDiscontinuos) ...[
-            const SizedBox(height: 12),
-            _buildExchangeSection(context, index, detalle),
-          ],
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildProductInfo(OperacionComercialDetalle detalle, bool esDiscontinuos) {
+  Widget _buildProductInfo(Producto producto, bool esDiscontinuos) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -196,9 +196,11 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.error.withOpacity(0.1),
+                  color: AppColors.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                  border: Border.all(
+                    color: AppColors.error.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Text(
                   'RETIRAR',
@@ -212,7 +214,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
             if (esDiscontinuos) const SizedBox(width: 6),
             Expanded(
               child: Text(
-                detalle.productoDescripcion,
+                producto.nombre ?? 'Sin nombre',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
@@ -226,16 +228,13 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          detalle.productoCodigo,
-          style: TextStyle(
-            fontSize: 11,
-            color: AppColors.textSecondary,
-          ),
+          producto.codigo ?? 'S/C',
+          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
         ),
-        if (detalle.productoCategoria != null) ...[
+        if (producto.categoria != null) ...[
           const SizedBox(height: 2),
           Text(
-            'Categoría: ${detalle.productoCategoria}',
+            'Categoría: ${producto.categoria}',
             style: TextStyle(
               fontSize: 10,
               color: AppColors.textTertiary,
@@ -303,18 +302,17 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildExchangeSection(BuildContext context, int index, OperacionComercialDetalle detalle) {
+  Widget _buildExchangeSection(
+      BuildContext context,
+      int index,
+      OperacionComercialDetalle detalle,
+      ) {
     return Column(
       children: [
-        // Icono de intercambio
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.swap_vert,
-              color: AppColors.warning,
-              size: 24,
-            ),
+            Icon(Icons.swap_vert, color: AppColors.warning, size: 24),
             const SizedBox(width: 8),
             Text(
               'INTERCAMBIO',
@@ -329,8 +327,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
         ),
         const SizedBox(height: 12),
 
-        // Producto de reemplazo
-        if (detalle.productoReemplazoCodigo == null)
+        if (detalle.productoReemplazoId == null)
           _buildSelectReplacementButton(index, detalle)
         else
           _buildReplacementInfo(index, detalle),
@@ -338,16 +335,19 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildSelectReplacementButton(int index, OperacionComercialDetalle detalle) {
+  Widget _buildSelectReplacementButton(
+      int index,
+      OperacionComercialDetalle detalle,
+      ) {
     return InkWell(
       onTap: () => onSeleccionarReemplazo?.call(index, detalle),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.success.withOpacity(0.1),
+          color: AppColors.success.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: AppColors.success.withOpacity(0.3),
+            color: AppColors.success.withValues(alpha: 0.3),
             style: BorderStyle.solid,
             width: 1.5,
           ),
@@ -387,64 +387,75 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
   }
 
   Widget _buildReplacementInfo(int index, OperacionComercialDetalle detalle) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.successContainer,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.borderSuccess),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppColors.success,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              'NUEVO',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+    return FutureBuilder<Producto?>(
+      future: _productoRepository.obtenerProductoPorId(detalle.productoReemplazoId!),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Center(child: CircularProgressIndicator());
+        }
+
+        final productoReemplazo = snapshot.data!;
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.successContainer,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.borderSuccess),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.success,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'NUEVO',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  detalle.productoReemplazoDescripcion ?? '',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      productoReemplazo.nombre ?? 'Sin nombre',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      productoReemplazo.codigo ?? 'S/C',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  detalle.productoReemplazoCodigo ?? '',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
+              ),
+              IconButton(
+                icon: Icon(Icons.edit, color: AppColors.primary, size: 18),
+                onPressed: () => onSeleccionarReemplazo?.call(index, detalle),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
           ),
-          IconButton(
-            icon: Icon(Icons.edit, color: AppColors.primary, size: 18),
-            onPressed: () => onSeleccionarReemplazo?.call(index, detalle),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

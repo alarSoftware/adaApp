@@ -2,17 +2,19 @@ import 'package:flutter/foundation.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/models/producto.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
-import 'package:ada_app/models/operaciones_comerciales/enums/estado_operacion.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
-import 'package:ada_app/services/post/operaciones_comerciales_post_service.dart';
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 import 'package:ada_app/repositories/producto_repository.dart';
+import 'package:ada_app/services/api/auth_service.dart';
+import 'package:ada_app/services/device/location_service.dart';
+import 'package:geolocator/geolocator.dart';
 
-/// Estados del formulario
-enum FormState { idle, loading, saving, error }
+import '../../utils/unidad_medida_helper.dart';
+import '../../services/sync/operacion_comercial_sync_service.dart';
 
-/// Resultado de validación
+enum FormState { idle, loading, saving, error, retrying }
+
 class ValidationResult {
   final bool isValid;
   final String? errorMessage;
@@ -21,128 +23,107 @@ class ValidationResult {
   ValidationResult.error(this.errorMessage) : isValid = false;
 }
 
-/// ViewModel para el formulario de operación comercial
 class OperacionComercialFormViewModel extends ChangeNotifier {
-  // Dependencias - Repositories
   final OperacionComercialRepository _operacionRepository;
   final ProductoRepository _productoRepository;
   final bool isViewOnly;
 
-  // Datos básicos
   final Cliente cliente;
   final TipoOperacion tipoOperacion;
-  final OperacionComercial? operacionExistente;
 
-  // Estado del formulario
+  OperacionComercial? _operacionActual;
+
   FormState _formState = FormState.idle;
   String? _errorMessage;
 
-  // Datos del formulario
   DateTime? _fechaRetiro;
+  String? _snc;
   List<OperacionComercialDetalle> _productosSeleccionados = [];
-  String _observaciones = '';
 
-  // Búsqueda de productos
   String _searchQuery = '';
   List<Producto> _productosFiltrados = [];
-  List<Producto> _productosDisponibles = []; // Cache de productos si es necesario
+  List<Producto> _productosDisponibles = [];
 
   OperacionComercialFormViewModel({
     required this.cliente,
     required this.tipoOperacion,
-    this.operacionExistente,
+    OperacionComercial? operacionExistente,
     this.isViewOnly = false,
     OperacionComercialRepository? operacionRepository,
     ProductoRepository? productoRepository,
-  })  : _operacionRepository = operacionRepository ?? OperacionComercialRepositoryImpl(),
-        _productoRepository = productoRepository ?? ProductoRepositoryImpl() {
+  }) : _operacionRepository =
+           operacionRepository ?? OperacionComercialRepositoryImpl(),
+       _productoRepository = productoRepository ?? ProductoRepositoryImpl() {
+    _operacionActual = operacionExistente;
     _initializeForm();
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // GETTERS
-  // ═══════════════════════════════════════════════════════════════════
+  OperacionComercial? get operacionExistente => _operacionActual;
 
   FormState get formState => _formState;
   String? get errorMessage => _errorMessage;
   DateTime? get fechaRetiro => _fechaRetiro;
+  String? get snc => _snc;
   List<OperacionComercialDetalle> get productosSeleccionados =>
       List.unmodifiable(_productosSeleccionados);
-  String get observaciones => _observaciones;
   String get searchQuery => _searchQuery;
-  List<Producto> get productosFiltrados => List.unmodifiable(_productosFiltrados);
+  List<Producto> get productosFiltrados =>
+      List.unmodifiable(_productosFiltrados);
 
   bool get isLoading => _formState == FormState.loading;
   bool get isSaving => _formState == FormState.saving;
+  bool get isRetrying => _formState == FormState.retrying;
   bool get hasError => _formState == FormState.error;
   bool get isFormDirty => _hasChanges();
 
   int get totalProductos => _productosSeleccionados.length;
   bool get necesitaFechaRetiro => tipoOperacion.necesitaFechaRetiro;
 
-  // ═══════════════════════════════════════════════════════════════════
-  // INICIALIZACIÓN
-  // ═══════════════════════════════════════════════════════════════════
-
   void _initializeForm() {
     if (operacionExistente != null) {
       _cargarOperacionExistente();
     }
-    // Precargar productos si es necesario, o dejarlo bajo demanda en búsqueda
     _cargarProductosIniciales();
   }
 
   void _cargarOperacionExistente() {
     final operacion = operacionExistente!;
-    _observaciones = operacion.observaciones ?? '';
     _fechaRetiro = operacion.fechaRetiro;
-    // Crear una copia de la lista para no mutar el objeto original directamente
+    _snc = operacion.snc;
     _productosSeleccionados = List.from(operacion.detalles);
     notifyListeners();
   }
 
   Future<void> _cargarProductosIniciales() async {
-    // Opcional: Cargar productos disponibles al inicio si no son demasiados
-    try {
-      // _productosDisponibles = await _productoRepository.obtenerProductosDisponibles();
-    } catch (e) {
-      print('Error carga inicial productos: $e');
+    try {} catch (e) {
+      _errorMessage = 'Error cargando productos iniciales: $e';
+      notifyListeners();
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // MANEJO DE FECHA
-  // ═══════════════════════════════════════════════════════════════════
-
   void setFechaRetiro(DateTime? fecha) {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
+    if (isViewOnly) return;
     _fechaRetiro = fecha;
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // MANEJO DE OBSERVACIONES
-  // ═══════════════════════════════════════════════════════════════════
+  //TODO mostrar odooName y adaSequence
 
-  void setObservaciones(String observaciones) {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
-    _observaciones = observaciones;
+  void setSnc(String value) {
+    if (isViewOnly) return;
+    _snc = value.trim().isEmpty ? null : value.trim();
     notifyListeners();
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // BÚSQUEDA DE PRODUCTOS
-  // ═══════════════════════════════════════════════════════════════════
-
   void setSearchQuery(String query) {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
+    if (isViewOnly) return;
     _searchQuery = query;
     _filtrarProductos();
     notifyListeners();
   }
 
   void clearSearch() {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
+    if (isViewOnly) return;
     _searchQuery = '';
     _productosFiltrados = [];
     notifyListeners();
@@ -155,64 +136,95 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     }
 
     try {
-      _productosFiltrados = await _productoRepository.buscarProductos(_searchQuery);
+      final todosLosProductos = await _productoRepository.buscarProductos(
+        _searchQuery,
+      );
+      _productosFiltrados = todosLosProductos.where((producto) {
+        final errorUnidad = tipoOperacion.validarUnidadMedida(
+          producto.unidadMedida,
+        );
+        return errorUnidad == null;
+      }).toList();
+      notifyListeners(); // linea cambiada porque no funcionaba el buscador
     } catch (e) {
-      print('Error filtrando productos: $e');
+      _errorMessage = 'Error buscando productos: $e';
       _productosFiltrados = [];
+      notifyListeners();
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // MANEJO DE PRODUCTOS (AGREGAR / QUITAR / CANTIDAD)
-  // ═══════════════════════════════════════════════════════════════════
-
-  bool isProductoSeleccionado(String? codigoProducto) {
-    if (codigoProducto == null) return false;
-    return _productosSeleccionados.any((detalle) => detalle.productoCodigo == codigoProducto);
+  bool isProductoSeleccionado(int? productoId) {
+    if (productoId == null) return false;
+    return _productosSeleccionados.any(
+      (detalle) => detalle.productoId == productoId,
+    );
   }
 
-  void agregarProducto(Producto producto) {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
+  bool agregarProducto(Producto producto) {
+    if (isViewOnly) return false;
 
-    // Validación básica para no duplicar por código
-    if (producto.codigo == null || isProductoSeleccionado(producto.codigo)) {
-      return;
+    if (producto.id == null) {
+      _setError('El producto no tiene un ID válido');
+      return false;
     }
 
-    final cantidadInicial = 0.0;
+    if (isProductoSeleccionado(producto.id)) {
+      _setError('El producto ya está seleccionado');
+      return false;
+    }
+
+    final errorUnidad = tipoOperacion.validarUnidadMedida(
+      producto.unidadMedida,
+    );
+    if (errorUnidad != null) {
+      String mensajeEspecifico;
+
+      if (tipoOperacion.esNotaRetiro) {
+        mensajeEspecifico =
+            'Este producto viene en "${UnidadMedidaHelper.obtenerNombreDisplay(producto.unidadMedida)}".\n\nPara notas de retiro solo puedes usar productos en "Unidades".';
+      } else if (tipoOperacion.esNotaReposicion) {
+        mensajeEspecifico =
+            'Este producto viene en "${UnidadMedidaHelper.obtenerNombreDisplay(producto.unidadMedida)}".\n\nPara notas de reposición solo puedes usar productos en packs/cajas (X 6, X 12, X 24, etc.).';
+      } else {
+        mensajeEspecifico = errorUnidad;
+      }
+
+      _setError(mensajeEspecifico);
+      return false;
+    }
 
     final detalle = OperacionComercialDetalle(
-      operacionComercialId: '', // Se asignará al guardar o por backend
-      productoCodigo: producto.codigo!,
-      productoDescripcion: producto.nombre ?? 'Sin nombre',
-      productoCategoria: producto.categoria,
-      productoId: producto.id,
-      cantidad: cantidadInicial,
-      unidadMedida: 'UN', // O obtener del producto si existe
+      operacionComercialId: '',
+      productoId: producto.id!,
+      cantidad: 0.0,
       orden: _productosSeleccionados.length + 1,
       fechaCreacion: DateTime.now(),
-      estaSincronizado: false,
     );
 
     _productosSeleccionados.add(detalle);
+
+    clearSearch();
     notifyListeners();
+
+    return true;
   }
 
   void eliminarProducto(int index) {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
+    if (isViewOnly) return;
 
     if (index >= 0 && index < _productosSeleccionados.length) {
       _productosSeleccionados.removeAt(index);
-      // Reordenar secuencialmente
       for (int i = 0; i < _productosSeleccionados.length; i++) {
-        _productosSeleccionados[i] = _productosSeleccionados[i].copyWith(orden: i + 1);
+        _productosSeleccionados[i] = _productosSeleccionados[i].copyWith(
+          orden: i + 1,
+        );
       }
       notifyListeners();
     }
   }
 
   void actualizarCantidadProducto(int index, double cantidad) {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
+    if (isViewOnly) return;
 
     if (index >= 0 && index < _productosSeleccionados.length) {
       if (cantidad < 0) cantidad = 0;
@@ -224,151 +236,97 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // MANEJO DE PRODUCTOS DE REEMPLAZO (CORREGIDO ✅)
-  // ═══════════════════════════════════════════════════════════════════
-
-  // 👈 NUEVO: Método que espera el FormScreen (obtenerProductosReemplazo)
-  Future<List<Producto>> obtenerProductosReemplazo(Producto productoOriginal) async {
-    // Verificamos que tenga categoría
+  Future<List<Producto>> obtenerProductosReemplazo(
+    Producto productoOriginal,
+  ) async {
     if (productoOriginal.categoria == null) {
-      print('Producto sin categoría: ${productoOriginal.nombre}');
       return [];
     }
 
     try {
-      return await _productoRepository.obtenerProductosPorCategoria(
-        productoOriginal.categoria!, // 👈 Usamos ! porque ya verificamos que no es null
+      final productos = await _productoRepository.obtenerProductosPorCategoria(
+        productoOriginal.categoria!,
         excluirId: productoOriginal.id,
       );
+
+      // Filtrar por unidad de medida según el tipo de operación
+      return productos.where((p) {
+        final error = tipoOperacion.validarUnidadMedida(p.unidadMedida);
+        return error == null;
+      }).toList();
     } catch (e) {
-      print('Error obteniendo productos de reemplazo: $e');
       return [];
     }
   }
 
-  // Método original renombrado para claridad
   Future<List<Producto>> getProductosReemplazo(
-      String? categoriaOriginal,
-      String? codigoOriginal,
-      int? idProductoActual,
-      ) async {
+    String? categoriaOriginal,
+    int? idProductoActual,
+  ) async {
     if (categoriaOriginal == null) return [];
 
     try {
       return await _productoRepository.obtenerProductosPorCategoria(
-        categoriaOriginal!, // 👈 Usamos ! porque ya verificamos que no es null arriba
+        categoriaOriginal,
         excluirId: idProductoActual,
       );
     } catch (e) {
-      print('Error obteniendo productos de reemplazo: $e');
       return [];
     }
   }
 
-  // 👈 NUEVO: Método que espera el FormScreen (seleccionarProductoReemplazo)
   void seleccionarProductoReemplazo(int index, Producto productoReemplazo) {
-    if (isViewOnly) return; // Bloqueo en modo lectura
+    if (isViewOnly) return;
     setProductoReemplazo(index, productoReemplazo);
   }
 
   void setProductoReemplazo(int index, Producto productoReemplazo) {
-    if (isViewOnly) return; // 👈 NUEVO: Bloqueo en modo lectura
+    if (isViewOnly) return;
 
     if (index >= 0 && index < _productosSeleccionados.length) {
-      // ✅ SOLUCIÓN APLICADA: Guardamos el ID y la categoría explícitamente
-      // Si el código viene vacío, ponemos un placeholder o lo dejamos vacío,
-      // pero la validación dependerá del ID.
-
       _productosSeleccionados[index] = _productosSeleccionados[index].copyWith(
-        // 1. Guardamos el ID para validación de existencia
         productoReemplazoId: productoReemplazo.id,
-
-        // 2. Guardamos datos descriptivos
-        productoReemplazoCodigo: productoReemplazo.codigo ?? 'S/C',
-        productoReemplazoDescripcion: productoReemplazo.nombre ?? 'Sin nombre',
-
-        // 3. Guardamos categoría para validación de negocio
-        productoReemplazoCategoria: productoReemplazo.categoria,
       );
       notifyListeners();
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // VALIDACIONES (CORREGIDAS ✅)
-  // ═══════════════════════════════════════════════════════════════════
-
   ValidationResult validateForm() {
-    // En modo solo lectura no validamos
     if (isViewOnly) return ValidationResult.valid();
 
-    // 1. Fecha de retiro
     if (tipoOperacion.necesitaFechaRetiro && _fechaRetiro == null) {
-      return ValidationResult.error('⚠️ Falta seleccionar la fecha de retiro');
+      return ValidationResult.error('Falta seleccionar la fecha de retiro');
     }
 
-    // 2. Mínimo un producto
     if (_productosSeleccionados.isEmpty) {
-      return ValidationResult.error('⚠️ Debes agregar al menos un producto a la operación');
+      return ValidationResult.error(
+        'Debes agregar al menos un producto a la operación',
+      );
     }
 
-    // 3. Cantidades válidas
     final productosSinCantidad = _productosSeleccionados
         .where((detalle) => detalle.cantidad <= 0)
         .toList();
 
     if (productosSinCantidad.isNotEmpty) {
-      final nombres = productosSinCantidad
-          .take(3)
-          .map((d) => '• ${d.productoDescripcion}')
-          .join('\n');
-      return ValidationResult.error(
-          '⚠️ Productos con cantidad 0:\n$nombres' +
-              (productosSinCantidad.length > 3 ? '\n...y más.' : ''));
+      return ValidationResult.error('Hay productos con cantidad 0');
     }
 
-    // 4. Validación específica para DISCONTINUOS
     if (tipoOperacion == TipoOperacion.notaRetiroDiscontinuos) {
-
-      // A) ¿Se seleccionó un reemplazo? (Usamos ID, no código)
       final sinReemplazo = _productosSeleccionados
           .where((detalle) => detalle.productoReemplazoId == null)
           .toList();
 
       if (sinReemplazo.isNotEmpty) {
-        final nombres = sinReemplazo
-            .take(3)
-            .map((d) => '• ${d.productoDescripcion}')
-            .join('\n');
         return ValidationResult.error(
-            '⚠️ Debes seleccionar un reemplazo para:\n$nombres');
-      }
-
-      // B) ¿El reemplazo es de la misma categoría?
-      final categoriasDiferentes = _productosSeleccionados
-          .where((detalle) =>
-      detalle.productoReemplazoId != null && // Ya sabemos que existe
-          detalle.productoCategoria != detalle.productoReemplazoCategoria)
-          .toList();
-
-      if (categoriasDiferentes.isNotEmpty) {
-        final detalles = categoriasDiferentes
-            .take(2)
-            .map((d) =>
-        '• ${d.productoDescripcion} (${d.productoCategoria}) \n'
-            '   → Intenta reemplazar con (${d.productoReemplazoCategoria})')
-            .join('\n\n');
-
-        return ValidationResult.error(
-            '⚠️ Los reemplazos deben ser de la misma categoría:\n\n$detalles');
+          'Debes seleccionar un reemplazo para todos los productos',
+        );
       }
     }
 
     return ValidationResult.valid();
   }
 
-  // Helper para validación individual de campos de texto (si usas TextFormField)
   ValidationResult validateCantidad(String? value) {
     if (value == null || value.trim().isEmpty) {
       return ValidationResult.error('Requerido');
@@ -380,79 +338,68 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     return ValidationResult.valid();
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // GUARDADO
-  // ═══════════════════════════════════════════════════════════════════
-
-  Future<bool> guardarOperacion() async {
-    if (isViewOnly) return false;
+  Future<OperacionComercial?> guardarOperacion() async {
+    if (isViewOnly) return null;
 
     final validation = validateForm();
     if (!validation.isValid) {
       _setError(validation.errorMessage!);
-      return false;
+      return null;
     }
 
     _setFormState(FormState.saving);
 
     try {
-      // 1. Preparar el objeto (igual que antes)
-      var operacion = OperacionComercial( // Cambié final por var para poder actualizarla
+      // Obtener usuario actual
+      final authService = AuthService();
+      final currentUser = await authService.getCurrentUser();
+
+      // Obtener ubicación
+      final locationService = LocationService();
+      Position? position;
+      try {
+        position = await locationService.getCurrentLocation();
+      } catch (e) {
+        // Si falla la ubicación, continuamos sin ella
+        print('Error obteniendo ubicación: $e');
+      }
+
+      final operacion = OperacionComercial(
         id: operacionExistente?.id,
         clienteId: cliente.id!,
         tipoOperacion: tipoOperacion,
         fechaCreacion: operacionExistente?.fechaCreacion ?? DateTime.now(),
         fechaRetiro: _fechaRetiro,
-        estado: EstadoOperacion.borrador,
-        observaciones: _observaciones.isEmpty ? null : _observaciones,
+        snc: tipoOperacion == TipoOperacion.notaRetiro ? _snc : null,
         totalProductos: _productosSeleccionados.length,
-        usuarioId: 1, // Ajustar según auth
-        estaSincronizado: false,
-        syncStatus: 'pending',
-        intentosSync: 0,
+        usuarioId: currentUser?.id ?? 1,
+        employeeId: currentUser?.employeeId,
+        latitud: position?.latitude,
+        longitud: position?.longitude,
+        syncStatus: 'creado',
         detalles: _productosSeleccionados,
       );
 
-      // 2. Guardar en BD Local (igual que antes)
-      if (operacionExistente != null) {
-        await _operacionRepository.actualizarOperacion(operacion);
-      } else {
-        await _operacionRepository.crearOperacion(operacion);
-      }
+      // Guardar la operación en la base de datos
+      final operacionId = await _operacionRepository.crearOperacion(operacion);
 
-      // 3. INTENTAR ENVIAR AL SERVIDOR (NUEVO) <---
-      try {
-        final resultado = await OperacionesComercialesPostService.enviarOperacion(operacion);
-
-        if (resultado['exito'] == true) {
-          // Si se envió bien, actualizamos el estado local a 'sincronizado' o 'enviado'
-          operacion = operacion.copyWith(
-            estaSincronizado: true,
-            syncStatus: 'synced',
-            estado: EstadoOperacion.sincronizado, // O el estado que prefieras
-            serverId: resultado['id'], // Si el server devuelve ID
-            fechaSincronizacion: DateTime.now(),
-          );
-
-          // Actualizamos en local el nuevo estado
-          await _operacionRepository.actualizarOperacion(operacion);
-        }
-      } catch (e) {
-        print('Error al intentar enviar online: $e');
-        // No fallamos el guardado general, solo queda pendiente de sync
-      }
+      // Recargar la operación completa desde la DB con sus detalles
+      final operacionCompleta = await _operacionRepository
+          .obtenerOperacionPorId(operacionId);
 
       _setFormState(FormState.idle);
-      return true;
+
+      // Si por alguna razón falla la recarga, devolver la operación con el ID
+      if (operacionCompleta == null) {
+        return operacion.copyWith(id: operacionId);
+      }
+
+      return operacionCompleta;
     } catch (e) {
-      _setError('❌ Error al guardar: $e');
-      return false;
+      _setError('Error al guardar: $e');
+      return null;
     }
   }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // MÉTODOS PRIVADOS DE ESTADO
-  // ═══════════════════════════════════════════════════════════════════
 
   void _setFormState(FormState state) {
     _formState = state;
@@ -475,17 +422,102 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   }
 
   bool _hasChanges() {
-    // En modo solo lectura nunca hay cambios
     if (isViewOnly) return false;
 
     if (operacionExistente == null) {
       return _productosSeleccionados.isNotEmpty ||
-          _observaciones.isNotEmpty ||
-          _fechaRetiro != null;
+          _fechaRetiro != null ||
+          _snc != null;
     }
 
-    return _observaciones != (operacionExistente!.observaciones ?? '') ||
-        _fechaRetiro != operacionExistente!.fechaRetiro ||
-        _productosSeleccionados.length != operacionExistente!.detalles.length;
+    // Check for changes in main operation fields
+    if (_fechaRetiro != operacionExistente!.fechaRetiro ||
+        _snc != operacionExistente!.snc) {
+      return true;
+    }
+
+    // Check for changes in product details
+    if (_productosSeleccionados.length != operacionExistente!.detalles.length) {
+      return true;
+    }
+
+    // Compare each product detail
+    for (int i = 0; i < _productosSeleccionados.length; i++) {
+      final currentDetail = _productosSeleccionados[i];
+      final originalDetail = operacionExistente!.detalles[i];
+
+      // Assuming details are ordered or can be matched by product ID
+      // For simplicity, we'll compare by index. A more robust solution might match by product ID.
+      if (currentDetail.productoId != originalDetail.productoId ||
+          currentDetail.cantidad != originalDetail.cantidad ||
+          currentDetail.productoReemplazoId !=
+              originalDetail.productoReemplazoId) {
+        return true;
+      }
+    }
+
+    return false; // No changes found
+  }
+
+  Future<bool> sincronizarOperacionActual() async {
+    if (_operacionActual == null || cliente.id == null) return false;
+
+    _setFormState(FormState.loading);
+
+    try {
+      // 1. Si tiene adaSequence, intentar obtener odooName específicamente
+      if (_operacionActual!.adaSequence != null &&
+          _operacionActual!.adaSequence!.isNotEmpty) {
+        final odooName = await OperacionComercialSyncService.obtenerOdooName(
+          _operacionActual!.adaSequence!,
+        );
+
+        if (odooName != null && odooName.isNotEmpty) {
+          await _operacionRepository.marcarComoMigrado(
+            _operacionActual!.id!,
+            _operacionActual!.serverId,
+            odooName: odooName,
+          );
+
+          final operacionActualizada = await _operacionRepository
+              .obtenerOperacionPorId(_operacionActual!.id!);
+
+          if (operacionActualizada != null) {
+            _operacionActual = operacionActualizada;
+            _cargarOperacionExistente();
+            _setFormState(FormState.idle);
+            return true;
+          }
+        }
+      }
+
+      // 2. Fallback: Sincronización general por cliente
+      await OperacionComercialSyncService.obtenerOperacionesPorCliente(
+        cliente.id!,
+      );
+
+      final operacionActualizada = await _operacionRepository
+          .obtenerOperacionPorId(_operacionActual!.id!);
+
+      if (operacionActualizada != null) {
+        _operacionActual = operacionActualizada;
+        _cargarOperacionExistente();
+      }
+
+      _setFormState(FormState.idle);
+      return true;
+    } catch (e) {
+      _setError('Error al descargar: $e');
+      _setFormState(FormState.idle);
+      return false;
+    }
+  }
+
+  Future<Producto?> obtenerProductoPorId(int productoId) async {
+    try {
+      return await _productoRepository.obtenerProductoPorId(productoId);
+    } catch (e) {
+      return null;
+    }
   }
 }

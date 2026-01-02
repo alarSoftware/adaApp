@@ -5,7 +5,7 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:uuid/uuid.dart';
 import 'package:ada_app/models/device_log.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import 'package:logger/logger.dart';
 
 /// 🔧 Helper para obtener información del dispositivo
@@ -23,8 +23,10 @@ class DeviceInfoHelper {
       }
 
       return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 15),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 15),
+        ),
       );
     } catch (e) {
       _logger.e('❌ Error al obtener ubicación: $e');
@@ -64,23 +66,23 @@ class DeviceInfoHelper {
   }
 
   /// 👤 Obtener ID del vendedor actual
-  static Future<String?> obtenerEdfVendedorId() async {
+  static Future<String?> obtenerEmployeeId() async {
     try {
       final db = await DatabaseHelper().database;
       final result = await db.query(
         'Users',
-        columns: ['edf_vendedor_id'],
+        columns: ['employee_id'],
         limit: 1,
       );
 
       if (result.isNotEmpty) {
-        return result.first['edf_vendedor_id'] as String?;
+        return result.first['employee_id'] as String?;
       }
 
       _logger.w('⚠️ No se encontró usuario en la base de datos');
       return null;
     } catch (e) {
-      _logger.e('❌ Error al obtener edf_vendedor_id: $e');
+      _logger.e('❌ Error al obtener employee_id: $e');
       return null;
     }
   }
@@ -96,13 +98,13 @@ class DeviceInfoHelper {
         obtenerUbicacion(),
         obtenerNivelBateria(),
         obtenerModeloDispositivo(),
-        obtenerEdfVendedorId(),
+        obtenerEmployeeId(),
       ]);
 
       final position = results[0] as Position?;
       final bateria = results[1] as int;
       final modelo = results[2] as String;
-      final edfVendedorId = results[3] as String?;
+      final employeeId = results[3] as String?;
 
       // Validar que tenemos ubicación
       if (position == null) {
@@ -113,7 +115,7 @@ class DeviceInfoHelper {
       // Crear el log
       final log = DeviceLog(
         id: const Uuid().v4(),
-        edfVendedorId: edfVendedorId,
+        employeeId: employeeId,
         latitudLongitud: '${position.latitude},${position.longitude}',
         bateria: bateria,
         modelo: modelo,
@@ -125,7 +127,6 @@ class DeviceInfoHelper {
       _logger.i('   📍 Ubicación: ${log.latitudLongitud}');
       _logger.i('   🔋 Batería: ${log.bateria}%');
       _logger.i('   📱 Modelo: ${log.modelo}');
-      _logger.i('   👤 Usuario: ${log.edfVendedorId}');
 
       return log;
     } catch (e) {
@@ -166,7 +167,7 @@ class DeviceInfoHelper {
 
       // Verificar usuario en BD
       try {
-        final userId = await obtenerEdfVendedorId();
+        final userId = await obtenerEmployeeId();
         resultados['usuario'] = userId != null;
       } catch (e) {
         resultados['usuario'] = false;
@@ -188,7 +189,9 @@ class DeviceInfoHelper {
     _logger.i('═══════════════════════════════════════');
     disponibilidad.forEach((servicio, disponible) {
       final icono = disponible ? '✅' : '❌';
-      _logger.i('$icono $servicio: ${disponible ? "DISPONIBLE" : "NO DISPONIBLE"}');
+      _logger.i(
+        '$icono $servicio: ${disponible ? "DISPONIBLE" : "NO DISPONIBLE"}',
+      );
     });
     _logger.i('═══════════════════════════════════════');
   }

@@ -1,11 +1,9 @@
-import 'package:logger/logger.dart';
-import '../services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
 import '../services/dynamic_form/dynamic_form_upload_service.dart';
 
 /// Repository especializado en gestionar el estado de sincronización
 /// de formularios dinámicos en la base de datos local
 class DynamicFormSyncRepository {
-  final Logger _logger = Logger();
   final DatabaseHelper _dbHelper = DatabaseHelper();
 
   String get _responseTableName => 'dynamic_form_response';
@@ -24,10 +22,8 @@ class DynamicFormSyncRepository {
         orderBy: 'creation_date ASC',
       );
 
-      _logger.i('📋 Respuestas pendientes: ${pending.length}');
       return pending;
     } catch (e) {
-      _logger.e('❌ Error obteniendo respuestas pendientes: $e');
       return [];
     }
   }
@@ -42,10 +38,8 @@ class DynamicFormSyncRepository {
         orderBy: 'ultimo_intento_sync ASC',
       );
 
-      _logger.i('⚠️ Respuestas con error: ${errors.length}');
       return errors;
     } catch (e) {
-      _logger.e('❌ Error obteniendo respuestas con error: $e');
       return [];
     }
   }
@@ -62,13 +56,14 @@ class DynamicFormSyncRepository {
 
       return results.isNotEmpty ? results.first : null;
     } catch (e) {
-      _logger.e('❌ Error obteniendo respuesta $responseId: $e');
       return null;
     }
   }
 
   /// Obtiene los detalles de una respuesta
-  Future<List<Map<String, dynamic>>> getResponseDetails(String responseId) async {
+  Future<List<Map<String, dynamic>>> getResponseDetails(
+    String responseId,
+  ) async {
     try {
       return await _dbHelper.consultar(
         _responseDetailTableName,
@@ -77,13 +72,14 @@ class DynamicFormSyncRepository {
         orderBy: 'dynamic_form_detail_id ASC',
       );
     } catch (e) {
-      _logger.e('❌ Error obteniendo detalles: $e');
       return [];
     }
   }
 
   /// Obtiene las imágenes de una respuesta
-  Future<List<Map<String, dynamic>>> getResponseImages(String responseId) async {
+  Future<List<Map<String, dynamic>>> getResponseImages(
+    String responseId,
+  ) async {
     try {
       // Obtener IDs de los detalles
       final details = await getResponseDetails(responseId);
@@ -100,7 +96,6 @@ class DynamicFormSyncRepository {
         detailIds,
       );
     } catch (e) {
-      _logger.e('❌ Error obteniendo imágenes: $e');
       return [];
     }
   }
@@ -126,12 +121,10 @@ class DynamicFormSyncRepository {
       );
 
       if (updated > 0) {
-        _logger.i('✅ Respuesta marcada como sincronizada: $responseId');
         return true;
       }
       return false;
     } catch (e) {
-      _logger.e('❌ Error marcando respuesta como sincronizada: $e');
       return false;
     }
   }
@@ -148,7 +141,6 @@ class DynamicFormSyncRepository {
 
       return updated > 0;
     } catch (e) {
-      _logger.e('❌ Error marcando detalle como sincronizado: $e');
       return false;
     }
   }
@@ -164,12 +156,10 @@ class DynamicFormSyncRepository {
       );
 
       if (updated > 0) {
-        _logger.i('✅ ${updated} detalles marcados como sincronizados');
         return true;
       }
       return false;
     } catch (e) {
-      _logger.e('❌ Error marcando detalles como sincronizados: $e');
       return false;
     }
   }
@@ -186,7 +176,6 @@ class DynamicFormSyncRepository {
 
       return updated > 0;
     } catch (e) {
-      _logger.e('❌ Error marcando imagen como sincronizada: $e');
       return false;
     }
   }
@@ -206,18 +195,18 @@ class DynamicFormSyncRepository {
         ['synced', ...detailIds],
       );
 
-      if (updated > 0) {
-        _logger.i('✅ $updated imágenes marcadas como sincronizadas');
-      }
+      if (updated > 0) {}
       return true;
     } catch (e) {
-      _logger.e('❌ Error marcando imágenes como sincronizadas: $e');
       return false;
     }
   }
 
   /// Marca una respuesta como error con mensaje
-  Future<bool> markResponseAsError(String responseId, String errorMessage) async {
+  Future<bool> markResponseAsError(
+    String responseId,
+    String errorMessage,
+  ) async {
     try {
       final now = DateTime.now().toIso8601String();
 
@@ -238,32 +227,30 @@ class DynamicFormSyncRepository {
       );
 
       if (updated > 0) {
-        _logger.w('⚠️ Respuesta marcada como error: $responseId (intento ${intentosActuales + 1})');
         return true;
       }
       return false;
     } catch (e) {
-      _logger.e('❌ Error marcando respuesta como error: $e');
       return false;
     }
   }
 
   /// Actualiza el intento de sincronización
-  Future<bool> updateSyncAttempt(String responseId, int intentNumber, String timestamp) async {
+  Future<bool> updateSyncAttempt(
+    String responseId,
+    int intentNumber,
+    String timestamp,
+  ) async {
     try {
       final updated = await _dbHelper.actualizar(
         _responseTableName,
-        {
-          'intentos_sync': intentNumber,
-          'ultimo_intento_sync': timestamp,
-        },
+        {'intentos_sync': intentNumber, 'ultimo_intento_sync': timestamp},
         where: 'id = ?',
         whereArgs: [responseId],
       );
 
       return updated > 0;
     } catch (e) {
-      _logger.e('❌ Error actualizando intento de sync: $e');
       return false;
     }
   }
@@ -284,12 +271,10 @@ class DynamicFormSyncRepository {
       );
 
       if (updated > 0) {
-        _logger.i('🔄 Intentos reiniciados para: $responseId');
         return true;
       }
       return false;
     } catch (e) {
-      _logger.e('❌ Error reiniciando intentos: $e');
       return false;
     }
   }
@@ -312,14 +297,7 @@ class DynamicFormSyncRepository {
         'total': pending + synced + errors + draft,
       };
     } catch (e) {
-      _logger.e('❌ Error obteniendo estadísticas: $e');
-      return {
-        'pending': 0,
-        'synced': 0,
-        'error': 0,
-        'draft': 0,
-        'total': 0,
-      };
+      return {'pending': 0, 'synced': 0, 'error': 0, 'draft': 0, 'total': 0};
     }
   }
 
@@ -333,7 +311,6 @@ class DynamicFormSyncRepository {
       );
       return result.length;
     } catch (e) {
-      _logger.e('❌ Error contando por estado $status: $e');
       return 0;
     }
   }
@@ -344,7 +321,6 @@ class DynamicFormSyncRepository {
       final count = await _countByStatus('pending');
       return count > 0;
     } catch (e) {
-      _logger.e('❌ Error verificando pendientes: $e');
       return false;
     }
   }
@@ -354,7 +330,9 @@ class DynamicFormSyncRepository {
   /// Limpia respuestas sincronizadas antiguas
   Future<int> cleanOldSyncedResponses({int daysOld = 30}) async {
     try {
-      final cutoffDate = DateTime.now().subtract(Duration(days: daysOld)).toIso8601String();
+      final cutoffDate = DateTime.now()
+          .subtract(Duration(days: daysOld))
+          .toIso8601String();
 
       final oldResponses = await _dbHelper.consultar(
         _responseTableName,
@@ -396,12 +374,9 @@ class DynamicFormSyncRepository {
         deleted++;
       }
 
-      if (deleted > 0) {
-        _logger.i('🗑️ Respuestas antiguas eliminadas: $deleted');
-      }
+      if (deleted > 0) {}
       return deleted;
     } catch (e) {
-      _logger.e('❌ Error limpiando respuestas antiguas: $e');
       return 0;
     }
   }
@@ -409,7 +384,9 @@ class DynamicFormSyncRepository {
   /// Limpia solo los borradores antiguos
   Future<int> cleanOldDrafts({int daysOld = 7}) async {
     try {
-      final cutoffDate = DateTime.now().subtract(Duration(days: daysOld)).toIso8601String();
+      final cutoffDate = DateTime.now()
+          .subtract(Duration(days: daysOld))
+          .toIso8601String();
 
       final oldDrafts = await _dbHelper.consultar(
         _responseTableName,
@@ -449,12 +426,9 @@ class DynamicFormSyncRepository {
         deleted++;
       }
 
-      if (deleted > 0) {
-        _logger.i('🗑️ Borradores antiguos eliminados: $deleted');
-      }
+      if (deleted > 0) {}
       return deleted;
     } catch (e) {
-      _logger.e('❌ Error limpiando borradores: $e');
       return 0;
     }
   }
@@ -464,13 +438,13 @@ class DynamicFormSyncRepository {
   /// ✅ CORREGIDO: Sincroniza una respuesta al servidor con manejo completo de estados
   Future<bool> syncTo(String responseId) async {
     try {
-      _logger.i('🔄 Sincronizando respuesta: $responseId');
-
       // Obtener el servicio de upload
       final uploadService = await _getDynamicFormUploadService();
 
       // Enviar al servidor
-      final resultado = await uploadService.enviarRespuestaAlServidor(responseId);
+      final resultado = await uploadService.enviarRespuestaAlServidor(
+        responseId,
+      );
 
       if (resultado['exito'] == true) {
         // ✅ Actualizar todos los estados locales después del éxito
@@ -478,15 +452,15 @@ class DynamicFormSyncRepository {
         await markAllDetailsAsSynced(responseId);
         await markAllImagesAsSynced(responseId);
 
-        _logger.i('✅ Respuesta sincronizada exitosamente: $responseId');
         return true;
       } else {
-        _logger.w('⚠️ Error sincronizando: ${resultado['mensaje']}');
-        await markResponseAsError(responseId, resultado['mensaje'] ?? 'Error desconocido');
+        await markResponseAsError(
+          responseId,
+          resultado['mensaje'] ?? 'Error desconocido',
+        );
         return false;
       }
     } catch (e) {
-      _logger.e('❌ Error en syncTo: $e');
       await markResponseAsError(responseId, 'Excepción: $e');
       return false;
     }
@@ -500,8 +474,6 @@ class DynamicFormSyncRepository {
   /// Sincronizar todas las respuestas pendientes
   Future<Map<String, int>> syncAllPending() async {
     try {
-      _logger.i('🔄 Sincronizando todas las respuestas pendientes...');
-
       // Obtener respuestas pendientes y con error (listas para reintentar)
       final pendientes = await getPendingResponses();
       final conError = await getErrorResponses();
@@ -510,11 +482,8 @@ class DynamicFormSyncRepository {
       final todasPendientes = [...pendientes, ...conError];
 
       if (todasPendientes.isEmpty) {
-        _logger.i('✅ No hay respuestas pendientes');
         return {'success': 0, 'failed': 0, 'total': 0};
       }
-
-      _logger.i('📋 Total a sincronizar: ${todasPendientes.length}');
 
       int exitosos = 0;
       int fallidos = 0;
@@ -526,18 +495,13 @@ class DynamicFormSyncRepository {
           final success = await syncTo(responseId);
           if (success) {
             exitosos++;
-            _logger.i('✅ Sincronizada: $responseId');
           } else {
             fallidos++;
-            _logger.w('⚠️ Error: $responseId');
           }
         } catch (e) {
           fallidos++;
-          _logger.e('❌ Error sincronizando $responseId: $e');
         }
       }
-
-      _logger.i('✅ Completado - Exitosos: $exitosos, Fallidos: $fallidos');
 
       return {
         'success': exitosos,
@@ -545,7 +509,6 @@ class DynamicFormSyncRepository {
         'total': todasPendientes.length,
       };
     } catch (e) {
-      _logger.e('❌ Error en syncAllPending: $e');
       return {'success': 0, 'failed': 0, 'total': 0};
     }
   }
@@ -553,13 +516,10 @@ class DynamicFormSyncRepository {
   /// Reintentar sincronización de una respuesta específica
   Future<bool> retrySyncResponse(String responseId) async {
     try {
-      _logger.i('🔁 Reintentando sincronización: $responseId');
-
       // Verificar que la respuesta exista
       final response = await getResponseById(responseId);
 
       if (response == null) {
-        _logger.e('❌ Respuesta no encontrada: $responseId');
         return false;
       }
 
@@ -569,7 +529,6 @@ class DynamicFormSyncRepository {
       // Reintentar envío usando syncTo
       return await syncTo(responseId);
     } catch (e) {
-      _logger.e('❌ Error en retrySyncResponse: $e');
       await markResponseAsError(responseId, 'Excepción en reintento: $e');
       return false;
     }

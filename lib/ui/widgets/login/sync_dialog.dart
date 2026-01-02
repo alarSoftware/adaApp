@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/viewmodels/login_screen_viewmodel.dart';
-import 'package:ada_app/services/auth_service.dart';
-import 'package:ada_app/services/database_helper.dart';
-import 'package:ada_app/services/database_validation_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
+import 'package:ada_app/services/data/database_helper.dart';
+import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/sync/full_sync_service.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/ui/common/snackbar_helper.dart';
@@ -16,10 +16,8 @@ class SyncDialog {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) => _SyncDialogContent(
-        viewModel: viewModel,
-        validation: validation,
-      ),
+      builder: (BuildContext dialogContext) =>
+          _SyncDialogContent(viewModel: viewModel, validation: validation),
     );
   }
 }
@@ -28,10 +26,7 @@ class _SyncDialogContent extends StatefulWidget {
   final LoginScreenViewModel viewModel;
   final SyncValidationResult validation;
 
-  const _SyncDialogContent({
-    required this.viewModel,
-    required this.validation,
-  });
+  const _SyncDialogContent({required this.viewModel, required this.validation});
 
   @override
   State<_SyncDialogContent> createState() => _SyncDialogContentState();
@@ -48,9 +43,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
     return PopScope(
       canPop: !_isSyncing,
       child: AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         backgroundColor: AppColors.cardBackground,
         title: Row(
           children: [
@@ -71,7 +64,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
             children: [
               _buildReasonContainer(),
               const SizedBox(height: 12),
-              _buildVendorInfo(), // 👈 Aquí se mostrarán los nombres
+              _buildVendorInfo(),
               const SizedBox(height: 12),
               _buildWarningContainer(),
               if (_isSyncing) ...[
@@ -87,25 +80,29 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
             child: Text(
               'Cancelar',
               style: TextStyle(
-                color: _isSyncing ? AppColors.textSecondary : AppColors.textPrimary,
+                color: _isSyncing
+                    ? AppColors.textSecondary
+                    : AppColors.textPrimary,
               ),
             ),
           ),
           ElevatedButton.icon(
             onPressed: _isSyncing ? null : _startSync,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _isSyncing ? AppColors.buttonDisabled : AppColors.warning,
+              backgroundColor: _isSyncing
+                  ? AppColors.buttonDisabled
+                  : AppColors.warning,
               foregroundColor: Colors.white,
             ),
             icon: _isSyncing
                 ? const SizedBox(
-              height: 16,
-              width: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            )
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
                 : const Icon(Icons.sync, size: 20),
             label: Text(
               _isSyncing ? 'Sincronizando...' : 'Sincronizar',
@@ -121,7 +118,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppColors.warning.withOpacity(0.1),
+        color: AppColors.warning.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.warning),
       ),
@@ -144,7 +141,6 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
     );
   }
 
-  // ✅ MODIFICADO: Muestra el NOMBRE en lugar del ID
   Widget _buildVendorInfo() {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -152,7 +148,10 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
       children: [
         if (widget.validation.vendedorAnteriorId != null) ...[
           // Muestra nombre anterior o 'Desconocido'
-          _buildInfoRow('Anterior:', widget.validation.vendedorAnteriorNombre ?? 'Desconocido'),
+          _buildInfoRow(
+            'Anterior:',
+            widget.validation.vendedorAnteriorNombre ?? 'Desconocido',
+          ),
           const SizedBox(height: 6),
         ],
         // Muestra nombre actual
@@ -166,10 +165,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontWeight: FontWeight.w500,
-            fontSize: 13,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
         ),
         const SizedBox(width: 6),
         Expanded(
@@ -201,10 +197,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
           const Expanded(
             child: Text(
               'Debe sincronizar antes de continuar',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -223,10 +216,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
         const SizedBox(height: 8),
         Text(
           _currentStep,
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-          ),
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           textAlign: TextAlign.center,
         ),
         if (_completedSteps.isNotEmpty) ...[
@@ -280,21 +270,22 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
     try {
       // ✅ AQUÍ USAMOS LOS ID PARA LA LÓGICA DE SINCRONIZACIÓN (LA API PIDE IDs)
       final result = await FullSyncService.syncAllDataWithProgress(
-        edfVendedorId: widget.validation.vendedorActualId, // Usamos ID
+        employeeId: widget.validation.vendedorActualId, // Usamos ID
         previousVendedorId: widget.validation.vendedorAnteriorId, // Usamos ID
-        onProgress: ({
-          required double progress,
-          required String currentStep,
-          required List<String> completedSteps,
-        }) {
-          if (mounted) {
-            setState(() {
-              _progress = progress;
-              _currentStep = currentStep;
-              _completedSteps = List.from(completedSteps);
-            });
-          }
-        },
+        onProgress:
+            ({
+              required double progress,
+              required String currentStep,
+              required List<String> completedSteps,
+            }) {
+              if (mounted) {
+                setState(() {
+                  _progress = progress;
+                  _currentStep = currentStep;
+                  _completedSteps = List.from(completedSteps);
+                });
+              }
+            },
       );
 
       if (!result.exito) {
@@ -305,7 +296,9 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
       final authService = AuthService();
       await authService.markSyncCompleted(
         widget.validation.vendedorActualId, // ID
-        widget.validation.vendedorActualNombre, // NOMBRE (Nuevo parámetro requerido)
+        widget
+            .validation
+            .vendedorActualNombre, // NOMBRE (Nuevo parámetro requerido)
       );
 
       if (!mounted) return;
@@ -318,8 +311,8 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
       );
 
       await Future.delayed(const Duration(milliseconds: 300));
+      if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/home');
-
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -342,10 +335,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
           Icon(Icons.warning_amber, color: Colors.orange, size: 24),
           const SizedBox(width: 8),
           const Expanded(
-            child: Text(
-              'Registros Pendientes',
-              style: TextStyle(fontSize: 16),
-            ),
+            child: Text('Registros Pendientes', style: TextStyle(fontSize: 16)),
           ),
         ],
       ),
@@ -359,11 +349,13 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
               style: TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
-            ...validationResult.pendingItems.map((item) => _buildPendingItem(
-              _getIconForTable(item.tableName),
-              item.displayName,
-              item.count,
-            )),
+            ...validationResult.pendingItems.map(
+              (item) => _buildPendingItem(
+                _getIconForTable(item.tableName),
+                item.displayName,
+                item.count,
+              ),
+            ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(10),
@@ -374,7 +366,11 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.error_outline, color: Colors.red.shade700, size: 18),
+                  Icon(
+                    Icons.error_outline,
+                    color: Colors.red.shade700,
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
@@ -403,8 +399,12 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
   IconData _getIconForTable(String tableName) {
     if (tableName.contains('equipo')) return Icons.devices;
     if (tableName.contains('censo')) return Icons.assignment;
-    if (tableName.contains('form') || tableName.contains('response')) return Icons.description;
-    if (tableName.contains('foto') || tableName.contains('image')) return Icons.photo;
+    if (tableName.contains('form') || tableName.contains('response')) {
+      return Icons.description;
+    }
+    if (tableName.contains('foto') || tableName.contains('image')) {
+      return Icons.photo;
+    }
     if (tableName.contains('log')) return Icons.article;
     return Icons.info_outline;
   }
@@ -416,12 +416,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
         children: [
           Icon(icon, size: 20, color: Colors.orange),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(

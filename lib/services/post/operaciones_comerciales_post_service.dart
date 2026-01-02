@@ -1,127 +1,146 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
+import 'package:ada_app/config/constants/server_response.dart';
+
+import 'package:ada_app/repositories/producto_repository.dart';
 import 'package:http/http.dart' as http;
-import 'package:logger/logger.dart';
-import 'package:ada_app/services/api_config_service.dart';
+
+import 'package:ada_app/services/api/api_config_service.dart';
 import 'package:ada_app/config/constants/server_constants.dart';
-import 'package:ada_app/services/error_log/error_log_service.dart';
+
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 
 class OperacionesComercialesPostService {
-  static final Logger _logger = Logger();
-  static const String _tableName = 'operaciones_comerciales';
-  // Endpoint solicitado por el usuario
-  static const String _endpoint = '/insertOperacionesComerciales';
+  static const String _endpoint =
+      '/operacionComercial/insertOperacionComercial';
 
-  static Future<Map<String, dynamic>> enviarOperacion(OperacionComercial operacion) async {
+  static Future<ServerResponse> enviarOperacion(
+    OperacionComercial operacion, {
+    int timeoutSegundos = 60,
+    ProductoRepository? productoRepository,
+  }) async {
     String? fullUrl;
-    String? operacionId = operacion.id;
-
     try {
-      _logger.i('📤 === ENVIANDO OPERACIÓN COMERCIAL ===');
-      _logger.i('   - Cliente ID: ${operacion.clienteId}');
-      _logger.i('   - Tipo: ${operacion.tipoOperacion.valor}');
+      if (operacion.id == null || operacion.id!.isEmpty) {
+        throw Exception('ID de operación es requerido');
+      }
+      if (operacion.detalles.isEmpty) {
+        throw Exception('La operación debe tener al menos un detalle');
+      }
 
-      final payload = _construirPayload(operacion);
+      final repo = productoRepository ?? ProductoRepositoryImpl();
+      final payload = await _construirPayload(operacion, repo);
 
-      _logger.i('📦 Payload size: ${jsonEncode(payload).length} caracteres');
-
-      // Obtener URL base
       final baseUrl = await ApiConfigService.getBaseUrl();
-      // Asegurar que no haya doble slash si baseUrl termina en /
-      final cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+      final cleanBaseUrl = baseUrl.endsWith('/')
+          ? baseUrl.substring(0, baseUrl.length - 1)
+          : baseUrl;
       fullUrl = '$cleanBaseUrl$_endpoint';
 
-      _logger.i('🌐 Enviando a: $fullUrl');
+      final response = await http
+          .post(
+            Uri.parse(fullUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'ngrok-skip-browser-warning': 'true',
+            },
+            body: jsonEncode(payload),
+          )
+          .timeout(Duration(seconds: timeoutSegundos));
 
-      // Envío HTTP
-      final response = await http.post(
-        Uri.parse(fullUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-        },
-        body: jsonEncode(payload),
-      ).timeout(const Duration(seconds: 60));
+      ServerResponse resultObject = ServerResponse.fromHttp(response);
 
-      _logger.i('📥 Response: ${response.statusCode}');
-
-      // Procesar respuesta
-      final result = _procesarRespuesta(response);
-
-      if (!result['exito']) {
-        ErrorLogService.manejarExcepcion(result, operacionId, fullUrl, operacion.usuarioId, 'operacion_comercial');
+      if (!resultObject.success) {
+        if (!resultObject.isDuplicate && resultObject.message != '') {
+          throw Exception(resultObject.message);
+        }
       }
 
-      return result;
-
-    } catch (e, stackTrace) {
-      _logger.e('❌ Error en envío de operación comercial: $e', stackTrace: stackTrace);
-      ErrorLogService.manejarExcepcion(e, operacionId, fullUrl, operacion.usuarioId, 'operacion_comercial');
+      return resultObject;
+    } catch (e) {
+      rethrow;
     }
-    return {};
   }
 
-  // =================================================================
-  // CONSTRUCCIÓN DEL PAYLOAD
-  // =================================================================
+  static Future<Map<String, dynamic>> _construirPayload(
+    OperacionComercial operacion,
+    ProductoRepository productoRepository,
+  ) async {
+    final operacionComercialData = {
+      'id': operacion.id,
+      'clienteId': operacion.clienteId,
+      'tipoOperacion': operacion.tipoOperacion.valor,
+      'fechaCreacion': operacion.fechaCreacion.toIso8601String(),
+      'fechaRetiro': operacion.fechaRetiro?.toIso8601String(),
+      if (operacion.snc != null) 'snc': operacion.snc,
+      'usuarioId': operacion.usuarioId,
+      'totalProductos': operacion.totalProductos,
+      'employeeId': operacion.employeeId,
+      'latitud': operacion.latitud,
+      'longitud': operacion.longitud,
+    };
 
-  static Map<String, dynamic> _construirPayload(OperacionComercial operacion) {
+    final detalles = await Future.wait(
+      operacion.detalles.map(
+        (d) =>
+            _construirDetalle(d, operacion.tipoOperacion, productoRepository),
+      ),
+    );
+
     return {
-      'operacionComercial': {
-        'id': operacion.id,
-        'clienteId': operacion.clienteId,
-        'tipoOperacion': operacion.tipoOperacion.valor,
-        'fechaCreacion': operacion.fechaCreacion.toIso8601String(),
-        'fechaRetiro': operacion.fechaRetiro?.toIso8601String(),
-        'usuarioId': operacion.usuarioId,
-        'totalProductos': operacion.totalProductos,
-        'detalles': operacion.detalles.map((d) => _construirDetalle(d, operacion.tipoOperacion)).toList(),
-      }
+      'operacionComercial': operacionComercialData,
+      ...operacionComercialData,
+      'detalles': detalles,
     };
   }
 
-  static Map<String, dynamic> _construirDetalle(
+  static Future<Map<String, dynamic>> _construirDetalle(
     OperacionComercialDetalle detalle,
     TipoOperacion tipoOperacion,
-  ) {
-    // Estructura base del detalle
+    ProductoRepository productoRepository,
+  ) async {
+    final producto = await productoRepository.obtenerProductoPorId(
+      detalle.productoId!,
+    );
+
+    if (producto == null) {
+      throw Exception('Producto con ID ${detalle.productoId} no encontrado');
+    }
+
     final detalleBase = {
-      'productoCodigo': detalle.productoCodigo,
-      'productoDescripcion': detalle.productoDescripcion,
-      'productoCategoria': detalle.productoCategoria,
+      'productoCodigo': producto.codigo,
+      'productoDescripcion': producto.nombre,
+      'productoCategoria': producto.categoria,
       'productoId': detalle.productoId,
       'cantidad': detalle.cantidad,
-      'unidadMedida': detalle.unidadMedida,
+      'unidadMedida': producto.unidadMedida,
     };
 
-    // Si es producto discontinuo (intercambio), usar estructura anidada con array
-    if (tipoOperacion == TipoOperacion.notaRetiroDiscontinuos) {
-      // Solo agregar productoIntercambio si hay datos de reemplazo
-      if (detalle.productoReemplazoId != null) {
+    if (tipoOperacion == TipoOperacion.notaRetiroDiscontinuos &&
+        detalle.productoReemplazoId != null) {
+      final productoReemplazo = await productoRepository.obtenerProductoPorId(
+        detalle.productoReemplazoId!,
+      );
+
+      if (productoReemplazo != null) {
         detalleBase['productoIntercambio'] = [
           {
             'productoId': detalle.productoReemplazoId,
-            'productoCodigo': detalle.productoReemplazoCodigo,
-            'productoDescripcion': detalle.productoReemplazoDescripcion,
-            'productoCategoria': detalle.productoReemplazoCategoria,
+            'productoCodigo': productoReemplazo.codigo,
+            'productoDescripcion': productoReemplazo.nombre,
+            'productoCategoria': productoReemplazo.categoria,
             'cantidad': detalle.cantidad,
-          }
+          },
         ];
       }
     }
-    // Para otros tipos (NOTA_RETIRO, NOTA_REPOSICION), no se incluyen datos de reemplazo
-    
+
     return detalleBase;
   }
-
-  // =================================================================
-  // MANEJO DE RESPUESTAS Y ERRORES
-  // =================================================================
 
   static Map<String, dynamic> _procesarRespuesta(http.Response response) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -135,33 +154,45 @@ class OperacionesComercialesPostService {
     try {
       final responseBody = json.decode(response.body);
 
-      // Si el backend devuelve una estructura estándar con serverAction
       if (responseBody is Map && responseBody.containsKey('serverAction')) {
         final serverAction = responseBody['serverAction'];
-        
+        final mensaje = responseBody['resultMessage'] ?? '';
+        final error = responseBody['resultError'] ?? '';
+
         if (serverAction == ServerConstants.SUCCESS_TRANSACTION) {
           return {
             'exito': true,
-            'mensaje': responseBody['resultMessage'] ?? 'Operación procesada correctamente',
+            'mensaje': mensaje.isNotEmpty
+                ? mensaje
+                : 'Operación procesada correctamente',
             'serverAction': serverAction,
             'id': responseBody['resultId'],
+          };
+        } else if (_esDuplicado(mensaje) || _esDuplicado(error)) {
+          return {
+            'exito': true,
+            'duplicado': true,
+            'mensaje': mensaje.isNotEmpty ? mensaje : error,
+            'serverAction': serverAction,
           };
         } else {
           return {
             'exito': false,
-            'mensaje': responseBody['resultError'] ?? responseBody['resultMessage'] ?? 'Error del servidor',
+            'mensaje': error.isNotEmpty
+                ? error
+                : mensaje.isNotEmpty
+                ? mensaje
+                : 'Error del servidor',
             'serverAction': serverAction,
           };
         }
       }
 
-      // Fallback genérico
       return {
         'exito': true,
         'mensaje': 'Operación enviada correctamente',
         'data': responseBody,
       };
-
     } catch (e) {
       return {
         'exito': false,
@@ -170,62 +201,22 @@ class OperacionesComercialesPostService {
     }
   }
 
-  // static Future<void> _manejarErrorServidor(
-  //     Map<String, dynamic> result,
-  //     String? operacionId,
-  //     String? fullUrl,
-  //     String? userId,
-  //     ) async {
-  //   final errorCode = result['serverAction']?.toString() ?? 'UNKNOWN';
-  //   final errorMessage = result['mensaje'] ?? 'Error del servidor';
-  //
-  //   await ErrorLogService.logServerError(
-  //     tableName: _tableName,
-  //     operation: 'POST_OPERACION_COMERCIAL_ERROR',
-  //     errorMessage: 'ServerAction $errorCode: $errorMessage',
-  //     errorCode: 'SERVER_ERROR_$errorCode',
-  //     registroFailId: operacionId,
-  //     endpoint: fullUrl,
-  //     userId: userId,
-  //   );
-  // }
+  static bool _esDuplicado(String mensaje) {
+    if (mensaje.isEmpty) return false;
 
-  // static Future<Map<String, dynamic>> _manejarExcepcion(
-  //     dynamic excepcion,
-  //     String? operacionId,
-  //     String? fullUrl,
-  //     String? userId,
-  //     ) async {
-  //
-  //   String tipoError = 'crash';
-  //   String codigoError = 'UNEXPECTED_EXCEPTION';
-  //   String mensajeUsuario = 'Error interno al enviar operación';
-  //
-  //   if (excepcion is SocketException || excepcion is http.ClientException) {
-  //     tipoError = 'network';
-  //     codigoError = 'NETWORK_ERROR';
-  //     mensajeUsuario = 'Error de conexión. Verifique su internet.';
-  //   } else if (excepcion is TimeoutException) {
-  //     tipoError = 'network';
-  //     codigoError = 'TIMEOUT_ERROR';
-  //     mensajeUsuario = 'El servidor tardó demasiado en responder.';
-  //   }
-  //
-  //   await ErrorLogService.logError(
-  //     tableName: _tableName,
-  //     operation: 'POST_OPERACION_COMERCIAL_EXCEPTION',
-  //     errorMessage: excepcion.toString(),
-  //     errorType: tipoError,
-  //     errorCode: codigoError,
-  //     registroFailId: operacionId,
-  //     endpoint: fullUrl,
-  //     userId: userId,
-  //   );
-  //
-  //   return {
-  //     'exito': false,
-  //     'mensaje': mensajeUsuario,
-  //     'error': excepcion.toString(),
-  //   };
-  // }
+    final mensajeLower = mensaje.toLowerCase();
+    return mensajeLower.contains('duplicado') ||
+        mensajeLower.contains('duplicate') ||
+        mensajeLower.contains('ya existe') ||
+        mensajeLower.contains('already exists');
+  }
+
+  static String _obtenerMensajeUsuario(dynamic excepcion) {
+    if (excepcion is SocketException || excepcion is http.ClientException) {
+      return 'Error de conexión. Verifique su internet.';
+    } else if (excepcion is TimeoutException) {
+      return 'El servidor tardó demasiado en responder.';
+    }
+    return 'Error interno al enviar operación';
+  }
 }

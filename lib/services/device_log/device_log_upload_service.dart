@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'package:logger/logger.dart';
-import 'package:sqflite/sqflite.dart';
+
 import 'package:ada_app/repositories/device_log_repository.dart';
 import 'package:ada_app/services/post/device_log_post_service.dart';
-import 'package:ada_app/services/database_helper.dart';
+import 'package:ada_app/services/data/database_helper.dart';
+import 'package:ada_app/services/api/auth_service.dart'; // 🆕 AGREGAR
 import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
-import 'package:ada_app/services/api_config_service.dart'; // 🆕 AGREGAR
+import 'package:ada_app/services/api/api_config_service.dart'; // 🆕 AGREGAR
 
 class DeviceLogUploadService {
   final Logger _logger = Logger();
@@ -40,10 +41,26 @@ class DeviceLogUploadService {
 
       for (final log in logsPendientes) {
         try {
+          // 🕵️‍♂️ Obtener usuario actual para userId
+          final currentUser = await AuthService().getCurrentUser();
+          String? userIdFromAuth = currentUser?.id?.toString();
+
+          // 🔄 Fallback: Si no hay sesión activa, buscar el usuario por employeeId del log
+          if (userIdFromAuth == null && log.employeeId != null) {
+            userIdFromAuth = await obtenerUserIdPorEmployeeId(log.employeeId!);
+          }
+
+          logger.i('🔍 Debug UserId:');
+          logger.i('   currentUser: ${currentUser?.username}');
+          logger.i('   currentUser.id: ${currentUser?.id}');
+          logger.i('   log.employeeId: ${log.employeeId}');
+          logger.i('   userId a enviar: ${userIdFromAuth ?? log.employeeId}');
+
           // ✅ Usar el servicio unificado con logging automático
           final resultado = await DeviceLogPostService.enviarDeviceLog(
             log,
-            userId: log.edfVendedorId,
+            userId:
+                userIdFromAuth, // 👈 FIX: No enviar log.employeeId como fallback si no se encuentra usuario
           );
 
           if (resultado['exito'] == true) {
@@ -57,21 +74,13 @@ class DeviceLogUploadService {
         } catch (e) {
           logger.e('❌ Error enviando ${log.id}: $e');
 
-          // 🔥 Log adicional solo si no fue capturado por BasePostService
-          // await ErrorLogService.logError(
-          //   tableName: 'device_log',
-          //   operation: 'sync_batch',
-          //   errorMessage: 'Error en sincronización batch: $e',
-          //   errorType: 'upload',
-          //   registroFailId: log.id,
-          //   userId: log.edfVendedorId,
-          // );
-
           fallidos++;
         }
       }
 
-      logger.i('✅ Sincronización completada - Exitosos: $exitosos, Fallidos: $fallidos');
+      logger.i(
+        '✅ Sincronización completada - Exitosos: $exitosos, Fallidos: $fallidos',
+      );
 
       return {
         'exitosos': exitosos,
@@ -93,22 +102,32 @@ class DeviceLogUploadService {
   }
 
   /// Enviar múltiples device logs en batch
-  static Future<Map<String, int>> enviarDeviceLogsBatch(List<DeviceLog> logs) async {
+  static Future<Map<String, int>> enviarDeviceLogsBatch(
+    List<DeviceLog> logs,
+  ) async {
     final logger = Logger();
 
     try {
       // 🔍 Mostrar URL para debugging
-      final urlCompleta = await ApiConfigService.getFullUrl('/appDeviceLog/insertAppDeviceLog');
+      final urlCompleta = await ApiConfigService.getFullUrl(
+        '/appDeviceLog/insertAppDeviceLog',
+      );
       logger.i('📤 Enviando batch de ${logs.length} device logs...');
       logger.i('🌐 URL destino: $urlCompleta');
 
-      // Obtener userId del primer log (asumiendo que todos son del mismo usuario)
-      final userId = logs.isNotEmpty ? logs.first.edfVendedorId : null;
+      // Obtener userId del usuario actual (User.id)
+      final currentUser = await AuthService().getCurrentUser();
+      String? userId = currentUser?.id?.toString();
+
+      // 🔄 Fallback: Si no hay sesión, buscar por el employeeId del primer log
+      if (userId == null && logs.isNotEmpty && logs.first.employeeId != null) {
+        userId = await obtenerUserIdPorEmployeeId(logs.first.employeeId!);
+      }
 
       // ✅ Usar el servicio unificado
       final resultado = await DeviceLogPostService.enviarDeviceLogsBatch(
         logs,
-        userId: userId,
+        userId: userId, // 👈 FIX: Solo enviar si se encontró usuario válido
       );
 
       // 🔄 Marcar como sincronizados los exitosos
@@ -139,20 +158,20 @@ class DeviceLogUploadService {
         errorType: 'upload',
       );
 
-      return {
-        'exitosos': 0,
-        'fallidos': logs.length,
-        'total': logs.length,
-      };
+      return {'exitosos': 0, 'fallidos': logs.length, 'total': logs.length};
     }
   }
 
   /// Limpiar logs antiguos ya sincronizados
-  static Future<int> limpiarLogsSincronizadosAntiguos({int diasAntiguos = 7}) async {
+  static Future<int> limpiarLogsSincronizadosAntiguos({
+    int diasAntiguos = 7,
+  }) async {
     final logger = Logger();
 
     try {
-      logger.i('🧹 Limpiando device logs sincronizados antiguos (>${diasAntiguos} días)...');
+      logger.i(
+        '🧹 Limpiando device logs sincronizados antiguos (>${diasAntiguos} días)...',
+      );
 
       final db = await DatabaseHelper().database;
       final repository = DeviceLogRepository(db);
@@ -184,11 +203,7 @@ class DeviceLogUploadService {
       };
     } catch (e) {
       Logger().e('❌ Error obteniendo estadísticas: $e');
-      return {
-        'total': 0,
-        'sincronizados': 0,
-        'pendientes': 0,
-      };
+      return {'total': 0, 'sincronizados': 0, 'pendientes': 0};
     }
   }
 
@@ -203,7 +218,9 @@ class DeviceLogUploadService {
     _syncActivo = true;
     final urlActual = await ApiConfigService.getBaseUrl();
 
-    Logger().i('🚀 Iniciando sincronización automática de device logs cada 10 minutos...');
+    Logger().i(
+      '🚀 Iniciando sincronización automática de device logs cada 10 minutos...',
+    );
     Logger().i('🌐 Sincronizando con: $urlActual');
 
     _syncTimer = Timer.periodic(Duration(minutes: 10), (timer) async {
@@ -235,11 +252,15 @@ class DeviceLogUploadService {
       final resultado = await sincronizarDeviceLogsPendientes();
 
       if (resultado['total']! > 0) {
-        logger.i('✅ Auto-sync completado: ${resultado['exitosos']}/${resultado['total']} enviados');
+        logger.i(
+          '✅ Auto-sync completado: ${resultado['exitosos']}/${resultado['total']} enviados',
+        );
 
         // 📊 Mostrar estadísticas después de la sincronización
         final stats = await obtenerEstadisticasSincronizacion();
-        logger.i('📊 Estado actual: ${stats['sincronizados']} sync, ${stats['pendientes']} pendientes');
+        logger.i(
+          '📊 Estado actual: ${stats['sincronizados']} sync, ${stats['pendientes']} pendientes',
+        );
       } else {
         logger.i('💤 No hay device logs pendientes para sincronizar');
       }
@@ -263,7 +284,9 @@ class DeviceLogUploadService {
   /// Verificar configuración actual del servicio
   static Future<Map<String, dynamic>> verificarConfiguracion() async {
     final baseUrl = await ApiConfigService.getBaseUrl();
-    final fullUrl = await ApiConfigService.getFullUrl('/appDeviceLog/insertAppDeviceLog');
+    final fullUrl = await ApiConfigService.getFullUrl(
+      '/appDeviceLog/insertAppDeviceLog',
+    );
     final stats = await obtenerEstadisticasSincronizacion();
 
     return {
@@ -285,7 +308,9 @@ class DeviceLogUploadService {
     logger.i("═══════════════════════════════════════");
     logger.i("🌐 Base URL: ${config['base_url']}");
     logger.i("🔗 URL Completa: ${config['full_url']}");
-    logger.i("🔄 Sync Automático: ${config['sync_activo'] ? 'ACTIVO' : 'INACTIVO'}");
+    logger.i(
+      "🔄 Sync Automático: ${config['sync_activo'] ? 'ACTIVO' : 'INACTIVO'}",
+    );
     logger.i("⏰ Timer Activo: ${config['timer_activo'] ? 'SÍ' : 'NO'}");
     logger.i("📊 Estadísticas:");
     final stats = config['estadisticas'] as Map<String, int>;
@@ -311,6 +336,38 @@ class DeviceLogUploadService {
       logger.i("✅ DeviceLogUploadService inicializado correctamente");
     } catch (e) {
       logger.e("💥 Error inicializando DeviceLogUploadService: $e");
+    }
+  }
+
+  /// 🔍 Busca el ID interno (Users.id) dado un employee_id
+  static Future<String?> obtenerUserIdPorEmployeeId(String employeeId) async {
+    try {
+      final db = await DatabaseHelper().database;
+      final result = await db.rawQuery(
+        'SELECT id FROM Users WHERE employee_id = ? LIMIT 1',
+        [employeeId],
+      );
+
+      if (result.isNotEmpty) {
+        final id = result.first['id'];
+        return id?.toString();
+      } else {
+        // 🔍 DEBUG: Si falla, inspeccionar qué hay en la tabla
+        Logger().w('⚠️ No se encontró usuario con employee_id "$employeeId".');
+        final allUsers = await db.rawQuery(
+          'SELECT id, employee_id, username FROM Users',
+        );
+        Logger().i('📋 Dump de tabla Users (${allUsers.length} registros):');
+        for (final u in allUsers) {
+          Logger().i(
+            '   User: id=${u['id']}, empId=${u['employee_id']}, user=${u['username']}',
+          );
+        }
+      }
+      return null;
+    } catch (e) {
+      Logger().w('⚠️ Error buscando userId para employeeId $employeeId: $e');
+      return null;
     }
   }
 }

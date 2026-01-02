@@ -1,17 +1,17 @@
 import '../models/censo_activo_foto.dart';
 import 'base_repository.dart';
-import 'package:logger/logger.dart';
+
 import 'package:uuid/uuid.dart';
 
 class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
-  final Logger _logger = Logger();
   final Uuid _uuid = Uuid();
 
   @override
   String get tableName => 'censo_activo_foto';
 
   @override
-  CensoActivoFoto fromMap(Map<String, dynamic> map) => CensoActivoFoto.fromMap(map);
+  CensoActivoFoto fromMap(Map<String, dynamic> map) =>
+      CensoActivoFoto.fromMap(map);
 
   @override
   Map<String, dynamic> toMap(CensoActivoFoto foto) => foto.toMap();
@@ -48,21 +48,6 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
       // Si no se especifica orden, obtener el siguiente disponible
       final ordenFinal = orden ?? await _obtenerSiguienteOrden(censoActivoId);
 
-      _logger.i('📸 Guardando foto para censo $censoActivoId');
-      _logger.i('   UUID: $uuidId');
-      _logger.i('   Orden: $ordenFinal');
-      _logger.i('   Tamaño: $imagenTamano bytes');
-
-      // ✅ LOGS DE DEBUG
-      _logger.i('🔍 DEBUG guardarFoto - Parámetros recibidos:');
-      _logger.i('🔍   imagenPath: $imagenPath');
-      _logger.i('🔍   imagenBase64 != null: ${imagenBase64 != null}');
-      _logger.i('🔍   imagenBase64 length: ${imagenBase64?.length ?? 0}');
-      if (imagenBase64 != null && imagenBase64.isNotEmpty) {
-        final preview = imagenBase64.length > 50 ? imagenBase64.substring(0, 50) : imagenBase64;
-        _logger.i('🔍   imagenBase64 preview: $preview...');
-      }
-
       final foto = CensoActivoFoto(
         id: uuidId,
         censoActivoId: censoActivoId,
@@ -74,33 +59,20 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
         estaSincronizado: false,
       );
 
-      // ✅ LOG DESPUÉS DE CREAR EL OBJETO
-      _logger.i('🔍 DEBUG guardarFoto - Objeto CensoActivoFoto creado:');
-      _logger.i('🔍   foto.imagenBase64 != null: ${foto.imagenBase64 != null}');
-      _logger.i('🔍   foto.imagenBase64 length: ${foto.imagenBase64?.length ?? 0}');
-
       final fotoMap = foto.toMap();
-
-      // ✅ LOG DESPUÉS DE CREAR EL MAP
-      _logger.i('🔍 DEBUG guardarFoto - Map para insertar:');
-      _logger.i('🔍   fotoMap keys: ${fotoMap.keys.toList()}');
-      _logger.i('🔍   fotoMap["imagen_base64"] != null: ${fotoMap['imagen_base64'] != null}');
-      _logger.i('🔍   fotoMap["imagen_base64"] length: ${fotoMap['imagen_base64']?.toString().length ?? 0}');
 
       await dbHelper.insertar(tableName, fotoMap);
 
-      _logger.i('✅ Foto guardada con UUID: $uuidId');
       return foto;
-
-    } catch (e, stackTrace) {
-      _logger.e('❌ Error guardando foto: $e');
-      _logger.e('StackTrace: $stackTrace');
+    } catch (e) {
       rethrow;
     }
   }
 
   /// Obtener todas las fotos de un censo
-  Future<List<CensoActivoFoto>> obtenerFotosPorCenso(String censoActivoId) async {
+  Future<List<CensoActivoFoto>> obtenerFotosPorCenso(
+    String censoActivoId,
+  ) async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
@@ -110,17 +82,18 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
       );
 
       final fotos = maps.map((map) => fromMap(map)).toList();
-      _logger.i('📸 Encontradas ${fotos.length} fotos para censo $censoActivoId');
-      return fotos;
 
+      return fotos;
     } catch (e) {
-      _logger.e('Error obteniendo fotos por censo: $e');
       return [];
     }
   }
 
   /// Obtener foto específica por orden
-  Future<CensoActivoFoto?> obtenerFotoPorOrden(String censoActivoId, int orden) async {
+  Future<CensoActivoFoto?> obtenerFotoPorOrden(
+    String censoActivoId,
+    int orden,
+  ) async {
     try {
       final maps = await dbHelper.consultar(
         tableName,
@@ -131,7 +104,6 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
 
       return maps.isNotEmpty ? fromMap(maps.first) : null;
     } catch (e) {
-      _logger.e('Error obteniendo foto por orden: $e');
       return null;
     }
   }
@@ -146,11 +118,9 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
       );
 
       final fotos = maps.map((map) => fromMap(map)).toList();
-      _logger.i('📸 Encontradas ${fotos.length} fotos pendientes de sincronización');
-      return fotos;
 
+      return fotos;
     } catch (e) {
-      _logger.e('Error obteniendo fotos pendientes: $e');
       return [];
     }
   }
@@ -159,23 +129,20 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
   Future<CensoConFotos> obtenerCensoConFotos(String censoActivoId) async {
     try {
       final fotos = await obtenerFotosPorCenso(censoActivoId);
-      return CensoConFotos(
-        censoActivoId: censoActivoId,
-        fotos: fotos,
-      );
+      return CensoConFotos(censoActivoId: censoActivoId, fotos: fotos);
     } catch (e) {
-      _logger.e('Error obteniendo censo con fotos: $e');
-      return CensoConFotos(
-        censoActivoId: censoActivoId,
-        fotos: [],
-      );
+      return CensoConFotos(censoActivoId: censoActivoId, fotos: []);
     }
   }
 
   // ========== MÉTODOS DE ACTUALIZACIÓN ==========
 
   /// Actualizar imagen Base64 de una foto
-  Future<void> actualizarImagenBase64(String fotoId, String imagenBase64, int? tamano) async {
+  Future<void> actualizarImagenBase64(
+    String fotoId,
+    String imagenBase64,
+    int? tamano,
+  ) async {
     try {
       await dbHelper.actualizar(
         tableName,
@@ -187,10 +154,7 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
         where: 'id = ?',
         whereArgs: [fotoId],
       );
-
-      _logger.i('📸 Imagen Base64 actualizada para foto $fotoId');
     } catch (e) {
-      _logger.e('Error actualizando imagen Base64: $e');
       rethrow;
     }
   }
@@ -200,16 +164,11 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
     try {
       await dbHelper.actualizar(
         tableName,
-        {
-          'sincronizado': 1,
-        },
+        {'sincronizado': 1},
         where: 'id = ?',
         whereArgs: [fotoId],
       );
-
-      _logger.i('📸 Foto $fotoId marcada como sincronizada y Base64 limpiado');
     } catch (e) {
-      _logger.e('Error marcando foto como sincronizada: $e');
       rethrow;
     }
   }
@@ -220,17 +179,11 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
       final placeholders = fotoIds.map((_) => '?').join(',');
       await dbHelper.actualizar(
         tableName,
-        {
-          'sincronizado': 1,
-          'imagen_base64': null,
-        },
+        {'sincronizado': 1, 'imagen_base64': null},
         where: 'id IN ($placeholders)',
         whereArgs: fotoIds,
       );
-
-      _logger.i('📸 ${fotoIds.length} fotos marcadas como sincronizadas');
     } catch (e) {
-      _logger.e('Error marcando múltiples fotos como sincronizadas: $e');
       rethrow;
     }
   }
@@ -244,10 +197,7 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
         where: 'id = ?',
         whereArgs: [fotoId],
       );
-
-      _logger.i('📸 Orden actualizado para foto $fotoId: $nuevoOrden');
     } catch (e) {
-      _logger.e('Error actualizando orden de foto: $e');
       rethrow;
     }
   }
@@ -257,15 +207,8 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
   /// Eliminar foto específica
   Future<void> eliminarFoto(String fotoId) async {
     try {
-      await dbHelper.eliminar(
-        tableName,
-        where: 'id = ?',
-        whereArgs: [fotoId],
-      );
-
-      _logger.i('📸 Foto $fotoId eliminada');
+      await dbHelper.eliminar(tableName, where: 'id = ?', whereArgs: [fotoId]);
     } catch (e) {
-      _logger.e('Error eliminando foto: $e');
       rethrow;
     }
   }
@@ -273,15 +216,12 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
   /// Eliminar todas las fotos de un censo
   Future<void> eliminarFotosPorCenso(String censoActivoId) async {
     try {
-      final eliminadas = await dbHelper.eliminar(
+      await dbHelper.eliminar(
         tableName,
         where: 'censo_activo_id = ?',
         whereArgs: [censoActivoId],
       );
-
-      _logger.i('📸 $eliminadas fotos eliminadas para censo $censoActivoId');
     } catch (e) {
-      _logger.e('Error eliminando fotos por censo: $e');
       rethrow;
     }
   }
@@ -301,21 +241,21 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
         'pendientes': pendientes.length,
       };
     } catch (e) {
-      _logger.e('Error contando fotos por sincronización: $e');
-      return {
-        'total': 0,
-        'sincronizadas': 0,
-        'pendientes': 0,
-      };
+      return {'total': 0, 'sincronizadas': 0, 'pendientes': 0};
     }
   }
 
   /// Obtener estadísticas por censo
-  Future<Map<String, dynamic>> obtenerEstadisticasPorCenso(String censoActivoId) async {
+  Future<Map<String, dynamic>> obtenerEstadisticasPorCenso(
+    String censoActivoId,
+  ) async {
     try {
       final fotos = await obtenerFotosPorCenso(censoActivoId);
       final pendientes = fotos.where((f) => !f.estaSincronizado).length;
-      final tamanoTotal = fotos.fold<int>(0, (sum, foto) => sum + (foto.imagenTamano ?? 0));
+      final tamanoTotal = fotos.fold<int>(
+        0,
+        (sum, foto) => sum + (foto.imagenTamano ?? 0),
+      );
 
       return {
         'total_fotos': fotos.length,
@@ -324,7 +264,6 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
         'tamano_total_mb': (tamanoTotal / (1024 * 1024)).toStringAsFixed(1),
       };
     } catch (e) {
-      _logger.e('Error obteniendo estadísticas por censo: $e');
       return {
         'total_fotos': 0,
         'sincronizadas': 0,
@@ -352,39 +291,40 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
       final ultimoOrden = maps.first['orden'] as int;
       return ultimoOrden + 1;
     } catch (e) {
-      _logger.e('Error obteniendo siguiente orden: $e');
       return 1;
     }
   }
 
   /// Reordenar fotos de un censo
-  Future<void> reordenarFotos(String censoActivoId, List<String> fotosIdsOrdenados) async {
+  Future<void> reordenarFotos(
+    String censoActivoId,
+    List<String> fotosIdsOrdenados,
+  ) async {
     try {
       for (int i = 0; i < fotosIdsOrdenados.length; i++) {
         await actualizarOrden(fotosIdsOrdenados[i], i + 1);
       }
-
-      _logger.i('📸 Fotos reordenadas para censo $censoActivoId');
     } catch (e) {
-      _logger.e('Error reordenando fotos: $e');
       rethrow;
     }
   }
 
   /// Limpiar fotos antigas sincronizadas
-  Future<void> limpiarFotosAntiguasSincronizadas({int diasAntiguedad = 30}) async {
+  Future<void> limpiarFotosAntiguasSincronizadas({
+    int diasAntiguedad = 30,
+  }) async {
     try {
-      final fechaLimite = DateTime.now().subtract(Duration(days: diasAntiguedad));
-
-      final eliminadas = await dbHelper.eliminar(
-        tableName,
-        where: 'fecha_creacion < ? AND sincronizado = 1 AND imagen_base64 IS NULL',
-        whereArgs: [fechaLimite.toIso8601String()],
+      final fechaLimite = DateTime.now().subtract(
+        Duration(days: diasAntiguedad),
       );
 
-      _logger.i('📸 $eliminadas fotos antigas eliminadas');
+      await dbHelper.eliminar(
+        tableName,
+        where:
+            'fecha_creacion < ? AND sincronizado = 1 AND imagen_base64 IS NULL',
+        whereArgs: [fechaLimite.toIso8601String()],
+      );
     } catch (e) {
-      _logger.e('Error limpiando fotos antigas: $e');
       rethrow;
     }
   }
@@ -395,7 +335,6 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
       final fotosPendientes = await obtenerFotosPendientes();
       return fotosPendientes.map((foto) => foto.toJson()).toList();
     } catch (e) {
-      _logger.e('Error preparando fotos para sincronización: $e');
       return [];
     }
   }
@@ -407,8 +346,6 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
     int migradas = 0;
 
     try {
-      _logger.i('🔄 Iniciando migración de fotos desde tabla censo_activo');
-
       // Consultar registros con imágenes en la tabla antigua
       final censosConImagenes = await dbHelper.consultar(
         'censo_activo',
@@ -443,11 +380,8 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
         }
       }
 
-      _logger.i('✅ Migración completada: $migradas fotos migradas');
       return migradas;
-
     } catch (e) {
-      _logger.e('❌ Error en migración de fotos: $e');
       return migradas;
     }
   }

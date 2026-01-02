@@ -2,6 +2,7 @@
 
 import 'package:uuid/uuid.dart';
 import 'package:ada_app/models/cliente.dart';
+import 'package:ada_app/config/app_config.dart';
 
 class CensoApiMapper {
   static final Uuid _uuid = const Uuid();
@@ -11,7 +12,7 @@ class CensoApiMapper {
     required String estadoId,
     required String equipoId,
     required Cliente cliente,
-    required int usuarioId,  // ← Lo recibimos
+    required int usuarioId, // ← Lo recibimos
     required Map<String, dynamic> datosOriginales,
     required Map<String, dynamic> equipoCompleto,
     required bool esCenso,
@@ -24,13 +25,15 @@ class CensoApiMapper {
     final timestampId = _uuid.v4();
 
     return {
-      'id': estadoId,  // ✅ CAMBIO: usar 'id' en lugar de 'id_local'
+      'id': estadoId, // ✅ CAMBIO: usar 'id' en lugar de 'id_local'
       'timestamp_id': timestampId,
       'estado_sincronizacion': 'pendiente',
-      'fecha_creacion': _formatearFechaLocal(now),  // ✅ CAMBIO: coincidir con tabla
+      'fecha_creacion': _formatearFechaLocal(
+        now,
+      ), // ✅ CAMBIO: coincidir con tabla
       'equipo_id': equipoId,
       'cliente_id': cliente.id,
-      'usuario_id': usuarioId,  // ✅ ESTO AHORA SE GUARDARÁ CORRECTAMENTE
+      'usuario_id': usuarioId, // ✅ ESTO AHORA SE GUARDARÁ CORRECTAMENTE
       'funcionando': true,
       'estado_general': 'Equipo registrado desde APP móvil',
 
@@ -46,8 +49,10 @@ class CensoApiMapper {
       'tiene_imagen2': datosOriginales['tiene_imagen2'] ?? false,
 
       // Información del equipo
-      'codigo_barras': equipoCompleto['cod_barras'] ?? datosOriginales['codigo_barras'],
-      'numero_serie': equipoCompleto['numero_serie'] ?? datosOriginales['numero_serie'],
+      'codigo_barras':
+          equipoCompleto['cod_barras'] ?? datosOriginales['codigo_barras'],
+      'numero_serie':
+          equipoCompleto['numero_serie'] ?? datosOriginales['numero_serie'],
       'modelo': equipoCompleto['modelo_nombre'] ?? datosOriginales['modelo'],
       'logo': equipoCompleto['logo_nombre'] ?? datosOriginales['logo'],
       'marca_nombre': equipoCompleto['marca_nombre'] ?? 'Sin marca',
@@ -66,12 +71,12 @@ class CensoApiMapper {
       'ya_asignado': yaAsignado,
 
       // Metadata
-      'version_app': '1.0.0',
+      'version_app': AppConfig.currentAppVersion,
       'dispositivo': datosOriginales['dispositivo'] ?? 'android',
       'fecha_revision': _formatearFechaLocal(now),
       'en_local': true,
-      'sincronizado': 0,  // ✅ AGREGADO
-      'estado_censo': 'creado',  // ✅ AGREGADO
+      'sincronizado': 0, // ✅ AGREGADO
+      'estado_censo': 'creado', // ✅ AGREGADO
     };
   }
 
@@ -79,7 +84,7 @@ class CensoApiMapper {
   // static Map<String, dynamic> prepararDatosParaApi({
   //   required Map<String, dynamic> datosLocales,
   //   required int usuarioId,
-  //   String? edfVendedorId,
+  //   String? employeeId,
   //   List<dynamic>? fotosConBase64,
   // }) {
   //   final now = DateTime.now().toLocal();
@@ -225,7 +230,7 @@ class CensoApiMapper {
       'imagen_base64_2': datos['imagen_base64_2'],
       'tiene_imagen2': datos['tiene_imagen2'] ?? false,
       'imagen_tamano2': datos['imagen_tamano2'],
-      'version_app': '1.0.0',
+      'version_app': AppConfig.currentAppVersion,
       'dispositivo': datos['dispositivo'] ?? 'android',
     };
   }

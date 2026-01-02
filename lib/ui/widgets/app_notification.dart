@@ -3,13 +3,13 @@ import 'package:ada_app/ui/theme/colors.dart';
 
 class AppNotification {
   static void show(
-      BuildContext context, {
-        required String message,
-        NotificationType type = NotificationType.info,
-        Duration duration = const Duration(seconds: 3),
-        String? action,
-        VoidCallback? onAction,
-      }) {
+    BuildContext context, {
+    required String message,
+    NotificationType type = NotificationType.info,
+    Duration duration = const Duration(seconds: 3),
+    String? action,
+    VoidCallback? onAction,
+  }) {
     final overlay = Overlay.of(context);
     late OverlayEntry overlayEntry;
 
@@ -50,8 +50,7 @@ class _MinimalNotificationWidget extends StatefulWidget {
       _MinimalNotificationWidgetState();
 }
 
-class _MinimalNotificationWidgetState
-    extends State<_MinimalNotificationWidget>
+class _MinimalNotificationWidgetState extends State<_MinimalNotificationWidget>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<Offset> _slideAnimation;
@@ -69,18 +68,12 @@ class _MinimalNotificationWidgetState
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, -1.2),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _controller.forward();
 
@@ -134,19 +127,19 @@ class _MinimalNotificationWidgetState
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: config.isDark
-                          ? Colors.white.withOpacity(0.1)
-                          : Colors.black.withOpacity(0.08),
+                          ? Colors.white.withValues(alpha: 0.1)
+                          : Colors.black.withValues(alpha: 0.08),
                       width: 1,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.12),
+                        color: Colors.black.withValues(alpha: 0.12),
                         blurRadius: 20,
                         offset: const Offset(0, 4),
                         spreadRadius: 0,
                       ),
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -163,7 +156,7 @@ class _MinimalNotificationWidgetState
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: config.color.withOpacity(0.4),
+                              color: config.color.withValues(alpha: 0.4),
                               blurRadius: 8,
                               spreadRadius: 1,
                             ),
@@ -219,25 +212,13 @@ class _MinimalNotificationWidgetState
   _MinimalConfig _getConfig(NotificationType type) {
     switch (type) {
       case NotificationType.success:
-        return _MinimalConfig(
-          color: AppColors.success,
-          isDark: false,
-        );
+        return _MinimalConfig(color: AppColors.success, isDark: false);
       case NotificationType.error:
-        return _MinimalConfig(
-          color: AppColors.error,
-          isDark: false,
-        );
+        return _MinimalConfig(color: AppColors.error, isDark: false);
       case NotificationType.warning:
-        return _MinimalConfig(
-          color: AppColors.warning,
-          isDark: false,
-        );
+        return _MinimalConfig(color: AppColors.warning, isDark: false);
       case NotificationType.info:
-        return _MinimalConfig(
-          color: AppColors.info,
-          isDark: false,
-        );
+        return _MinimalConfig(color: AppColors.info, isDark: false);
     }
   }
 }
@@ -246,16 +227,8 @@ class _MinimalConfig {
   final Color color;
   final bool isDark;
 
-  _MinimalConfig({
-    required this.color,
-    required this.isDark,
-  });
+  _MinimalConfig({required this.color, required this.isDark});
 }
 
 // Reutilizar el enum existente
-enum NotificationType {
-  success,
-  error,
-  warning,
-  info,
-}
+enum NotificationType { success, error, warning, info }

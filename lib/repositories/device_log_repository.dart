@@ -1,29 +1,26 @@
-// lib/repositories/device_log_repository.dart
-
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'package:ada_app/models/device_log.dart';
-import 'package:logger/logger.dart';
 
 class DeviceLogRepository {
   final Database db;
   final _uuid = const Uuid();
-  final _logger = Logger();
 
   DeviceLogRepository(this.db);
 
   // ==================== MÉTODOS EXISTENTES ====================
 
   Future<String> guardarLog({
-    String? edfVendedorId,
+    String? id, // <--- ID opcional
+    String? employeeId,
     required double latitud,
     required double longitud,
     required int bateria,
     required String modelo,
   }) async {
     final log = DeviceLog(
-      id: _uuid.v4(),
-      edfVendedorId: edfVendedorId,
+      id: id ?? _uuid.v4(), // <--- Usar ID si se provee
+      employeeId: employeeId,
       latitudLongitud: '$latitud,$longitud',
       bateria: bateria,
       modelo: modelo,
@@ -32,7 +29,7 @@ class DeviceLogRepository {
     );
 
     await db.insert('device_log', log.toMapLocal());
-    _logger.i('✅ Device log guardado: ${log.id}');
+
     return log.id;
   }
 
@@ -44,16 +41,16 @@ class DeviceLogRepository {
   // ==================== 🆕 NUEVOS MÉTODOS ANTI-DUPLICADOS ====================
 
   /// 🆕 Obtener el último log de un vendedor
-  Future<DeviceLog?> obtenerUltimoLog(String? edfVendedorId) async {
+  Future<DeviceLog?> obtenerUltimoLog(String? employeeId) async {
     try {
       // Si no hay vendedor, buscar el último log sin filtro
       final List<Map<String, dynamic>> maps;
 
-      if (edfVendedorId != null) {
+      if (employeeId != null) {
         maps = await db.query(
           'device_log',
-          where: 'edf_vendedor_id = ?',
-          whereArgs: [edfVendedorId],
+          where: 'employee_id = ?',
+          whereArgs: [employeeId],
           orderBy: 'fecha_registro DESC',
           limit: 1,
         );
@@ -68,31 +65,39 @@ class DeviceLogRepository {
       if (maps.isEmpty) return null;
       return DeviceLog.fromMap(maps.first);
     } catch (e) {
-      _logger.e('❌ Error obteniendo último log: $e');
       return null;
     }
   }
 
   /// 🆕 Verificar si existe un log muy reciente (prevenir duplicados)
-  Future<bool> existeLogReciente(String? edfVendedorId, {int minutos = 8}) async {
+  Future<bool> existeLogReciente(
+    String? employeeId, {
+    int minutos = 0,
+    int segundos = 0,
+  }) async {
     try {
-      final ultimoLog = await obtenerUltimoLog(edfVendedorId);
+      final ultimoLog = await obtenerUltimoLog(employeeId);
 
       if (ultimoLog == null) return false;
 
       final tiempoDesdeUltimo = DateTime.now().difference(
-          DateTime.parse(ultimoLog.fechaRegistro)
+        DateTime.parse(ultimoLog.fechaRegistro),
       );
 
-      final esReciente = tiempoDesdeUltimo.inMinutes < minutos;
+      // Calcular el umbral total en segundos
+      final umbralSegundos = (minutos * 60) + segundos;
+
+      // Si no se especifica umbral, asumimos 0 y devolvemos false (siempre permite)
+      if (umbralSegundos <= 0) return false;
+
+      final esReciente = tiempoDesdeUltimo.inSeconds < umbralSegundos;
 
       if (esReciente) {
-        _logger.i('⏭️ Log reciente encontrado (hace ${tiempoDesdeUltimo.inMinutes} min)');
+        // print('Log bloqueado: Último hace ${tiempoDesdeUltimo.inSeconds}s (Umbral: ${umbralSegundos}s)');
       }
 
       return esReciente;
     } catch (e) {
-      _logger.e('❌ Error verificando log reciente: $e');
       return false; // En caso de error, permitir crear log
     }
   }
@@ -110,10 +115,9 @@ class DeviceLogRepository {
       );
 
       final logs = maps.map((map) => DeviceLog.fromMap(map)).toList();
-      _logger.i('📋 Logs no sincronizados encontrados: ${logs.length}');
+
       return logs;
     } catch (e) {
-      _logger.e('❌ Error obteniendo logs no sincronizados: $e');
       return [];
     }
   }
@@ -129,12 +133,8 @@ class DeviceLogRepository {
       );
 
       if (count > 0) {
-        _logger.i('✅ Log marcado como sincronizado: $logId');
-      } else {
-        _logger.w('⚠️ No se encontró el log: $logId');
-      }
+      } else {}
     } catch (e) {
-      _logger.e('❌ Error marcando log como sincronizado: $e');
       rethrow;
     }
   }
@@ -150,13 +150,11 @@ class DeviceLogRepository {
       );
 
       if (maps.isEmpty) {
-        _logger.w('⚠️ Log no encontrado: $logId');
         return null;
       }
 
       return DeviceLog.fromMap(maps.first);
     } catch (e) {
-      _logger.e('❌ Error obteniendo log por ID: $e');
       return null;
     }
   }
@@ -173,24 +171,22 @@ class DeviceLogRepository {
 
       return maps.map((map) => DeviceLog.fromMap(map)).toList();
     } catch (e) {
-      _logger.e('❌ Error obteniendo logs sincronizados: $e');
       return [];
     }
   }
 
   /// Obtener logs por vendedor
-  Future<List<DeviceLog>> obtenerPorVendedor(String edfVendedorId) async {
+  Future<List<DeviceLog>> obtenerPorVendedor(String employeeId) async {
     try {
       final maps = await db.query(
         'device_log',
-        where: 'edf_vendedor_id = ?',
-        whereArgs: [edfVendedorId],
+        where: 'employee_id = ?',
+        whereArgs: [employeeId],
         orderBy: 'fecha_registro DESC',
       );
 
       return maps.map((map) => DeviceLog.fromMap(map)).toList();
     } catch (e) {
-      _logger.e('❌ Error obteniendo logs por vendedor: $e');
       return [];
     }
   }
@@ -204,16 +200,12 @@ class DeviceLogRepository {
       final maps = await db.query(
         'device_log',
         where: 'fecha_registro BETWEEN ? AND ?',
-        whereArgs: [
-          fechaInicio.toIso8601String(),
-          fechaFin.toIso8601String(),
-        ],
+        whereArgs: [fechaInicio.toIso8601String(), fechaFin.toIso8601String()],
         orderBy: 'fecha_registro DESC',
       );
 
       return maps.map((map) => DeviceLog.fromMap(map)).toList();
     } catch (e) {
-      _logger.e('❌ Error obteniendo logs por rango de fechas: $e');
       return [];
     }
   }
@@ -227,7 +219,6 @@ class DeviceLogRepository {
 
       return (result.first['count'] as int?) ?? 0;
     } catch (e) {
-      _logger.e('❌ Error contando pendientes: $e');
       return 0;
     }
   }
@@ -241,7 +232,6 @@ class DeviceLogRepository {
 
       return (result.first['count'] as int?) ?? 0;
     } catch (e) {
-      _logger.e('❌ Error contando sincronizados: $e');
       return 0;
     }
   }
@@ -259,10 +249,8 @@ class DeviceLogRepository {
         whereArgs: [1, fechaLimite],
       );
 
-      _logger.i('🧹 Logs antiguos eliminados: $count');
       return count;
     } catch (e) {
-      _logger.e('❌ Error eliminando logs antiguos: $e');
       return 0;
     }
   }
@@ -277,14 +265,11 @@ class DeviceLogRepository {
       );
 
       if (count > 0) {
-        _logger.i('✅ Log eliminado: $logId');
         return true;
       } else {
-        _logger.w('⚠️ No se encontró el log para eliminar: $logId');
         return false;
       }
     } catch (e) {
-      _logger.e('❌ Error eliminando log: $e');
       return false;
     }
   }
@@ -293,10 +278,9 @@ class DeviceLogRepository {
   Future<int> eliminarTodos() async {
     try {
       final count = await db.delete('device_log');
-      _logger.w('⚠️ Todos los logs eliminados: $count');
+
       return count;
     } catch (e) {
-      _logger.e('❌ Error eliminando todos los logs: $e');
       return 0;
     }
   }
@@ -324,7 +308,6 @@ class DeviceLogRepository {
         'ultimo_registro': row['ultimo_registro'],
       };
     } catch (e) {
-      _logger.e('❌ Error obteniendo estadísticas: $e');
       return {
         'total': 0,
         'pendientes': 0,
@@ -346,7 +329,6 @@ class DeviceLogRepository {
 
       return maps.map((map) => DeviceLog.fromMap(map)).toList();
     } catch (e) {
-      _logger.e('❌ Error obteniendo logs recientes: $e');
       return [];
     }
   }
@@ -354,15 +336,10 @@ class DeviceLogRepository {
   /// Resetear estado de sincronización (útil para testing)
   Future<int> resetearSincronizacion() async {
     try {
-      final count = await db.update(
-        'device_log',
-        {'sincronizado': 0},
-      );
+      final count = await db.update('device_log', {'sincronizado': 0});
 
-      _logger.w('⚠️ Sincronización reseteada para $count logs');
       return count;
     } catch (e) {
-      _logger.e('❌ Error reseteando sincronización: $e');
       return 0;
     }
   }

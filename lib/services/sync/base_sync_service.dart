@@ -3,17 +3,16 @@ import 'dart:io';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
-import 'package:ada_app/services/api_config_service.dart';
+import 'package:ada_app/services/api/api_config_service.dart';
 
 abstract class BaseSyncService {
-  static const Duration timeout = Duration(minutes: 5);
+  static const Duration timeout = Duration(minutes: 1);
 
   static final Logger logger = Logger();
 
   static Future<String> getBaseUrl() async {
     return await ApiConfigService.getBaseUrl();
   }
-
 
   static Map<String, String> get headers => {
     'Content-Type': 'application/json; charset=UTF-8',
@@ -41,7 +40,12 @@ abstract class BaseSyncService {
           }
 
           if (data is Map<String, dynamic>) {
-            final knownFields = ['equipos', 'asignaciones', 'clientes', 'estados'];
+            final knownFields = [
+              'equipos',
+              'asignaciones',
+              'clientes',
+              'estados',
+            ];
             for (final field in knownFields) {
               if (data.containsKey(field) && data[field] is List) {
                 return data[field] as List;
@@ -101,10 +105,9 @@ abstract class BaseSyncService {
     try {
       final baseUrl = await getBaseUrl();
 
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/getPing'),
-        headers: headers,
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(Uri.parse('$baseUrl/api/getPing'), headers: headers)
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         Map<String, dynamic>? serverInfo;
@@ -135,14 +138,10 @@ abstract class BaseSyncService {
         );
       }
     } catch (e) {
-      return ApiResponse(
-        exito: false,
-        mensaje: getErrorMessage(e),
-      );
+      return ApiResponse(exito: false, mensaje: getErrorMessage(e));
     }
   }
 }
-
 
 // Clases de resultado reutilizables
 class SyncResult {

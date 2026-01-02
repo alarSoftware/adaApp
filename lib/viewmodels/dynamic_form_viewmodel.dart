@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:logger/logger.dart';
 import 'package:uuid/uuid.dart';
 import '../models/dynamic_form/dynamic_form_template.dart';
 import '../models/dynamic_form/dynamic_form_response.dart';
@@ -10,32 +9,27 @@ import '../repositories/dynamic_form_sync_repository.dart';
 import '../services/sync/dynamic_form_sync_service.dart';
 
 class DynamicFormViewModel extends ChangeNotifier {
-  final Logger _logger = Logger();
   final Uuid _uuid = Uuid();
 
-  // Repositorios
-  final DynamicFormTemplateRepository _templateRepo = DynamicFormTemplateRepository();
-  final DynamicFormResponseRepository _responseRepo = DynamicFormResponseRepository();
+  final DynamicFormTemplateRepository _templateRepo =
+      DynamicFormTemplateRepository();
+  final DynamicFormResponseRepository _responseRepo =
+      DynamicFormResponseRepository();
   final DynamicFormSyncRepository _syncRepo = DynamicFormSyncRepository();
 
-  // Estado
   bool _isLoading = false;
   bool _isSyncing = false;
   String? _errorMessage;
 
-  // Templates
   List<DynamicFormTemplate> _templates = [];
 
-  // Formulario actual
   DynamicFormTemplate? _currentTemplate;
   DynamicFormResponse? _currentResponse;
   Map<String, dynamic> _fieldValues = {};
   Map<String, String?> _fieldErrors = {};
 
-  // Respuestas guardadas
   List<DynamicFormResponse> _savedResponses = [];
 
-  // Getters
   bool get isLoading => _isLoading;
   bool get isSyncing => _isSyncing;
   String? get errorMessage => _errorMessage;
@@ -44,29 +38,22 @@ class DynamicFormViewModel extends ChangeNotifier {
   DynamicFormResponse? get currentResponse => _currentResponse;
   List<DynamicFormResponse> get savedResponses => _savedResponses;
 
-  // ==================== TEMPLATES ====================
-
   Future<void> loadTemplates() async {
     await _executeWithLoading(() async {
       _templates = await _templateRepo.getAll();
-      _logger.i('✅ Templates cargados: ${_templates.length}');
     });
   }
 
   Future<bool> downloadTemplatesFromServer() async {
     return await _executeWithLoading(() async {
-      _logger.i('📥 Descargando formularios desde servidor...');
-
       final success = await _templateRepo.downloadFromServer();
 
       if (success) {
         await loadTemplates();
-        _logger.i('✅ Templates descargados: ${_templates.length} disponibles');
         return true;
       }
 
       _errorMessage = 'Error descargando formularios del servidor';
-      _logger.e('❌ Error descargando templates');
       return false;
     }, defaultValue: false);
   }
@@ -79,33 +66,30 @@ class DynamicFormViewModel extends ChangeNotifier {
     }
   }
 
-  // ==================== FORM LIFECYCLE ====================
-
   void startNewForm(
-      String templateId, {
-        String? contactoId,
-        String? equipoId,
-        String? userId,
-        String? edfVendedorId,
-        DynamicFormResponse? existingResponse,
-      }) {
+    String templateId, {
+    String? contactoId,
+    String? equipoId,
+    String? userId,
+    String? employeeId,
+    DynamicFormResponse? existingResponse,
+  }) {
     try {
       _currentTemplate = _templates.firstWhere(
-            (t) => t.id == templateId,
+        (t) => t.id == templateId,
         orElse: () => throw Exception('Template no encontrado'),
       );
 
       if (existingResponse != null) {
         _loadExistingResponse(existingResponse);
       } else {
-        _createNewResponse(templateId, contactoId, userId, edfVendedorId);
+        _createNewResponse(templateId, contactoId, userId, employeeId);
       }
 
       _fieldErrors.clear();
       notifyListeners();
     } catch (e) {
       _errorMessage = 'Error iniciando formulario: $e';
-      _logger.e('❌ Error iniciando formulario: $e');
       notifyListeners();
     }
   }
@@ -113,27 +97,14 @@ class DynamicFormViewModel extends ChangeNotifier {
   void _loadExistingResponse(DynamicFormResponse response) {
     _currentResponse = response;
     _fieldValues = Map<String, dynamic>.from(response.answers);
-
-    _logger.i('✅ Formulario cargado para editar: ${response.id}');
-    _logger.i('📝 Valores cargados: ${_fieldValues.length} campos');
-
-    // ✨ NUEVO: Log detallado de los valores cargados
-    _logger.i('📋 Contenido de campos:');
-    _fieldValues.forEach((key, value) {
-      if (value is String && (value.contains('.jpg') || value.contains('.png') || value.contains('.jpeg'))) {
-        _logger.i('  📸 $key: $value (posible imagen)');
-      } else {
-        _logger.i('  📝 $key: $value');
-      }
-    });
   }
 
   void _createNewResponse(
-      String templateId,
-      String? contactoId,
-      String? userId,
-      String? edfVendedorId,
-      ) {
+    String templateId,
+    String? contactoId,
+    String? userId,
+    String? employeeId,
+  ) {
     final responseId = _uuid.v4();
 
     _currentResponse = DynamicFormResponse(
@@ -144,31 +115,26 @@ class DynamicFormViewModel extends ChangeNotifier {
       status: 'draft',
       contactoId: contactoId,
       userId: userId,
-      edfVendedorId: edfVendedorId,
+      employeeId: employeeId,
     );
 
     _fieldValues.clear();
-    _logger.i('✅ Formulario nuevo iniciado: ${_currentTemplate?.title} (UUID: $responseId)');
   }
 
   void loadResponseForEditing(DynamicFormResponse response) {
     try {
       _currentTemplate = _templates.firstWhere(
-            (t) => t.id == response.formTemplateId,
+        (t) => t.id == response.formTemplateId,
         orElse: () => throw Exception('Template no encontrado'),
       );
 
       _loadExistingResponse(response);
-      _logger.i('✅ Respuesta cargada para edición: ${response.id}');
       notifyListeners();
     } catch (e) {
       _errorMessage = 'Error cargando respuesta: $e';
-      _logger.e('❌ Error cargando respuesta: $e');
       notifyListeners();
     }
   }
-
-  // ==================== FIELD MANAGEMENT ====================
 
   dynamic getFieldValue(String fieldId) => _fieldValues[fieldId];
 
@@ -177,7 +143,8 @@ class DynamicFormViewModel extends ChangeNotifier {
   void updateFieldValue(String fieldId, dynamic value) {
     final field = _currentTemplate?.getFieldById(fieldId);
 
-    if (field != null && (field.type == 'radio_button' || field.type == 'checkbox')) {
+    if (field != null &&
+        (field.type == 'radio_button' || field.type == 'checkbox')) {
       _clearChildrenValues(field, value);
     }
 
@@ -188,7 +155,6 @@ class DynamicFormViewModel extends ChangeNotifier {
       _currentResponse = _currentResponse!.copyWith(answers: {..._fieldValues});
     }
 
-    _logger.d('📝 Campo actualizado: $fieldId = $value');
     notifyListeners();
   }
 
@@ -207,7 +173,9 @@ class DynamicFormViewModel extends ChangeNotifier {
   }
 
   void _clearUnselectedOptions(DynamicFormField field, dynamic newValue) {
-    final selectedIds = newValue is List ? List<String>.from(newValue) : <String>[];
+    final selectedIds = newValue is List
+        ? List<String>.from(newValue)
+        : <String>[];
 
     for (var option in field.children.where((c) => c.type == 'opt')) {
       if (!selectedIds.contains(option.id)) {
@@ -220,7 +188,6 @@ class DynamicFormViewModel extends ChangeNotifier {
     if (field.type != 'opt') {
       _fieldValues.remove(field.id);
       _fieldErrors.remove(field.id);
-      _logger.d('🧹 Limpiando campo: ${field.id} (${field.label})');
     }
 
     for (var child in field.children) {
@@ -228,9 +195,6 @@ class DynamicFormViewModel extends ChangeNotifier {
     }
   }
 
-  // ==================== MANEJO DE IMÁGENES ====================
-
-  /// Guarda una imagen inmediatamente cuando el usuario la selecciona
   Future<bool> saveImageForField(String fieldId, String imagePath) async {
     try {
       if (_currentResponse == null) {
@@ -238,7 +202,6 @@ class DynamicFormViewModel extends ChangeNotifier {
         return false;
       }
 
-      // 1. Guardar imagen en dynamic_form_response_image
       final imageId = await _responseRepo.saveImageImmediately(
         responseId: _currentResponse!.id,
         fieldId: fieldId,
@@ -247,52 +210,40 @@ class DynamicFormViewModel extends ChangeNotifier {
 
       if (imageId != null) {
         updateFieldValue(fieldId, imagePath);
-
-        _logger.i('✅ Imagen y detalle guardados exitosamente');
         return true;
       }
 
       return false;
     } catch (e) {
       _errorMessage = 'Error guardando imagen: $e';
-      _logger.e('❌ Error en saveImageForField: $e');
       return false;
     }
   }
 
-  /// Elimina una imagen de un campo
   Future<bool> deleteImageForField(String fieldId) async {
     try {
       if (_currentResponse == null) {
-        _logger.e('❌ No hay formulario activo para eliminar imagen');
         return false;
       }
 
-      _logger.i('🗑️ Eliminando imagen del campo: $fieldId');
-
-      // Buscar el detalle asociado
       final details = await _responseRepo.getDetails(_currentResponse!.id);
-      final detail = details.where((d) => d.dynamicFormDetailId == fieldId).firstOrNull;
+      final detail = details
+          .where((d) => d.dynamicFormDetailId == fieldId)
+          .firstOrNull;
 
       if (detail != null) {
-        // Obtener y eliminar imágenes
         final images = await _responseRepo.getImagesForDetail(detail.id);
         for (var image in images) {
           await _responseRepo.deleteImageFile(image);
         }
       }
 
-      // Limpiar el valor del campo
       updateFieldValue(fieldId, null);
-      _logger.i('✅ Imagen eliminada');
       return true;
     } catch (e) {
-      _logger.e('❌ Error eliminando imagen: $e');
       return false;
     }
   }
-
-  // ==================== VALIDATION ====================
 
   bool _validateAllFields() {
     if (_currentTemplate == null) return false;
@@ -306,12 +257,7 @@ class DynamicFormViewModel extends ChangeNotifier {
       if (field.required && _isFieldEmpty(_fieldValues[field.id])) {
         _fieldErrors[field.id] = '${field.label} es obligatorio';
         isValid = false;
-        _logger.w('⚠️ Campo obligatorio sin completar: ${field.label} (${field.id})');
       }
-    }
-
-    if (!isValid) {
-      _logger.w('⚠️ Validación fallida: ${_fieldErrors.length} errores');
     }
 
     return isValid;
@@ -320,8 +266,9 @@ class DynamicFormViewModel extends ChangeNotifier {
   bool isFormComplete() {
     if (_currentTemplate == null) return false;
 
-    return _currentTemplate!.requiredFields
-        .every((field) => !_isFieldEmpty(_fieldValues[field.id]));
+    return _currentTemplate!.requiredFields.every(
+      (field) => !_isFieldEmpty(_fieldValues[field.id]),
+    );
   }
 
   double getFormProgress() {
@@ -344,10 +291,11 @@ class DynamicFormViewModel extends ChangeNotifier {
     return false;
   }
 
-  // ==================== SAVING ====================
-
   Future<bool> saveProgress() async {
-    return await _saveWithStatus('draft', 'Guardando progreso como borrador...');
+    return await _saveWithStatus(
+      'draft',
+      'Guardando progreso como borrador...',
+    );
   }
 
   Future<bool> saveDraft() async {
@@ -361,24 +309,18 @@ class DynamicFormViewModel extends ChangeNotifier {
         return false;
       }
 
-      _logger.i('✔️ Intentando completar formulario...');
-
       if (!_validateAllFields()) {
         _errorMessage = 'Por favor completa todos los campos obligatorios';
-        _logger.w('⚠️ Validación fallida al completar');
         notifyListeners();
         return false;
       }
 
-      // ✅ MEJORADO: Asegurar que completedAt esté establecido correctamente
       final now = DateTime.now();
       final completedResponse = _currentResponse!.copyWith(
         answers: Map<String, dynamic>.from(_fieldValues),
         completedAt: now,
         status: 'completed',
       );
-
-      _logger.i('🔍 DEBUG: Guardando formulario completado con fecha: ${now.toIso8601String()}');
 
       final saved = await _responseRepo.save(completedResponse);
       if (!saved) {
@@ -387,9 +329,6 @@ class DynamicFormViewModel extends ChangeNotifier {
         return false;
       }
 
-      _logger.i('✅ Formulario completado y guardado en BD');
-
-      // Sincronizar
       await _syncResponse(completedResponse.id);
 
       _clearCurrentForm();
@@ -397,7 +336,6 @@ class DynamicFormViewModel extends ChangeNotifier {
       return true;
     } catch (e) {
       _errorMessage = 'Error completando formulario: $e';
-      _logger.e('❌ Error en saveAndComplete: $e');
       _isSyncing = false;
       notifyListeners();
       return false;
@@ -411,8 +349,6 @@ class DynamicFormViewModel extends ChangeNotifier {
         return false;
       }
 
-      _logger.i('💾 $logMessage');
-
       final updatedResponse = _currentResponse!.copyWith(
         answers: Map<String, dynamic>.from(_fieldValues),
         status: status,
@@ -422,17 +358,14 @@ class DynamicFormViewModel extends ChangeNotifier {
 
       if (success) {
         _currentResponse = updatedResponse;
-        _logger.i('✅ Guardado exitoso');
         notifyListeners();
         return true;
       }
 
       _errorMessage = 'Error guardando';
-      _logger.e('❌ Error guardando');
       return false;
     } catch (e) {
       _errorMessage = 'Error guardando: $e';
-      _logger.e('❌ Error guardando: $e');
       return false;
     }
   }
@@ -444,27 +377,14 @@ class DynamicFormViewModel extends ChangeNotifier {
     _fieldErrors.clear();
   }
 
-  // ==================== SYNC ====================
-
-  /// ✅ MEJORADO: Mejor manejo de errores y logging
   Future<void> _syncResponse(String responseId) async {
     _isSyncing = true;
     notifyListeners();
 
     try {
-      _logger.i('🔄 Iniciando sincronización de respuesta: $responseId');
-
-      final synced = await _syncRepo.syncTo(responseId);
-
-      if (synced) {
-        _logger.i('✅ Formulario sincronizado exitosamente');
-      } else {
-        _logger.w('⚠️ Formulario guardado pero no sincronizado - se reintentará automáticamente');
-      }
+      await _syncRepo.syncTo(responseId);
     } catch (e) {
-      _logger.e('❌ Error en sincronización: $e');
-      // No establecer _errorMessage aquí para no confundir al usuario
-      // El error se maneja en el syncRepo
+      _errorMessage = 'Error de sincronización: $e';
     } finally {
       _isSyncing = false;
       notifyListeners();
@@ -477,11 +397,10 @@ class DynamicFormViewModel extends ChangeNotifier {
       notifyListeners();
 
       final result = await _syncRepo.syncAllPending();
-      _logger.i('✅ Sincronización completada: ${result['success']} exitosas, ${result['failed']} fallidas');
 
       return result;
     } catch (e) {
-      _logger.e('❌ Error sincronizando: $e');
+      _errorMessage = 'Error sincronizando pendientes: $e';
       return {'success': 0, 'failed': 0};
     } finally {
       _isSyncing = false;
@@ -491,8 +410,6 @@ class DynamicFormViewModel extends ChangeNotifier {
 
   Future<bool> retrySyncResponse(String responseId) async {
     try {
-      _logger.i('🔄 Reintentando sincronización: $responseId');
-
       _isSyncing = true;
       notifyListeners();
 
@@ -502,16 +419,13 @@ class DynamicFormViewModel extends ChangeNotifier {
       notifyListeners();
 
       if (success) {
-        _logger.i('✅ Reintento exitoso');
         return true;
       }
 
-      _logger.w('⚠️ Reintento fallido');
       _errorMessage = 'No se pudo sincronizar. Intenta más tarde.';
       notifyListeners();
       return false;
     } catch (e) {
-      _logger.e('❌ Error en reintento: $e');
       _errorMessage = e.toString();
       _isSyncing = false;
       notifyListeners();
@@ -524,18 +438,11 @@ class DynamicFormViewModel extends ChangeNotifier {
       final pending = await _responseRepo.countPendingSync();
       final synced = await _responseRepo.countSynced();
 
-      return {
-        'pending': pending,
-        'synced': synced,
-        'total': pending + synced,
-      };
+      return {'pending': pending, 'synced': synced, 'total': pending + synced};
     } catch (e) {
-      _logger.e('❌ Error obteniendo contadores: $e');
       return {'pending': 0, 'synced': 0, 'total': 0};
     }
   }
-
-  // ==================== RESPONSES ====================
 
   Future<void> loadSavedResponsesWithSync({String? clienteId}) async {
     await _executeWithLoading(() async {
@@ -553,7 +460,6 @@ class DynamicFormViewModel extends ChangeNotifier {
 
       if (success) {
         _savedResponses.removeWhere((r) => r.id == responseId);
-        _logger.i('✅ Respuesta eliminada: $responseId');
         notifyListeners();
         return true;
       }
@@ -561,35 +467,31 @@ class DynamicFormViewModel extends ChangeNotifier {
       return false;
     } catch (e) {
       _errorMessage = 'Error eliminando respuesta: $e';
-      _logger.e('❌ Error eliminando respuesta: $e');
       return false;
     }
   }
 
-  Future<bool> downloadResponsesFromServer(String edfvendedorId) async {
+  Future<bool> downloadResponsesFromServer(String employeeId) async {
     return await _executeWithLoading(() async {
-      _logger.i('📥 Descargando respuestas desde servidor...');
-
-      final resultado = await DynamicFormSyncService.obtenerRespuestasPorVendedor(edfvendedorId);
+      final resultado =
+          await DynamicFormSyncService.obtenerRespuestasPorVendedor(
+            employeeId,
+          );
 
       if (resultado.exito) {
         await loadSavedResponsesWithSync();
-        _logger.i('✅ Respuestas descargadas: ${resultado.itemsSincronizados}');
         return true;
       }
 
       _errorMessage = 'Error descargando respuestas del servidor';
-      _logger.e('❌ Error descargando respuestas');
       return false;
     }, defaultValue: false);
   }
 
-  // ==================== HELPERS ====================
-
   Future<T> _executeWithLoading<T>(
-      Future<T> Function() action, {
-        T? defaultValue,
-      }) async {
+    Future<T> Function() action, {
+    T? defaultValue,
+  }) async {
     try {
       _isLoading = true;
       _errorMessage = null;
@@ -598,7 +500,6 @@ class DynamicFormViewModel extends ChangeNotifier {
       return await action();
     } catch (e) {
       _errorMessage = 'Error: $e';
-      _logger.e('❌ Error: $e');
       if (defaultValue != null) return defaultValue;
       rethrow;
     } finally {
@@ -609,7 +510,6 @@ class DynamicFormViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
-    _logger.d('Limpiando DynamicFormViewModel');
     super.dispose();
   }
 }

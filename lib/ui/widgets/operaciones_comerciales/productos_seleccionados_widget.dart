@@ -1,76 +1,36 @@
-// lib/ui/screens/operaciones_comerciales/widgets/productos_seleccionados_widget.dart
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
+import 'package:ada_app/models/producto.dart';
+import 'package:ada_app/repositories/producto_repository.dart';
 
-/// Widget para mostrar y manejar productos seleccionados
-/// Incluye funcionalidad específica para productos discontinuos con reemplazos
 class ProductosSeleccionadosWidget extends StatelessWidget {
   final List<OperacionComercialDetalle> productosSeleccionados;
   final TipoOperacion tipoOperacion;
   final Function(int) onEliminarProducto;
   final Function(int, double) onActualizarCantidad;
   final Function(int, dynamic)? onSeleccionarReemplazo;
+  final bool isReadOnly;
+  final ProductoRepository _productoRepository;
 
-  const ProductosSeleccionadosWidget({
+  ProductosSeleccionadosWidget({
     Key? key,
     required this.productosSeleccionados,
     required this.tipoOperacion,
     required this.onEliminarProducto,
     required this.onActualizarCantidad,
     this.onSeleccionarReemplazo,
-  }) : super(key: key);
+    this.isReadOnly = false,
+    ProductoRepository? productoRepository,
+  }) : _productoRepository = productoRepository ?? ProductoRepositoryImpl(),
+       super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(Icons.shopping_cart_outlined, 
-              size: 20, 
-              color: AppColors.primary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Productos Seleccionados',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(width: 8),
-            if (productosSeleccionados.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.3),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  '${productosSeleccionados.length}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Lista de productos seleccionados
         if (productosSeleccionados.isEmpty)
           _buildEmptyState()
         else
@@ -106,11 +66,6 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
               color: AppColors.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              Icons.inventory_2_outlined, 
-              size: 48, 
-              color: AppColors.primary.withValues(alpha: 0.6),
-            ),
           ),
           const SizedBox(height: 16),
           Text(
@@ -124,10 +79,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'Busca productos arriba para agregarlos',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             textAlign: TextAlign.center,
           ),
         ],
@@ -149,10 +101,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           builder: (context, value, child) {
             return Transform.translate(
               offset: Offset(0, 20 * (1 - value)),
-              child: Opacity(
-                opacity: value,
-                child: child,
-              ),
+              child: Opacity(opacity: value, child: child),
             );
           },
           child: _buildProductCard(context, index),
@@ -163,23 +112,24 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
 
   Widget _buildProductCard(BuildContext context, int index) {
     final detalle = productosSeleccionados[index];
-    final esDiscontinuos = tipoOperacion == TipoOperacion.notaRetiroDiscontinuos;
+    final esDiscontinuos =
+        tipoOperacion == TipoOperacion.notaRetiroDiscontinuos;
 
     return Container(
       decoration: BoxDecoration(
         gradient: AppColors.cardGradient,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: esDiscontinuos 
-            ? AppColors.error.withValues(alpha: 0.2)
-            : AppColors.border.withValues(alpha: 0.3),
+          color: esDiscontinuos
+              ? AppColors.error.withValues(alpha: 0.2)
+              : AppColors.border.withValues(alpha: 0.3),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
             color: esDiscontinuos
-              ? AppColors.error.withValues(alpha: 0.1)
-              : AppColors.shadow.withValues(alpha: 0.08),
+                ? AppColors.error.withValues(alpha: 0.1)
+                : AppColors.shadow.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -189,67 +139,47 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: Column(
           children: [
-            // Barra superior con gradiente si es discontinuo
             if (esDiscontinuos)
               Container(
                 height: 4,
-                decoration: BoxDecoration(
-                  gradient: AppColors.errorGradient,
-                ),
+                decoration: BoxDecoration(gradient: AppColors.errorGradient),
               ),
-            
+
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Icono del producto con gradiente
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          gradient: esDiscontinuos 
-                            ? AppColors.errorGradient
-                            : AppColors.primaryGradient,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: (esDiscontinuos ? AppColors.error : AppColors.primary)
-                                .withValues(alpha: 0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
+                  FutureBuilder<Producto?>(
+                    future: _productoRepository.obtenerProductoPorId(
+                      detalle.productoId!,
+                    ),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const SizedBox(
+                          height: 60,
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+
+                      final producto = snapshot.data!;
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildProductInfo(producto, esDiscontinuos),
+                          ),
+                          const SizedBox(width: 12),
+                          _buildQuantityField(index, detalle),
+                          if (!isReadOnly) ...[
+                            const SizedBox(width: 8),
+                            _buildDeleteButton(index),
                           ],
-                        ),
-                        child: Icon(
-                          esDiscontinuos ? Icons.remove_circle_outline : Icons.inventory_2,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                      
-                      const SizedBox(width: 16),
-                      
-                      // Información del producto
-                      Expanded(
-                        child: _buildProductInfo(detalle, esDiscontinuos),
-                      ),
-                      
-                      const SizedBox(width: 12),
-                      
-                      // Campo de cantidad
-                      _buildQuantityField(index, detalle),
-                      
-                      const SizedBox(width: 8),
-                      
-                      // Botón eliminar
-                      _buildDeleteButton(index),
-                    ],
+                        ],
+                      );
+                    },
                   ),
-                  
-                  // Sección de intercambio para discontinuos
+
                   if (esDiscontinuos) ...[
                     const SizedBox(height: 16),
                     _buildExchangeSection(context, index, detalle),
@@ -263,7 +193,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildProductInfo(OperacionComercialDetalle detalle, bool esDiscontinuos) {
+  Widget _buildProductInfo(Producto producto, bool esDiscontinuos) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -297,48 +227,93 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           ],
         ),
         if (esDiscontinuos) const SizedBox(height: 6),
-        Text(
-          detalle.productoDescripcion,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-            height: 1.3,
-          ),
+        RichText(
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
+          text: TextSpan(
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+              height: 1.3,
+            ),
+            children: [
+              TextSpan(
+                text: '[${producto.codigo ?? 'S/C'}] ',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              TextSpan(text: producto.nombre ?? 'Sin nombre'),
+            ],
+          ),
         ),
         const SizedBox(height: 4),
-        Row(
-          children: [
-            Icon(Icons.qr_code, size: 12, color: AppColors.textSecondary),
-            const SizedBox(width: 4),
-            Text(
-              detalle.productoCodigo,
-              style: TextStyle(
-                fontSize: 12,
+        if (producto.codigoBarras != null && producto.codigoBarras!.isNotEmpty)
+          Row(
+            children: [
+              Icon(
+                Icons.barcode_reader,
+                size: 12,
                 color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
               ),
-            ),
-          ],
-        ),
-        if (detalle.productoCategoria != null) ...[ 
+              const SizedBox(width: 4),
+              Text(
+                producto.codigoBarras!,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        if (producto.tieneCategoria || producto.tieneUnidadMedida) ...[
           const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              detalle.productoCategoria!,
-              style: TextStyle(
-                fontSize: 10,
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+          Row(
+            children: [
+              if (producto.tieneCategoria)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    producto.categoria!,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              if (producto.tieneCategoria && producto.tieneUnidadMedida)
+                const SizedBox(width: 6),
+              if (producto.tieneUnidadMedida)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.textSecondary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    producto.displayUnidadMedida,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ],
@@ -349,24 +324,31 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     return Container(
       width: 70,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isReadOnly ? Colors.grey.shade100 : Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.3),
+          color: isReadOnly
+              ? Colors.grey.shade300
+              : AppColors.primary.withValues(alpha: 0.3),
           width: 1.5,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        boxShadow: isReadOnly
+            ? []
+            : [
+                BoxShadow(
+                  color: AppColors.shadow.withValues(alpha: 0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: TextFormField(
-        initialValue: detalle.cantidad > 0 ? detalle.cantidad.toInt().toString() : '',
+        initialValue: detalle.cantidad > 0
+            ? detalle.cantidad.toInt().toString()
+            : '',
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
+        enabled: !isReadOnly,
         decoration: InputDecoration(
           hintText: '0',
           hintStyle: TextStyle(
@@ -383,17 +365,21 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           focusedBorder: InputBorder.none,
           errorBorder: InputBorder.none,
           focusedErrorBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
         ),
         style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.bold,
-          color: AppColors.textPrimary,
+          color: isReadOnly ? AppColors.textSecondary : AppColors.textPrimary,
         ),
         onChanged: (value) {
-          final cantidad = int.tryParse(value) ?? 0;
-          onActualizarCantidad(index, cantidad.toDouble());
+          if (!isReadOnly) {
+            final cantidad = int.tryParse(value) ?? 0;
+            onActualizarCantidad(index, cantidad.toDouble());
+          }
         },
         validator: (value) {
+          if (isReadOnly) return null;
           final cantidad = int.tryParse(value ?? '');
           if (cantidad == null || cantidad <= 0) {
             return '';
@@ -417,8 +403,8 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
-            Icons.delete_outline_rounded, 
-            color: AppColors.error, 
+            Icons.delete_outline_rounded,
+            color: AppColors.error,
             size: 20,
           ),
         ),
@@ -426,7 +412,11 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildExchangeSection(BuildContext context, int index, OperacionComercialDetalle detalle) {
+  Widget _buildExchangeSection(
+    BuildContext context,
+    int index,
+    OperacionComercialDetalle detalle,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -446,7 +436,6 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Icono de intercambio con animación
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -455,30 +444,8 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                 tween: Tween(begin: 0.0, end: 1.0),
                 curve: Curves.easeInOut,
                 builder: (context, value, child) {
-                  return Transform.rotate(
-                    angle: value * 3.14159, // 180 grados
-                    child: child,
-                  );
+                  return Transform.rotate(angle: value * 3.14159, child: child);
                 },
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: AppColors.warningGradient,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.warning.withValues(alpha: 0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.swap_vert_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
               ),
               const SizedBox(width: 12),
               Text(
@@ -494,8 +461,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Producto de reemplazo
-          if (detalle.productoReemplazoCodigo == null)
+          if (detalle.productoReemplazoId == null)
             _buildSelectReplacementButton(index, detalle)
           else
             _buildReplacementInfo(index, detalle),
@@ -504,7 +470,37 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildSelectReplacementButton(int index, OperacionComercialDetalle detalle) {
+  Widget _buildSelectReplacementButton(
+    int index,
+    OperacionComercialDetalle detalle,
+  ) {
+    if (isReadOnly) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300, width: 2),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, color: AppColors.textSecondary, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Sin producto de reemplazo',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -543,8 +539,8 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                   ],
                 ),
                 child: const Icon(
-                  Icons.add_rounded, 
-                  color: Colors.white, 
+                  Icons.add_rounded,
+                  color: Colors.white,
                   size: 20,
                 ),
               ),
@@ -573,8 +569,8 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                 ),
               ),
               Icon(
-                Icons.arrow_forward_ios_rounded, 
-                size: 16, 
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
                 color: AppColors.success,
               ),
             ],
@@ -585,109 +581,122 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
   }
 
   Widget _buildReplacementInfo(int index, OperacionComercialDetalle detalle) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.success.withValues(alpha: 0.15),
-            AppColors.success.withValues(alpha: 0.2),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.success.withValues(alpha: 0.5),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.success.withValues(alpha: 0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
+    return FutureBuilder<Producto?>(
+      future: _productoRepository.obtenerProductoPorId(
+        detalle.productoReemplazoId!,
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              gradient: AppColors.successGradient,
-              borderRadius: BorderRadius.circular(6),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.success.withValues(alpha: 0.3),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const SizedBox(
+            height: 60,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final productoReemplazo = snapshot.data!;
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.success.withValues(alpha: 0.15),
+                AppColors.success.withValues(alpha: 0.2),
               ],
             ),
-            child: const Text(
-              'NUEVO',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppColors.success.withValues(alpha: 0.5),
+              width: 2,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.success.withValues(alpha: 0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  detalle.productoReemplazoDescripcion ?? '',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Row(
+          child: Row(
+            children: [
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.qr_code, size: 11, color: AppColors.textSecondary),
-                    const SizedBox(width: 4),
-                    Text(
-                      detalle.productoReemplazoCodigo ?? '',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w500,
+                    RichText(
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      text: TextSpan(
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: '[${productoReemplazo.codigo ?? 'S/C'}] ',
+                            style: TextStyle(
+                              color: AppColors.success,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          TextSpan(
+                            text: productoReemplazo.nombre ?? 'Sin nombre',
+                          ),
+                        ],
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    if (productoReemplazo.codigoBarras != null &&
+                        productoReemplazo.codigoBarras!.isNotEmpty)
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.barcode_reader,
+                            size: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            productoReemplazo.codigoBarras!,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => onSeleccionarReemplazo?.call(index, detalle),
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.edit_rounded, 
-                  color: AppColors.success, 
-                  size: 18,
-                ),
               ),
-            ),
+              if (!isReadOnly)
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => onSeleccionarReemplazo?.call(index, detalle),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.edit_rounded,
+                        color: AppColors.success,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

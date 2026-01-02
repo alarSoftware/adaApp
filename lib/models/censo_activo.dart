@@ -30,7 +30,7 @@ extension EstadoEquipoCensoExtension on EstadoEquipoCenso {
 
 class CensoActivo {
   final String? id;
-  final String? edfVendedorId;
+  final String? employeeId;
   final String equipoId;
   final int clienteId;
   final int? usuarioId;
@@ -48,7 +48,7 @@ class CensoActivo {
 
   CensoActivo({
     this.id,
-    this.edfVendedorId,
+    this.employeeId,
     required this.equipoId,
     required this.clienteId,
     this.usuarioId,
@@ -68,7 +68,7 @@ class CensoActivo {
   factory CensoActivo.fromMap(Map<String, dynamic> map) {
     return CensoActivo(
       id: map['id'] as String?,
-      edfVendedorId: map['edf_vendedor_id'],
+      employeeId: map['employee_id'],
       equipoId: map['equipo_id'] as String? ?? '0',
       clienteId: map['cliente_id'] as int? ?? 0,
       usuarioId: map['usuario_id'] as int?,
@@ -111,6 +111,7 @@ class CensoActivo {
       'intentos_sync': intentosSync,
       'ultimo_intento': ultimoIntento?.toIso8601String(),
       'error_mensaje': errorMensaje,
+      'employee_id': employeeId,
     };
 
     if (estadoCenso != null) {

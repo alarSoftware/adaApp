@@ -3,8 +3,8 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:logger/logger.dart';
-import 'package:ada_app/services/api_config_service.dart';
-import 'package:ada_app/services/error_log/error_log_service.dart';
+import 'package:ada_app/services/api/api_config_service.dart';
+
 import 'package:ada_app/config/constants/server_constants.dart';
 
 class BasePostService {
@@ -38,11 +38,13 @@ class BasePostService {
       logger.i('📤 POST a $fullUrl');
       logger.i('📦 Body size: ${jsonBody.length} caracteres');
 
-      final response = await http.post(
-        Uri.parse(fullUrl),
-        headers: customHeaders ?? headers,
-        body: jsonBody,
-      ).timeout(timeout);
+      final response = await http
+          .post(
+            Uri.parse(fullUrl),
+            headers: customHeaders ?? headers,
+            body: jsonBody,
+          )
+          .timeout(timeout);
 
       logger.i('📥 Response: ${response.statusCode}');
 
@@ -51,7 +53,9 @@ class BasePostService {
       // 🚨 Si hubo error del servidor, loguear
       if (!result['exito'] && tableName != null) {
         // Usamos el status_code que devuelve el result si existe, sino el HTTP code
-        final errorCode = result['serverAction']?.toString() ?? response.statusCode.toString();
+        final errorCode =
+            result['serverAction']?.toString() ??
+            response.statusCode.toString();
 
         // await ErrorLogService.logServerError(
         //   tableName: tableName,
@@ -65,7 +69,6 @@ class BasePostService {
       }
 
       return result;
-
     } on SocketException catch (e) {
       logger.e('📡 Error de red: $e');
 
@@ -87,7 +90,6 @@ class BasePostService {
         'mensaje': 'Sin conexión de red',
         'error': 'Sin conexión de red',
       };
-
     } on TimeoutException catch (e) {
       logger.e('⏰ Timeout: $e');
 
@@ -109,7 +111,6 @@ class BasePostService {
         'mensaje': 'Tiempo de espera agotado',
         'error': 'Tiempo de espera agotado',
       };
-
     } on http.ClientException catch (e) {
       logger.e('🌐 Error de cliente HTTP: $e');
 
@@ -131,7 +132,6 @@ class BasePostService {
         'mensaje': 'Error de red: ${e.message}',
         'error': e.message,
       };
-
     } catch (e) {
       logger.e('❌ Error general en POST: $e');
 
@@ -159,7 +159,10 @@ class BasePostService {
   }
 
   /// Procesar respuesta HTTP
-  static Map<String, dynamic> _processResponse(http.Response response, String? url) {
+  static Map<String, dynamic> _processResponse(
+    http.Response response,
+    String? url,
+  ) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       // 🛑 Aquí validamos el cuerpo JSON, incluso si el status es 200
       return _processSuccessResponse(response);
@@ -187,7 +190,8 @@ class BasePostService {
       if (responseBody is Map && responseBody.containsKey('serverAction')) {
         final serverAction = responseBody['serverAction'] as int?;
 
-        if (serverAction == ServerConstants.SUCCESS_TRANSACTION) { // 100
+        if (serverAction == ServerConstants.SUCCESS_TRANSACTION) {
+          // 100
           // Éxito Lógico confirmado
           final servidorId = responseBody['resultId'] ?? responseBody['id'];
           return {
@@ -204,7 +208,10 @@ class BasePostService {
           return {
             'exito': false,
             'success': false,
-            'mensaje': responseBody['resultError'] ?? responseBody['resultMessage'] ?? 'Error de lógica del servidor',
+            'mensaje':
+                responseBody['resultError'] ??
+                responseBody['resultMessage'] ??
+                'Error de lógica del servidor',
             'serverAction': serverAction,
             'resultError': responseBody['resultError'],
             'status_code': response.statusCode,
@@ -214,7 +221,8 @@ class BasePostService {
 
       // 3. Fallback genérico (si no tiene serverAction)
       dynamic servidorId = responseBody['id'] ?? responseBody['insertId'];
-      String mensaje = responseBody['message'] ?? 'Operación exitosa (Formato Genérico)';
+      String mensaje =
+          responseBody['message'] ?? 'Operación exitosa (Formato Genérico)';
 
       return {
         'exito': true,
@@ -223,9 +231,10 @@ class BasePostService {
         'servidor_id': servidorId,
         'mensaje': mensaje,
       };
-
     } catch (e) {
-      logger.w('⚠️ Error al parsear JSON o respuesta plana: $e. Body: ${response.body}');
+      logger.w(
+        '⚠️ Error al parsear JSON o respuesta plana: $e. Body: ${response.body}',
+      );
       // Si falla el parseo, pero el status es 2xx, asumimos éxito simple
       return {
         'exito': true,
