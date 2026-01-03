@@ -53,7 +53,9 @@ class UserSyncService {
           // PROCESAR RUTAS
           final rutas = usuario['rutas'];
           if (rutas != null && rutas is List && usuarioId != null) {
-            _dbHelper.sincronizarRutas(usuarioId, rutas).catchError((e) {});
+            _dbHelper.sincronizarRutas(usuarioId, rutas).catchError((e) {
+              print('Error sincronizando rutas para usuario $usuarioId: $e');
+            });
           }
 
           return {

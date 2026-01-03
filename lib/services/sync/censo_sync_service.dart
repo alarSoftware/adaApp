@@ -604,6 +604,7 @@ class CensusSyncService extends BaseSyncService {
             final censoParaGuardar = _mapApiToLocalFormat(censoMap);
             censosParaGuardar.add(censoParaGuardar);
           } catch (e) {
+            print('Error procesando censo individual: $e');
             // Error procesando censo
           }
         }
@@ -611,6 +612,7 @@ class CensusSyncService extends BaseSyncService {
 
       return censosParaGuardar;
     } catch (e) {
+      print('Error general procesando JSON de censos: $e');
       return null;
     }
   }
