@@ -2,7 +2,7 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+
 import 'dart:isolate';
 import 'package:http/http.dart' as http;
 
@@ -141,25 +141,19 @@ class OperacionComercialSyncService extends BaseSyncService {
         itemsSincronizados: processedResult.length,
         totalEnAPI: processedResult.length,
       );
-    } on TimeoutException catch (timeoutError) {
-      _ultimasOperaciones = [];
-      print('FIN DE DESCARGA');
-      return SyncResult(
-        exito: false,
-        mensaje: 'Timeout de conexión al servidor',
-        itemsSincronizados: 0,
-      );
-    } on SocketException catch (socketError) {
-      _ultimasOperaciones = [];
-      print('FIN DE DESCARGA');
-      return SyncResult(
-        exito: false,
-        mensaje: 'Sin conexión de red',
-        itemsSincronizados: 0,
-      );
     } catch (e) {
       _ultimasOperaciones = [];
-      print('FIN DE DESCARGA');
+      print('FIN DE DESCARGA CON ERROR: $e');
+
+      // Manejo centralizado de excepciones
+      await ErrorLogService.manejarExcepcion(
+        e,
+        null,
+        '/api/getOperacionComercial',
+        null, // No tenemos fácil acceso al userId numérico aquí, solo employeeId string
+        _tableName,
+      );
+
       return SyncResult(
         exito: false,
         mensaje: BaseSyncService.getErrorMessage(e),

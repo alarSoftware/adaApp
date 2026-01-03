@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
-import 'dart:io';
+
 import 'dart:isolate';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
@@ -76,22 +76,17 @@ class ProductoSyncService extends BaseSyncService {
         itemsSincronizados: processedResult.length,
         totalEnAPI: processedResult.length,
       );
-    } on TimeoutException catch (timeoutError) {
-      _ultimosProductos = [];
-      return SyncResult(
-        exito: false,
-        mensaje: 'Timeout de conexión al servidor',
-        itemsSincronizados: 0,
-      );
-    } on SocketException catch (socketError) {
-      _ultimosProductos = [];
-      return SyncResult(
-        exito: false,
-        mensaje: 'Sin conexión de red',
-        itemsSincronizados: 0,
-      );
     } catch (e) {
       _ultimosProductos = [];
+
+      await ErrorLogService.manejarExcepcion(
+        e,
+        null,
+        currentEndpoint,
+        null,
+        'productos',
+      );
+
       return SyncResult(
         exito: false,
         mensaje: BaseSyncService.getErrorMessage(e),

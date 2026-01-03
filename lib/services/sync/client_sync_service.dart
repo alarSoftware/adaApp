@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
-import 'dart:io';
+
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/repositories/cliente_repository.dart';
@@ -130,19 +130,15 @@ class ClientSyncService {
           itemsSincronizados: 0,
         );
       }
-    } on TimeoutException catch (timeoutError) {
-      return SyncResult(
-        exito: false,
-        mensaje: 'Timeout de conexión al servidor',
-        itemsSincronizados: 0,
-      );
-    } on SocketException catch (socketError) {
-      return SyncResult(
-        exito: false,
-        mensaje: 'Sin conexión de red',
-        itemsSincronizados: 0,
-      );
     } catch (e) {
+      await ErrorLogService.manejarExcepcion(
+        e,
+        employeeId,
+        currentEndpoint,
+        null,
+        'clientes',
+      );
+
       return SyncResult(
         exito: false,
         mensaje: BaseSyncService.getErrorMessage(e),

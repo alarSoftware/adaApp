@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
-import 'dart:io';
+
 import 'dart:isolate';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
@@ -87,55 +87,16 @@ class CensusSyncService extends BaseSyncService {
         itemsSincronizados: processedResult.length,
         totalEnAPI: processedResult.length,
       );
-    } on TimeoutException catch (timeoutError) {
-      BaseSyncService.logger.e('⏰ Timeout obteniendo censos: $timeoutError');
-
-      // 🚨 LOG ERROR: Timeout
-      // await ErrorLogService.logNetworkError(
-      //   tableName: 'censo_activo',
-      //   operation: 'sync_from_server',
-      //   errorMessage: 'Timeout de conexión: $timeoutError',
-      //   endpoint: currentEndpoint,
-      //   userId: edfVendedorId,
-      // );
-
-      _ultimosCensos = [];
-      return SyncResult(
-        exito: false,
-        mensaje: 'Timeout de conexión al servidor',
-        itemsSincronizados: 0,
-      );
-    } on SocketException catch (socketError) {
-      BaseSyncService.logger.e('📡 Error de red: $socketError');
-
-      // 🚨 LOG ERROR: Sin conexión de red
-      // await ErrorLogService.logNetworkError(
-      //   tableName: 'censo_activo',
-      //   operation: 'sync_from_server',
-      //   errorMessage: 'Sin conexión de red: $socketError',
-      //   endpoint: currentEndpoint,
-      //   userId: edfVendedorId,
-      // );
-
-      _ultimosCensos = [];
-      return SyncResult(
-        exito: false,
-        mensaje: 'Sin conexión de red',
-        itemsSincronizados: 0,
-      );
     } catch (e) {
       BaseSyncService.logger.e('💥 Error obteniendo censos activos: $e');
 
-      // 🚨 LOG ERROR: Error general
-      // await ErrorLogService.logError(
-      //   tableName: 'censo_activo',
-      //   operation: 'sync_from_server',
-      //   errorMessage: 'Error general: $e',
-      //   errorType: 'unknown',
-      //   errorCode: 'GENERAL_ERROR',
-      //   endpoint: currentEndpoint,
-      //   userId: edfVendedorId,
-      // );
+      await ErrorLogService.manejarExcepcion(
+        e,
+        null,
+        currentEndpoint,
+        null,
+        'censo_activo',
+      );
 
       _ultimosCensos = [];
       return SyncResult(
@@ -220,46 +181,15 @@ class CensusSyncService extends BaseSyncService {
           itemsSincronizados: 0,
         );
       }
-    } on TimeoutException catch (timeoutError) {
-      await ErrorLogService.logNetworkError(
-        tableName: 'censo_activo',
-        operation: 'get_by_id',
-        errorMessage: 'Timeout: $timeoutError',
-        endpoint: currentEndpoint,
-        registroFailId: censoId.toString(),
-      );
-
-      _ultimoCenso = null;
-      return SyncResult(
-        exito: false,
-        mensaje: 'Timeout de conexión',
-        itemsSincronizados: 0,
-      );
-    } on SocketException catch (socketError) {
-      await ErrorLogService.logNetworkError(
-        tableName: 'censo_activo',
-        operation: 'get_by_id',
-        errorMessage: 'Sin conexión: $socketError',
-        endpoint: currentEndpoint,
-        registroFailId: censoId.toString(),
-      );
-
-      _ultimoCenso = null;
-      return SyncResult(
-        exito: false,
-        mensaje: 'Sin conexión de red',
-        itemsSincronizados: 0,
-      );
     } catch (e) {
       BaseSyncService.logger.e('Error obteniendo censo por ID: $e');
 
-      await ErrorLogService.logError(
-        tableName: 'censo_activo',
-        operation: 'get_by_id',
-        errorMessage: 'Error: $e',
-        errorType: 'unknown',
-        endpoint: currentEndpoint,
-        registroFailId: censoId.toString(),
+      await ErrorLogService.manejarExcepcion(
+        e,
+        censoId.toString(),
+        currentEndpoint,
+        null,
+        'censo_activo',
       );
 
       _ultimoCenso = null;
@@ -321,43 +251,15 @@ class CensusSyncService extends BaseSyncService {
           itemsSincronizados: 0,
         );
       }
-    } on TimeoutException catch (timeoutError) {
-      await ErrorLogService.logNetworkError(
-        tableName: 'censo_activo',
-        operation: 'buscar_por_codigo',
-        errorMessage: 'Timeout: $timeoutError',
-        endpoint: currentEndpoint,
-      );
-
-      _ultimosCensos = [];
-      return SyncResult(
-        exito: false,
-        mensaje: 'Timeout de conexión',
-        itemsSincronizados: 0,
-      );
-    } on SocketException catch (socketError) {
-      await ErrorLogService.logNetworkError(
-        tableName: 'censo_activo',
-        operation: 'buscar_por_codigo',
-        errorMessage: 'Sin conexión: $socketError',
-        endpoint: currentEndpoint,
-      );
-
-      _ultimosCensos = [];
-      return SyncResult(
-        exito: false,
-        mensaje: 'Sin conexión de red',
-        itemsSincronizados: 0,
-      );
     } catch (e) {
       BaseSyncService.logger.e('Error buscando por código: $e');
 
-      await ErrorLogService.logError(
-        tableName: 'censo_activo',
-        operation: 'buscar_por_codigo',
-        errorMessage: 'Error: $e',
-        errorType: 'unknown',
-        endpoint: currentEndpoint,
+      await ErrorLogService.manejarExcepcion(
+        e,
+        codigoBarras,
+        currentEndpoint,
+        null,
+        'censo_activo',
       );
 
       _ultimosCensos = [];

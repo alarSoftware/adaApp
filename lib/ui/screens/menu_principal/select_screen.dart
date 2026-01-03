@@ -1227,13 +1227,13 @@ class _SelectScreenState extends State<SelectScreen>
                   },
                 ),
                 Divider(),
-              ], // Closing the children list
-            ), // Closing the ListView
-          ), // Closing the Expanded
+              ],
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(
-              'Versión 1.0.0', // You might want to get this dynamically
+              'Versión 1.0.0',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
             ),
           ),
