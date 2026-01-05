@@ -255,6 +255,33 @@ class DatabaseHelper {
     });
   }
 
+  // MÉTODO PARA DEBUG: TOGGLE PERMISSION
+  Future<void> toggleTestPermission(
+    int userId,
+    String moduleName,
+    bool enable,
+  ) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+
+    if (enable) {
+      // Insertar si no existe
+      await db.insert('app_routes', {
+        'user_id': userId,
+        'module_name': moduleName,
+        'route_path': 'debug/$moduleName',
+        'fecha_sync': now,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    } else {
+      // Borrar
+      await db.delete(
+        'app_routes',
+        where: 'user_id = ? AND module_name = ?',
+        whereArgs: [userId, moduleName],
+      );
+    }
+  }
+
   Future<List<Map<String, dynamic>>> obtenerClientesConEquipos() async {
     final db = await database;
     return _queries.obtenerClientesConEquipos(db);

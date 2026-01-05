@@ -234,7 +234,6 @@ class SelectScreenViewModel extends ChangeNotifier {
         return;
       }
 
-
       // 2. Construir display name: Prefiriendo employeeName
       String displayName;
       if (_currentUser!.employeeName != null &&
@@ -663,6 +662,31 @@ class SelectScreenViewModel extends ChangeNotifier {
     } finally {
       _setSyncLoading(false);
     }
+  }
+
+  // MÉTODO PARA DEBUG: TOGGLE PERMISSION
+  Future<void> togglePermission(String moduleName, bool enable) async {
+    if (_currentUser == null || _currentUser!.id == null) return;
+
+    try {
+      await _dbHelper.toggleTestPermission(
+        _currentUser!.id!,
+        moduleName,
+        enable,
+      );
+      notifyListeners();
+    } catch (e) {
+      _eventController.add(ShowErrorEvent('Error cambiando permiso: $e'));
+    }
+  }
+
+  Future<Map<String, bool>> getDebugPermissions() async {
+    // Retorna el estado actual de los permisos para el diálogo
+    // Esto reutiliza la lógica existente de PermissionsService pero
+    // podríamos optimizarlo si fuera necesario.
+    // Por ahora, asumimos que el diálogo gestionará su estado o
+    // consultará PermissionsService directamente.
+    return {};
   }
 
   /// Refresca manualmente el estado de conexión

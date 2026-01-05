@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
+import 'package:ada_app/ui/widgets/debug_permissions_dialog.dart';
 import 'package:ada_app/ui/widgets/app_connection_indicator.dart';
 import 'package:ada_app/ui/screens/menu_principal/equipos_screen.dart';
 import 'package:ada_app/ui/screens/menu_principal/modelos_screen.dart';
@@ -1340,6 +1341,13 @@ class _SelectScreenState extends State<SelectScreen>
                         MaterialPageRoute(builder: (context) => AboutScreen()),
                       );
                       break;
+                    case 'debug_menu':
+                      showDialog(
+                        context: context,
+                        builder: (context) =>
+                            DebugPermissionsDialog(viewModel: _viewModel),
+                      );
+                      break;
                   }
                 },
                 itemBuilder: (BuildContext context) => [
@@ -1397,6 +1405,22 @@ class _SelectScreenState extends State<SelectScreen>
                         Text(
                           'Acerca de',
                           style: TextStyle(color: AppColors.textPrimary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem<String>(
+                    value: 'debug_menu',
+                    child: Row(
+                      children: [
+                        Icon(Icons.bug_report, color: AppColors.error),
+                        SizedBox(width: 8),
+                        Text(
+                          '🛠️ Debug Menu',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
