@@ -132,6 +132,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
     }
   }
 
+  //BOTON INDEPENDIENTE DE SINCRONIZACION
   Future<void> _sincronizarClientes() async {
     if (_isSyncing) return;
 

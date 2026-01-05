@@ -216,95 +216,95 @@ class AuthService {
     }
   }
 
-  static Future<SyncResult> sincronizarClientesDelVendedor(
-    String employeeId,
-  ) async {
-    try {
-      final baseUrl = await BaseSyncService.getBaseUrl();
-      final url = '$baseUrl/api/getEdfClientes?employeeId=$employeeId';
-
-      final response = await http
-          .get(Uri.parse(url), headers: BaseSyncService.headers)
-          .timeout(BaseSyncService.timeout);
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final List<dynamic> clientesAPI = BaseSyncService.parseResponse(
-          response.body,
-        );
-
-        if (clientesAPI.isEmpty) {
-          return SyncResult(
-            exito: true,
-            mensaje: 'No hay clientes para este vendedor',
-            itemsSincronizados: 0,
-          );
-        }
-
-        final clientesProcesados = <Map<String, dynamic>>[];
-
-        for (final cliente in clientesAPI) {
-          if (cliente['cliente'] == null ||
-              cliente['cliente'].toString().trim().isEmpty) {
-            continue;
-          }
-
-          String rucCi = '';
-          if (cliente['ruc'] != null &&
-              cliente['ruc'].toString().trim().isNotEmpty) {
-            rucCi = cliente['ruc'].toString().trim();
-          } else if (cliente['cedula'] != null &&
-              cliente['cedula'].toString().trim().isNotEmpty) {
-            rucCi = cliente['cedula'].toString().trim();
-          }
-
-          clientesProcesados.add({
-            'id': cliente['id'],
-            'nombre': cliente['cliente'].toString().trim(),
-            'telefono': cliente['telefono']?.toString().trim() ?? '',
-            'direccion': cliente['direccion']?.toString().trim() ?? '',
-            'ruc_ci': rucCi,
-            'propietario': cliente['propietario']?.toString().trim() ?? '',
-          });
-        }
-
-        if (clientesProcesados.isEmpty) {
-          return SyncResult(
-            exito: false,
-            mensaje: 'No se procesaron clientes válidos',
-            itemsSincronizados: 0,
-          );
-        }
-
-        await _dbHelper.sincronizarClientes(clientesProcesados);
-
-        return SyncResult(
-          exito: true,
-          mensaje: 'Clientes sincronizados correctamente',
-          itemsSincronizados: clientesProcesados.length,
-          totalEnAPI: clientesProcesados.length,
-        );
-      } else {
-        final mensaje = BaseSyncService.extractErrorMessage(response);
-        return SyncResult(
-          exito: false,
-          mensaje: mensaje,
-          itemsSincronizados: 0,
-        );
-      }
-    } catch (e) {
-      await ErrorLogService.logError(
-        tableName: 'Clientes',
-        operation: 'sync_from_server',
-        errorMessage: 'Error sincronizando clientes: $e',
-        errorType: 'unknown',
-      );
-      return SyncResult(
-        exito: false,
-        mensaje: BaseSyncService.getErrorMessage(e),
-        itemsSincronizados: 0,
-      );
-    }
-  }
+  // static Future<SyncResult> sincronizarClientesDelVendedor(
+  //   String employeeId,
+  // ) async {
+  //   try {
+  //     final baseUrl = await BaseSyncService.getBaseUrl();
+  //     final url = '$baseUrl/api/getEdfClientes?employeeId=$employeeId';
+  //
+  //     final response = await http
+  //         .get(Uri.parse(url), headers: BaseSyncService.headers)
+  //         .timeout(BaseSyncService.timeout);
+  //
+  //     if (response.statusCode >= 200 && response.statusCode < 300) {
+  //       final List<dynamic> clientesAPI = BaseSyncService.parseResponse(
+  //         response.body,
+  //       );
+  //
+  //       if (clientesAPI.isEmpty) {
+  //         return SyncResult(
+  //           exito: true,
+  //           mensaje: 'No hay clientes para este vendedor',
+  //           itemsSincronizados: 0,
+  //         );
+  //       }
+  //
+  //       final clientesProcesados = <Map<String, dynamic>>[];
+  //
+  //       for (final cliente in clientesAPI) {
+  //         if (cliente['cliente'] == null ||
+  //             cliente['cliente'].toString().trim().isEmpty) {
+  //           continue;
+  //         }
+  //
+  //         String rucCi = '';
+  //         if (cliente['ruc'] != null &&
+  //             cliente['ruc'].toString().trim().isNotEmpty) {
+  //           rucCi = cliente['ruc'].toString().trim();
+  //         } else if (cliente['cedula'] != null &&
+  //             cliente['cedula'].toString().trim().isNotEmpty) {
+  //           rucCi = cliente['cedula'].toString().trim();
+  //         }
+  //
+  //         clientesProcesados.add({
+  //           'id': cliente['id'],
+  //           'nombre': cliente['cliente'].toString().trim(),
+  //           'telefono': cliente['telefono']?.toString().trim() ?? '',
+  //           'direccion': cliente['direccion']?.toString().trim() ?? '',
+  //           'ruc_ci': rucCi,
+  //           'propietario': cliente['propietario']?.toString().trim() ?? '',
+  //         });
+  //       }
+  //
+  //       if (clientesProcesados.isEmpty) {
+  //         return SyncResult(
+  //           exito: false,
+  //           mensaje: 'No se procesaron clientes válidos',
+  //           itemsSincronizados: 0,
+  //         );
+  //       }
+  //
+  //       await _dbHelper.sincronizarClientes(clientesProcesados);
+  //
+  //       return SyncResult(
+  //         exito: true,
+  //         mensaje: 'Clientes sincronizados correctamente',
+  //         itemsSincronizados: clientesProcesados.length,
+  //         totalEnAPI: clientesProcesados.length,
+  //       );
+  //     } else {
+  //       final mensaje = BaseSyncService.extractErrorMessage(response);
+  //       return SyncResult(
+  //         exito: false,
+  //         mensaje: mensaje,
+  //         itemsSincronizados: 0,
+  //       );
+  //     }
+  //   } catch (e) {
+  //     await ErrorLogService.logError(
+  //       tableName: 'Clientes',
+  //       operation: 'sync_from_server',
+  //       errorMessage: 'Error sincronizando clientes: $e',
+  //       errorType: 'unknown',
+  //     );
+  //     return SyncResult(
+  //       exito: false,
+  //       mensaje: BaseSyncService.getErrorMessage(e),
+  //       itemsSincronizados: 0,
+  //     );
+  //   }
+  // }
 
   static Future<SyncResult> sincronizarRespuestasDelVendedor(
     String employeeId,

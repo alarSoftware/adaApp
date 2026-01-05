@@ -21,28 +21,11 @@ class ClientSyncService {
       final employeeId = await UserSyncService.obtenerEmployeeIdUsuarioActual();
 
       if (employeeId == null || employeeId.trim().isEmpty) {
-        return SyncResult(
-          exito: true,
-          mensaje:
-              'Usuario sin clientes asignados - omitiendo sincronización de clientes',
-          itemsSincronizados: 0,
-        );
+        throw Exception('Usuario sin clientes asignados - omitiendo sincronización de clientes');
       }
-
       return await sincronizarClientesPorVendedor(employeeId);
     } catch (e) {
-      await ErrorLogService.logError(
-        tableName: 'clientes',
-        operation: 'get_user_data',
-        errorMessage: 'Error obteniendo datos del usuario: $e',
-        errorType: 'validation',
-      );
-
-      return SyncResult(
-        exito: false,
-        mensaje: 'Error obteniendo datos del usuario: $e',
-        itemsSincronizados: 0,
-      );
+      rethrow;
     }
   }
 
@@ -66,11 +49,7 @@ class ClientSyncService {
 
         if (clientesData.isEmpty) {
           // CORRECCIÓN: Si el servidor devuelve una lista vacía, debemos limpiar la tabla local
-          try {
-            await _clienteRepo.limpiarYSincronizar([]);
-          } catch (dbError) {
-            print('Error al limpiar clientes: $dbError');
-          }
+          await _clienteRepo.limpiarYSincronizar([]);
 
           return SyncResult(
             exito: true,
@@ -102,19 +81,8 @@ class ClientSyncService {
           );
         }
 
-        try {
-          final clientesMapas = clientes
-              .map((cliente) => cliente.toMap())
-              .toList();
-          await _clienteRepo.limpiarYSincronizar(clientesMapas);
-        } catch (dbError) {
-          await ErrorLogService.logDatabaseError(
-            tableName: 'clientes',
-            operation: 'bulk_insert',
-            errorMessage: 'Error guardando clientes en BD local: $dbError',
-          );
-        }
-
+        final clientesMapas = clientes.map((cliente) => cliente.toMap()).toList();
+        await _clienteRepo.limpiarYSincronizar(clientesMapas);
         return SyncResult(
           exito: true,
           mensaje: 'Clientes sincronizados correctamente',
@@ -122,28 +90,11 @@ class ClientSyncService {
           totalEnAPI: clientes.length,
         );
       } else {
-        final mensaje = BaseSyncService.extractErrorMessage(response);
-
-        return SyncResult(
-          exito: false,
-          mensaje: mensaje,
-          itemsSincronizados: 0,
-        );
+        // response.body
+        throw Exception("Error en la respuesta del servidor: ${response.body}");
       }
     } catch (e) {
-      await ErrorLogService.manejarExcepcion(
-        e,
-        employeeId,
-        currentEndpoint,
-        null,
-        'clientes',
-      );
-
-      return SyncResult(
-        exito: false,
-        mensaje: BaseSyncService.getErrorMessage(e),
-        itemsSincronizados: 0,
-      );
+      rethrow;
     }
   }
 
@@ -186,7 +137,7 @@ class ClientSyncService {
         rutaDia: data['diasVisita']?.toString().trim(),
       );
     } catch (e) {
-      return null;
+      rethrow;
     }
   }
 }

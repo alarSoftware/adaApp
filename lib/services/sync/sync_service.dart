@@ -21,42 +21,42 @@ import 'package:ada_app/services/device_log/device_log_upload_service.dart'; // 
 class SyncService {
   static final _clienteRepo = ClienteRepository();
 
-  static Future<SyncResultUnificado> sincronizarYLimpiarDatos() async {
-    final dbHelper = DatabaseHelper();
-    final db = await dbHelper.database;
-    final validationService = DatabaseValidationService(db);
-
-    try {
-      final syncResult = await sincronizarTodosLosDatos();
-
-      if (!syncResult.exito) {
-        return syncResult;
-      }
-
-      final validation = await validationService.canDeleteDatabase();
-
-      if (validation.canDelete) {
-        await _limpiarDatosSincronizados(db);
-        syncResult.mensaje += '\n\n✅ Base de datos limpiada exitosamente';
-      } else {
-        syncResult.mensaje += '\n\n⚠️ Advertencia: ${validation.message}';
-      }
-
-      return syncResult;
-    } catch (e) {
-      await ErrorLogService.logError(
-        tableName: 'sync_general',
-        operation: 'sincronizar_y_limpiar',
-        errorMessage: e.toString(),
-        errorType: 'sync_error',
-      );
-
-      final errorResult = SyncResultUnificado();
-      errorResult.exito = false;
-      errorResult.mensaje = 'Error durante sincronización y limpieza: $e';
-      return errorResult;
-    }
-  }
+  // static Future<SyncResultUnificado> sincronizarYLimpiarDatos() async {
+  //   final dbHelper = DatabaseHelper();
+  //   final db = await dbHelper.database;
+  //   final validationService = DatabaseValidationService(db);
+  //
+  //   try {
+  //     final syncResult = await sincronizarTodosLosDatos();
+  //
+  //     if (!syncResult.exito) {
+  //       return syncResult;
+  //     }
+  //
+  //     final validation = await validationService.canDeleteDatabase();
+  //
+  //     if (validation.canDelete) {
+  //       await _limpiarDatosSincronizados(db);
+  //       syncResult.mensaje += '\n\n✅ Base de datos limpiada exitosamente';
+  //     } else {
+  //       syncResult.mensaje += '\n\n⚠️ Advertencia: ${validation.message}';
+  //     }
+  //
+  //     return syncResult;
+  //   } catch (e) {
+  //     await ErrorLogService.logError(
+  //       tableName: 'sync_general',
+  //       operation: 'sincronizar_y_limpiar',
+  //       errorMessage: e.toString(),
+  //       errorType: 'sync_error',
+  //     );
+  //
+  //     final errorResult = SyncResultUnificado();
+  //     errorResult.exito = false;
+  //     errorResult.mensaje = 'Error durante sincronización y limpieza: $e';
+  //     return errorResult;
+  //   }
+  // }
 
   static Future<Map<String, dynamic>> verificarEstadoSincronizacion() async {
     try {
@@ -197,18 +197,21 @@ class SyncService {
 
       try {
         onProgress?.call(0.25, 'Sincronizando clientes...');
-        final resultadoClientes =
-            await ClientSyncService.sincronizarClientesDelUsuario();
+        final resultadoClientes = await ClientSyncService.sincronizarClientesDelUsuario();
         resultado.clientesSincronizados = resultadoClientes.itemsSincronizados;
         resultado.clientesExito = resultadoClientes.exito;
 
         if (!resultadoClientes.exito) {
           resultado.erroresClientes = resultadoClientes.mensaje;
         }
-      } catch (e) {
+
+      } catch (e, stackTrace) {
         resultado.clientesExito = false;
         resultado.erroresClientes = 'Error al sincronizar clientes: $e';
         resultado.clientesSincronizados = 0;
+        print("ERROR CONTROLADO: $stackTrace");
+        //TODO TENER UN SOLO METODO PUBLICO PARA OBTENER USUARIO Y SETEAR ACA
+        await ErrorLogService.manejarExcepcion(e, null, 'getCliente', null, 'clientes');
       }
 
       try {
@@ -461,12 +464,12 @@ class SyncService {
   static Future<SyncResult> sincronizarUsuarios() =>
       UserSyncService.sincronizarUsuarios();
 
-  static Future<SyncResult> sincronizarClientes({String? employeeId}) {
-    if (employeeId != null) {
-      return ClientSyncService.sincronizarClientesPorVendedor(employeeId);
-    }
-    return ClientSyncService.sincronizarClientesDelUsuario();
-  }
+  // static Future<SyncResult> sincronizarClientes({String? employeeId}) {
+  //   if (employeeId != null) {
+  //     return ClientSyncService.sincronizarClientesPorVendedor(employeeId);
+  //   }
+  //   return ClientSyncService.sincronizarClientesDelUsuario();
+  // }
 
   static Future<SyncResult> sincronizarEquipos() =>
       EquipmentSyncService.sincronizarEquipos();
