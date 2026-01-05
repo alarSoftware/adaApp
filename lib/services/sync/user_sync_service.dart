@@ -204,7 +204,6 @@ class UserSyncService {
     }
   }
 
-  // MANTENEMOS TUS MÉTODOS EXISTENTES ABAJO
   static Future<String?> obtenerEmployeeIdUsuarioActual() async {
     try {
       final prefs = await SharedPreferences.getInstance();

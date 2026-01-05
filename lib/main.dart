@@ -13,6 +13,7 @@ import 'ui/screens/api_settings_screen.dart';
 import 'models/cliente.dart';
 import 'package:ada_app/config/app_config.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:intl/date_symbol_data_local.dart';
 //IMPORTS PARA EL RESET TEMPORAL - COMENTADOS PARA PRODUCCIÓN
 // import 'package:ada_app/services/database_helper.dart';
 
@@ -20,6 +21,7 @@ var logger = Logger();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('es', null);
 
   // RESET TEMPORAL - COMENTADO PARA PRODUCCIÓN
   // await _resetCompleteApp();
