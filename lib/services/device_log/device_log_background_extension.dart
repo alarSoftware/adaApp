@@ -112,23 +112,27 @@ class DeviceLogBackgroundExtension {
       BackgroundLogConfig.horaFin =
           prefs.getInt(BackgroundLogConfig.keyHoraFin) ?? 17;
 
-      // Cargar intervalo (Default 5 min now possible)
+      // Cargar intervalo
       final intervaloMin = prefs.getInt(BackgroundLogConfig.keyIntervalo) ?? 5;
-      BackgroundLogConfig.intervalo = Duration(minutes: intervaloMin);
+      final nuevoIntervalo = Duration(minutes: intervaloMin);
 
-      _logger.i(
-        'Config loaded - Hours: ${BackgroundLogConfig.horaInicio}-${BackgroundLogConfig.horaFin} | Interval: ${intervaloMin}min',
-      );
-
-      if (_isInitialized &&
-          _backgroundTimer != null &&
-          _backgroundTimer!.isActive) {
-        _logger.i('Reiniciando timer con nuevo intervalo log...');
-        _backgroundTimer?.cancel();
-        _backgroundTimer = Timer.periodic(
-          BackgroundLogConfig.intervalo,
-          (timer) async => await ejecutarLoggingConHorario(),
+      // SOLO reiniciar si el intervalo cambió
+      if (nuevoIntervalo != BackgroundLogConfig.intervalo) {
+        BackgroundLogConfig.intervalo = nuevoIntervalo;
+        _logger.i(
+          'Config loaded - Hours: ${BackgroundLogConfig.horaInicio}-${BackgroundLogConfig.horaFin} | Interval: ${intervaloMin}min',
         );
+
+        if (_isInitialized &&
+            _backgroundTimer != null &&
+            _backgroundTimer!.isActive) {
+          _logger.i('Reiniciando timer con nuevo intervalo log...');
+          _backgroundTimer?.cancel();
+          _backgroundTimer = Timer.periodic(
+            BackgroundLogConfig.intervalo,
+            (timer) async => await ejecutarLoggingConHorario(),
+          );
+        }
       }
     } catch (e) {
       _logger.e('Error cargando configuración: $e');
@@ -382,7 +386,12 @@ class DeviceLogBackgroundExtension {
   static Future<void> inicializarDespuesDeLogin() async {
     try {
       _logger.i('Inicializando logging después de login exitoso...');
-      await inicializar(verificarSesion: true);
+      // FIX: Usar AppBackgroundService para evitar timer duplicado en Isolate Principal
+      // await inicializar(verificarSesion: true);
+      final service = FlutterBackgroundService();
+      if (!(await service.isRunning())) {
+        await service.startService();
+      }
     } catch (e) {
       _logger.e('Error inicializando logging post-login: $e');
     }

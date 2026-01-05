@@ -25,7 +25,7 @@ class DeviceInfoHelper {
       return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 15),
+          timeLimit: Duration(seconds: 30),
         ),
       );
     } catch (e) {

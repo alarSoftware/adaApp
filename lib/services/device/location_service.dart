@@ -129,7 +129,7 @@ class LocationService {
   /// Obtener ubicación actual (puede retornar null si hay error)
   Future<Position?> getCurrentLocation({
     LocationAccuracy accuracy = LocationAccuracy.high,
-    Duration timeout = const Duration(seconds: 15),
+    Duration timeout = const Duration(seconds: 30),
   }) async {
     try {
       _logger.i('Obteniendo ubicación GPS...');
@@ -159,7 +159,7 @@ class LocationService {
   /// Obtener ubicación actual (OBLIGATORIO - lanza excepción si falla)
   Future<Position> getCurrentLocationRequired({
     LocationAccuracy accuracy = LocationAccuracy.high,
-    Duration timeout = const Duration(seconds: 15),
+    Duration timeout = const Duration(seconds: 30),
     bool autoRequestPermissions = true,
   }) async {
     try {
@@ -226,7 +226,7 @@ class LocationService {
     int samples = 3,
     Duration delayBetweenSamples = const Duration(seconds: 2),
     LocationAccuracy accuracy = LocationAccuracy.high,
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = const Duration(seconds: 30),
   }) async {
     try {
       _logger.i('Obteniendo ubicación promediada ($samples muestras)...');

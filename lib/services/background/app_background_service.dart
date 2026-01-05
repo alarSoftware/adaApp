@@ -187,10 +187,7 @@ class AppBackgroundService {
         initialNotificationContent: 'Servicio en segundo plano activo',
         foregroundServiceNotificationId: 888,
         // Match types declared in AndroidManifest.xml
-        foregroundServiceTypes: [
-          AndroidForegroundType.location,
-          AndroidForegroundType.dataSync,
-        ],
+        foregroundServiceTypes: [AndroidForegroundType.location],
       ),
       iosConfiguration: IosConfiguration(
         autoStart: false,

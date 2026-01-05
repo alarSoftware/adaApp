@@ -39,7 +39,7 @@ class ClienteListState {
     this.currentPage = 0,
     this.totalCount = 0,
     this.error,
-    this.filterMode = 'all',
+    this.filterMode = 'today_route',
     this.countTodayRoute = 0,
     this.countVisitedToday = 0,
     this.countAll = 0,
@@ -157,8 +157,7 @@ class ClienteListScreenViewModel extends ChangeNotifier {
           if (c.rutaDia == null || c.rutaDia!.isEmpty) return false;
 
           final rutasCliente = c.rutaDia!.toLowerCase();
-          // Casos: "Sábado", "Martes, Viernes"
-          // Dividir por comas si existen
+
           final dias = rutasCliente.split(',').map((d) {
             return d.trim();
           }).toList();
@@ -263,10 +262,8 @@ class ClienteListScreenViewModel extends ChangeNotifier {
 
       _calculateCount();
 
-      // Si hay un query pendiente (ej: recharge), aplicar filtro
-      if (_state.searchQuery.isNotEmpty) {
-        await _applyFilters();
-      }
+      // Aplicar filtros siempre para respetar el filterMode inicial
+      await _applyFilters();
 
       _updateState(
         _state.copyWith(

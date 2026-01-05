@@ -121,7 +121,7 @@ class AuthService {
       await prefs.setString('last_sync_date', DateTime.now().toIso8601String());
 
       try {
-        await DeviceLogBackgroundExtension.inicializarDespuesDeLogin();
+        await AppServices().inicializarDeviceLoggingDespuesDeSincronizacion();
       } catch (e) {}
     } catch (e) {}
   }
