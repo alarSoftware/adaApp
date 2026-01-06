@@ -107,8 +107,6 @@ class CensoActivoPostService {
 
       if (!resultObject.success) {
         if (!resultObject.isDuplicate && resultObject.message != '') {
-          // final censoActivoRepository = CensoActivoRepository();
-          // await censoActivoRepository.marcarComoError(censoId, resultObject.message);
           throw Exception(resultObject.message);
         }
       }

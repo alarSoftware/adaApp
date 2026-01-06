@@ -43,9 +43,12 @@ class _OperacionesComercialesMenuViewState
   late TabController _tabController;
   late List<_TabConfig> _availableTabs;
 
+  bool _canCreateOperacion = true;
+
   @override
   void initState() {
     super.initState();
+    // _checkPermission(); -> SIMPLIFICADO: Si entra al módulo, puede crear.
     _availableTabs = _getAvailableTabs();
     _tabController = TabController(length: _availableTabs.length, vsync: this);
   }
@@ -264,28 +267,32 @@ class _OperacionesComercialesMenuViewState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 16),
-              SizedBox(
-                height: 54,
-                child: ElevatedButton.icon(
-                  onPressed: () =>
-                      _navigateToCreateOperacion(tipoOperacion, viewModel),
-                  icon: const Icon(Icons.add_circle_outline_rounded),
-                  label: const Text(
-                    'Nueva Solicitud',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: color,
-                    foregroundColor: Colors.white,
-                    elevation: 4,
-                    shadowColor: color.withValues(alpha: 0.4),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+              if (_canCreateOperacion)
+                SizedBox(
+                  height: 54,
+                  child: ElevatedButton.icon(
+                    onPressed: () =>
+                        _navigateToCreateOperacion(tipoOperacion, viewModel),
+                    icon: const Icon(Icons.add_circle_outline_rounded),
+                    label: const Text(
+                      'Nueva Solicitud',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: color,
+                      foregroundColor: Colors.white,
+                      elevation: 4,
+                      shadowColor: color.withValues(alpha: 0.4),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
+              if (_canCreateOperacion) const SizedBox(height: 24),
               Row(
                 children: [
                   Icon(Icons.history, size: 20, color: AppColors.textSecondary),

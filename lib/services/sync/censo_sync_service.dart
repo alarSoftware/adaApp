@@ -70,7 +70,6 @@ class CensusSyncService extends BaseSyncService {
         final dbHelper = DatabaseHelper();
         await dbHelper.vaciarEInsertar('censo_activo', processedResult);
       } catch (e) {
-        BaseSyncService.logger.e('Error guardando censos en BD: $e');
         await ErrorLogService.logDatabaseError(
           tableName: 'censo_activo',
           operation: 'bulk_insert',
@@ -87,9 +86,8 @@ class CensusSyncService extends BaseSyncService {
         itemsSincronizados: processedResult.length,
         totalEnAPI: processedResult.length,
       );
-    } catch (e) {
-      BaseSyncService.logger.e('💥 Error obteniendo censos activos: $e');
 
+    } catch (e) {
       await ErrorLogService.manejarExcepcion(
         e,
         null,
@@ -97,7 +95,6 @@ class CensusSyncService extends BaseSyncService {
         null,
         'censo_activo',
       );
-
       _ultimosCensos = [];
       return SyncResult(
         exito: false,
@@ -167,7 +164,7 @@ class CensusSyncService extends BaseSyncService {
           itemsSincronizados: 1,
         );
       } else {
-        // 🚨 LOG ERROR: Censo no encontrado
+        // LOG ERROR: Censo no encontrado
         await ErrorLogService.logValidationError(
           tableName: 'censo_activo',
           operation: 'get_by_id',
@@ -182,8 +179,6 @@ class CensusSyncService extends BaseSyncService {
         );
       }
     } catch (e) {
-      BaseSyncService.logger.e('Error obteniendo censo por ID: $e');
-
       await ErrorLogService.manejarExcepcion(
         e,
         censoId.toString(),
@@ -234,7 +229,7 @@ class CensusSyncService extends BaseSyncService {
           itemsSincronizados: censosData.length,
         );
       } else {
-        // 🚨 LOG ERROR: Error en búsqueda
+        // LOG ERROR: Error en búsqueda
         await ErrorLogService.logServerError(
           tableName: 'censo_activo',
           operation: 'buscar_por_codigo',
@@ -252,8 +247,7 @@ class CensusSyncService extends BaseSyncService {
         );
       }
     } catch (e) {
-      BaseSyncService.logger.e('Error buscando por código: $e');
-
+     
       await ErrorLogService.manejarExcepcion(
         e,
         codigoBarras,
@@ -317,8 +311,6 @@ class CensusSyncService extends BaseSyncService {
 
       return await dbHelper.consultarPersonalizada(query, args);
     } catch (e) {
-      BaseSyncService.logger.e('Error obteniendo censos locales: $e');
-
       await ErrorLogService.logDatabaseError(
         tableName: 'censo_activo',
         operation: 'query_local',
@@ -339,8 +331,6 @@ class CensusSyncService extends BaseSyncService {
       );
       return result.isNotEmpty ? (result.first['total'] as int? ?? 0) : 0;
     } catch (e) {
-      BaseSyncService.logger.e('Error contando censos locales: $e');
-
       await ErrorLogService.logDatabaseError(
         tableName: 'censo_activo',
         operation: 'count_local',
@@ -470,10 +460,6 @@ class CensusSyncService extends BaseSyncService {
       final dbHelper = DatabaseHelper();
       await dbHelper.vaciarEInsertar('censo_activo', [censo]);
     } catch (e) {
-      BaseSyncService.logger.e(
-        'Error guardando censo ID ${censo['id']} en BD: $e',
-      );
-
       await ErrorLogService.logDatabaseError(
         tableName: 'censo_activo',
         operation: 'save_single',
@@ -525,6 +511,7 @@ class CensusSyncService extends BaseSyncService {
             final censoParaGuardar = _mapApiToLocalFormat(censoMap);
             censosParaGuardar.add(censoParaGuardar);
           } catch (e) {
+            print('Error procesando censo individual: $e');
             // Error procesando censo
           }
         }
@@ -532,6 +519,7 @@ class CensusSyncService extends BaseSyncService {
 
       return censosParaGuardar;
     } catch (e) {
+      print('Error general procesando JSON de censos: $e');
       return null;
     }
   }

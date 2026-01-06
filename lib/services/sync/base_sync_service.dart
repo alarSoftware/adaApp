@@ -2,13 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'package:http/http.dart' as http;
-import 'package:logger/logger.dart';
 import 'package:ada_app/services/api/api_config_service.dart';
 
 abstract class BaseSyncService {
   static const Duration timeout = Duration(minutes: 1);
-
-  static final Logger logger = Logger();
 
   static Future<String> getBaseUrl() async {
     return await ApiConfigService.getBaseUrl();
@@ -68,7 +65,6 @@ abstract class BaseSyncService {
 
       return [];
     } catch (e) {
-      logger.e('Error parseando respuesta JSON: $e');
       return [];
     }
   }
@@ -121,9 +117,7 @@ abstract class BaseSyncService {
               'hasData': responseData['data'] != null,
             };
           }
-        } catch (e) {
-          logger.w('No se pudo parsear info del servidor: $e');
-        }
+        } catch (e) {}
 
         return ApiResponse(
           exito: true,

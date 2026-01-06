@@ -11,9 +11,9 @@ import 'package:ada_app/services/api/auth_service.dart';
 
 /// Pantalla principal que muestra las respuestas guardadas
 class DynamicFormResponsesScreen extends StatefulWidget {
-  final Cliente cliente;
+  final Cliente? cliente;
 
-  const DynamicFormResponsesScreen({super.key, required this.cliente});
+  const DynamicFormResponsesScreen({super.key, this.cliente});
 
   @override
   State<DynamicFormResponsesScreen> createState() =>
@@ -42,7 +42,7 @@ class _DynamicFormResponsesScreenState
   Future<void> _loadData() async {
     await _viewModel.loadTemplates();
     await _viewModel.loadSavedResponsesWithSync(
-      clienteId: widget.cliente.id.toString(),
+      clienteId: widget.cliente?.id.toString(),
     );
   }
 
@@ -61,7 +61,7 @@ class _DynamicFormResponsesScreenState
         child: SafeArea(
           child: Column(
             children: [
-              _buildClientInfo(),
+              if (widget.cliente != null) _buildClientInfo(),
               _buildFilterChips(),
               _buildResponsesList(),
             ],
@@ -92,8 +92,64 @@ class _DynamicFormResponsesScreenState
           onPressed: _navigateToFormList,
           tooltip: 'Nuevo Formulario',
         ),
+        IconButton(
+          icon: Icon(Icons.logout, color: AppColors.onPrimary),
+          onPressed: _handleLogout,
+          tooltip: 'Cerrar Sesión',
+        ),
       ],
     );
+  }
+
+  Future<void> _handleLogout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Cerrar Sesión'),
+        content: Text('¿Seguro que deseas salir?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Salir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => Center(child: CircularProgressIndicator()),
+        );
+      }
+
+      await AuthService().logout();
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Close dialog
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      }
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al cerrar sesión: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   // ==================== CLIENT INFO ====================
@@ -101,7 +157,7 @@ class _DynamicFormResponsesScreenState
   Widget _buildClientInfo() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0),
-      child: ClientInfoCard(cliente: widget.cliente),
+      child: ClientInfoCard(cliente: widget.cliente!),
     );
   }
 
@@ -575,7 +631,6 @@ class _DynamicFormResponsesScreenState
     final usuario = await AuthService().getCurrentUser();
     final employeeId = usuario?.employeeId ?? '';
 
-
     _showLoadingDialog();
 
     // PASO 1: Descargar templates
@@ -592,8 +647,7 @@ class _DynamicFormResponsesScreenState
         employeeId,
       );
       debugPrint('📝 Responses: $responsesSuccess');
-    } else {
-    }
+    } else {}
 
     if (!mounted) return;
     Navigator.pop(context);

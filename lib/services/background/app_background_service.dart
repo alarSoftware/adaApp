@@ -6,7 +6,6 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:ada_app/services/device_log/device_log_background_extension.dart';
-import 'package:logger/logger.dart';
 
 // Top-level entry point (MUST BE OUTSIDE CLASS for AOT)
 @pragma('vm:entry-point')
@@ -14,8 +13,7 @@ void onStart(ServiceInstance service) async {
   // Necesario para plugins en background
   DartPluginRegistrant.ensureInitialized();
 
-  final Logger logger = Logger();
-  logger.i('Background Service: onStart ejecutado');
+  print('Background Service: onStart ejecutado');
 
   // Configuración de Notificación Persistente
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -76,13 +74,13 @@ void onStart(ServiceInstance service) async {
 
   // Listen for config updates
   service.on('updateConfig').listen((event) async {
-    logger.i('Recibida señal de actualización de configuración');
+    print('Recibida señal de actualización de configuración');
     await DeviceLogBackgroundExtension.cargarConfiguracionHorario();
   });
 
   // Helper callback para notificación unificada
   void showGpsNotification() {
-    logger.w('CALLBACK: Disparando alerta de GPS desactivado');
+    print('CALLBACK: Disparando alerta de GPS desactivado');
     flutterLocalNotificationsPlugin.show(
       999,
       '⚠️ GPS Desactivado',
@@ -148,7 +146,7 @@ void onStart(ServiceInstance service) async {
 
       // Check Watchdog
       if (!DeviceLogBackgroundExtension.estaActivo) {
-        logger.w('Watchdog: Timer de logs inactivo. Reinicializando...');
+        print('Watchdog: Timer de logs inactivo. Reinicializando...');
         await DeviceLogBackgroundExtension.inicializar(
           verificarSesion: true,
           serviceInstance: service,
@@ -156,7 +154,7 @@ void onStart(ServiceInstance service) async {
         );
       }
     } catch (e) {
-      logger.e("Error en ciclo principal de background: $e");
+      print("Error en ciclo principal de background: $e");
     }
   });
 }
@@ -169,13 +167,11 @@ bool onIosBackground(ServiceInstance service) {
 }
 
 class AppBackgroundService {
-  static final Logger _logger = Logger();
-
   /// Inicializa el servicio en segundo plano
   static Future<void> initialize() async {
     final service = FlutterBackgroundService();
 
-    _logger.i('Inicializando AppBackgroundService...');
+    print('Inicializando AppBackgroundService...');
 
     await service.configure(
       androidConfiguration: AndroidConfiguration(
@@ -198,7 +194,7 @@ class AppBackgroundService {
 
     if (!await service.isRunning()) {
       await service.startService();
-      _logger.i('Servicio background iniciado');
+      print('Servicio background iniciado');
     }
   }
 

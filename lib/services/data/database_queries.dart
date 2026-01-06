@@ -1,34 +1,47 @@
-// database_queries.dart
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseQueries {
-
   // ================================================================
   // CONSULTAS ESPECÍFICAS DEL NEGOCIO - ACTUALIZADAS
   // ================================================================
 
-  Future<List<Map<String, dynamic>>> obtenerClientesConEquipos(Database db) async {
+  Future<List<Map<String, dynamic>>> obtenerClientesConEquipos(
+    Database db,
+  ) async {
     return await db.rawQuery(_sqlClientesConEquipos());
   }
 
-  Future<List<Map<String, dynamic>>> obtenerEquiposDisponibles(Database db) async {
+  Future<List<Map<String, dynamic>>> obtenerEquiposDisponibles(
+    Database db,
+  ) async {
     return await db.rawQuery(_sqlEquiposDisponibles());
   }
 
-  Future<List<Map<String, dynamic>>> obtenerEquiposConDetalles(Database db) async {
+  Future<List<Map<String, dynamic>>> obtenerEquiposConDetalles(
+    Database db,
+  ) async {
     return await db.rawQuery(_sqlEquiposConDetalles());
   }
 
-  Future<List<Map<String, dynamic>>> obtenerHistorialEquipo(Database db, int equipoId) async {
+  Future<List<Map<String, dynamic>>> obtenerHistorialEquipo(
+    Database db,
+    int equipoId,
+  ) async {
     return await db.rawQuery(_sqlHistorialEquipo(), [equipoId]);
   }
 
   // NUEVAS CONSULTAS PARA EQUIPOS PENDIENTES
-  Future<List<Map<String, dynamic>>> obtenerEquiposPendientesPorCliente(Database db, int clienteId) async {
+  Future<List<Map<String, dynamic>>> obtenerEquiposPendientesPorCliente(
+    Database db,
+    int clienteId,
+  ) async {
     return await db.rawQuery(_sqlEquiposPendientesPorCliente(), [clienteId]);
   }
 
-  Future<List<Map<String, dynamic>>> obtenerEquiposAsignadosPorCliente(Database db, int clienteId) async {
+  Future<List<Map<String, dynamic>>> obtenerEquiposAsignadosPorCliente(
+    Database db,
+    int clienteId,
+  ) async {
     return await db.rawQuery(_sqlEquiposAsignadosPorCliente(), [clienteId]);
   }
 

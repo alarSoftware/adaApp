@@ -1,10 +1,16 @@
 import 'package:permission_handler/permission_handler.dart'; // Add import
+
 import 'package:ada_app/ui/screens/menu_principal/pending_data_screen.dart';
+import 'package:ada_app/services/permissions_service.dart';
+// import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_template_list_screen.dart';
+import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_responses_screen.dart';
+// import 'package:ada_app/viewmodels/dynamic_form_viewmodel.dart';
 
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
+import 'package:ada_app/ui/widgets/debug_permissions_dialog.dart';
 import 'package:ada_app/ui/widgets/app_connection_indicator.dart';
 import 'package:ada_app/ui/screens/menu_principal/equipos_screen.dart';
 import 'package:ada_app/ui/screens/menu_principal/modelos_screen.dart';
@@ -21,6 +27,8 @@ import 'package:ada_app/ui/screens/error_log_screen.dart';
 import 'package:ada_app/repositories/device_log_repository.dart'; // Needed for DeviceLogScreen
 import 'package:ada_app/services/device/location_service.dart';
 import 'package:ada_app/ui/screens/settings/work_hours_settings_screen.dart';
+import 'package:ada_app/services/navigation/navigation_guard_service.dart';
+import 'package:ada_app/services/navigation/route_constants.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -52,7 +60,28 @@ class _SelectScreenState extends State<SelectScreen>
       _checkBatteryOptimizationOnFirstLoad();
       _checkLocationPermissions();
       _checkNotificationPermissions();
+      _checkAutoRedirect();
     });
+  }
+
+  Future<void> _checkAutoRedirect() async {
+    final permissions = await PermissionsService.checkPermissions([
+      'VerClientes',
+      'VerFormularios',
+    ]);
+    final canViewClients = permissions['VerClientes'] ?? false;
+    final canViewForms = permissions['VerFormularios'] ?? false;
+
+    if (canViewForms && !canViewClients) {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const DynamicFormResponsesScreen(),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -1185,36 +1214,7 @@ class _SelectScreenState extends State<SelectScreen>
                 ),
                 Divider(),
                 _buildDrawerItem(
-                  icon: Icons.logout,
-                  label: 'Cerrar Sesión',
-                  color: AppColors.error,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _handleLogout();
-                  },
-                ),
-                if (_viewModel.userDisplayName.toLowerCase().contains(
-                      'admin',
-                    ) ||
-                    _viewModel.userDisplayName.toLowerCase().contains(
-                      'sistemas',
-                    )) ...[
-                  _buildDrawerItem(
-                    icon: Icons.settings_applications,
-                    label: 'Configurar Horario',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const WorkHoursSettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-                _buildDrawerItem(
-                  icon: Icons.access_time, // Icono válido
+                  icon: Icons.access_time,
                   label: 'Horario de Trabajo',
                   onTap: () {
                     Navigator.pop(context);
@@ -1226,6 +1226,16 @@ class _SelectScreenState extends State<SelectScreen>
                     );
                   },
                 ),
+                _buildDrawerItem(
+                  icon: Icons.logout,
+                  label: 'Cerrar Sesión',
+                  color: AppColors.error,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _handleLogout();
+                  },
+                ),
+
                 Divider(),
               ],
             ),
@@ -1314,6 +1324,13 @@ class _SelectScreenState extends State<SelectScreen>
                         MaterialPageRoute(builder: (context) => AboutScreen()),
                       );
                       break;
+                    case 'debug_menu':
+                      showDialog(
+                        context: context,
+                        builder: (context) =>
+                            DebugPermissionsDialog(viewModel: _viewModel),
+                      );
+                      break;
                   }
                 },
                 itemBuilder: (BuildContext context) => [
@@ -1375,6 +1392,22 @@ class _SelectScreenState extends State<SelectScreen>
                       ],
                     ),
                   ),
+                  PopupMenuItem<String>(
+                    value: 'debug_menu',
+                    child: Row(
+                      children: [
+                        Icon(Icons.bug_report, color: AppColors.error),
+                        SizedBox(width: 8),
+                        Text(
+                          '🛠️ Debug Menu',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               );
             },
@@ -1405,60 +1438,139 @@ class _SelectScreenState extends State<SelectScreen>
                         side: BorderSide(color: AppColors.border),
                       ),
                       elevation: 2,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: ListenableBuilder(
-                          listenable: _viewModel,
-                          builder: (context, child) {
-                            return Row(
-                              children: [
-                                if (_viewModel.isLoadingUser) ...[
-                                  SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        AppColors.primary,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: ListenableBuilder(
+                            listenable: _viewModel,
+                            builder: (context, child) {
+                              return Row(
+                                children: [
+                                  if (_viewModel.isLoadingUser) ...[
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              AppColors.primary,
+                                            ),
                                       ),
                                     ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Cargando usuario...',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ] else
-                                  Expanded(
-                                    child: Text(
-                                      'Hola, ${_viewModel.userDisplayName}',
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Cargando usuario...',
                                       style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
-                                        color: AppColors.textPrimary,
+                                        color: AppColors.textSecondary,
                                       ),
-                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  ),
-                              ],
-                            );
-                          },
+                                  ] else
+                                    Expanded(
+                                      child: Text(
+                                        'Hola, ${_viewModel.userDisplayName}',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _buildMenuCard(
-                      label: 'Clientes',
-                      description: 'Lista de clientes y operaciones',
-                      icon: Icons.people,
-                      color: AppColors.primary,
-                      routeName: '/clienteLista',
+                    child: FutureBuilder<Map<String, bool>>(
+                      future: _checkNavigationPermissions(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        }
+
+                        final permissions = snapshot.data ?? {};
+                        final canViewClients =
+                            permissions[RouteConstants.serverClientes] ?? false;
+                        final canViewForms =
+                            permissions[RouteConstants.serverFormularios] ??
+                            false;
+
+                        // Auto-redirect logic handling could be done here or in initState.
+                        // Doing it here risks rebuild loops if not careful.
+                        // Better to just render the buttons here.
+
+                        if (!canViewClients && !canViewForms) {
+                          return Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.lock_person,
+                                  size: 64,
+                                  color: AppColors.textSecondary,
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  "No tienes módulos asignados.",
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return Column(
+                          children: [
+                            if (canViewClients)
+                              _buildMenuCard(
+                                label: 'Clientes',
+                                description: 'Lista de clientes y operaciones',
+                                icon: Icons.people,
+                                color: AppColors.primary,
+                                routeName: '/clienteLista',
+                              ),
+
+                            if (canViewClients && canViewForms)
+                              SizedBox(height: 16),
+
+                            if (canViewForms)
+                              _buildMenuCard(
+                                label: 'Formularios Dinámicos',
+                                description: 'Completar y enviar formularios',
+                                icon: Icons.assignment,
+                                color: AppColors
+                                    .secondary, // Ensure this color exists or use another
+                                routeName:
+                                    '/dynamicForms', // Need to ensure this route exists or push manually
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const DynamicFormResponsesScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -1476,6 +1588,24 @@ class _SelectScreenState extends State<SelectScreen>
         ],
       ),
     );
+  }
+
+  Future<Map<String, bool>> _checkNavigationPermissions() async {
+    final guard = NavigationGuardService();
+    // Desde el Menú (/menu) hacia...
+    final canViewClients = await guard.canNavigate(
+      currentScreen: RouteConstants.serverMenu,
+      targetScreen: RouteConstants.serverClientes,
+    );
+    final canViewForms = await guard.canNavigate(
+      currentScreen: RouteConstants.serverMenu,
+      targetScreen: RouteConstants.serverFormularios,
+    );
+
+    return {
+      RouteConstants.serverClientes: canViewClients,
+      RouteConstants.serverFormularios: canViewForms,
+    };
   }
 
   Future<void> _handleRequiredSync(RequiredSyncEvent event) async {

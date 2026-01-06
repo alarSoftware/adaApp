@@ -361,7 +361,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         position = await locationService.getCurrentLocation();
       } catch (e) {
         // Si falla la ubicación, continuamos sin ella
-        print('Error obteniendo ubicación: $e');
+        debugPrint('Error obteniendo ubicación: $e');
       }
 
       final operacion = OperacionComercial(

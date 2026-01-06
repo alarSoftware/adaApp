@@ -9,7 +9,7 @@ import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/post/device_log_post_service.dart';
 import 'package:ada_app/utils/device_info_helper.dart';
 import 'package:ada_app/services/api/auth_service.dart';
-import 'package:logger/logger.dart';
+
 import 'package:ada_app/services/device_log/device_log_upload_service.dart';
 import 'package:ada_app/services/api/api_config_service.dart';
 
@@ -24,7 +24,7 @@ class BackgroundLogConfig {
   static const String keyHoraFin = 'work_hours_end';
   static const String keyIntervalo = 'work_interval_minutes';
 
-  ///  INTERVALO ENTRE REGISTROS (Dinámico)
+  /// INTERVALO ENTRE REGISTROS (Dinámico)
   static Duration intervalo = Duration(minutes: 15);
 
   /// NÚMERO MÁXIMO DE REINTENTOS
@@ -41,7 +41,6 @@ class BackgroundLogConfig {
 }
 
 class DeviceLogBackgroundExtension {
-  static final _logger = Logger();
   static Timer? _backgroundTimer;
   static bool _isInitialized = false;
   static bool _isExecuting = false;
@@ -53,14 +52,14 @@ class DeviceLogBackgroundExtension {
       final tieneSession = await authService.hasUserLoggedInBefore();
 
       if (!tieneSession) {
-        _logger.w('No active session - stopping auto logging');
+        print('No active session - stopping auto logging');
         await detener();
         return false;
       }
 
       return true;
     } catch (e) {
-      _logger.e('Error checking session: $e');
+      print('Error checking session: $e');
       return false;
     }
   }
@@ -80,13 +79,13 @@ class DeviceLogBackgroundExtension {
 
       _isInitialized = true;
 
-      _logger.i('DeviceLog Extension Initialized');
+      print('DeviceLog Extension Initialized');
 
       // Cargar configuración de horario
       await cargarConfiguracionHorario();
 
       // INICIAR TIMER INTERNO
-      _logger.i(
+      print(
         'Iniciando timer interno con intervalo de ${BackgroundLogConfig.intervalo.inMinutes} min',
       );
       _backgroundTimer = Timer.periodic(
@@ -97,7 +96,7 @@ class DeviceLogBackgroundExtension {
       // Verificar disponibilidad de servicios
       await DeviceInfoHelper.mostrarEstadoDisponibilidad();
     } catch (e) {
-      _logger.e('Error inicializando extensión: $e');
+      print('Error inicializando extensión: $e');
     }
   }
 
@@ -115,12 +114,12 @@ class DeviceLogBackgroundExtension {
       // Cargar intervalo
       final intervaloMin = prefs.getInt(BackgroundLogConfig.keyIntervalo) ?? 5;
       final nuevoIntervalo = Duration(minutes: intervaloMin);
-
       // SOLO reiniciar si el intervalo cambió
       if (nuevoIntervalo != BackgroundLogConfig.intervalo) {
         BackgroundLogConfig.intervalo = nuevoIntervalo;
         _logger.i(
           'Config loaded - Hours: ${BackgroundLogConfig.horaInicio}-${BackgroundLogConfig.horaFin} | Interval: ${intervaloMin}min',
+
         );
 
         if (_isInitialized &&
@@ -135,11 +134,11 @@ class DeviceLogBackgroundExtension {
         }
       }
     } catch (e) {
-      _logger.e('Error cargando configuración: $e');
+      print('Error cargando configuración: $e');
     }
   }
 
-  /// 💾 Guardar nuevos horarios e intervalo
+  /// Guardar nuevos horarios e intervalo
   static Future<void> guardarConfiguracionHorario(
     int inicio,
     int fin, {
@@ -158,7 +157,7 @@ class DeviceLogBackgroundExtension {
         BackgroundLogConfig.intervalo = Duration(minutes: intervaloMinutos);
       }
 
-      _logger.i(
+      print(
         'Nueva configuración guardada - Intervalo: ${intervaloMinutos ?? BackgroundLogConfig.intervalo.inMinutes}min',
       );
 
@@ -166,16 +165,14 @@ class DeviceLogBackgroundExtension {
       final service = FlutterBackgroundService();
       if (await service.isRunning()) {
         service.invoke('updateConfig');
-        _logger.i('Señal updateConfig enviada al servicio');
+        print('Señal updateConfig enviada al servicio');
       } else {
         // Fallback porsi el servicio no corre (raro)
         // No llamamos inicializar() aqui para no duplicar timers en UI
-        _logger.w(
-          'Servicio no corriendo - configuración guardada solo en disco',
-        );
+        print('Servicio no corriendo - configuración guardada solo en disco');
       }
     } catch (e) {
-      _logger.e('Error guardando configuración: $e');
+      print('Error guardando configuración: $e');
       rethrow;
     }
   }
@@ -192,7 +189,7 @@ class DeviceLogBackgroundExtension {
 
       // Verificar horario
       if (!estaEnHorarioTrabajo()) {
-        _logger.i(
+        print(
           'Fuera del horario de trabajo (${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00)',
         );
         return;
@@ -200,7 +197,7 @@ class DeviceLogBackgroundExtension {
 
       await _ejecutarLogging();
     } catch (e) {
-      _logger.e('Error en logging con horario: $e');
+      print('Error en logging con horario: $e');
     }
   }
 
@@ -208,7 +205,7 @@ class DeviceLogBackgroundExtension {
   static Future<void> _ejecutarLogging() async {
     // LOCK DE CONCURRENCIA
     if (_isExecuting) {
-      _logger.w('Ya hay un proceso de logging en ejecución - saltando...');
+      print('Ya hay un proceso de logging en ejecución - saltando...');
       return;
     }
 
@@ -217,13 +214,13 @@ class DeviceLogBackgroundExtension {
     try {
       // Re-verificar sesión
       if (!await _verificarSesionActiva()) {
-        _logger.w('LOGGING SKIPPED: No hay sesión activa');
+        print('LOGGING SKIPPED: No hay sesión activa');
         return;
       }
 
       final isGpsEnabled = await Geolocator.isLocationServiceEnabled();
       if (!isGpsEnabled) {
-        _logger.w('LOGGING SKIPPED: GPS Desactivado - Enviando alerta');
+        print('LOGGING SKIPPED: GPS Desactivado - Enviando alerta');
 
         // Llamada directa al callback si existe (Sin usar invoke)
         if (_onGpsAlertListener != null) {
@@ -236,16 +233,16 @@ class DeviceLogBackgroundExtension {
       final hasAlways = await Permission.locationAlways.isGranted;
 
       if (!hasPermission && !hasAlways) {
-        _logger.w('LOGGING SKIPPED: Sin permisos de ubicación');
+        print('LOGGING SKIPPED: Sin permisos de ubicación');
         return;
       }
 
       // Crear log
-      _logger.i('Creando device log...');
+      print('Creando device log...');
       final log = await DeviceInfoHelper.crearDeviceLog();
 
       if (log == null) {
-        _logger.w('No se pudo crear el device log');
+        print('No se pudo crear el device log');
         return;
       }
 
@@ -258,15 +255,15 @@ class DeviceLogBackgroundExtension {
       // Trigger sync general
       await DeviceLogUploadService.sincronizarDeviceLogsPendientes();
 
-      _logger.i('Proceso de logging completado para: ${log.id}');
+      print('Proceso de logging completado para: ${log.id}');
     } catch (e) {
-      _logger.e('Error en proceso de logging: $e');
+      print('Error en proceso de logging: $e');
     } finally {
       _isExecuting = false;
     }
   }
 
-  ///  Verificar si estamos en horario de trabajo
+  /// Verificar si estamos en horario de trabajo
   static bool estaEnHorarioTrabajo() {
     final now = DateTime.now();
     final hora = now.hour;
@@ -282,7 +279,7 @@ class DeviceLogBackgroundExtension {
     return esDiaLaboral && esHorarioTrabajo;
   }
 
-  ///  Guardar log en base de datos local
+  /// Guardar log en base de datos local
   static Future<void> _guardarEnBD(DeviceLog log) async {
     try {
       final db = await DatabaseHelper().database;
@@ -297,9 +294,9 @@ class DeviceLogBackgroundExtension {
         modelo: log.modelo,
       );
 
-      _logger.i('Log guardado en BD local (sincronizado: 0)');
+      print('Log guardado en BD local (sincronizado: 0)');
     } catch (e) {
-      _logger.e('Error guardando en BD: $e');
+      print('Error guardando en BD: $e');
       rethrow;
     }
   }
@@ -312,11 +309,9 @@ class DeviceLogBackgroundExtension {
       intento++;
 
       try {
-        _logger.i(
-          'Intento $intento de ${BackgroundLogConfig.maxReintentos}...',
-        );
+        print('Intento $intento de ${BackgroundLogConfig.maxReintentos}...');
 
-        // 🔍 FETCH CORRECT USER ID
+        // FETCH CORRECT USER ID
         final authService = AuthService();
         final currentUser = await authService.getCurrentUser();
         String? validUserId = currentUser?.id?.toString();
@@ -330,18 +325,18 @@ class DeviceLogBackgroundExtension {
 
         final resultado = await DeviceLogPostService.enviarDeviceLog(
           log,
-          userId: validUserId, // 👈 FIX: Usar ID real (60), no employeeId
+          userId: validUserId,
         );
 
         if (resultado['exito'] == true) {
-          _logger.i('Enviado exitosamente en intento $intento');
+          print('Enviado exitosamente en intento $intento');
           await _marcarComoSincronizado(log.id);
           return;
         } else {
-          _logger.w('Fallo en intento $intento: ${resultado['mensaje']}');
+          print('Fallo en intento $intento: ${resultado['mensaje']}');
         }
       } catch (e) {
-        _logger.w('Error en intento $intento: $e');
+        print('Error en intento $intento: $e');
       }
 
       if (intento < BackgroundLogConfig.maxReintentos) {
@@ -360,32 +355,31 @@ class DeviceLogBackgroundExtension {
         where: 'id = ?',
         whereArgs: [logId],
       );
-      _logger.i('Log marcado como sincronizado en BD');
+      print('Log marcado como sincronizado en BD');
     } catch (e) {
-      _logger.e('Error marcando como sincronizado: $e');
+      print('Error marcando como sincronizado: $e');
     }
   }
 
-  /// 🛑 Detener servicio de logging
+  /// Detener servicio de logging
   static Future<void> detener() async {
     try {
-      _logger.i('Deteniendo extensión de logging...');
+      print('Deteniendo extensión de logging...');
 
       _backgroundTimer?.cancel();
       _backgroundTimer = null;
       _isInitialized = false;
       _isExecuting = false;
 
-      _logger.i('Extensión de logging detenida');
+      print('Extensión de logging detenida');
     } catch (e) {
-      _logger.e('Error deteniendo extensión: $e');
+      print('Error deteniendo extensión: $e');
     }
   }
 
   /// Método para inicializar desde login exitoso
   static Future<void> inicializarDespuesDeLogin() async {
     try {
-      _logger.i('Inicializando logging después de login exitoso...');
       // FIX: Usar AppBackgroundService para evitar timer duplicado en Isolate Principal
       // await inicializar(verificarSesion: true);
       final service = FlutterBackgroundService();
@@ -393,7 +387,7 @@ class DeviceLogBackgroundExtension {
         await service.startService();
       }
     } catch (e) {
-      _logger.e('Error inicializando logging post-login: $e');
+      print('Error inicializando logging post-login: $e');
     }
   }
 
@@ -424,7 +418,7 @@ class DeviceLogBackgroundExtension {
 
   static Future<void> mostrarConfiguracion() async {
     final estado = await obtenerEstado();
-    _logger.i(
+    print(
       'Background Logging Config: Active=${estado['activo']}, Interval=${estado['intervalo_minutos']}',
     );
   }

@@ -20,44 +20,6 @@ import 'package:ada_app/services/device_log/device_log_upload_service.dart'; // 
 
 class SyncService {
   static final _clienteRepo = ClienteRepository();
-
-  // static Future<SyncResultUnificado> sincronizarYLimpiarDatos() async {
-  //   final dbHelper = DatabaseHelper();
-  //   final db = await dbHelper.database;
-  //   final validationService = DatabaseValidationService(db);
-  //
-  //   try {
-  //     final syncResult = await sincronizarTodosLosDatos();
-  //
-  //     if (!syncResult.exito) {
-  //       return syncResult;
-  //     }
-  //
-  //     final validation = await validationService.canDeleteDatabase();
-  //
-  //     if (validation.canDelete) {
-  //       await _limpiarDatosSincronizados(db);
-  //       syncResult.mensaje += '\n\n✅ Base de datos limpiada exitosamente';
-  //     } else {
-  //       syncResult.mensaje += '\n\n⚠️ Advertencia: ${validation.message}';
-  //     }
-  //
-  //     return syncResult;
-  //   } catch (e) {
-  //     await ErrorLogService.logError(
-  //       tableName: 'sync_general',
-  //       operation: 'sincronizar_y_limpiar',
-  //       errorMessage: e.toString(),
-  //       errorType: 'sync_error',
-  //     );
-  //
-  //     final errorResult = SyncResultUnificado();
-  //     errorResult.exito = false;
-  //     errorResult.mensaje = 'Error durante sincronización y limpieza: $e';
-  //     return errorResult;
-  //   }
-  // }
-
   static Future<Map<String, dynamic>> verificarEstadoSincronizacion() async {
     try {
       final dbHelper = DatabaseHelper();

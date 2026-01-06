@@ -27,7 +27,8 @@ class DynamicFormResponseImage {
   factory DynamicFormResponseImage.fromMap(Map<String, dynamic> map) {
     return DynamicFormResponseImage(
       id: map['id'] as String,
-      dynamicFormResponseDetailId: map['dynamic_form_response_detail_id'] as String,
+      dynamicFormResponseDetailId:
+          map['dynamic_form_response_detail_id'] as String,
       imagenPath: map['imagen_path'] as String?,
       imagenBase64: map['imagen_base64'] as String?,
       imagenTamano: map['imagen_tamano'] as int?,
@@ -50,7 +51,7 @@ class DynamicFormResponseImage {
       'orden': orden,
       'created_at': createdAt,
       'sync_status': syncStatus,
-      // ❌ NO incluir fecha_creacion ni fecha_actualizacion
+      // NO incluir fecha_creacion ni fecha_actualizacion
     };
   }
 
@@ -58,7 +59,8 @@ class DynamicFormResponseImage {
   factory DynamicFormResponseImage.fromJson(Map<String, dynamic> json) {
     return DynamicFormResponseImage(
       id: json['id'] as String,
-      dynamicFormResponseDetailId: json['dynamicFormResponseDetailId'] as String,
+      dynamicFormResponseDetailId:
+          json['dynamicFormResponseDetailId'] as String,
       imagenPath: json['imagenPath'] as String?,
       imagenBase64: json['imagenBase64'] as String?,
       imagenTamano: json['imagenTamano'] as int?,
@@ -98,7 +100,8 @@ class DynamicFormResponseImage {
   }) {
     return DynamicFormResponseImage(
       id: id ?? this.id,
-      dynamicFormResponseDetailId: dynamicFormResponseDetailId ?? this.dynamicFormResponseDetailId,
+      dynamicFormResponseDetailId:
+          dynamicFormResponseDetailId ?? this.dynamicFormResponseDetailId,
       imagenPath: imagenPath ?? this.imagenPath,
       imagenBase64: imagenBase64 ?? this.imagenBase64,
       imagenTamano: imagenTamano ?? this.imagenTamano,

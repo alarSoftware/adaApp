@@ -82,62 +82,6 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
     }
   }
 
-  /// Crear nuevo estado con imágenes - DEPRECADO: Usar crearCensoActivo() + CensoActivoFotoRepository
-  // @Deprecated('Usar crearCensoActivo() y CensoActivoFotoRepository.guardarFoto() por separado')
-  // Future<EstadoEquipo> crearNuevoEstadoConImagenes({
-  //   required String equipoId,
-  //   required int clienteId,
-  //   int? usuarioId,  // ← Nuevo parámetro agregado
-  //   required bool enLocal,
-  //   required DateTime fechaRevision,
-  //   double? latitud,
-  //   double? longitud,
-  //   String? estadoCenso,
-  //   String? observaciones,
-  //   // Primera imagen - DEPRECADO
-  //   String? imagenPath,
-  //   String? imagenBase64,
-  //   bool tieneImagen = false,
-  //   int? imagenTamano,
-  //   // Segunda imagen - DEPRECADO
-  //   String? imagenPath2,
-  //   String? imagenBase64_2,
-  //   bool tieneImagen2 = false,
-  //   int? imagenTamano2,
-  // }) async {
-  //   try {
-  //     _logger.w('⚠️ Método deprecado: crearNuevoEstadoConImagenes()');
-  //     _logger.w('   Usar crearCensoActivo() + CensoActivoFotoRepository.guardarFoto()');
-  //
-  //     // Crear el estado sin imágenes
-  //     final estado = await crearCensoActivo(
-  //       equipoId: equipoId,
-  //       clienteId: clienteId,
-  //       usuarioId: usuarioId,  // ← Nuevo parámetro pasado
-  //       enLocal: enLocal,
-  //       fechaRevision: fechaRevision,
-  //       latitud: latitud,
-  //       longitud: longitud,
-  //       estadoCenso: estadoCenso,
-  //       observaciones: observaciones,
-  //     );
-  //
-  //     // Log de advertencia para migrar imágenes manualmente
-  //     if (tieneImagen || tieneImagen2) {
-  //       _logger.w('⚠️ IMÁGENES DETECTADAS - Se necesita migración manual:');
-  //       _logger.w('   Estado creado con ID: ${estado.id}');
-  //       _logger.w('   Usar CensoActivoFotoRepository.guardarFoto() para guardar las imágenes');
-  //       if (tieneImagen) _logger.w('   - Imagen 1: ${imagenTamano ?? 0} bytes');
-  //       if (tieneImagen2) _logger.w('   - Imagen 2: ${imagenTamano2 ?? 0} bytes');
-  //     }
-  //
-  //     return estado;
-  //   } catch (e) {
-  //     _logger.e('❌ Error creando nuevo estado con imágenes: $e');
-  //     rethrow;
-  //   }
-  // }
-
   Future<CensoActivo?> obtenerCensoActivoById(String id) async {
     try {
       final maps = await dbHelper.consultar(

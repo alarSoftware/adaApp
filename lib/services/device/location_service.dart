@@ -1,5 +1,5 @@
 import 'package:geolocator/geolocator.dart';
-import 'package:logger/logger.dart';
+
 import 'dart:async';
 
 /// Excepción personalizada para errores de ubicación
@@ -18,7 +18,6 @@ enum LocationErrorType { permissionDenied, serviceDisabled, timeout, unknown }
 /// Servicio centralizado para manejo de ubicación GPS
 class LocationService {
   static LocationService? _instance;
-  final Logger _logger = Logger();
 
   LocationService._internal();
 
@@ -43,10 +42,10 @@ class LocationService {
   Future<bool> isLocationServiceEnabled() async {
     try {
       final isEnabled = await Geolocator.isLocationServiceEnabled();
-      _logger.i('Servicios de ubicación habilitados: $isEnabled');
+      print('Servicios de ubicación habilitados: $isEnabled');
       return isEnabled;
     } catch (e) {
-      _logger.e('Error verificando servicios de ubicación: $e');
+      print('Error verificando servicios de ubicación: $e');
       return false;
     }
   }
@@ -55,10 +54,10 @@ class LocationService {
   Future<LocationPermission> checkPermission() async {
     try {
       final permission = await Geolocator.checkPermission();
-      _logger.i('Permisos actuales: $permission');
+      print('Permisos actuales: $permission');
       return permission;
     } catch (e) {
-      _logger.e('Error verificando permisos: $e');
+      print('Error verificando permisos: $e');
       return LocationPermission.denied;
     }
   }
@@ -67,10 +66,10 @@ class LocationService {
   Future<LocationPermission> requestPermission() async {
     try {
       final permission = await Geolocator.requestPermission();
-      _logger.i('Permisos solicitados - resultado: $permission');
+      print('Permisos solicitados - resultado: $permission');
       return permission;
     } catch (e) {
-      _logger.e('Error solicitando permisos: $e');
+      print('Error solicitando permisos: $e');
       return LocationPermission.denied;
     }
   }
@@ -132,11 +131,11 @@ class LocationService {
     Duration timeout = const Duration(seconds: 30),
   }) async {
     try {
-      _logger.i('Obteniendo ubicación GPS...');
+      print('Obteniendo ubicación GPS...');
 
       // Verificar permisos primero
       if (!await hasValidPermissions()) {
-        _logger.w('No hay permisos válidos para ubicación');
+        print('No hay permisos válidos para ubicación');
         return null;
       }
 
@@ -146,12 +145,12 @@ class LocationService {
         timeLimit: timeout,
       );
 
-      _logger.i(
+      print(
         'Ubicación obtenida: ${position.latitude}, ${position.longitude} (precisión: ${position.accuracy}m)',
       );
       return position;
     } catch (e) {
-      _logger.w('No se pudo obtener ubicación: $e');
+      print('No se pudo obtener ubicación: $e');
       return null;
     }
   }
@@ -163,7 +162,7 @@ class LocationService {
     bool autoRequestPermissions = true,
   }) async {
     try {
-      _logger.i('Obteniendo ubicación GPS (obligatorio)...');
+      print('Obteniendo ubicación GPS (obligatorio)...');
 
       // Asegurar permisos si está habilitado
       if (autoRequestPermissions) {
@@ -193,7 +192,7 @@ class LocationService {
         forceAndroidLocationManager: true,
       );
 
-      _logger.i(
+      print(
         'Ubicación obtenida exitosamente: ${position.latitude}, ${position.longitude}',
       );
       return position;
@@ -213,7 +212,7 @@ class LocationService {
         LocationErrorType.permissionDenied,
       );
     } catch (e) {
-      _logger.e('Error obteniendo ubicación obligatoria: $e');
+      print('Error obteniendo ubicación obligatoria: $e');
       throw LocationException(
         'Error inesperado obteniendo ubicación: $e',
         LocationErrorType.unknown,
@@ -229,7 +228,7 @@ class LocationService {
     Duration timeout = const Duration(seconds: 30),
   }) async {
     try {
-      _logger.i('Obteniendo ubicación promediada ($samples muestras)...');
+      print('Obteniendo ubicación promediada ($samples muestras)...');
 
       if (!await hasValidPermissions()) {
         return null;
@@ -245,7 +244,7 @@ class LocationService {
           );
           positions.add(position);
 
-          _logger.i(
+          print(
             'Muestra ${i + 1}/$samples: ${position.latitude}, ${position.longitude}',
           );
 
@@ -253,12 +252,12 @@ class LocationService {
             await Future.delayed(delayBetweenSamples);
           }
         } catch (e) {
-          _logger.w('Error en muestra ${i + 1}: $e');
+          print('Error en muestra ${i + 1}: $e');
         }
       }
 
       if (positions.isEmpty) {
-        _logger.w('No se pudieron obtener muestras de ubicación');
+        print('No se pudieron obtener muestras de ubicación');
         return null;
       }
 
@@ -273,7 +272,7 @@ class LocationService {
           positions.map((p) => p.accuracy).reduce((a, b) => a + b) /
           positions.length;
 
-      _logger.i(
+      print(
         'Ubicación promediada: $avgLat, $avgLng (precisión promedio: ${avgAccuracy.toStringAsFixed(1)}m)',
       );
 
@@ -291,7 +290,7 @@ class LocationService {
         headingAccuracy: positions.first.headingAccuracy,
       );
     } catch (e) {
-      _logger.e('Error obteniendo ubicación promediada: $e');
+      print('Error obteniendo ubicación promediada: $e');
       return null;
     }
   }
@@ -300,10 +299,10 @@ class LocationService {
   Future<bool> openLocationSettings() async {
     try {
       final result = await Geolocator.openLocationSettings();
-      _logger.i('Configuraciones de ubicación abiertas: $result');
+      print('Configuraciones de ubicación abiertas: $result');
       return result;
     } catch (e) {
-      _logger.e('Error abriendo configuraciones: $e');
+      print('Error abriendo configuraciones: $e');
       return false;
     }
   }
@@ -312,10 +311,10 @@ class LocationService {
   Future<bool> openAppSettings() async {
     try {
       final result = await Geolocator.openAppSettings();
-      _logger.i('Configuraciones de app abiertas: $result');
+      print('Configuraciones de app abiertas: $result');
       return result;
     } catch (e) {
-      _logger.e('Error abriendo configuraciones de app: $e');
+      print('Error abriendo configuraciones de app: $e');
       return false;
     }
   }
@@ -350,7 +349,7 @@ class LocationService {
     return distance <= radiusMeters;
   }
 
-  /// 🕵️‍♂️ Detectar si la ubicación es simulada (Fake GPS)
+  /// Detectar si la ubicación es simulada (Fake GPS)
   Future<bool> checkForMockLocation() async {
     try {
       if (!await hasValidPermissions()) {
@@ -362,13 +361,13 @@ class LocationService {
       position ??= await Geolocator.getCurrentPosition();
 
       if (position.isMocked) {
-        _logger.w('⚠️ ALERTA: Ubicación simulada detectada (Fake GPS)');
+        print('ALERTA: Ubicación simulada detectada (Fake GPS)');
         return true;
       }
 
       return false;
     } catch (e) {
-      _logger.e('Error verificando ubicación simulada: $e');
+      print('Error verificando ubicación simulada: $e');
       return false;
     }
   }

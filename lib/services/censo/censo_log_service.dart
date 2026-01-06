@@ -2,12 +2,11 @@
 
 import 'dart:io';
 import 'dart:convert';
-import 'package:logger/logger.dart';
+
 import 'package:path_provider/path_provider.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 
 class CensoLogService {
-  final Logger _logger = Logger();
   final CensoActivoFotoRepository _fotoRepository = CensoActivoFotoRepository();
 
   /// Guarda un log detallado del POST request en un archivo de texto
@@ -33,9 +32,9 @@ class CensoLogService {
 
       await file.writeAsString(contenido);
 
-      _logger.i('📁 Log guardado: ${file.uri.pathSegments.last}');
+      print('Log guardado: ${file.uri.pathSegments.last}');
     } catch (e) {
-      _logger.w('Error guardando log: $e');
+      print('Error guardando log: $e');
     }
   }
 
@@ -50,9 +49,11 @@ class CensoLogService {
       final files = downloadsDir
           .listSync()
           .whereType<File>()
-          .where((file) =>
-      file.path.contains('post_nuevo_equipo_') ||
-          file.path.contains('censo_activo_post_'))
+          .where(
+            (file) =>
+                file.path.contains('post_nuevo_equipo_') ||
+                file.path.contains('censo_activo_post_'),
+          )
           .map((file) => file.path)
           .toList();
 
@@ -67,10 +68,10 @@ class CensoLogService {
         }
       });
 
-      _logger.i('📁 ${files.length} logs encontrados');
+      print('${files.length} logs encontrados');
       return files;
     } catch (e) {
-      _logger.e('Error listando logs: $e');
+      print('Error listando logs: $e');
       return [];
     }
   }
@@ -86,7 +87,8 @@ class CensoLogService {
     }
 
     final now = DateTime.now();
-    final fechaFormateada = '${now.year}${now.month.toString().padLeft(2, '0')}'
+    final fechaFormateada =
+        '${now.year}${now.month.toString().padLeft(2, '0')}'
         '${now.day.toString().padLeft(2, '0')}_'
         '${now.hour.toString().padLeft(2, '0')}'
         '${now.minute.toString().padLeft(2, '0')}_'
@@ -110,7 +112,7 @@ class CensoLogService {
       }
       return null;
     } catch (e) {
-      _logger.w('Error obteniendo directorio: $e');
+      print('Error obteniendo directorio: $e');
       return null;
     }
   }
@@ -165,20 +167,26 @@ class CensoLogService {
     return buffer.toString();
   }
 
-  // ✅ MÉTODO CORREGIDO PARA RESUMEN DEL CENSO
+  // Resumen del censo
   Future<void> _agregarResumenCenso(
-      StringBuffer buffer,
-      Map<String, dynamic> body,
-      String? censoActivoId,
-      ) async {
-    buffer.writeln('Equipo ID: ${body['edfEquipoId'] ?? body['equipo_id'] ?? 'N/A'}');
-    buffer.writeln('Cliente ID: ${body['edfClienteId'] ?? body['cliente_id'] ?? 'N/A'}');
-    buffer.writeln('Usuario ID: ${body['usuarioId'] ?? body['usuario_id'] ?? 'N/A'}');
+    StringBuffer buffer,
+    Map<String, dynamic> body,
+    String? censoActivoId,
+  ) async {
+    buffer.writeln(
+      'Equipo ID: ${body['edfEquipoId'] ?? body['equipo_id'] ?? 'N/A'}',
+    );
+    buffer.writeln(
+      'Cliente ID: ${body['edfClienteId'] ?? body['cliente_id'] ?? 'N/A'}',
+    );
+    buffer.writeln(
+      'Usuario ID: ${body['usuarioId'] ?? body['usuario_id'] ?? 'N/A'}',
+    );
     buffer.writeln('Latitud: ${body['latitud'] ?? 'N/A'}');
     buffer.writeln('Longitud: ${body['longitud'] ?? 'N/A'}');
     buffer.writeln('Es nuevo equipo: ${body['esNuevoEquipo'] ?? false}');
 
-    // ✅ DETECTAR FOTOS DINÁMICAMENTE
+    // Detectar fotos dinámicamente
     bool fotosDetectadas = false;
 
     // Primero intentar obtener de la base de datos
@@ -192,7 +200,7 @@ class CensoLogService {
           fotosDetectadas = true;
         }
       } catch (e) {
-        _logger.w('No se pudieron obtener fotos para resumen: $e');
+        print('No se pudieron obtener fotos para resumen: $e');
       }
     }
 
@@ -219,11 +227,15 @@ class CensoLogService {
     // Tamaños de imágenes (mantener lógica existente)
     if (body['imageBase64_1'] != null) {
       final tamano = body['imageBase64_1'].toString().length;
-      buffer.writeln('Tamaño imagen 1: ${(tamano / 1024).toStringAsFixed(1)} KB');
+      buffer.writeln(
+        'Tamaño imagen 1: ${(tamano / 1024).toStringAsFixed(1)} KB',
+      );
     }
     if (body['imageBase64_2'] != null) {
       final tamano = body['imageBase64_2'].toString().length;
-      buffer.writeln('Tamaño imagen 2: ${(tamano / 1024).toStringAsFixed(1)} KB');
+      buffer.writeln(
+        'Tamaño imagen 2: ${(tamano / 1024).toStringAsFixed(1)} KB',
+      );
     }
 
     buffer.writeln('Observaciones: ${body['observaciones'] ?? 'N/A'}');
@@ -231,43 +243,50 @@ class CensoLogService {
     buffer.writeln('Fecha revisión: ${body['fecha_revision'] ?? 'N/A'}');
   }
 
-  // ✅ MÉTODO CORREGIDO PARA BODY JSON
+  // Método para body JSON
   Future<void> _agregarBodyJson(
-      StringBuffer buffer,
-      Map<String, dynamic> body,
-      String? censoActivoId,
-      ) async {
+    StringBuffer buffer,
+    Map<String, dynamic> body,
+    String? censoActivoId,
+  ) async {
     // Crear versión simplificada (sin estructuras anidadas)
     final bodySimplificado = <String, dynamic>{};
     body.forEach((key, value) {
-      if (key != 'equipo' && key != 'cliente' && key != 'imagenes' && key != 'metadata') {
+      if (key != 'equipo' &&
+          key != 'cliente' &&
+          key != 'imagenes' &&
+          key != 'metadata') {
         bodySimplificado[key] = value;
       }
     });
 
-    // ✅ AGREGAR INFO DE FOTOS CON FORMATO CORRECTO
+    // Agregar info de fotos con formato correcto
     if (censoActivoId != null) {
       try {
         final fotos = await _fotoRepository.obtenerFotosPorCenso(censoActivoId);
         if (fotos.isNotEmpty) {
-          // ✅ FORMATO CORRECTO CON ORDEN
-          bodySimplificado['fotos'] = fotos.map((foto) => {
-            'orden': foto.orden,
-            'uuid': foto.id ?? 'N/A',
-            'path': foto.imagenPath ?? '',
-            'tamano': foto.imagenTamano ?? 0,
-          }).toList();
+          // Formato correcto con orden
+          bodySimplificado['fotos'] = fotos
+              .map(
+                (foto) => {
+                  'orden': foto.orden,
+                  'uuid': foto.id ?? 'N/A',
+                  'path': foto.imagenPath ?? '',
+                  'tamano': foto.imagenTamano ?? 0,
+                },
+              )
+              .toList();
         }
       } catch (e) {
-        _logger.w('No se pudieron obtener fotos para el log: $e');
+        print('No se pudieron obtener fotos para el log: $e');
 
-        // ✅ FALLBACK: Si no se pueden obtener de BD, mantener las que vengan en el body
+        // Fallback: Si no se pueden obtener de BD, mantener las que vengan en el body
         if (body.containsKey('fotos')) {
           bodySimplificado['fotos'] = body['fotos'];
         }
       }
     } else {
-      // ✅ Si no hay censoActivoId pero el body tiene fotos, mantenerlas
+      // Si no hay censoActivoId pero el body tiene fotos, mantenerlas
       if (body.containsKey('fotos')) {
         bodySimplificado['fotos'] = body['fotos'];
       }

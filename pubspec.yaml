@@ -16,7 +16,7 @@ dependencies:
   # Dependencias principales
   sqflite: ^2.3.0
   path: ^1.8.3
-  logger: ^2.4.0
+
   geolocator: ^13.0.0
   barcode_scan2: ^4.2.3
   connectivity_plus: ^6.1.4

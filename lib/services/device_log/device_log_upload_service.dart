@@ -1,85 +1,78 @@
 import 'dart:async';
-import 'package:logger/logger.dart';
 
 import 'package:ada_app/repositories/device_log_repository.dart';
 import 'package:ada_app/services/post/device_log_post_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
-import 'package:ada_app/services/api/auth_service.dart'; // 🆕 AGREGAR
+import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
-import 'package:ada_app/services/api/api_config_service.dart'; // 🆕 AGREGAR
+import 'package:ada_app/services/api/api_config_service.dart';
 
 class DeviceLogUploadService {
-  final Logger _logger = Logger();
-
   static Timer? _syncTimer;
   static bool _syncActivo = false;
 
   /// Sincroniza todos los device logs pendientes
   static Future<Map<String, int>> sincronizarDeviceLogsPendientes() async {
-    final logger = Logger();
-
     try {
-      // 🔍 Mostrar configuración actual para debugging
+      // Mostrar configuración actual para debugging
       final urlActual = await ApiConfigService.getBaseUrl();
-      logger.i('🔄 Sincronización de device logs pendientes...');
-      logger.i('🌐 URL configurada: $urlActual');
+      print('Sincronización de device logs pendientes...');
+      print('URL configurada: $urlActual');
 
       final db = await DatabaseHelper().database;
       final repository = DeviceLogRepository(db);
       final logsPendientes = await repository.obtenerNoSincronizados();
 
       if (logsPendientes.isEmpty) {
-        logger.i('✅ No hay device logs pendientes');
+        print('No hay device logs pendientes');
         return {'exitosos': 0, 'fallidos': 0, 'total': 0};
       }
 
-      logger.i('📋 Total a sincronizar: ${logsPendientes.length}');
+      print('Total a sincronizar: ${logsPendientes.length}');
 
       int exitosos = 0;
       int fallidos = 0;
 
       for (final log in logsPendientes) {
         try {
-          // 🕵️‍♂️ Obtener usuario actual para userId
+          // Obtener usuario actual para userId
           final currentUser = await AuthService().getCurrentUser();
           String? userIdFromAuth = currentUser?.id?.toString();
 
-          // 🔄 Fallback: Si no hay sesión activa, buscar el usuario por employeeId del log
+          // Fallback: Si no hay sesión activa, buscar el usuario por employeeId del log
           if (userIdFromAuth == null && log.employeeId != null) {
             userIdFromAuth = await obtenerUserIdPorEmployeeId(log.employeeId!);
           }
 
-          logger.i('🔍 Debug UserId:');
-          logger.i('   currentUser: ${currentUser?.username}');
-          logger.i('   currentUser.id: ${currentUser?.id}');
-          logger.i('   log.employeeId: ${log.employeeId}');
-          logger.i('   userId a enviar: ${userIdFromAuth ?? log.employeeId}');
+          print('Debug UserId:');
+          print('   currentUser: ${currentUser?.username}');
+          print('   currentUser.id: ${currentUser?.id}');
+          print('   log.employeeId: ${log.employeeId}');
+          print('   userId a enviar: ${userIdFromAuth ?? log.employeeId}');
 
-          // ✅ Usar el servicio unificado con logging automático
+          // Usar el servicio unificado con logging automático
           final resultado = await DeviceLogPostService.enviarDeviceLog(
             log,
-            userId:
-                userIdFromAuth, // 👈 FIX: No enviar log.employeeId como fallback si no se encuentra usuario
+            userId: userIdFromAuth,
           );
 
           if (resultado['exito'] == true) {
             await repository.marcarComoSincronizado(log.id);
             exitosos++;
-            logger.i('✅ Device log ${log.id} enviado');
+            print('Device log ${log.id} enviado');
           } else {
             fallidos++;
-            logger.w('⚠️ Error enviando ${log.id}: ${resultado['mensaje']}');
+            print('Error enviando ${log.id}: ${resultado['mensaje']}');
           }
         } catch (e) {
-          logger.e('❌ Error enviando ${log.id}: $e');
-
+          print('Error enviando ${log.id}: $e');
           fallidos++;
         }
       }
 
-      logger.i(
-        '✅ Sincronización completada - Exitosos: $exitosos, Fallidos: $fallidos',
+      print(
+        'Sincronización completada - Exitosos: $exitosos, Fallidos: $fallidos',
       );
 
       return {
@@ -88,7 +81,7 @@ class DeviceLogUploadService {
         'total': logsPendientes.length,
       };
     } catch (e) {
-      logger.e('💥 Error general en sincronización: $e');
+      print('Error general en sincronización: $e');
 
       await ErrorLogService.logError(
         tableName: 'device_log',
@@ -105,15 +98,13 @@ class DeviceLogUploadService {
   static Future<Map<String, int>> enviarDeviceLogsBatch(
     List<DeviceLog> logs,
   ) async {
-    final logger = Logger();
-
     try {
       // 🔍 Mostrar URL para debugging
       final urlCompleta = await ApiConfigService.getFullUrl(
         '/appDeviceLog/insertAppDeviceLog',
       );
-      logger.i('📤 Enviando batch de ${logs.length} device logs...');
-      logger.i('🌐 URL destino: $urlCompleta');
+      print('📤 Enviando batch de ${logs.length} device logs...');
+      print('🌐 URL destino: $urlCompleta');
 
       // Obtener userId del usuario actual (User.id)
       final currentUser = await AuthService().getCurrentUser();
@@ -141,15 +132,15 @@ class DeviceLogUploadService {
             await repository.marcarComoSincronizado(log.id);
             marcados++;
           } catch (e) {
-            logger.w('⚠️ Error marcando ${log.id} como sincronizado: $e');
+            print('⚠️ Error marcando ${log.id} como sincronizado: $e');
           }
         }
-        logger.i('🔄 Marcados como sincronizados: $marcados');
+        print('🔄 Marcados como sincronizados: $marcados');
       }
 
       return resultado;
     } catch (e) {
-      logger.e('❌ Error en batch upload: $e');
+      print('❌ Error en batch upload: $e');
 
       await ErrorLogService.logError(
         tableName: 'device_log',
@@ -166,10 +157,8 @@ class DeviceLogUploadService {
   static Future<int> limpiarLogsSincronizadosAntiguos({
     int diasAntiguos = 7,
   }) async {
-    final logger = Logger();
-
     try {
-      logger.i(
+      print(
         '🧹 Limpiando device logs sincronizados antiguos (>${diasAntiguos} días)...',
       );
 
@@ -180,10 +169,10 @@ class DeviceLogUploadService {
         diasAntiguos: diasAntiguos,
       );
 
-      logger.i('✅ Eliminados $eliminados logs antiguos sincronizados');
+      print('✅ Eliminados $eliminados logs antiguos sincronizados');
       return eliminados;
     } catch (e) {
-      logger.e('❌ Error limpiando logs antiguos: $e');
+      print('❌ Error limpiando logs antiguos: $e');
       return 0;
     }
   }
@@ -202,7 +191,7 @@ class DeviceLogUploadService {
         'pendientes': stats['pendientes'] as int,
       };
     } catch (e) {
-      Logger().e('❌ Error obteniendo estadísticas: $e');
+      print('❌ Error obteniendo estadísticas: $e');
       return {'total': 0, 'sincronizados': 0, 'pendientes': 0};
     }
   }
@@ -211,17 +200,17 @@ class DeviceLogUploadService {
 
   static Future<void> iniciarSincronizacionAutomatica() async {
     if (_syncActivo) {
-      Logger().i('⚠️ Sincronización de device logs ya está activa');
+      print('⚠️ Sincronización de device logs ya está activa');
       return;
     }
 
     _syncActivo = true;
     final urlActual = await ApiConfigService.getBaseUrl();
 
-    Logger().i(
+    print(
       '🚀 Iniciando sincronización automática de device logs cada 10 minutos...',
     );
-    Logger().i('🌐 Sincronizando con: $urlActual');
+    print('🌐 Sincronizando con: $urlActual');
 
     _syncTimer = Timer.periodic(Duration(minutes: 10), (timer) async {
       await _ejecutarSincronizacionAutomatica();
@@ -238,7 +227,7 @@ class DeviceLogUploadService {
       _syncTimer!.cancel();
       _syncTimer = null;
       _syncActivo = false;
-      Logger().i('⏹️ Sincronización automática de device logs detenida');
+      print('⏹️ Sincronización automática de device logs detenida');
     }
   }
 
@@ -246,26 +235,25 @@ class DeviceLogUploadService {
     if (!_syncActivo) return;
 
     try {
-      final logger = Logger();
-      logger.i('🔄 Ejecutando sincronización automática de device logs...');
+      print('🔄 Ejecutando sincronización automática de device logs...');
 
       final resultado = await sincronizarDeviceLogsPendientes();
 
       if (resultado['total']! > 0) {
-        logger.i(
+        print(
           '✅ Auto-sync completado: ${resultado['exitosos']}/${resultado['total']} enviados',
         );
 
         // 📊 Mostrar estadísticas después de la sincronización
         final stats = await obtenerEstadisticasSincronizacion();
-        logger.i(
+        print(
           '📊 Estado actual: ${stats['sincronizados']} sync, ${stats['pendientes']} pendientes',
         );
       } else {
-        logger.i('💤 No hay device logs pendientes para sincronizar');
+        print('💤 No hay device logs pendientes para sincronizar');
       }
     } catch (e) {
-      Logger().e('❌ Error en auto-sync device logs: $e');
+      print('❌ Error en auto-sync device logs: $e');
     }
   }
 
@@ -273,11 +261,11 @@ class DeviceLogUploadService {
 
   static Future<Map<String, int>?> forzarSincronizacion() async {
     if (!_syncActivo) {
-      Logger().w('⚠️ Sincronización automática no está activa');
+      print('⚠️ Sincronización automática no está activa');
       return null;
     }
 
-    Logger().i('⚡ Forzando sincronización inmediata de device logs...');
+    print('⚡ Forzando sincronización inmediata de device logs...');
     return await sincronizarDeviceLogsPendientes();
   }
 
@@ -301,31 +289,23 @@ class DeviceLogUploadService {
   /// Método para debugging - mostrar configuración completa
   static Future<void> mostrarConfiguracion() async {
     final config = await verificarConfiguracion();
-    final logger = Logger();
 
-    logger.i("═══════════════════════════════════════");
-    logger.i("🔧 CONFIGURACIÓN UPLOAD SERVICE");
-    logger.i("═══════════════════════════════════════");
-    logger.i("🌐 Base URL: ${config['base_url']}");
-    logger.i("🔗 URL Completa: ${config['full_url']}");
-    logger.i(
-      "🔄 Sync Automático: ${config['sync_activo'] ? 'ACTIVO' : 'INACTIVO'}",
-    );
-    logger.i("⏰ Timer Activo: ${config['timer_activo'] ? 'SÍ' : 'NO'}");
-    logger.i("📊 Estadísticas:");
+    print("CONFIGURACIÓN UPLOAD SERVICE");
+    print("Base URL: ${config['base_url']}");
+    print("URL Completa: ${config['full_url']}");
+    print("Sync Automático: ${config['sync_activo'] ? 'ACTIVO' : 'INACTIVO'}");
+    print("Timer Activo: ${config['timer_activo'] ? 'SÍ' : 'NO'}");
+    print("Estadísticas:");
     final stats = config['estadisticas'] as Map<String, int>;
-    logger.i("   • Total: ${stats['total']}");
-    logger.i("   • Sincronizados: ${stats['sincronizados']}");
-    logger.i("   • Pendientes: ${stats['pendientes']}");
-    logger.i("═══════════════════════════════════════");
+    print("   - Total: ${stats['total']}");
+    print("   - Sincronizados: ${stats['sincronizados']}");
+    print("   - Pendientes: ${stats['pendientes']}");
   }
 
   /// Método de conveniencia para inicializar todo el servicio
   static Future<void> inicializar() async {
-    final logger = Logger();
-
     try {
-      logger.i("🚀 Inicializando DeviceLogUploadService...");
+      print("Inicializando DeviceLogUploadService...");
 
       // Mostrar configuración actual
       await mostrarConfiguracion();
@@ -333,9 +313,9 @@ class DeviceLogUploadService {
       // Iniciar sincronización automática
       await iniciarSincronizacionAutomatica();
 
-      logger.i("✅ DeviceLogUploadService inicializado correctamente");
+      print("DeviceLogUploadService inicializado correctamente");
     } catch (e) {
-      logger.e("💥 Error inicializando DeviceLogUploadService: $e");
+      print("Error inicializando DeviceLogUploadService: $e");
     }
   }
 
@@ -352,21 +332,20 @@ class DeviceLogUploadService {
         final id = result.first['id'];
         return id?.toString();
       } else {
-        // 🔍 DEBUG: Si falla, inspeccionar qué hay en la tabla
-        Logger().w('⚠️ No se encontró usuario con employee_id "$employeeId".');
+        print('No se encontró usuario con employee_id "$employeeId".');
         final allUsers = await db.rawQuery(
           'SELECT id, employee_id, username FROM Users',
         );
-        Logger().i('📋 Dump de tabla Users (${allUsers.length} registros):');
+        print('Dump de tabla Users (${allUsers.length} registros):');
         for (final u in allUsers) {
-          Logger().i(
+          print(
             '   User: id=${u['id']}, empId=${u['employee_id']}, user=${u['username']}',
           );
         }
       }
       return null;
     } catch (e) {
-      Logger().w('⚠️ Error buscando userId para employeeId $employeeId: $e');
+      print('Error buscando userId para employeeId $employeeId: $e');
       return null;
     }
   }

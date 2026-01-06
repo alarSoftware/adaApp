@@ -11,14 +11,12 @@ import 'package:logger/logger.dart';
 /// 🔧 Helper para obtener información del dispositivo
 /// Centraliza toda la lógica de obtención de datos sin duplicación
 class DeviceInfoHelper {
-  static final _logger = Logger();
-
   /// 📍 Obtener ubicación actual
   static Future<Position?> obtenerUbicacion() async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        _logger.w('⚠️ Servicios de ubicación desactivados');
+        print('⚠️ Servicios de ubicación desactivados');
         return null;
       }
 
@@ -29,7 +27,7 @@ class DeviceInfoHelper {
         ),
       );
     } catch (e) {
-      _logger.e('❌ Error al obtener ubicación: $e');
+      print('❌ Error al obtener ubicación: $e');
       return null;
     }
   }
@@ -40,7 +38,7 @@ class DeviceInfoHelper {
       final battery = Battery();
       return await battery.batteryLevel;
     } catch (e) {
-      _logger.e('❌ Error al obtener nivel de batería: $e');
+      print('❌ Error al obtener nivel de batería: $e');
       return 0;
     }
   }
@@ -60,7 +58,7 @@ class DeviceInfoHelper {
 
       return 'Desconocido';
     } catch (e) {
-      _logger.e('❌ Error al obtener modelo: $e');
+      print('❌ Error al obtener modelo: $e');
       return 'Desconocido';
     }
   }
@@ -78,8 +76,6 @@ class DeviceInfoHelper {
   /// Crear DeviceLog completo (método todo-en-uno)
   static Future<DeviceLog?> crearDeviceLog() async {
     try {
-      _logger.i(' Creando device log...');
-
       // Obtener todos los datos necesarios en paralelo para mayor eficiencia
       final results = await Future.wait([
         obtenerUbicacion(),
@@ -96,7 +92,6 @@ class DeviceInfoHelper {
 
       // Validar que tenemos ubicación
       if (position == null) {
-        _logger.w(' No se pudo obtener ubicación - log no creado');
         return null;
       }
 
@@ -110,15 +105,6 @@ class DeviceInfoHelper {
         fechaRegistro: DateTime.now().toIso8601String(),
         sincronizado: 0,
       );
-
-      _logger.i(' DeviceLog creado exitosamente');
-      _logger.i('   Ubicación: ${log.latitudLongitud}');
-      _logger.i('   Batería: ${log.bateria}%');
-      _logger.i('   Modelo: ${log.modelo}');
-
-      return log;
-    } catch (e) {
-      _logger.e(' Error creando DeviceLog: $e');
       return null;
     }
   }
@@ -163,7 +149,7 @@ class DeviceInfoHelper {
 
       return resultados;
     } catch (e) {
-      _logger.e('Error verificando disponibilidad: $e');
+      print('Error verificando disponibilidad: $e');
       return resultados;
     }
   }
@@ -172,15 +158,13 @@ class DeviceInfoHelper {
   static Future<void> mostrarEstadoDisponibilidad() async {
     final disponibilidad = await verificarDisponibilidad();
 
-    _logger.i('═══════════════════════════════════════');
-    _logger.i('📊 DISPONIBILIDAD DE SERVICIOS');
-    _logger.i('═══════════════════════════════════════');
+    print('═══════════════════════════════════════');
+    print('📊 DISPONIBILIDAD DE SERVICIOS');
+    print('═══════════════════════════════════════');
     disponibilidad.forEach((servicio, disponible) {
       final icono = disponible ? '✅' : '❌';
-      _logger.i(
-        '$icono $servicio: ${disponible ? "DISPONIBLE" : "NO DISPONIBLE"}',
-      );
+      print('$icono $servicio: ${disponible ? "DISPONIBLE" : "NO DISPONIBLE"}');
     });
-    _logger.i('═══════════════════════════════════════');
+    print('═══════════════════════════════════════');
   }
 }

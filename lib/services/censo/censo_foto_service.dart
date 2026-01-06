@@ -1,21 +1,19 @@
-import 'package:logger/logger.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
-import 'package:ada_app/models/censo_activo_foto.dart'; // ← Agregar import
+import 'package:ada_app/models/censo_activo_foto.dart';
 
 class CensoFotoService {
-  final Logger _logger = Logger();
   final CensoActivoFotoRepository _fotoRepository;
 
   CensoFotoService({CensoActivoFotoRepository? fotoRepository})
-      : _fotoRepository = fotoRepository ?? CensoActivoFotoRepository();
+    : _fotoRepository = fotoRepository ?? CensoActivoFotoRepository();
 
   /// Guarda las fotos asociadas a un censo
   Future<Map<String, String?>> guardarFotosDelCenso(
-      String censoActivoId,
-      Map<String, dynamic> datos,
-      ) async {
+    String censoActivoId,
+    Map<String, dynamic> datos,
+  ) async {
     try {
-      _logger.i('📸 Guardando fotos para censo: $censoActivoId');
+      print('Guardando fotos para censo: $censoActivoId');
 
       String? imagenId1;
       String? imagenId2;
@@ -44,18 +42,12 @@ class CensoFotoService {
         );
       }
 
-      _logger.i('✅ Fotos guardadas - ID1: $imagenId1, ID2: $imagenId2');
+      print('Fotos guardadas - ID1: $imagenId1, ID2: $imagenId2');
 
-      return {
-        'imagen_id_1': imagenId1,
-        'imagen_id_2': imagenId2,
-      };
+      return {'imagen_id_1': imagenId1, 'imagen_id_2': imagenId2};
     } catch (e) {
-      _logger.e('❌ Error en guardarFotosDelCenso: $e');
-      return {
-        'imagen_id_1': null,
-        'imagen_id_2': null,
-      };
+      print('Error en guardarFotosDelCenso: $e');
+      return {'imagen_id_1': null, 'imagen_id_2': null};
     }
   }
 
@@ -64,7 +56,7 @@ class CensoFotoService {
     try {
       return await _fotoRepository.obtenerFotosPorCenso(censoActivoId);
     } catch (e) {
-      _logger.e('❌ Error obteniendo fotos: $e');
+      print('Error obteniendo fotos: $e');
       return [];
     }
   }
@@ -77,9 +69,9 @@ class CensoFotoService {
           await _fotoRepository.marcarComoSincronizada(foto.id!);
         }
       }
-      _logger.i('✅ ${fotos.length} fotos marcadas como sincronizadas');
+      print('${fotos.length} fotos marcadas como sincronizadas');
     } catch (e) {
-      _logger.e('❌ Error marcando fotos: $e');
+      print('Error marcando fotos: $e');
     }
   }
 
@@ -99,10 +91,10 @@ class CensoFotoService {
         imagenTamano: imagenTamano,
         orden: orden,
       );
-      _logger.i('✅ Foto $orden guardada: ${foto.id}');
-      return foto.id; // ← Retornar el ID del objeto
+      print('Foto $orden guardada: ${foto.id}');
+      return foto.id;
     } catch (e) {
-      _logger.e('❌ Error guardando foto $orden: $e');
+      print('Error guardando foto $orden: $e');
       return null;
     }
   }
