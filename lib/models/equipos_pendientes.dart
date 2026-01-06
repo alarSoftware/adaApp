@@ -44,7 +44,7 @@ class EquiposPendientes {
   factory EquiposPendientes.fromMap(Map<String, dynamic> map) {
     return EquiposPendientes(
       id: map['id'] as String?,
-      employeeId: map['employee_id' as String?],
+      employeeId: map['employee_id'] as String?,
       equipoId: map['equipo_id'] as String,
       clienteId: map['cliente_id'] as String,
       fechaCenso: DateTime.parse(map['fecha_censo'] as String),

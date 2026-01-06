@@ -2,12 +2,10 @@
 
 import 'dart:io';
 import 'dart:convert';
-import 'package:logger/logger.dart';
+
 import 'package:path_provider/path_provider.dart';
 
 class DynamicFormLogService {
-  final Logger _logger = Logger();
-
   /// Guarda un log detallado del POST request en un archivo de texto
   Future<void> guardarLogPost({
     required String url,
@@ -31,9 +29,9 @@ class DynamicFormLogService {
 
       await file.writeAsString(contenido);
 
-      _logger.i('📁 Log guardado: ${file.uri.pathSegments.last}');
+      print('📁 Log guardado: ${file.uri.pathSegments.last}');
     } catch (e) {
-      _logger.w('Error guardando log: $e');
+      print('Error guardando log: $e');
     }
   }
 
@@ -63,10 +61,10 @@ class DynamicFormLogService {
         }
       });
 
-      _logger.i('📁 ${files.length} logs encontrados');
+      print('📁 ${files.length} logs encontrados');
       return files;
     } catch (e) {
-      _logger.e('Error listando logs: $e');
+      print('Error listando logs: $e');
       return [];
     }
   }
@@ -82,7 +80,8 @@ class DynamicFormLogService {
     }
 
     final now = DateTime.now();
-    final fechaFormateada = '${now.year}${now.month.toString().padLeft(2, '0')}'
+    final fechaFormateada =
+        '${now.year}${now.month.toString().padLeft(2, '0')}'
         '${now.day.toString().padLeft(2, '0')}_'
         '${now.hour.toString().padLeft(2, '0')}'
         '${now.minute.toString().padLeft(2, '0')}_'
@@ -106,7 +105,7 @@ class DynamicFormLogService {
       }
       return null;
     } catch (e) {
-      _logger.w('Error obteniendo directorio: $e');
+      print('Error obteniendo directorio: $e');
       return null;
     }
   }
@@ -164,7 +163,10 @@ class DynamicFormLogService {
     return buffer.toString();
   }
 
-  void _agregarResumenFormulario(StringBuffer buffer, Map<String, dynamic> body) {
+  void _agregarResumenFormulario(
+    StringBuffer buffer,
+    Map<String, dynamic> body,
+  ) {
     buffer.writeln('Form ID: ${body['id'] ?? 'N/A'}');
     buffer.writeln('Template ID: ${body['dynamicFormId'] ?? 'N/A'}');
     buffer.writeln('Contacto ID: ${body['contactoId'] ?? 'N/A'}');
@@ -179,7 +181,9 @@ class DynamicFormLogService {
     final details = body['details'] as List<dynamic>?;
     if (details != null && details.isNotEmpty) {
       buffer.writeln('Cantidad de detalles: ${details.length}');
-      int imageDetails = details.where((d) => d['response'] == '[IMAGE]').length;
+      int imageDetails = details
+          .where((d) => d['response'] == '[IMAGE]')
+          .length;
       int textDetails = details.length - imageDetails;
       buffer.writeln('  - Campos de texto: $textDetails');
       buffer.writeln('  - Campos de imagen: $imageDetails');
@@ -197,10 +201,14 @@ class DynamicFormLogService {
         final orden = foto['orden'] ?? (i + 1);
         final tamano = foto['imagenTamano'] ?? 0;
         final mimeType = foto['mimeType'] ?? 'N/A';
-        final hasBase64 = foto['imageBase64'] != null && foto['imageBase64'].toString().isNotEmpty;
+        final hasBase64 =
+            foto['imageBase64'] != null &&
+            foto['imageBase64'].toString().isNotEmpty;
 
         buffer.writeln('  Foto $orden:');
-        buffer.writeln('    - Tamaño: ${(tamano / 1024).toStringAsFixed(2)} KB');
+        buffer.writeln(
+          '    - Tamaño: ${(tamano / 1024).toStringAsFixed(2)} KB',
+        );
         buffer.writeln('    - Tipo: $mimeType');
         buffer.writeln('    - Tiene Base64: $hasBase64');
         buffer.writeln('    - Path: ${foto['imagePath'] ?? 'N/A'}');
@@ -218,13 +226,16 @@ class DynamicFormLogService {
     if (bodyCopia.containsKey('fotos')) {
       final fotos = bodyCopia['fotos'] as List<dynamic>;
       bodyCopia['fotos'] = fotos.map((foto) {
-        final fotoCopia = Map<String, dynamic>.from(foto as Map<String, dynamic>);
+        final fotoCopia = Map<String, dynamic>.from(
+          foto as Map<String, dynamic>,
+        );
 
         // Truncar imageBase64
         if (fotoCopia['imageBase64'] != null) {
           final base64 = fotoCopia['imageBase64'].toString();
           if (base64.length > 100) {
-            fotoCopia['imageBase64'] = '${base64.substring(0, 100)}... [TRUNCADO - ${base64.length} caracteres totales]';
+            fotoCopia['imageBase64'] =
+                '${base64.substring(0, 100)}... [TRUNCADO - ${base64.length} caracteres totales]';
           }
         }
 

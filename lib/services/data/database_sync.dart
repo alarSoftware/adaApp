@@ -1,8 +1,4 @@
-// database_sync.dart
 import 'package:sqflite/sqflite.dart';
-import 'package:logger/logger.dart';
-
-var logger = Logger();
 
 class DatabaseSync {
   // ================================================================
@@ -108,13 +104,13 @@ class DatabaseSync {
     bool limpiarTabla = false,
     bool usarReplace = false,
   }) async {
-    logger.i('=== SINCRONIZANDO $nombreEntidad ===');
-    logger.i('$nombreEntidad recibidos: ${datos.length}');
+    print('=== SINCRONIZANDO $nombreEntidad ===');
+    print('$nombreEntidad recibidos: ${datos.length}');
 
     await db.transaction((txn) async {
       if (limpiarTabla) {
         await txn.delete(tabla);
-        logger.i('$nombreEntidad existentes eliminados');
+        print('$nombreEntidad existentes eliminados');
       }
 
       int sincronizados = 0;
@@ -124,7 +120,7 @@ class DatabaseSync {
         final entidad = datos[i];
 
         if (!validarEntidad(entidad)) {
-          logger.w('$nombreEntidad ${i + 1} omitido por validación');
+          print('$nombreEntidad ${i + 1} omitido por validación');
           omitidos++;
           continue;
         }
@@ -132,7 +128,7 @@ class DatabaseSync {
         try {
           final mapa = mapearEntidad(entidad);
           if (mapa == null) {
-            logger.w('$nombreEntidad ${i + 1} omitido - mapeo falló');
+            print('$nombreEntidad ${i + 1} omitido - mapeo falló');
             omitidos++;
             continue;
           }
@@ -149,19 +145,15 @@ class DatabaseSync {
 
           sincronizados++;
         } catch (e) {
-          logger.e(
-            'Error insertando ${nombreEntidad.toLowerCase()} ${i + 1}: $e',
-          );
+          print('Error insertando ${nombreEntidad.toLowerCase()} ${i + 1}: $e');
           omitidos++;
         }
       }
 
-      logger.i(
-        '$nombreEntidad: $sincronizados sincronizados, $omitidos omitidos',
-      );
+      print('$nombreEntidad: $sincronizados sincronizados, $omitidos omitidos');
     });
 
-    logger.i('=== SINCRONIZACIÓN DE $nombreEntidad COMPLETADA ===');
+    print('=== SINCRONIZACIÓN DE $nombreEntidad COMPLETADA ===');
   }
 
   // ================================================================
@@ -189,7 +181,7 @@ class DatabaseSync {
     final camposCriticos = ['code', 'username', 'password', 'fullname'];
     for (final campo in camposCriticos) {
       if (usuarioMapa[campo] == null) {
-        logger.e('Campo requerido null: $campo');
+        print('Campo requerido null: $campo');
         return null;
       }
     }
@@ -197,8 +189,7 @@ class DatabaseSync {
     return {
       'id': usuarioMapa['id'],
       'employee_id': usuarioMapa['employee_id'],
-      'employee_name': usuarioMapa['employeeName']
-          ?.toString(), // Corrigiendo mapeo
+      'employee_name': usuarioMapa['employeeName']?.toString(),
       'code': usuarioMapa['code'],
       'username': usuarioMapa['username'],
       'password': usuarioMapa['password'],

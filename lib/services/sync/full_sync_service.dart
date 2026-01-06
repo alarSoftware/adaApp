@@ -103,7 +103,7 @@ class FullSyncService {
           throw Exception(syncResult.mensaje);
         }
 
-        // ✅ Suma dinámica usando el getter
+        // Suma dinámica usando el getter
         totalItemsSincronizados += syncResult.totalItemsSincronizados;
 
         // Agregamos steps al historial
@@ -147,7 +147,7 @@ class FullSyncService {
           );
         }
       } catch (e) {
-        debugPrint('⚠️ Excepción al descargar respuestas: $e');
+        debugPrint('Excepción al descargar respuestas: $e');
         throw Exception('Error crítico descargando respuestas: $e');
       }
       await Future.delayed(const Duration(milliseconds: 200));
@@ -197,7 +197,7 @@ class FullSyncService {
         itemsSincronizados: totalItemsSincronizados,
       );
     } catch (e) {
-      debugPrint('❌ Error en sincronización completa: $e');
+      debugPrint('Error en sincronización completa: $e');
 
       return SyncResult(
         exito: false,

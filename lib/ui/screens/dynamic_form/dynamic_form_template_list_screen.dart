@@ -8,12 +8,12 @@ import 'package:ada_app/services/api/auth_service.dart';
 
 /// Pantalla que muestra la lista de formularios dinámicos disponibles (templates)
 class DynamicFormTemplateListScreen extends StatefulWidget {
-  final Cliente cliente;
+  final Cliente? cliente;
   final DynamicFormViewModel viewModel;
 
   const DynamicFormTemplateListScreen({
     super.key,
-    required this.cliente,
+    this.cliente,
     required this.viewModel,
   });
 
@@ -347,7 +347,7 @@ class _DynamicFormTemplateListScreenState
     // ✅ Iniciar formulario con todos los datos
     widget.viewModel.startNewForm(
       template.id,
-      contactoId: widget.cliente.id.toString(),
+      contactoId: widget.cliente?.id?.toString(),
       userId: usuario?.id?.toString(),
       employeeId: usuario?.employeeId,
     );
@@ -367,10 +367,7 @@ class _DynamicFormTemplateListScreenState
           builder: (context) =>
               DynamicFormFillScreen(viewModel: widget.viewModel),
         ),
-      ).then((_) {
-        // Cuando regresa de llenar el formulario, cierra esta pantalla también
-        if (mounted) Navigator.pop(context);
-      });
+      );
     } else {
       // Mostrar error
       ScaffoldMessenger.of(context).showSnackBar(

@@ -3,7 +3,7 @@ import 'package:ada_app/utils/parsing_helpers.dart';
 class Usuario {
   final int? id;
   final String? employeeId;
-  final String? employeeName; // <--- RENAMED
+  final String? employeeName;
   final int code;
   final String username;
   final String password;
@@ -12,7 +12,7 @@ class Usuario {
   const Usuario({
     this.id,
     this.employeeId,
-    this.employeeName, // <--- RENAMED
+    this.employeeName,
     required this.code,
     required this.username,
     required this.password,
@@ -71,7 +71,7 @@ class Usuario {
     return {
       'id': id,
       'employeeId': employeeId,
-      'employeeName': employeeName, // <--- RENAMED
+      'employeeName': employeeName,
       'code': code,
       'username': username,
       'password': password,
@@ -84,7 +84,7 @@ class Usuario {
   Usuario copyWith({
     int? id,
     String? employeeId,
-    String? employeeName, // <--- RENAMED
+    String? employeeName,
     int? code,
     String? username,
     String? password,
@@ -93,7 +93,7 @@ class Usuario {
     return Usuario(
       id: id ?? this.id,
       employeeId: employeeId ?? this.employeeId,
-      employeeName: employeeName ?? this.employeeName, // <--- RENAMED
+      employeeName: employeeName ?? this.employeeName,
       code: code ?? this.code,
       username: username ?? this.username,
       password: password ?? this.password,

@@ -52,7 +52,7 @@ class CensoActivoFoto {
       'id': id,
       'censo_activo_id': censoActivoId,
       'imagen_path': imagenPath,
-      'imagen_base64': imagenBase64,  // ✅ CORREGIDO: Campo agregado
+      'imagen_base64': imagenBase64,
       'imagen_tamano': imagenTamano,
       'orden': orden,
       'fecha_creacion': fechaCreacion.toIso8601String(),
@@ -93,7 +93,8 @@ class CensoActivoFoto {
     return '${tamanoMB.toStringAsFixed(1)} MB';
   }
 
-  String get infoCompleta => 'Foto ${orden} (${tamanoFormateado}) - ${estaSincronizado ? 'Sincronizada' : 'Pendiente'}';
+  String get infoCompleta =>
+      'Foto ${orden} (${tamanoFormateado}) - ${estaSincronizado ? 'Sincronizada' : 'Pendiente'}';
 }
 
 // Clase helper para trabajar con múltiples fotos de un censo
@@ -101,19 +102,18 @@ class CensoConFotos {
   final String censoActivoId;
   final List<CensoActivoFoto> fotos;
 
-  CensoConFotos({
-    required this.censoActivoId,
-    required this.fotos,
-  });
+  CensoConFotos({required this.censoActivoId, required this.fotos});
 
   // Helpers útiles
   int get totalFotos => fotos.length;
 
   bool get tieneFotos => fotos.isNotEmpty;
 
-  List<CensoActivoFoto> get fotosSincronizadas => fotos.where((f) => f.estaSincronizado).toList();
+  List<CensoActivoFoto> get fotosSincronizadas =>
+      fotos.where((f) => f.estaSincronizado).toList();
 
-  List<CensoActivoFoto> get fotosPendientes => fotos.where((f) => !f.estaSincronizado).toList();
+  List<CensoActivoFoto> get fotosPendientes =>
+      fotos.where((f) => !f.estaSincronizado).toList();
 
   bool get todasSincronizadas => fotos.every((f) => f.estaSincronizado);
 

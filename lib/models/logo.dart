@@ -4,10 +4,7 @@ class Logo {
   final int? id;
   final String nombre;
 
-  const Logo({
-    this.id,
-    required this.nombre,
-  });
+  const Logo({this.id, required this.nombre});
 
   // ========== FACTORY CONSTRUCTORS ==========
 
@@ -23,36 +20,27 @@ class Logo {
   // ========== SERIALIZATION ==========
 
   Map<String, dynamic> toMap() {
-    return {
-      if (id != null) 'id': id,
-      'nombre': nombre.trim(),
-    };
+    return {if (id != null) 'id': id, 'nombre': nombre.trim()};
   }
 
   Map<String, dynamic> toJson() => toMap();
 
   // ========== UTILITIES ==========
 
-  Logo copyWith({
-    int? id,
-    String? nombre,  // ✅ CORREGIDO: era 'maca'
-  }) {
-    return Logo(
-      id: id ?? this.id,
-      nombre: nombre ?? this.nombre,
-    );
+  Logo copyWith({int? id, String? nombre}) {
+    return Logo(id: id ?? this.id, nombre: nombre ?? this.nombre);
   }
 
   @override
-  String toString() => 'Logo(id: $id, nombre: $nombre)';  // ✅ CORREGIDO: era "modelo"
+  String toString() => 'Logo(id: $id, nombre: $nombre)';
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-          other is Logo &&
-              runtimeType == other.runtimeType &&
-              id == other.id &&
-              nombre == other.nombre;
+      other is Logo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          nombre == other.nombre;
 
   @override
   int get hashCode => id.hashCode ^ nombre.hashCode;

@@ -133,10 +133,16 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
       foregroundColor: AppColors.appBarForeground,
       elevation: 2,
       actions: [
-        IconButton(
-          onPressed: _viewModel.navegarAAsignarEquipo,
-          icon: const Icon(Icons.add),
-          tooltip: 'Realizar censo de equipo',
+        ListenableBuilder(
+          listenable: _viewModel,
+          builder: (context, child) {
+            if (!_viewModel.canCreateCenso) return SizedBox.shrink();
+            return IconButton(
+              onPressed: _viewModel.navegarAAsignarEquipo,
+              icon: const Icon(Icons.add),
+              tooltip: 'Realizar censo de equipo',
+            );
+          },
         ),
       ],
     );
@@ -345,15 +351,16 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            OutlinedButton.icon(
-              onPressed: _viewModel.navegarAAsignarEquipo,
-              icon: const Icon(Icons.qr_code_scanner),
-              label: const Text('Realizar Censo'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: color,
-                side: BorderSide(color: color),
+            if (_viewModel.canCreateCenso)
+              OutlinedButton.icon(
+                onPressed: _viewModel.navegarAAsignarEquipo,
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('Realizar Censo'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: color,
+                  side: BorderSide(color: color),
+                ),
               ),
-            ),
           ],
         ),
       ),

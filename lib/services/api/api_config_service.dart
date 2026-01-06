@@ -1,11 +1,8 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:logger/logger.dart';
 
 class ApiConfigService {
   static const String _endpointKey = 'api_base_url';
   static const String defaultBaseUrl = 'http://200.85.60.250:28080/adaControl';
-
-  static final Logger logger = Logger();
 
   // Obtener la URL base configurada
   static Future<String> getBaseUrl() async {
@@ -17,7 +14,7 @@ class ApiConfigService {
   static Future<void> setBaseUrl(String url) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_endpointKey, url);
-    logger.i('URL base actualizada: $url');
+    print('URL base actualizada: $url');
   }
 
   // Obtener URL completa para un endpoint

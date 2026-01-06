@@ -12,12 +12,10 @@ import 'package:ada_app/ui/widgets/iconography_dialog.dart';
 import 'package:ada_app/services/sync/client_sync_service.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:logger/logger.dart';
+
 import 'dart:async';
 
 import 'package:ada_app/main.dart';
-
-final _logger = Logger();
 
 class ClienteListScreen extends StatefulWidget {
   const ClienteListScreen({super.key});
@@ -173,15 +171,12 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
         });
       } else {
         final mensaje = resultado.mensaje;
-        _logger.e('Error sincronizando clientes: $mensaje');
 
         if (mounted) {
           AppSnackbar.showError(context, mensaje);
         }
       }
     } catch (e) {
-      _logger.e('Error sincronizando clientes: $e');
-
       if (mounted) {
         AppSnackbar.showError(
           context,

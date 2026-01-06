@@ -86,7 +86,7 @@ class DynamicFormResponse {
       completedAt: map['last_update_date'] != null
           ? DateTime.parse(map['last_update_date'] as String)
           : null,
-      // ✅ CAMBIAR ESTA LÍNEA:
+
       syncedAt: map['fecha_sincronizado'] != null
           ? DateTime.parse(map['fecha_sincronizado'] as String)
           : null,
@@ -112,11 +112,12 @@ class DynamicFormResponse {
       'sync_status': 'pending',
       'intentos_sync': 0,
       'creation_date': createdAt.toIso8601String(),
-      'last_update_date': completedAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
+      'last_update_date':
+          completedAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
     };
   }
 
-// Getters simplificados
+  // Getters simplificados
   bool get isDraft => status == 'draft';
   bool get isCompleted => status == 'completed';
   bool get isSynced => status == 'synced' || syncedAt != null;
@@ -131,10 +132,7 @@ class DynamicFormResponse {
   }
 
   DynamicFormResponse markAsCompleted() {
-    return copyWith(
-      status: 'completed',
-      completedAt: DateTime.now(),
-    );
+    return copyWith(status: 'completed', completedAt: DateTime.now());
   }
 
   DynamicFormResponse markAsSynced() {
@@ -146,10 +144,7 @@ class DynamicFormResponse {
   }
 
   DynamicFormResponse markAsError(String error) {
-    return copyWith(
-      status: 'error',
-      errorMessage: error,
-    );
+    return copyWith(status: 'error', errorMessage: error);
   }
 
   DynamicFormResponse copyWith({

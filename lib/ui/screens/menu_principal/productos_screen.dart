@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/repositories/producto_repository.dart';
 import 'package:ada_app/services/sync/producto_sync_service.dart';
-import 'package:logger/logger.dart';
-
-final _logger = Logger();
 
 class ProductosScreen extends StatefulWidget {
   const ProductosScreen({super.key});
@@ -47,7 +44,9 @@ class _ProductosScreenState extends State<ProductosScreen> {
         _productosFiltrados = _productos.where((producto) {
           final nombre = (producto['nombre'] ?? '').toString().toLowerCase();
           final codigo = (producto['codigo'] ?? '').toString().toLowerCase();
-          final codigoBarras = (producto['codigo_barras'] ?? '').toString().toLowerCase();
+          final codigoBarras = (producto['codigo_barras'] ?? '')
+              .toString()
+              .toLowerCase();
           final id = (producto['id'] ?? '').toString().toLowerCase();
           return nombre.contains(query) ||
               codigo.contains(query) ||
@@ -71,13 +70,17 @@ class _ProductosScreenState extends State<ProductosScreen> {
       final productosLocales = await productoRepo.obtenerProductosDisponibles();
 
       if (mounted) {
-        final productosData = productosLocales.map((producto) => {
-          'id': producto.id,
-          'codigo': producto.codigo,
-          'codigo_barras': producto.codigoBarras,
-          'nombre': producto.nombre,
-          'categoria': producto.categoria,
-        }).toList();
+        final productosData = productosLocales
+            .map(
+              (producto) => {
+                'id': producto.id,
+                'codigo': producto.codigo,
+                'codigo_barras': producto.codigoBarras,
+                'nombre': producto.nombre,
+                'categoria': producto.categoria,
+              },
+            )
+            .toList();
 
         setState(() {
           _productos = productosData;
@@ -85,10 +88,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
           _isLoading = false;
         });
       }
-
-      _logger.i('Productos locales cargados: ${_productos.length}');
     } catch (e) {
-      _logger.e('Error cargando productos locales: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -107,8 +107,6 @@ class _ProductosScreenState extends State<ProductosScreen> {
     });
 
     try {
-      _logger.i('Iniciando sincronización de productos desde el servidor...');
-
       // Usar ProductoSyncService
       final resultado = await ProductoSyncService.obtenerProductos();
 
@@ -117,15 +115,20 @@ class _ProductosScreenState extends State<ProductosScreen> {
       if (resultado.exito) {
         // Recargar productos locales después de la sincronización
         final productoRepo = ProductoRepositoryImpl();
-        final productosActualizados = await productoRepo.obtenerProductosDisponibles();
+        final productosActualizados = await productoRepo
+            .obtenerProductosDisponibles();
 
-        final productosData = productosActualizados.map((producto) => {
-          'id': producto.id,
-          'codigo': producto.codigo,
-          'codigo_barras': producto.codigoBarras,
-          'nombre': producto.nombre,
-          'categoria': producto.categoria,
-        }).toList();
+        final productosData = productosActualizados
+            .map(
+              (producto) => {
+                'id': producto.id,
+                'codigo': producto.codigo,
+                'codigo_barras': producto.codigoBarras,
+                'nombre': producto.nombre,
+                'categoria': producto.categoria,
+              },
+            )
+            .toList();
 
         setState(() {
           _productos = productosData;
@@ -139,7 +142,6 @@ class _ProductosScreenState extends State<ProductosScreen> {
         }
 
         final cantidadSincronizada = resultado.itemsSincronizados;
-        _logger.i('Productos sincronizados exitosamente: $cantidadSincronizada');
 
         // Mostrar mensaje de éxito con la cantidad
         ScaffoldMessenger.of(context).showSnackBar(
@@ -162,8 +164,6 @@ class _ProductosScreenState extends State<ProductosScreen> {
           _errorMessage = mensaje;
         });
 
-        _logger.e('Error sincronizando productos: $mensaje');
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(mensaje),
@@ -173,7 +173,6 @@ class _ProductosScreenState extends State<ProductosScreen> {
         );
       }
     } catch (e) {
-      _logger.e('Error sincronizando productos: $e');
       if (mounted) {
         setState(() {
           _isSyncing = false;
@@ -204,13 +203,13 @@ class _ProductosScreenState extends State<ProductosScreen> {
             onPressed: _isSyncing ? null : _sincronizarProductos,
             icon: _isSyncing
                 ? SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            )
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
                 : Icon(Icons.sync),
             tooltip: 'Sincronizar productos',
           ),
@@ -222,9 +221,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
           _buildSearchSection(),
 
           // Contenido principal
-          Expanded(
-            child: _buildContent(),
-          ),
+          Expanded(child: _buildContent()),
         ],
       ),
     );
@@ -235,12 +232,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
-          bottom: BorderSide(
-            color: Colors.grey[200]!,
-            width: 1,
-          ),
-        ),
+        border: Border(bottom: BorderSide(color: Colors.grey[200]!, width: 1)),
       ),
       child: TextField(
         controller: _searchController,
@@ -250,11 +242,11 @@ class _ProductosScreenState extends State<ProductosScreen> {
           prefixIcon: Icon(Icons.search, color: Colors.grey[500]),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-            icon: Icon(Icons.clear, color: Colors.grey[500]),
-            onPressed: () {
-              _searchController.clear();
-            },
-          )
+                  icon: Icon(Icons.clear, color: Colors.grey[500]),
+                  onPressed: () {
+                    _searchController.clear();
+                  },
+                )
               : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -270,7 +262,10 @@ class _ProductosScreenState extends State<ProductosScreen> {
           ),
           filled: true,
           fillColor: Colors.grey[50],
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
         ),
       ),
     );
@@ -278,11 +273,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
 
   Widget _buildContent() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          color: Colors.grey,
-        ),
-      );
+      return const Center(child: CircularProgressIndicator(color: Colors.grey));
     }
 
     if (_errorMessage != null) {
@@ -303,11 +294,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
               'Error al cargar productos',
@@ -320,10 +307,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
             const SizedBox(height: 8),
             Text(
               _errorMessage!,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -348,26 +332,16 @@ class _ProductosScreenState extends State<ProductosScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.inventory_outlined,
-              size: 64,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.inventory_outlined, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
               'No hay productos registrados',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
             ),
             const SizedBox(height: 16),
             Text(
               'Presiona el botón de sincronizar para descargar productos',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[500],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -379,13 +353,13 @@ class _ProductosScreenState extends State<ProductosScreen> {
               ),
               icon: _isSyncing
                   ? SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
                   : Icon(Icons.sync),
               label: Text(_isSyncing ? 'Sincronizando...' : 'Sincronizar'),
             ),
@@ -404,26 +378,16 @@ class _ProductosScreenState extends State<ProductosScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.search_off,
-                size: 64,
-                color: Colors.grey[400],
-              ),
+              Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
               const SizedBox(height: 16),
               Text(
                 'No se encontraron productos',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 18, color: Colors.grey[600]),
               ),
               const SizedBox(height: 8),
               Text(
                 'Intenta con otros términos de búsqueda',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[500],
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
               ),
             ],
           ),
@@ -508,9 +472,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       child: Card(
         elevation: 1,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         color: Colors.white,
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -546,10 +508,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                         _buildHighlightedText(
                           'ID: ${producto['id']}',
                           searchQuery,
-                          TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[500],
-                          ),
+                          TextStyle(fontSize: 12, color: Colors.grey[500]),
                         ),
                       ],
                     ),
@@ -558,10 +517,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                       _buildHighlightedText(
                         'CB: $codigoBarras',
                         searchQuery,
-                        TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
-                        ),
+                        TextStyle(fontSize: 12, color: Colors.grey[500]),
                       ),
                     ],
                   ],
@@ -618,9 +574,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            TextSpan(
-              text: nombre,
-            ),
+            TextSpan(text: nombre),
           ],
         ),
       );
@@ -744,10 +698,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
     return RichText(
       text: TextSpan(
         children: [
-          TextSpan(
-            text: text.substring(0, startIndex),
-            style: style,
-          ),
+          TextSpan(text: text.substring(0, startIndex), style: style),
           TextSpan(
             text: text.substring(startIndex, endIndex),
             style: style.copyWith(
@@ -755,10 +706,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          TextSpan(
-            text: text.substring(endIndex),
-            style: style,
-          ),
+          TextSpan(text: text.substring(endIndex), style: style),
         ],
       ),
     );

@@ -24,25 +24,14 @@ class UserSyncService {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final responseData = jsonDecode(response.body);
 
-        BaseSyncService.logger.i('=== DEBUG API RESPONSE ===');
-        BaseSyncService.logger.i('Response status: ${response.statusCode}');
-        BaseSyncService.logger.i('Response data: $responseData');
-
         final String dataString = responseData['data'];
         final List<dynamic> usuariosAPI = jsonDecode(dataString);
-
-        BaseSyncService.logger.i('=== DEBUG PARSED DATA ===');
-        BaseSyncService.logger.i('Usuarios API count: ${usuariosAPI.length}');
 
         if (usuariosAPI.isEmpty) {
           // Si no hay usuarios en el servidor, limpiar la tabla local
           try {
             await _dbHelper.sincronizarUsuarios([]);
-          } catch (dbError) {
-            BaseSyncService.logger.e(
-              'Error limpiando usuarios en BD: $dbError',
-            );
-          }
+          } catch (dbError) {}
 
           return SyncResult(
             exito: true,
@@ -61,12 +50,47 @@ class UserSyncService {
           final now = DateTime.now().toIso8601String();
           final usuarioId = usuario['id'];
 
-          if (usuarioId == null) {
-            BaseSyncService.logger.w('Usuario con ID null: $usuario');
+          // PROCESAR RUTAS
+          var rutas = usuario['rutas'];
+
+          // Soporte para adaAppJsonPermission (String JSON) si 'rutas' no viene
+          if (rutas == null && usuario['adaAppJsonPermission'] != null) {
+            try {
+              final jsonPermission = usuario['adaAppJsonPermission'];
+              if (jsonPermission is String && jsonPermission.isNotEmpty) {
+                // Decodificar JSON String
+                rutas = jsonDecode(jsonPermission);
+
+                // FIX: Manejo de doble encoding (si el resultado sigue siendo String)
+                if (rutas is String) {
+                  rutas = jsonDecode(rutas);
+                }
+              }
+            } catch (e) {
+              // Fail silently or log error if strictly needed, but print removal requested.
+            }
+          }
+
+          if (rutas != null && rutas is List && usuarioId != null) {
+            print('Intentando sincronizar rutas para usuario $usuarioId...');
+            _dbHelper
+                .sincronizarRutas(usuarioId, rutas)
+                .then((_) {
+                  print('Rutas sincronizadas exitosamente para $usuarioId');
+                })
+                .catchError((e) {
+                  print(
+                    'Error sincronizando rutas para usuario $usuarioId: $e',
+                  );
+                });
+          } else {
+            print(
+              'No se llamará a sincronizarRutas. Rutas: $rutas, UsuarioId: $usuarioId',
+            );
           }
 
           return {
-            'id': usuarioId, // 👈 FIX: Asignar ID explícitamente a la PK
+            'id': usuarioId, // FIX: Asignar ID explícitamente a la PK
             'employee_id': usuario['employeeId']?.toString(),
             'edfVendedorNombre': usuario['edfVendedorNombre']?.toString(),
             'code': usuarioId,
@@ -79,18 +103,9 @@ class UserSyncService {
           };
         }).toList();
 
-        BaseSyncService.logger.i('=== DATOS PROCESADOS PARA DB ===');
-        for (int i = 0; i < usuariosProcesados.length; i++) {
-          BaseSyncService.logger.i(
-            'Usuario ${i + 1}: ${usuariosProcesados[i]}',
-          );
-        }
-
         try {
           await _dbHelper.sincronizarUsuarios(usuariosProcesados);
         } catch (dbError) {
-          BaseSyncService.logger.e('Error guardando usuarios en BD: $dbError');
-
           await ErrorLogService.logDatabaseError(
             tableName: 'Users',
             operation: 'bulk_insert',
@@ -124,10 +139,6 @@ class UserSyncService {
         );
       }
     } on TimeoutException catch (timeoutError) {
-      BaseSyncService.logger.e(
-        '⏰ Timeout sincronizando usuarios: $timeoutError',
-      );
-
       await ErrorLogService.logNetworkError(
         tableName: 'Users',
         operation: 'sync_from_server',
@@ -141,8 +152,6 @@ class UserSyncService {
         itemsSincronizados: 0,
       );
     } on SocketException catch (socketError) {
-      BaseSyncService.logger.e('📡 Error de red: $socketError');
-
       await ErrorLogService.logNetworkError(
         tableName: 'Users',
         operation: 'sync_from_server',
@@ -156,8 +165,6 @@ class UserSyncService {
         itemsSincronizados: 0,
       );
     } catch (e) {
-      BaseSyncService.logger.e('💥 Error en sincronizarUsuarios: $e');
-
       await ErrorLogService.logError(
         tableName: 'Users',
         operation: 'sync_from_server',
@@ -199,7 +206,6 @@ class UserSyncService {
       }
       return null;
     } catch (e) {
-      BaseSyncService.logger.e('Error obteniendo nombre vendedor: $e');
       return null;
     }
   }
@@ -211,7 +217,6 @@ class UserSyncService {
       final username = prefs.getString('current_user');
 
       if (username == null) {
-        BaseSyncService.logger.e('No hay usuario logueado');
         await ErrorLogService.logValidationError(
           tableName: 'Users',
           operation: 'get_employee_id',
@@ -219,8 +224,6 @@ class UserSyncService {
         );
         return null;
       }
-
-      BaseSyncService.logger.i('Buscando employee_id para usuario: $username');
 
       final db = await _dbHelper.database;
       final result = await db.query(
@@ -232,9 +235,6 @@ class UserSyncService {
       );
 
       if (result.isEmpty) {
-        BaseSyncService.logger.e(
-          'Usuario $username no encontrado en base de datos local',
-        );
         await ErrorLogService.logDatabaseError(
           tableName: 'Users',
           operation: 'query_user',
@@ -245,9 +245,6 @@ class UserSyncService {
       }
 
       final employeeId = result.first['employee_id'] as String?;
-
-      BaseSyncService.logger.i('Usuario encontrado: $username');
-      BaseSyncService.logger.i('employee_id: $employeeId');
 
       if (employeeId == null || employeeId.trim().isEmpty) {
         // await ErrorLogService.logValidationError(
@@ -260,7 +257,6 @@ class UserSyncService {
 
       return employeeId;
     } catch (e) {
-      BaseSyncService.logger.e('Error obteniendo employee_id: $e');
       await ErrorLogService.logError(
         tableName: 'Users',
         operation: 'get_employee_id',
@@ -291,7 +287,6 @@ class UserSyncService {
 
       return null;
     } catch (e) {
-      BaseSyncService.logger.e('Error en obtenerEmployeeIdDirecto: $e');
       await ErrorLogService.logError(
         tableName: 'Users',
         operation: 'query_user_direct',

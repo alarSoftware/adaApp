@@ -2,7 +2,8 @@ import 'package:ada_app/services/post/base_post_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
 class DynamicFormPostService {
-  static const String _endpoint = '/dynamicFormResponse/insertDynamicFormResponse';
+  static const String _endpoint =
+      '/dynamicFormResponse/insertDynamicFormResponse';
   static const String _tableName = 'dynamic_form_response';
 
   /// Enviar respuesta de formulario dinámico
@@ -21,12 +22,12 @@ class DynamicFormPostService {
       );
     }
 
-    // ✅ BasePostService ya maneja TODOS los errores y logging
+    // BasePostService ya maneja TODOS los errores y logging
     return await BasePostService.post(
       endpoint: _endpoint,
       body: respuesta,
       timeout: const Duration(seconds: 90),
-      tableName: _tableName,      // 🔥 Activa el logging automático
+      tableName: _tableName, // Activa el logging automático
       registroId: responseId,
       userId: userId,
     );
@@ -39,7 +40,7 @@ class DynamicFormPostService {
     int intentoNumero = 1,
     String? userId,
   }) async {
-    BasePostService.logger.i('🔁 Reintentando: $responseId (Intento #$intentoNumero)');
+    print('Reintentando: $responseId (Intento #$intentoNumero)');
 
     final result = await enviarRespuestaFormulario(
       respuesta: respuesta,
@@ -48,17 +49,7 @@ class DynamicFormPostService {
     );
 
     // Solo loguear el reintento específicamente si falló
-    if (result['success'] == false || result['exito'] == false) {
-      // await ErrorLogService.logError(
-      //   tableName: _tableName,
-      //   operation: 'RETRY_POST',
-      //   errorMessage: 'Reintento #$intentoNumero falló: ${result['error'] ?? result['mensaje']}',
-      //   errorType: 'retry_failed',
-      //   registroFailId: responseId,
-      //   syncAttempt: intentoNumero,
-      //   userId: userId,
-      // );
-    }
+    if (result['success'] == false || result['exito'] == false) {}
 
     return result;
   }

@@ -55,22 +55,4 @@ class DeviceLog {
       sincronizado: map['sincronizado'] ?? 1,
     );
   }
-
-  /// Ver exactamente qué se envía al backend (para debugging)
-  String toBackendJsonDebug() {
-    final map = toMap();
-    return '''
-JSON QUE SE ENVIA AL BACKEND GRAILS:
-{
-  "uuid": "${map['uuid']}",
-  "employeeId": "${map['employeeId']}",
-  "latitudLongitud": "${map['latitudLongitud']}",
-  "bateria": ${map['bateria']},
-  "modelo": "${map['modelo']}",
-  "fechaRegistro": "${map['fechaRegistro']}"
-}
-
-Todos los campos coinciden con AppDeviceLog.groovy
-''';
-  }
 }
