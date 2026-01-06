@@ -5,7 +5,8 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:uuid/uuid.dart';
 import 'package:ada_app/models/device_log.dart';
-import 'package:ada_app/services/data/database_helper.dart';
+import 'package:ada_app/services/sync/user_sync_service.dart';
+import 'package:logger/logger.dart';
 
 /// 🔧 Helper para obtener información del dispositivo
 /// Centraliza toda la lógica de obtención de datos sin duplicación
@@ -22,7 +23,7 @@ class DeviceInfoHelper {
       return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 15),
+          timeLimit: Duration(seconds: 30),
         ),
       );
     } catch (e) {
@@ -65,36 +66,22 @@ class DeviceInfoHelper {
   /// 👤 Obtener ID del vendedor actual
   static Future<String?> obtenerEmployeeId() async {
     try {
-      final db = await DatabaseHelper().database;
-      final result = await db.query(
-        'Users',
-        columns: ['employee_id'],
-        limit: 1,
-      );
-
-      if (result.isNotEmpty) {
-        return result.first['employee_id'] as String?;
-      }
-
-      print('⚠️ No se encontró usuario en la base de datos');
-      return null;
+      return await UserSyncService.obtenerEmployeeIdUsuarioActual();
     } catch (e) {
-      print('❌ Error al obtener employee_id: $e');
+      _logger.e('Error al obtener employee_id: $e');
       return null;
     }
   }
 
-  /// 📦 Crear DeviceLog completo (método todo-en-uno)
-  /// Obtiene todos los datos necesarios y crea el objeto DeviceLog
+  /// Crear DeviceLog completo (método todo-en-uno)
   static Future<DeviceLog?> crearDeviceLog() async {
     try {
-      print('📦 Creando device log...');
-
       // Obtener todos los datos necesarios en paralelo para mayor eficiencia
       final results = await Future.wait([
         obtenerUbicacion(),
         obtenerNivelBateria(),
         obtenerModeloDispositivo(),
+        //TODO revisar para obtener employee id
         obtenerEmployeeId(),
       ]);
 
@@ -105,7 +92,6 @@ class DeviceInfoHelper {
 
       // Validar que tenemos ubicación
       if (position == null) {
-        print('⚠️ No se pudo obtener ubicación - log no creado');
         return null;
       }
 
@@ -119,20 +105,11 @@ class DeviceInfoHelper {
         fechaRegistro: DateTime.now().toIso8601String(),
         sincronizado: 0,
       );
-
-      print('✅ DeviceLog creado exitosamente');
-      print('   📍 Ubicación: ${log.latitudLongitud}');
-      print('   🔋 Batería: ${log.bateria}%');
-      print('   📱 Modelo: ${log.modelo}');
-
-      return log;
-    } catch (e) {
-      print('💥 Error creando DeviceLog: $e');
       return null;
     }
   }
 
-  /// 🔍 Verificar disponibilidad de servicios necesarios
+  ///  Verificar disponibilidad de servicios necesarios
   static Future<Map<String, bool>> verificarDisponibilidad() async {
     final resultados = <String, bool>{};
 

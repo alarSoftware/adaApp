@@ -383,7 +383,7 @@ class _OperacionComercialFormViewState
                               ? 'Seleccionar fecha...'
                               : DateFormat(
                                   'EEEE d, MMMM yyyy',
-                                  'es_ES',
+                                  'es',
                                 ).format(viewModel.fechaRetiro!),
                           style: TextStyle(
                             fontWeight: FontWeight.w600,

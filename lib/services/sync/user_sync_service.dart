@@ -210,19 +210,13 @@ class UserSyncService {
     }
   }
 
-  // MANTENEMOS TUS MÉTODOS EXISTENTES ABAJO
   static Future<String?> obtenerEmployeeIdUsuarioActual() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final username = prefs.getString('current_user');
 
       if (username == null) {
-        await ErrorLogService.logValidationError(
-          tableName: 'Users',
-          operation: 'get_employee_id',
-          errorMessage: 'No hay usuario logueado',
-        );
-        return null;
+        throw Exception("NO HAY USUARIO LOGUEADO");
       }
 
       final db = await _dbHelper.database;
@@ -235,35 +229,18 @@ class UserSyncService {
       );
 
       if (result.isEmpty) {
-        await ErrorLogService.logDatabaseError(
-          tableName: 'Users',
-          operation: 'query_user',
-          errorMessage:
-              'Usuario $username no encontrado en base de datos local',
-        );
-        return null;
+        throw Exception('Usuario $username no encontrado en base de datos local');
       }
 
       final employeeId = result.first['employee_id'] as String?;
 
       if (employeeId == null || employeeId.trim().isEmpty) {
-        // await ErrorLogService.logValidationError(
-        //   tableName: 'Users',
-        //   operation: 'get_edf_vendedor_id',
-        //   errorMessage: 'Usuario $username no tiene edf_vendedor_id configurado',
-        //   userId: username,
-        // );
+        throw Exception('Usuario $username no tiene edf_vendedor_id configurado');
       }
 
       return employeeId;
     } catch (e) {
-      await ErrorLogService.logError(
-        tableName: 'Users',
-        operation: 'get_employee_id',
-        errorMessage: 'Error obteniendo employee_id: $e',
-        errorType: 'database',
-      );
-      return null;
+      rethrow;
     }
   }
 

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
-import 'dart:io';
+
 import 'dart:isolate';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
@@ -68,7 +68,12 @@ class EquipmentSyncService extends BaseSyncService {
         totalEnAPI: marcasAPI.length,
       );
     } catch (e) {
-      return _manejarExcepcion(e, 'marcas', endpoint);
+      await ErrorLogService.manejarExcepcion(e, null, endpoint, null, 'marcas');
+      return SyncResult(
+        exito: false,
+        mensaje: BaseSyncService.getErrorMessage(e),
+        itemsSincronizados: 0,
+      );
     }
   }
 
@@ -118,7 +123,18 @@ class EquipmentSyncService extends BaseSyncService {
         itemsSincronizados: modelosParaInsertar.length,
       );
     } catch (e) {
-      return _manejarExcepcion(e, 'modelos', endpoint);
+      await ErrorLogService.manejarExcepcion(
+        e,
+        null,
+        endpoint,
+        null,
+        'modelos',
+      );
+      return SyncResult(
+        exito: false,
+        mensaje: BaseSyncService.getErrorMessage(e),
+        itemsSincronizados: 0,
+      );
     }
   }
 
@@ -167,7 +183,12 @@ class EquipmentSyncService extends BaseSyncService {
         itemsSincronizados: logosParaInsertar.length,
       );
     } catch (e) {
-      return _manejarExcepcion(e, 'logo', endpoint);
+      await ErrorLogService.manejarExcepcion(e, null, endpoint, null, 'logo');
+      return SyncResult(
+        exito: false,
+        mensaje: BaseSyncService.getErrorMessage(e),
+        itemsSincronizados: 0,
+      );
     }
   }
 
@@ -264,7 +285,18 @@ class EquipmentSyncService extends BaseSyncService {
         totalEnAPI: equiposMapas.length,
       );
     } catch (e) {
-      return _manejarExcepcion(e, 'equipos', endpoint);
+      await ErrorLogService.manejarExcepcion(
+        e,
+        null,
+        endpoint,
+        null,
+        'equipos',
+      );
+      return SyncResult(
+        exito: false,
+        mensaje: BaseSyncService.getErrorMessage(e),
+        itemsSincronizados: 0,
+      );
     }
   }
 
@@ -338,32 +370,5 @@ class EquipmentSyncService extends BaseSyncService {
       return responseData;
     }
     return [];
-  }
-
-  static Future<SyncResult> _manejarExcepcion(
-    dynamic e,
-    String tabla,
-    String endpoint,
-  ) async {
-    String errorType = 'unknown';
-    String mensaje = BaseSyncService.getErrorMessage(e);
-
-    if (e is TimeoutException) {
-      errorType = 'network';
-      mensaje = 'Timeout';
-    } else if (e is SocketException) {
-      errorType = 'network';
-      mensaje = 'Sin conexión';
-    }
-
-    await ErrorLogService.logError(
-      tableName: tabla,
-      operation: 'sync_from_server',
-      errorMessage: e.toString(),
-      errorType: errorType,
-      endpoint: endpoint,
-    );
-
-    return SyncResult(exito: false, mensaje: mensaje, itemsSincronizados: 0);
   }
 }

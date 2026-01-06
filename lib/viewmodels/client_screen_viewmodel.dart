@@ -39,7 +39,7 @@ class ClienteListState {
     this.currentPage = 0,
     this.totalCount = 0,
     this.error,
-    this.filterMode = 'all',
+    this.filterMode = 'today_route',
     this.countTodayRoute = 0,
     this.countVisitedToday = 0,
     this.countAll = 0,
@@ -131,21 +131,33 @@ class ClienteListScreenViewModel extends ChangeNotifier {
       final query = _state.searchQuery.toLowerCase().trim();
       List<Cliente> baseList = _allClientes;
 
-      // 1. Filtrar por Modo (Ruta de Hoy / Visitados Hoy / Todos)
       if (_state.filterMode == 'today_route') {
         final now = DateTime.now();
-        // Obtener nombre del día en español (ej: "lunes", "martes")
-        final diaHoy = DateFormat(
-          'EEEE',
-          'es',
-        ).format(now).toLowerCase().trim();
+        String diaHoy;
+        try {
+          diaHoy = DateFormat('EEEE', 'es').format(now).toLowerCase().trim();
+        } catch (e) {
+          final englishDay = DateFormat(
+            //Cambio de idioma para los dias de la semana para evitar que la consulta sql no funcione
+            'EEEE',
+          ).format(now).toLowerCase().trim();
+          const dayMap = {
+            'monday': 'lunes',
+            'tuesday': 'martes',
+            'wednesday': 'miércoles',
+            'thursday': 'jueves',
+            'friday': 'viernes',
+            'saturday': 'sábado',
+            'sunday': 'domingo',
+          };
+          diaHoy = dayMap[englishDay] ?? englishDay;
+        }
 
         baseList = baseList.where((c) {
           if (c.rutaDia == null || c.rutaDia!.isEmpty) return false;
 
           final rutasCliente = c.rutaDia!.toLowerCase();
-          // Casos: "Sábado", "Martes, Viernes"
-          // Dividir por comas si existen
+
           final dias = rutasCliente.split(',').map((d) {
             return d.trim();
           }).toList();
@@ -193,7 +205,22 @@ class ClienteListScreenViewModel extends ChangeNotifier {
 
   void _calculateCount() {
     final now = DateTime.now();
-    final diaHoy = DateFormat('EEEE', 'es').format(now).toLowerCase().trim();
+    String diaHoy;
+    try {
+      diaHoy = DateFormat('EEEE', 'es').format(now).toLowerCase().trim();
+    } catch (e) {
+      final englishDay = DateFormat('EEEE').format(now).toLowerCase().trim();
+      const dayMap = {
+        'monday': 'lunes',
+        'tuesday': 'martes',
+        'wednesday': 'miércoles',
+        'thursday': 'jueves',
+        'friday': 'viernes',
+        'saturday': 'sábado',
+        'sunday': 'domingo',
+      };
+      diaHoy = dayMap[englishDay] ?? englishDay;
+    }
 
     final rutaHoyCount = _allClientes.where((c) {
       if (c.rutaDia == null || c.rutaDia!.isEmpty) return false;
@@ -235,10 +262,8 @@ class ClienteListScreenViewModel extends ChangeNotifier {
 
       _calculateCount();
 
-      // Si hay un query pendiente (ej: recharge), aplicar filtro
-      if (_state.searchQuery.isNotEmpty) {
-        await _applyFilters();
-      }
+      // Aplicar filtros siempre para respetar el filterMode inicial
+      await _applyFilters();
 
       _updateState(
         _state.copyWith(

@@ -114,7 +114,7 @@ abstract class BaseRepository<T> {
           );
           exitosos++;
         } catch (e) {
-          errores++;
+          rethrow;
         }
       }
     });
