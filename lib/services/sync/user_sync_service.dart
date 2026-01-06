@@ -51,11 +51,42 @@ class UserSyncService {
           final usuarioId = usuario['id'];
 
           // PROCESAR RUTAS
-          final rutas = usuario['rutas'];
+          var rutas = usuario['rutas'];
+
+          // Soporte para adaAppJsonPermission (String JSON) si 'rutas' no viene
+          if (rutas == null && usuario['adaAppJsonPermission'] != null) {
+            try {
+              final jsonPermission = usuario['adaAppJsonPermission'];
+              if (jsonPermission is String && jsonPermission.isNotEmpty) {
+                // Decodificar JSON String
+                rutas = jsonDecode(jsonPermission);
+
+                // FIX: Manejo de doble encoding (si el resultado sigue siendo String)
+                if (rutas is String) {
+                  rutas = jsonDecode(rutas);
+                }
+              }
+            } catch (e) {
+              // Fail silently or log error if strictly needed, but print removal requested.
+            }
+          }
+
           if (rutas != null && rutas is List && usuarioId != null) {
-            _dbHelper.sincronizarRutas(usuarioId, rutas).catchError((e) {
-              print('Error sincronizando rutas para usuario $usuarioId: $e');
-            });
+            print('Intentando sincronizar rutas para usuario $usuarioId...');
+            _dbHelper
+                .sincronizarRutas(usuarioId, rutas)
+                .then((_) {
+                  print('Rutas sincronizadas exitosamente para $usuarioId');
+                })
+                .catchError((e) {
+                  print(
+                    'Error sincronizando rutas para usuario $usuarioId: $e',
+                  );
+                });
+          } else {
+            print(
+              'No se llamará a sincronizarRutas. Rutas: $rutas, UsuarioId: $usuarioId',
+            );
           }
 
           return {

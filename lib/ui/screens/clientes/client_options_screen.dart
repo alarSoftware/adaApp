@@ -5,7 +5,8 @@ import 'package:ada_app/ui/screens/clientes/cliente_detail_screen.dart';
 import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_responses_screen.dart';
 import 'package:ada_app/ui/screens/operaciones_comerciales/operaciones_comerciales_menu_screen.dart';
 import 'package:ada_app/ui/widgets/client_info_card.dart';
-import 'package:ada_app/services/permissions_service.dart';
+import 'package:ada_app/services/navigation/navigation_guard_service.dart';
+import 'package:ada_app/services/navigation/route_constants.dart';
 
 /// Pantalla de selección de opciones para un cliente
 class ClientOptionsScreen extends StatelessWidget {
@@ -58,11 +59,7 @@ class ClientOptionsScreen extends StatelessWidget {
               // Opciones con Permisos
               Expanded(
                 child: FutureBuilder<Map<String, bool>>(
-                  future: PermissionsService.checkPermissions([
-                    'CrearCensoActivo',
-                    'CrearOperacionComercial',
-                    'VerFormularios',
-                  ]),
+                  future: _checkNavigationPermissions(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return Center(child: CircularProgressIndicator());
@@ -70,10 +67,11 @@ class ClientOptionsScreen extends StatelessWidget {
 
                     final permissions = snapshot.data ?? {};
                     final canCreateCenso =
-                        permissions['CrearCensoActivo'] ?? false;
+                        permissions[RouteConstants.serverCensos] ?? false;
                     final canCreateOperacion =
-                        permissions['CrearOperacionComercial'] ?? false;
-                    final canViewForms = permissions['VerFormularios'] ?? false;
+                        permissions[RouteConstants.serverOperaciones] ?? false;
+                    final canViewForms =
+                        permissions[RouteConstants.serverFormularios] ?? false;
 
                     return ListView(
                       padding: EdgeInsets.symmetric(horizontal: 16),
@@ -129,7 +127,7 @@ class ClientOptionsScreen extends StatelessWidget {
                                 ),
                                 SizedBox(height: 16),
                                 Text(
-                                  "No tienes permisos habilitados para este módulo.",
+                                  "No tienes rutas de navegación habilitadas desde esta pantalla.",
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: AppColors.textSecondary,
@@ -148,6 +146,29 @@ class ClientOptionsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<Map<String, bool>> _checkNavigationPermissions() async {
+    final guard = NavigationGuardService();
+    // Desde Clientes (/clientes) hacia...
+    final canCreateCenso = await guard.canNavigate(
+      currentScreen: RouteConstants.serverClientes,
+      targetScreen: RouteConstants.serverCensos,
+    );
+    final canCreateOperacion = await guard.canNavigate(
+      currentScreen: RouteConstants.serverClientes,
+      targetScreen: RouteConstants.serverOperaciones,
+    );
+    final canViewForms = await guard.canNavigate(
+      currentScreen: RouteConstants.serverClientes,
+      targetScreen: RouteConstants.serverFormularios,
+    );
+
+    return {
+      RouteConstants.serverCensos: canCreateCenso,
+      RouteConstants.serverOperaciones: canCreateOperacion,
+      RouteConstants.serverFormularios: canViewForms,
+    };
   }
 
   Widget _buildOptionCard({

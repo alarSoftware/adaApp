@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:ada_app/repositories/dynamic_form_sync_repository.dart';
 import 'package:ada_app/services/post/dynamic_form_post_service.dart';
@@ -364,7 +365,6 @@ class DynamicFormUploadService {
       final payload = {
         'id': respuesta['id'],
         'dynamicFormId': respuesta['dynamic_form_id'],
-        'contactoId': respuesta['contacto_id'],
         'employeeId': respuesta['employee_id'],
         'usuarioId': respuesta['usuario_id'] != null
             ? int.tryParse(respuesta['usuario_id'].toString())
@@ -377,10 +377,16 @@ class DynamicFormUploadService {
         'details': detallesFormateados,
       };
 
+      final contactoIdArg = respuesta['contacto_id']?.toString();
+      if (contactoIdArg != null && contactoIdArg.isNotEmpty) {
+        payload['contactoId'] = contactoIdArg;
+      }
+
       print('PAYLOAD FINAL:');
       print('  - ID: ${payload['id']}');
       print('  - Estado: ${payload['estado']}');
       print('  - Details: ${(payload['details'] as List).length}');
+      print('JSON POST: ${jsonEncode(payload)}'); // DEBUG JSON
 
       return payload;
     } catch (e) {

@@ -4,7 +4,6 @@ import '../models/cliente.dart';
 import '../repositories/equipo_repository.dart';
 import '../repositories/equipo_pendiente_repository.dart';
 import '../repositories/censo_activo_repository.dart';
-import '../services/permissions_service.dart';
 
 abstract class ClienteDetailUIEvent {}
 
@@ -115,14 +114,12 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
     super.dispose();
   }
 
-  bool _canCreateCenso = false;
+  bool _canCreateCenso = true;
   bool get canCreateCenso => _canCreateCenso;
 
   Future<void> initialize(Cliente cliente) async {
     _cliente = cliente;
-    _canCreateCenso = await PermissionsService.hasPermission(
-      'CrearCensoActivo',
-    );
+    // _canCreateCenso = await PermissionsService.hasPermission('CrearCensoActivo'); -> SIMPLIFICADO
     await cargarEquipos();
   }
 

@@ -27,6 +27,8 @@ import 'package:ada_app/ui/screens/error_log_screen.dart';
 import 'package:ada_app/repositories/device_log_repository.dart'; // Needed for DeviceLogScreen
 import 'package:ada_app/services/device/location_service.dart';
 import 'package:ada_app/ui/screens/settings/work_hours_settings_screen.dart';
+import 'package:ada_app/services/navigation/navigation_guard_service.dart';
+import 'package:ada_app/services/navigation/route_constants.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -1212,36 +1214,7 @@ class _SelectScreenState extends State<SelectScreen>
                 ),
                 Divider(),
                 _buildDrawerItem(
-                  icon: Icons.logout,
-                  label: 'Cerrar Sesión',
-                  color: AppColors.error,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _handleLogout();
-                  },
-                ),
-                if (_viewModel.userDisplayName.toLowerCase().contains(
-                      'admin',
-                    ) ||
-                    _viewModel.userDisplayName.toLowerCase().contains(
-                      'sistemas',
-                    )) ...[
-                  _buildDrawerItem(
-                    icon: Icons.settings_applications,
-                    label: 'Configurar Horario',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const WorkHoursSettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-                _buildDrawerItem(
-                  icon: Icons.access_time, // Icono válido
+                  icon: Icons.access_time,
                   label: 'Horario de Trabajo',
                   onTap: () {
                     Navigator.pop(context);
@@ -1253,6 +1226,16 @@ class _SelectScreenState extends State<SelectScreen>
                     );
                   },
                 ),
+                _buildDrawerItem(
+                  icon: Icons.logout,
+                  label: 'Cerrar Sesión',
+                  color: AppColors.error,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _handleLogout();
+                  },
+                ),
+
                 Divider(),
               ], // Closing the children list
             ), // Closing the ListView
@@ -1508,10 +1491,7 @@ class _SelectScreenState extends State<SelectScreen>
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: FutureBuilder<Map<String, bool>>(
-                      future: PermissionsService.checkPermissions([
-                        'VerClientes',
-                        'VerFormularios',
-                      ]),
+                      future: _checkNavigationPermissions(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
@@ -1524,16 +1504,11 @@ class _SelectScreenState extends State<SelectScreen>
                         }
 
                         final permissions = snapshot.data ?? {};
-                        // Fallback: If no permissions found at all (empty list/map), maybe default to Clientes?
-                        // For now, strict check: defaults to false if not present.
-                        // But to prevent breaking current users without DB sync, let's assume if NO permissions exist in DB, we allow Clientes.
-                        // This logic would need a specific check in PermissionsService.
-                        // For this task, assuming backend logic is key.
-
                         final canViewClients =
-                            permissions['VerClientes'] ?? false;
+                            permissions[RouteConstants.serverClientes] ?? false;
                         final canViewForms =
-                            permissions['VerFormularios'] ?? false;
+                            permissions[RouteConstants.serverFormularios] ??
+                            false;
 
                         // Auto-redirect logic handling could be done here or in initState.
                         // Doing it here risks rebuild loops if not careful.
@@ -1613,6 +1588,24 @@ class _SelectScreenState extends State<SelectScreen>
         ],
       ),
     );
+  }
+
+  Future<Map<String, bool>> _checkNavigationPermissions() async {
+    final guard = NavigationGuardService();
+    // Desde el Menú (/menu) hacia...
+    final canViewClients = await guard.canNavigate(
+      currentScreen: RouteConstants.serverMenu,
+      targetScreen: RouteConstants.serverClientes,
+    );
+    final canViewForms = await guard.canNavigate(
+      currentScreen: RouteConstants.serverMenu,
+      targetScreen: RouteConstants.serverFormularios,
+    );
+
+    return {
+      RouteConstants.serverClientes: canViewClients,
+      RouteConstants.serverFormularios: canViewForms,
+    };
   }
 
   Future<void> _handleRequiredSync(RequiredSyncEvent event) async {

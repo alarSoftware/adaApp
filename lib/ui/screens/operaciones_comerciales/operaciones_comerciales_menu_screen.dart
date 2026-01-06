@@ -11,7 +11,6 @@ import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart'
 import 'package:ada_app/ui/screens/operaciones_comerciales/operacion_comercial_form_screen.dart';
 import 'package:ada_app/viewmodels/operaciones_comerciales/operaciones_comerciales_menu_viewmodel.dart';
 import 'package:ada_app/main.dart';
-import 'package:ada_app/services/permissions_service.dart';
 
 class OperacionesComercialesMenuScreen extends StatelessWidget {
   final Cliente cliente;
@@ -44,25 +43,14 @@ class _OperacionesComercialesMenuViewState
   late TabController _tabController;
   late List<_TabConfig> _availableTabs;
 
-  bool _canCreateOperacion = false;
+  bool _canCreateOperacion = true;
 
   @override
   void initState() {
     super.initState();
-    _checkPermission();
+    // _checkPermission(); -> SIMPLIFICADO: Si entra al módulo, puede crear.
     _availableTabs = _getAvailableTabs();
     _tabController = TabController(length: _availableTabs.length, vsync: this);
-  }
-
-  Future<void> _checkPermission() async {
-    final hasPerm = await PermissionsService.hasPermission(
-      'CrearOperacionComercial',
-    );
-    if (mounted) {
-      setState(() {
-        _canCreateOperacion = hasPerm;
-      });
-    }
   }
 
   @override

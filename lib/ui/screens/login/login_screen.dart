@@ -10,6 +10,7 @@ import 'package:ada_app/ui/widgets/login/delete_users_dialog.dart';
 import 'package:ada_app/ui/widgets/login/sync_dialog.dart';
 import 'package:ada_app/ui/common/snackbar_helper.dart';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -333,7 +334,23 @@ class _LoginScreenContentState extends State<_LoginScreenContent>
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const SizedBox(height: 40),
-                        const LoginHeader(),
+                        GestureDetector(
+                          onLongPress: () {
+                            if (!kReleaseMode) {
+                              viewModel.usernameController.text = 'admin';
+                              viewModel.passwordController.text = 'Admin2021';
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Credenciales de desarrollo cargadas',
+                                  ),
+                                  duration: Duration(seconds: 1),
+                                ),
+                              );
+                            }
+                          },
+                          child: const LoginHeader(),
+                        ),
                         const SizedBox(height: 48),
                         LoginForm(
                           formKey: _formKey,

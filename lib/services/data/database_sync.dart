@@ -189,8 +189,7 @@ class DatabaseSync {
     return {
       'id': usuarioMapa['id'],
       'employee_id': usuarioMapa['employee_id'],
-      'employee_name': usuarioMapa['employeeName']
-          ?.toString(), // Corrigiendo mapeo
+      'employee_name': usuarioMapa['employeeName']?.toString(),
       'code': usuarioMapa['code'],
       'username': usuarioMapa['username'],
       'password': usuarioMapa['password'],

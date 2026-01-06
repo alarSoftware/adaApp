@@ -1,11 +1,10 @@
-import 'dart:convert';
-
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/sync/dynamic_form_sync_service.dart';
+import 'package:ada_app/services/sync/user_sync_service.dart';
 
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:ada_app/services/app_services.dart';
@@ -138,79 +137,21 @@ class AuthService {
   }
 
   static Future<SyncResult> sincronizarSoloUsuarios() async {
+    // Delegar al servicio centralizado de sincronización de usuarios
+    // Esto asegura que se use la misma lógica de "adaAppJsonPermission" y manejo de errores
     try {
-      final baseUrl = await BaseSyncService.getBaseUrl();
-
-      final response = await http
-          .get(
-            Uri.parse('$baseUrl/api/getUsers'),
-            headers: BaseSyncService.headers,
-          )
-          .timeout(BaseSyncService.timeout);
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final responseData = jsonDecode(response.body);
-
-        final String dataString = responseData['data'];
-        final List<dynamic> usuariosAPI = jsonDecode(dataString);
-
-        if (usuariosAPI.isEmpty) {
-          return SyncResult(
-            exito: true,
-            mensaje: 'No hay usuarios en el servidor',
-            itemsSincronizados: 0,
-          );
-        }
-
-        final usuariosProcesados = usuariosAPI.map((usuario) {
-          String password = usuario['password'].toString();
-          if (password.startsWith('{bcrypt}')) {
-            password = password.substring(8);
-          }
-
-          final usuarioProcesado = {
-            'id': usuario['id'],
-            'employee_id': usuario['employeeId']?.toString(),
-            'employeeName':
-                usuario['employeeName']?.toString() ??
-                usuario['edfVendedorNombre']?.toString(),
-            'code': usuario['id'],
-            'username': usuario['username'],
-            'password': password,
-            'fullname': usuario['fullname'],
-            'fecha_creacion': DateTime.now().toIso8601String(),
-            'fecha_actualizacion': DateTime.now().toIso8601String(),
-          };
-
-          return usuarioProcesado;
-        }).toList();
-
-        await _dbHelper.sincronizarUsuarios(usuariosProcesados);
-
-        return SyncResult(
-          exito: true,
-          mensaje: 'Usuarios sincronizados correctamente',
-          itemsSincronizados: usuariosProcesados.length,
-          totalEnAPI: usuariosProcesados.length,
-        );
-      } else {
-        final mensaje = BaseSyncService.extractErrorMessage(response);
-        return SyncResult(
-          exito: false,
-          mensaje: mensaje,
-          itemsSincronizados: 0,
-        );
-      }
+      // Necesitamos importar el servicio, se agregará en los imports
+      return await UserSyncService.sincronizarUsuarios();
     } catch (e) {
       await ErrorLogService.logError(
         tableName: 'Users',
         operation: 'sync_from_server',
-        errorMessage: 'Error sincronizando usuarios: $e',
+        errorMessage: 'Error delegando sync usuarios: $e',
         errorType: 'unknown',
       );
       return SyncResult(
         exito: false,
-        mensaje: BaseSyncService.getErrorMessage(e),
+        mensaje: 'Error interno: $e',
         itemsSincronizados: 0,
       );
     }
