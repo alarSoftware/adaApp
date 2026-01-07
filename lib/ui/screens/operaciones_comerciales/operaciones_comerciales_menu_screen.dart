@@ -105,7 +105,7 @@ class _OperacionesComercialesMenuViewState
       tabs.add(
         _TabConfig(
           tipo: TipoOperacion.notaRetiro,
-          label: 'Retiro',
+          label: 'Nota de Retiro',
           icon: Icons.remove_shopping_cart,
           color: AppColors.warning,
           title: 'Nota de Retiro',
@@ -118,7 +118,7 @@ class _OperacionesComercialesMenuViewState
       tabs.add(
         _TabConfig(
           tipo: TipoOperacion.notaRetiroDiscontinuos,
-          label: 'Discontinuos',
+          label: 'NDR Discontinuos',
           icon: Icons.inventory_2_outlined,
           color: AppColors.error,
           title: 'Retiro de Discontinuos',

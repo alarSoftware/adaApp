@@ -76,19 +76,6 @@ class ClientOptionsScreen extends StatelessWidget {
                     return ListView(
                       padding: EdgeInsets.symmetric(horizontal: 16),
                       children: [
-                        if (canCreateCenso)
-                          _buildOptionCard(
-                            context: context,
-                            title: 'Realizar Censo de Equipo',
-                            description:
-                                'Censo de los equipos de frio del cliente',
-                            icon: Icons.barcode_reader,
-                            color: AppColors.primary,
-                            onTap: () => _navigateToCenso(context),
-                          ),
-
-                        if (canCreateCenso) SizedBox(height: 12),
-
                         if (canCreateOperacion)
                           _buildOptionCard(
                             context: context,
@@ -100,7 +87,20 @@ class ClientOptionsScreen extends StatelessWidget {
                                 _navigateToOperacionesComerciales(context),
                           ),
 
-                        if (canCreateOperacion && canViewForms)
+                        if (canCreateOperacion) SizedBox(height: 12),
+
+                        if (canCreateCenso)
+                          _buildOptionCard(
+                            context: context,
+                            title: 'Realizar Censo de Equipo',
+                            description:
+                                'Censo de los equipos de frio del cliente',
+                            icon: Icons.barcode_reader,
+                            color: AppColors.primary,
+                            onTap: () => _navigateToCenso(context),
+                          ),
+
+                        if (canCreateCenso && canViewForms)
                           SizedBox(height: 12),
 
                         if (canViewForms)
