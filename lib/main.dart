@@ -14,6 +14,7 @@ import 'models/cliente.dart';
 import 'package:ada_app/config/app_config.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:ada_app/ui/widgets/debug_ribbon_wrapper.dart';
 //IMPORTS PARA EL RESET TEMPORAL - COMENTADOS PARA PRODUCCIÓN
 // import 'package:ada_app/services/database_helper.dart';
 
@@ -56,6 +57,9 @@ class MyApp extends StatelessWidget {
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        return DebugRibbonWrapper(child: child!);
+      },
       home: const InitializationScreen(),
       navigatorObservers: [routeObserver],
       routes: {
