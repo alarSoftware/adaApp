@@ -258,7 +258,7 @@ class ClienteListScreenViewModel extends ChangeNotifier {
       final clientesDB = await _repository.buscarConFiltros(query: '');
 
       _allClientes = clientesDB;
-      _filteredClientes = clientesDB;
+      // _filteredClientes = clientesDB; // FIX: No asignar todos por defecto, esperar al filtro
 
       _calculateCount();
 

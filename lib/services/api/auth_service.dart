@@ -343,6 +343,28 @@ class AuthService {
     }
   }
 
+  Future<AuthResult> forceLogin(Usuario usuario) async {
+    try {
+      final usuarioAuth = UsuarioAuth.fromUsuario(usuario);
+      await _saveLoginSuccess(usuarioAuth);
+
+      try {
+        await AppServices().inicializarEnLogin();
+      } catch (e) {}
+
+      return AuthResult(
+        exitoso: true,
+        mensaje: 'Bienvenido (Debug), ${usuario.fullname}',
+        usuario: usuarioAuth,
+      );
+    } catch (e) {
+      return AuthResult(
+        exitoso: false,
+        mensaje: 'Error en inicio de sesión forzado',
+      );
+    }
+  }
+
   Future<void> logout() async {
     try {
       try {

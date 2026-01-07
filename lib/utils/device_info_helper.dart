@@ -68,7 +68,7 @@ class DeviceInfoHelper {
     try {
       return await UserSyncService.obtenerEmployeeIdUsuarioActual();
     } catch (e) {
-      _logger.e('Error al obtener employee_id: $e');
+
       return null;
     }
   }
@@ -105,6 +105,10 @@ class DeviceInfoHelper {
         fechaRegistro: DateTime.now().toIso8601String(),
         sincronizado: 0,
       );
+      return null;
+    }
+    catch (e) {
+      print('❌ Error al crear log: $e');
       return null;
     }
   }

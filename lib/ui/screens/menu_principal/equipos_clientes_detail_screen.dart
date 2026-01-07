@@ -524,13 +524,11 @@ class _EquiposClientesDetailScreenState
                           child: Text(
                             dropdownHabilitado
                                 ? '-- Seleccionar ubicación --'
-                                : 'Bloqueado - día no corresponde',
+                                : '-- Seleccionar ubicación --',
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: AppColors.textSecondary,
-                              fontStyle: dropdownHabilitado
-                                  ? FontStyle.normal
-                                  : FontStyle.italic,
+                              fontStyle: FontStyle.normal,
                             ),
                           ),
                         ),

@@ -92,7 +92,7 @@ class UserSyncService {
           return {
             'id': usuarioId, // FIX: Asignar ID explícitamente a la PK
             'employee_id': usuario['employeeId']?.toString(),
-            'edfVendedorNombre': usuario['edfVendedorNombre']?.toString(),
+            'employeeName': usuario['employeeName']?.toString(),
             'code': usuarioId,
             'username': usuario['username'],
             'password': password,
@@ -195,14 +195,14 @@ class UserSyncService {
       final db = await _dbHelper.database;
       final result = await db.query(
         'Users',
-        columns: ['edfVendedorNombre'], // Nombre de la columna nueva
+        columns: ['employee_name'], // Nombre de la columna nueva
         where: 'LOWER(username) = ?',
         whereArgs: [username.toLowerCase()],
         limit: 1,
       );
 
       if (result.isNotEmpty) {
-        return result.first['edfVendedorNombre'] as String?;
+        return result.first['employee_name'] as String?;
       }
       return null;
     } catch (e) {
@@ -229,13 +229,17 @@ class UserSyncService {
       );
 
       if (result.isEmpty) {
-        throw Exception('Usuario $username no encontrado en base de datos local');
+        throw Exception(
+          'Usuario $username no encontrado en base de datos local',
+        );
       }
 
       final employeeId = result.first['employee_id'] as String?;
 
       if (employeeId == null || employeeId.trim().isEmpty) {
-        throw Exception('Usuario $username no tiene edf_vendedor_id configurado');
+        throw Exception(
+          'Usuario $username no tiene edf_vendedor_id configurado',
+        );
       }
 
       return employeeId;
