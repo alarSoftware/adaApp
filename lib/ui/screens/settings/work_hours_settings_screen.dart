@@ -15,6 +15,7 @@ class _WorkHoursSettingsScreenState extends State<WorkHoursSettingsScreen> {
   int _startHour = 9;
   int _endHour = 17;
   int _intervalMinutes = 5; // Default
+  List<int> _selectedDays = [1, 2, 3, 4, 5, 6]; // Default Lun-Sab
   bool _isLoading = true;
 
   @override
@@ -34,6 +35,7 @@ class _WorkHoursSettingsScreenState extends State<WorkHoursSettingsScreen> {
       _intervalMinutes = BackgroundLogConfig.intervalo.inMinutes < 1
           ? 1
           : BackgroundLogConfig.intervalo.inMinutes;
+      _selectedDays = List.from(BackgroundLogConfig.diasTrabajo);
       _isLoading = false;
     });
   }
@@ -52,6 +54,16 @@ class _WorkHoursSettingsScreenState extends State<WorkHoursSettingsScreen> {
       return;
     }
 
+    if (_selectedDays.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Debes seleccionar al menos un día de trabajo'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -61,6 +73,7 @@ class _WorkHoursSettingsScreenState extends State<WorkHoursSettingsScreen> {
         _startHour,
         _endHour,
         intervaloMinutos: _intervalMinutes,
+        diasTrabajo: _selectedDays,
       );
 
       final service = FlutterBackgroundService();
@@ -110,109 +123,196 @@ class _WorkHoursSettingsScreenState extends State<WorkHoursSettingsScreen> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Icon(
-                        Icons.access_time_filled,
-                        size: 48,
-                        color: AppColors.primary,
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'Horario de Monitoreo',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Icon(
+                          Icons.access_time_filled,
+                          size: 48,
+                          color: AppColors.primary,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Define en qué horario la aplicación debe registrar la ubicación y estado del dispositivo.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: 32),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildHourSelector(
-                              'Hora Inicio',
-                              _startHour,
-                              (val) => setState(() => _startHour = val!),
-                            ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Horario de Monitoreo',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
                           ),
-                          SizedBox(width: 16),
-                          Expanded(
-                            child: _buildHourSelector(
-                              'Hora Fin',
-                              _endHour,
-                              (val) => setState(() => _endHour = val!),
-                            ),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Define los días y el horario para el registro de ubicación.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
                           ),
-                        ],
-                      ),
-                      SizedBox(height: 32),
-                      Text(
-                        'Intervalo entre registros: $_intervalMinutes min',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          textAlign: TextAlign.center,
                         ),
-                      ),
-                      SizedBox(height: 8),
-                      Slider(
-                        value: _intervalMinutes.toDouble(),
-                        min: 1,
-                        max: 60,
-                        divisions: 59,
-                        label: '$_intervalMinutes min',
-                        activeColor: AppColors.primary,
-                        onChanged: (value) {
-                          setState(() {
-                            _intervalMinutes = value.round();
-                          });
-                        },
-                      ),
-                      Text(
-                        'Frecuencia con la que se guardará la ubicación.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: 32),
-                      ElevatedButton(
-                        onPressed: _saveSettings,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: AppColors.onPrimary,
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          'Guardar Cambios',
+                        SizedBox(height: 24),
+                        Text(
+                          'Días de Trabajo',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
                           ),
                         ),
-                      ),
-                    ],
+                        SizedBox(height: 12),
+                        _buildDaysSelector(),
+                        SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildHourSelector(
+                                'Hora Inicio',
+                                _startHour,
+                                (val) => setState(() => _startHour = val!),
+                              ),
+                            ),
+                            SizedBox(width: 16),
+                            Expanded(
+                              child: _buildHourSelector(
+                                'Hora Fin',
+                                _endHour,
+                                (val) => setState(() => _endHour = val!),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 32),
+                        Text(
+                          'Intervalo entre registros: $_intervalMinutes min',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Slider(
+                          value: _intervalMinutes.toDouble(),
+                          min: 1,
+                          max: 60,
+                          divisions: 59,
+                          label: '$_intervalMinutes min',
+                          activeColor: AppColors.primary,
+                          onChanged: (value) {
+                            setState(() {
+                              _intervalMinutes = value.round();
+                            });
+                          },
+                        ),
+                        Text(
+                          'Frecuencia con la que se guardará la ubicación.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 32),
+                        ElevatedButton(
+                          onPressed: _saveSettings,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: AppColors.onPrimary,
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            'Guardar Cambios',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildDaysSelector() {
+    final days = [
+      {'val': 1, 'label': 'L'},
+      {'val': 2, 'label': 'M'},
+      {'val': 3, 'label': 'X'}, // X para Miércoles para distinguir de Martes
+      {'val': 4, 'label': 'J'},
+      {'val': 5, 'label': 'V'},
+      {'val': 6, 'label': 'S'},
+      {'val': 7, 'label': 'D'},
+    ];
+
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: days.map((day) {
+          final val = day['val'] as int;
+          final label = day['label'] as String;
+          final isSelected = _selectedDays.contains(val);
+
+          return InkWell(
+            onTap: () {
+              setState(() {
+                if (isSelected) {
+                  _selectedDays.remove(val);
+                } else {
+                  _selectedDays.add(val);
+                }
+              });
+            },
+            borderRadius: BorderRadius.circular(30),
+            child: AnimatedContainer(
+              duration: Duration(milliseconds: 200),
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primary
+                    : AppColors.surfaceVariant,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.textSecondary.withValues(alpha: 0.3),
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.4),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ]
+                    : [],
+              ),
+              child: Center(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected
+                        ? AppColors.onPrimary
+                        : AppColors.textSecondary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 

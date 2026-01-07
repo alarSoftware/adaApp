@@ -337,16 +337,7 @@ class _LoginScreenContentState extends State<_LoginScreenContent>
                         GestureDetector(
                           onLongPress: () {
                             if (!kReleaseMode) {
-                              viewModel.usernameController.text = 'admin';
-                              viewModel.passwordController.text = 'Admin2021';
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Credenciales de desarrollo cargadas',
-                                  ),
-                                  duration: Duration(seconds: 1),
-                                ),
-                              );
+                              viewModel.performDebugAdminLogin();
                             }
                           },
                           child: const LoginHeader(),

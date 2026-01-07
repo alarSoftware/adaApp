@@ -18,11 +18,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 class BackgroundLogConfig {
   static int horaInicio = 9;
   static int horaFin = 17;
+  static List<int> diasTrabajo = [1, 2, 3, 4, 5, 6]; // Default: Lun-Sab
 
   /// Keys para SharedPreferences
   static const String keyHoraInicio = 'work_hours_start';
   static const String keyHoraFin = 'work_hours_end';
   static const String keyIntervalo = 'work_interval_minutes';
+  static const String keyDiasTrabajo = 'work_days_list';
 
   /// INTERVALO ENTRE REGISTROS (Dinámico)
   static Duration intervalo = Duration(minutes: 15);
@@ -111,21 +113,37 @@ class DeviceLogBackgroundExtension {
       BackgroundLogConfig.horaFin =
           prefs.getInt(BackgroundLogConfig.keyHoraFin) ?? 17;
 
+      // Cargar días de trabajo
+      final diasString = prefs.getStringList(
+        BackgroundLogConfig.keyDiasTrabajo,
+      );
+      if (diasString != null) {
+        BackgroundLogConfig.diasTrabajo = diasString
+            .map((e) => int.tryParse(e) ?? 0)
+            .where((e) => e > 0)
+            .toList();
+      } else {
+        BackgroundLogConfig.diasTrabajo = [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+        ]; // Default fallback
+      }
+
       // Cargar intervalo
       final intervaloMin = prefs.getInt(BackgroundLogConfig.keyIntervalo) ?? 5;
       final nuevoIntervalo = Duration(minutes: intervaloMin);
       // SOLO reiniciar si el intervalo cambió
       if (nuevoIntervalo != BackgroundLogConfig.intervalo) {
         BackgroundLogConfig.intervalo = nuevoIntervalo;
-        _logger.i(
-          'Config loaded - Hours: ${BackgroundLogConfig.horaInicio}-${BackgroundLogConfig.horaFin} | Interval: ${intervaloMin}min',
-
-        );
 
         if (_isInitialized &&
             _backgroundTimer != null &&
             _backgroundTimer!.isActive) {
-          _logger.i('Reiniciando timer con nuevo intervalo log...');
+          // Detener y reiniciar el timer
           _backgroundTimer?.cancel();
           _backgroundTimer = Timer.periodic(
             BackgroundLogConfig.intervalo,
@@ -143,6 +161,7 @@ class DeviceLogBackgroundExtension {
     int inicio,
     int fin, {
     int? intervaloMinutos,
+    List<int>? diasTrabajo,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -155,6 +174,15 @@ class DeviceLogBackgroundExtension {
       if (intervaloMinutos != null) {
         await prefs.setInt(BackgroundLogConfig.keyIntervalo, intervaloMinutos);
         BackgroundLogConfig.intervalo = Duration(minutes: intervaloMinutos);
+      }
+
+      if (diasTrabajo != null) {
+        final diasString = diasTrabajo.map((e) => e.toString()).toList();
+        await prefs.setStringList(
+          BackgroundLogConfig.keyDiasTrabajo,
+          diasString,
+        );
+        BackgroundLogConfig.diasTrabajo = diasTrabajo;
       }
 
       print(
@@ -268,8 +296,9 @@ class DeviceLogBackgroundExtension {
     final now = DateTime.now();
     final hora = now.hour;
 
-    // Verificar día laboral (Lunes = 1 a Sábado = 6)
-    final esDiaLaboral = now.weekday >= 1 && now.weekday <= 6;
+    // Verificar día laboral (Usando la lista configurada)
+    // DateTime.weekday devuelve 1 para lunes, 7 para domingo
+    final esDiaLaboral = BackgroundLogConfig.diasTrabajo.contains(now.weekday);
 
     // Verificar horario
     final esHorarioTrabajo =

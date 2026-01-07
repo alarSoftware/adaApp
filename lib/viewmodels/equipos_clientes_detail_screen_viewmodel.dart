@@ -94,44 +94,17 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     }
   }
 
-  String _getDiaActual() {
-    final diasSemana = [
-      'Lunes',
-      'Martes',
-      'Miércoles',
-      'Jueves',
-      'Viernes',
-      'Sábado',
-      'Domingo',
-    ];
-    final now = DateTime.now();
-    return diasSemana[now.weekday - 1];
-  }
-
   bool _validarDiaRuta() {
-    // Obtener rutaDia del equipoCliente
-    final rutaDia = equipoCliente['ruta_dia']?.toString();
-
-    // Si el cliente no tiene día de ruta asignado, permitir acceso
-    if (rutaDia == null || rutaDia.isEmpty) return true;
-
-    final diaActual = _getDiaActual();
-
-    // Validar que el día actual coincida con el día de ruta
-    return rutaDia == diaActual;
+    // SE ELIMINA LA VALIDACION DE DIA A PETICION DEL USUARIO
+    return true;
   }
 
   bool puedeRealizarCambios() {
-    return _validarDiaRuta();
+    return true;
   }
 
   String obtenerMensajeRestriccionDia() {
-    final diaActual = _getDiaActual();
-    final rutaDia = equipoCliente['ruta_dia']?.toString() ?? 'sin asignar';
-
-    return 'No puedes realizar cambios hoy.\n'
-        'Este cliente corresponde al día: $rutaDia\n'
-        'Hoy es: $diaActual';
+    return '';
   }
 
   void _initializeState() {
@@ -304,7 +277,8 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
   // ========== MÉTODOS PARA DROPDOWN ==========
 
   // Getter para saber si el dropdown debe estar habilitado
-  bool get dropdownHabilitado => _validarDiaRuta();
+  // Getter para saber si el dropdown debe estar habilitado
+  bool get dropdownHabilitado => true;
 
   void cambiarUbicacionEquipo(bool? nuevaUbicacion) {
     // VALIDAR DÍA DE RUTA ANTES DE PERMITIR CAMBIOS
@@ -579,7 +553,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
     if (tipoEstado == 'asignado') {
       return _estadoLocalActual == 1 ? 'En local' : 'Fuera del local';
     } else if (tipoEstado == 'pendiente') {
-      return 'Pendiente';
+      return 'No asignado';
     } else {
       return 'Sin estado';
     }

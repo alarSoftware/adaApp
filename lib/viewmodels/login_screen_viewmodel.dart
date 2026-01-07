@@ -626,6 +626,78 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> performDebugAdminLogin() async {
+    _isLoading = true;
+    notifyListeners();
+    HapticFeedback.lightImpact();
+
+    try {
+      final db = await _dbHelper.database;
+      // Buscar usuario admin o useradmin
+      final result = await db.query(
+        'Users',
+        where: 'LOWER(username) IN (?, ?)',
+        whereArgs: ['admin', 'useradmin'],
+        limit: 1,
+      );
+
+      if (result.isEmpty) {
+        _eventController.add(
+          ShowErrorEvent('No se encontró usuario administrador en la BD local'),
+        );
+        return;
+      }
+
+      final adminUser = Usuario.fromMap(result.first);
+
+      // Usar login forzado (bypass contraseña)
+      final authResult = await _authService.forceLogin(adminUser);
+
+      if (!authResult.exitoso) {
+        _eventController.add(ShowErrorEvent(authResult.mensaje));
+        return;
+      }
+
+      _currentUser = await _authService.getCurrentUser();
+
+      if (_currentUser == null) {
+        _eventController.add(
+          ShowErrorEvent('Error obteniendo información del usuario'),
+        );
+        return;
+      }
+
+      final validationResult = await _validateUserAssignment();
+      if (!validationResult) return;
+
+      final syncValidation = await _validateSyncRequirement();
+
+      if (syncValidation.requiereSincronizacion) {
+        _syncValidationResult = syncValidation;
+        _eventController.add(
+          ShowSyncRequiredDialogEvent(syncValidation, _currentUser!),
+        );
+        return;
+      }
+
+      await _checkBiometricAvailability();
+      await checkAndRequestPermissions();
+
+      _eventController.add(
+        ShowSuccessEvent(
+          'Modo Debug: ${_currentUser!.fullname}',
+          Icons.admin_panel_settings,
+        ),
+      );
+      _eventController.add(NavigateToHomeEvent());
+    } catch (e) {
+      _eventController.add(ShowErrorEvent('Error en debug login: $e'));
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   void _resetSyncProgress() {
     _syncProgress = 0.0;
     _syncCurrentStep = '';

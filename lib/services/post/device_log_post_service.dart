@@ -88,7 +88,7 @@ class DeviceLogPostService {
       await mostrarConfiguracion();
       final config = await verificarConfiguracion();
     } catch (e) {
-      _logger.e('Error probando conexión: $e');
+      print('Error en el testeo: $e');
     }
   }
 }
