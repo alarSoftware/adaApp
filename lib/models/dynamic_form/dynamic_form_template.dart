@@ -232,9 +232,4 @@ class DynamicFormTemplate {
       metadata: metadata ?? this.metadata,
     );
   }
-
-  @override
-  String toString() {
-    return 'DynamicFormTemplate(id: $id, title: $title, fields: ${fields.length})';
-  }
 }

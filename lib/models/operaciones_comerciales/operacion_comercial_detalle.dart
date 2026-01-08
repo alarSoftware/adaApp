@@ -94,22 +94,14 @@ class OperacionComercialDetalle {
     );
   }
 
-  bool get tieneTicket => ticket != null && ticket!.isNotEmpty;
-  bool get tienePrecio => precioUnitario != null && precioUnitario! > 0;
-
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-          other is OperacionComercialDetalle &&
-              runtimeType == other.runtimeType &&
-              id == other.id &&
-              operacionComercialId == other.operacionComercialId;
+      other is OperacionComercialDetalle &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          operacionComercialId == other.operacionComercialId;
 
   @override
   int get hashCode => id.hashCode ^ operacionComercialId.hashCode;
-
-  @override
-  String toString() {
-    return 'OperacionComercialDetalle{id: $id, productoId: $productoId, cantidad: $cantidad, reemplazoId: $productoReemplazoId}';
-  }
 }

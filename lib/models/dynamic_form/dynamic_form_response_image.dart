@@ -115,41 +115,9 @@ class DynamicFormResponseImage {
   /// Verifica si tiene datos de imagen válidos
   bool get hasValidImage => imagenPath != null || imagenBase64 != null;
 
-  /// Verifica si está listo para sincronizar
-  bool get isPending => syncStatus == 'pending';
-
   /// Verifica si está sincronizado
   bool get isSynced => syncStatus == 'synced';
 
   /// Verifica si tiene error
   bool get hasError => syncStatus == 'error';
-
-  /// Marca como sincronizado
-  DynamicFormResponseImage markAsSynced() {
-    return copyWith(syncStatus: 'synced');
-  }
-
-  /// Marca como error
-  DynamicFormResponseImage markAsError() {
-    return copyWith(syncStatus: 'error');
-  }
-
-  /// Marca como pendiente
-  DynamicFormResponseImage markAsPending() {
-    return copyWith(syncStatus: 'pending');
-  }
-
-  @override
-  String toString() {
-    return 'DynamicFormResponseImage(id: $id, detailId: $dynamicFormResponseDetailId, orden: $orden, hasImage: $hasValidImage, syncStatus: $syncStatus)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is DynamicFormResponseImage && other.id == id;
-  }
-
-  @override
-  int get hashCode => id.hashCode;
 }

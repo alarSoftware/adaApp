@@ -2,9 +2,9 @@
 class DynamicFormResponseDetail {
   final String id;
   final int? version;
-  final String? response;  // La respuesta en texto/JSON
-  final String dynamicFormResponseId;  // FK a dynamic_form_response
-  final String dynamicFormDetailId;    // FK a dynamic_form_detail (el campo)
+  final String? response; // La respuesta en texto/JSON
+  final String dynamicFormResponseId; // FK a dynamic_form_response
+  final String dynamicFormDetailId; // FK a dynamic_form_detail (el campo)
   final String syncStatus;
 
   DynamicFormResponseDetail({
@@ -72,37 +72,17 @@ class DynamicFormResponseDetail {
     String? dynamicFormResponseId,
     String? dynamicFormDetailId,
     String? syncStatus,
-
   }) {
     return DynamicFormResponseDetail(
       id: id ?? this.id,
       version: version ?? this.version,
       response: response ?? this.response,
-      dynamicFormResponseId: dynamicFormResponseId ?? this.dynamicFormResponseId,
+      dynamicFormResponseId:
+          dynamicFormResponseId ?? this.dynamicFormResponseId,
       dynamicFormDetailId: dynamicFormDetailId ?? this.dynamicFormDetailId,
       syncStatus: syncStatus ?? this.syncStatus,
     );
   }
-  
-  /// Verifica si está listo para sincronizar
-  bool get isPending => syncStatus == 'pending';
 
-  /// Verifica si está sincronizado
   bool get isSynced => syncStatus == 'synced';
-
-  /// Marca como sincronizado
-  DynamicFormResponseDetail markAsSynced() {
-    return copyWith(syncStatus: 'synced');
-  }
-
-  /// Marca como error
-  DynamicFormResponseDetail markAsError() {
-    return copyWith(syncStatus: 'error');
-  }
-
-
-  @override
-  String toString() {
-    return 'DynamicFormResponseDetail(id: $id, fieldId: $dynamicFormDetailId)';
-  }
 }

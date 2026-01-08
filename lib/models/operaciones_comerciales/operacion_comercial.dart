@@ -169,7 +169,6 @@ class OperacionComercial {
       tipoOperacion == TipoOperacion.notaRetiro ||
       tipoOperacion == TipoOperacion.notaRetiroDiscontinuos;
 
-  String get displayTipo => tipoOperacion.displayName;
   String get displaySyncStatus {
     switch (syncStatus) {
       case 'creado':
@@ -194,9 +193,4 @@ class OperacionComercial {
 
   @override
   int get hashCode => id.hashCode ^ clienteId.hashCode ^ tipoOperacion.hashCode;
-
-  @override
-  String toString() {
-    return 'OperacionComercial{id: $id, tipo: ${tipoOperacion.valor}, cliente: $clienteId, snc: $snc, detalles: ${detalles.length}, sync: $syncStatus, retries: $syncRetryCount}';
-  }
 }

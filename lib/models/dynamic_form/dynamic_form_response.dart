@@ -118,34 +118,10 @@ class DynamicFormResponse {
   }
 
   // Getters simplificados
-  bool get isDraft => status == 'draft';
+  // Getters
   bool get isCompleted => status == 'completed';
   bool get isSynced => status == 'synced' || syncedAt != null;
   bool get hasError => errorMessage != null && errorMessage!.isNotEmpty;
-
-  dynamic getAnswer(String key) => answers[key];
-
-  DynamicFormResponse updateAnswer(String key, dynamic value) {
-    final updatedAnswers = Map<String, dynamic>.from(answers);
-    updatedAnswers[key] = value;
-    return copyWith(answers: updatedAnswers);
-  }
-
-  DynamicFormResponse markAsCompleted() {
-    return copyWith(status: 'completed', completedAt: DateTime.now());
-  }
-
-  DynamicFormResponse markAsSynced() {
-    return copyWith(
-      status: 'synced',
-      syncedAt: DateTime.now(),
-      errorMessage: null,
-    );
-  }
-
-  DynamicFormResponse markAsError(String error) {
-    return copyWith(status: 'error', errorMessage: error);
-  }
 
   DynamicFormResponse copyWith({
     String? id,
@@ -174,10 +150,5 @@ class DynamicFormResponse {
       employeeId: employeeId ?? this.employeeId,
       errorMessage: errorMessage ?? this.errorMessage,
     );
-  }
-
-  @override
-  String toString() {
-    return 'DynamicFormResponse(id: $id, formTemplateId: $formTemplateId, status: $status, employeeId: $employeeId)';
   }
 }
