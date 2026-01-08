@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/post/base_post_service.dart';
 import 'package:ada_app/services/api/api_config_service.dart';
@@ -8,11 +9,10 @@ class DeviceLogPostService {
 
   /// Enviar un device log individual
   static Future<Map<String, dynamic>> enviarDeviceLog(
-      DeviceLog log, {
-        String? userId,
-      }) async {
+    DeviceLog log, {
+    String? userId,
+  }) async {
     try {
-      final fullUrl = await ApiConfigService.getFullUrl(_endpoint);
       final Map<String, dynamic> body = log.toMap();
       // Establecer userId (puede ser null)
       body['userId'] = userId;
@@ -24,19 +24,15 @@ class DeviceLogPostService {
       );
       return resultado;
     } catch (e) {
-      return {
-        'exito': false,
-        'success': false,
-        'mensaje': 'Error: $e',
-      };
+      return {'exito': false, 'success': false, 'mensaje': 'Error: $e'};
     }
   }
 
   /// Enviar múltiples device logs en batch
   static Future<Map<String, int>> enviarDeviceLogsBatch(
-      List<DeviceLog> logs, {
-        String? userId,
-      }) async {
+    List<DeviceLog> logs, {
+    String? userId,
+  }) async {
     int exitosos = 0;
     int fallidos = 0;
     for (final log in logs) {
@@ -50,18 +46,14 @@ class DeviceLogPostService {
         }
 
         if ((exitosos + fallidos) % 10 == 0) {
-          print('Progreso: ${exitosos + fallidos}/${logs.length}');
+          debugPrint('Progreso: ${exitosos + fallidos}/${logs.length}');
         }
       } catch (e) {
-        print('Error enviando log ${log.id}: $e');
+        debugPrint('Error enviando log ${log.id}: $e');
         fallidos++;
       }
     }
-    return {
-      'exitosos': exitosos,
-      'fallidos': fallidos,
-      'total': logs.length,
-    };
+    return {'exitosos': exitosos, 'fallidos': fallidos, 'total': logs.length};
   }
 
   /// Verificar configuración actual del servicio
@@ -79,16 +71,16 @@ class DeviceLogPostService {
 
   /// Mostrar configuración en logs
   static Future<void> mostrarConfiguracion() async {
-    final config = await verificarConfiguracion();
+    await verificarConfiguracion();
   }
 
   /// Test rápido del servicio
   static Future<void> testearConexion() async {
     try {
       await mostrarConfiguracion();
-      final config = await verificarConfiguracion();
+      await verificarConfiguracion();
     } catch (e) {
-      print('Error en el testeo: $e');
+      debugPrint('Error en el testeo: $e');
     }
   }
 }

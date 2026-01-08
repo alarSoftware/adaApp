@@ -107,8 +107,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  //TODO mostrar odooName y adaSequence
-
   void setSnc(String value) {
     if (isViewOnly) return;
     _snc = value.trim().isEmpty ? null : value.trim();

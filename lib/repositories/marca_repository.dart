@@ -27,6 +27,7 @@ class MarcaRepository extends BaseRepository<Marca> {
   String getEntityName() => 'Marca';
 
   /// ✅ CORREGIDO: Obtener todas las marcas (SIN filtro activo)
+  @override
   Future<List<Marca>> obtenerTodos() async {
     try {
       final maps = await dbHelper.consultar(

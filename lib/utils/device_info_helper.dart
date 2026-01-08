@@ -68,7 +68,6 @@ class DeviceInfoHelper {
     try {
       return await UserSyncService.obtenerEmployeeIdUsuarioActual();
     } catch (e) {
-
       return null;
     }
   }
@@ -81,7 +80,6 @@ class DeviceInfoHelper {
         obtenerUbicacion(),
         obtenerNivelBateria(),
         obtenerModeloDispositivo(),
-        //TODO revisar para obtener employee id
         obtenerEmployeeId(),
       ]);
 
@@ -105,9 +103,8 @@ class DeviceInfoHelper {
         fechaRegistro: DateTime.now().toIso8601String(),
         sincronizado: 0,
       );
-      return null;
-    }
-    catch (e) {
+      return log;
+    } catch (e) {
       print('❌ Error al crear log: $e');
       return null;
     }

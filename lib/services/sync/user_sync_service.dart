@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -72,19 +73,23 @@ class UserSyncService {
           }
 
           if (rutas != null && rutas is List && usuarioId != null) {
-            print('Intentando sincronizar rutas para usuario $usuarioId...');
+            debugPrint(
+              'Intentando sincronizar rutas para usuario $usuarioId...',
+            );
             _dbHelper
                 .sincronizarRutas(usuarioId, rutas)
                 .then((_) {
-                  print('Rutas sincronizadas exitosamente para $usuarioId');
+                  debugPrint(
+                    'Rutas sincronizadas exitosamente para $usuarioId',
+                  );
                 })
                 .catchError((e) {
-                  print(
+                  debugPrint(
                     'Error sincronizando rutas para usuario $usuarioId: $e',
                   );
                 });
           } else {
-            print(
+            debugPrint(
               'No se llamará a sincronizarRutas. Rutas: $rutas, UsuarioId: $usuarioId',
             );
           }

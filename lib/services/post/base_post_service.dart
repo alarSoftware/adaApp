@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -33,8 +34,8 @@ class BasePostService {
 
       final jsonBody = json.encode(body);
 
-      print('POST a $fullUrl');
-      print('Body size: ${jsonBody.length} caracteres');
+      debugPrint('POST a $fullUrl');
+      debugPrint('Body size: ${jsonBody.length} caracteres');
 
       final response = await http
           .post(
@@ -44,16 +45,14 @@ class BasePostService {
           )
           .timeout(timeout);
 
-      print('Response: ${response.statusCode}');
+      debugPrint('Response: ${response.statusCode}');
 
       final result = _processResponse(response, fullUrl);
 
       // Si hubo error del servidor, loguear
       if (!result['exito'] && tableName != null) {
         // Usamos el status_code que devuelve el result si existe, sino el HTTP code
-        final errorCode =
-            result['serverAction']?.toString() ??
-            response.statusCode.toString();
+        // Usamos el status_code que devuelve el result si existe, sino el HTTP code
 
         // await ErrorLogService.logServerError(
         //   tableName: tableName,
@@ -68,7 +67,7 @@ class BasePostService {
 
       return result;
     } on SocketException catch (e) {
-      print('Error de red: $e');
+      debugPrint('Error de red: $e');
 
       // 🚨 LOG ERROR
       if (tableName != null) {
@@ -89,7 +88,7 @@ class BasePostService {
         'error': 'Sin conexión de red',
       };
     } on TimeoutException catch (e) {
-      print('Timeout: $e');
+      debugPrint('Timeout: $e');
 
       // 🚨 LOG ERROR
       if (tableName != null) {
@@ -110,7 +109,7 @@ class BasePostService {
         'error': 'Tiempo de espera agotado',
       };
     } on http.ClientException catch (e) {
-      print('Error de cliente HTTP: $e');
+      debugPrint('Error de cliente HTTP: $e');
 
       // 🚨 LOG ERROR
       if (tableName != null) {
@@ -131,7 +130,7 @@ class BasePostService {
         'error': e.message,
       };
     } catch (e) {
-      print('Error general en POST: $e');
+      debugPrint('Error general en POST: $e');
 
       // 🚨 LOG ERROR
       if (tableName != null) {
@@ -165,7 +164,7 @@ class BasePostService {
       // 🛑 Aquí validamos el cuerpo JSON, incluso si el status es 200
       return _processSuccessResponse(response);
     } else {
-      print('Error del servidor: ${response.statusCode}');
+      debugPrint('Error del servidor: ${response.statusCode}');
 
       return {
         'exito': false,
@@ -202,7 +201,7 @@ class BasePostService {
           };
         } else {
           // Error Lógico (-501, 205, etc.), aun con HTTP 200
-          print('Falso Negativo detectado. Action: $serverAction');
+          debugPrint('Falso Negativo detectado. Action: $serverAction');
           return {
             'exito': false,
             'success': false,
@@ -230,7 +229,7 @@ class BasePostService {
         'mensaje': mensaje,
       };
     } catch (e) {
-      print(
+      debugPrint(
         'Error al parsear JSON o respuesta plana: $e. Body: ${response.body}',
       );
       // Si falla el parseo, pero el status es 2xx, asumimos éxito simple
@@ -249,14 +248,14 @@ class BasePostService {
     required Map<String, dynamic> body,
     String? additionalInfo,
   }) async {
-    print('═══════════════════════════════════════');
-    print('REQUEST POST');
-    print('Endpoint: $endpoint');
+    debugPrint('═══════════════════════════════════════');
+    debugPrint('REQUEST POST');
+    debugPrint('Endpoint: $endpoint');
     if (additionalInfo != null) {
-      print('Info: $additionalInfo');
+      debugPrint('Info: $additionalInfo');
     }
-    print('Body: ${json.encode(body)}');
-    print('═══════════════════════════════════════');
+    debugPrint('Body: ${json.encode(body)}');
+    debugPrint('═══════════════════════════════════════');
   }
 
   /// Helper para obtener baseUrl

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 
 import 'dart:isolate';
@@ -64,7 +65,7 @@ class ProductoSyncService extends BaseSyncService {
           final repo = ProductoRepositoryImpl();
           await repo.limpiarProductosLocales();
         } catch (e) {
-          print('Error limpiando productos locales: $e');
+          debugPrint('Error limpiando productos locales: $e');
         }
       }
 

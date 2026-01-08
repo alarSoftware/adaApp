@@ -294,7 +294,7 @@ class DynamicFormTemplateRepository {
       }
 
       return DynamicFormTemplate.fromApiJson(formJson, detailsJson);
-    } catch (e, stackTrace) {
+    } catch (e) {
       return null;
     }
   }

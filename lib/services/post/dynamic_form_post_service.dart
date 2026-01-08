@@ -1,5 +1,5 @@
+import 'package:flutter/foundation.dart';
 import 'package:ada_app/services/post/base_post_service.dart';
-import 'package:ada_app/services/error_log/error_log_service.dart';
 
 class DynamicFormPostService {
   static const String _endpoint =
@@ -40,7 +40,7 @@ class DynamicFormPostService {
     int intentoNumero = 1,
     String? userId,
   }) async {
-    print('Reintentando: $responseId (Intento #$intentoNumero)');
+    debugPrint('Reintentando: $responseId (Intento #$intentoNumero)');
 
     final result = await enviarRespuestaFormulario(
       respuesta: respuesta,

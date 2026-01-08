@@ -13,8 +13,7 @@ abstract class BaseRepository<T> {
   Future<void> debugEsquemaTabla() async {
     final db = await dbHelper.database;
     try {
-      final result = await db.rawQuery("PRAGMA table_info($tableName)");
-      final columnas = result.map((r) => r['name']).toList();
+      await db.rawQuery("PRAGMA table_info($tableName)");
     } catch (e) {
       // Silently fail
     }
@@ -73,29 +72,11 @@ abstract class BaseRepository<T> {
     return await dbHelper.eliminar(tableName, where: 'id = ?', whereArgs: [id]);
   }
 
-  Future<Map<String, dynamic>> obtenerEstadisticas() async {
-    final db = await dbHelper.database;
-
-    final total =
-        Sqflite.firstIntValue(
-          await db.rawQuery('SELECT COUNT(*) FROM $tableName'),
-        ) ??
-        0;
-
-    return {
-      'total${getEntityName()}s': total,
-      'ultimaActualizacion': DateTime.now().toIso8601String(),
-    };
-  }
-
   Future<void> limpiarYSincronizar(List<dynamic> itemsAPI) async {
     final db = await dbHelper.database;
 
     await db.transaction((txn) async {
       await txn.delete(tableName);
-
-      int exitosos = 0;
-      int errores = 0;
 
       for (var itemData in itemsAPI) {
         try {
@@ -112,7 +93,6 @@ abstract class BaseRepository<T> {
             datos,
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
-          exitosos++;
         } catch (e) {
           rethrow;
         }

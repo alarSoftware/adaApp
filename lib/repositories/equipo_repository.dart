@@ -30,9 +30,9 @@ class EquipoRepository extends BaseRepository<Equipo> {
   String getEntityName() => 'Equipo';
 
   @override
-  Future<void> limpiarYSincronizar(List<dynamic> items) async {
+  Future<void> limpiarYSincronizar(List<dynamic> itemsAPI) async {
     try {
-      final List<Map<String, dynamic>> equipos = items
+      final List<Map<String, dynamic>> equipos = itemsAPI
           .cast<Map<String, dynamic>>();
 
       final db = await dbHelper.database;
@@ -510,7 +510,6 @@ class EquipoRepository extends BaseRepository<Equipo> {
   Future<List<Map<String, dynamic>>> obtenerLogos() async =>
       dbHelper.consultar('logo', orderBy: 'nombre ASC');
 
-  @override
   Future<Map<String, dynamic>> obtenerEstadisticas() async {
     final sql = '''
       SELECT 

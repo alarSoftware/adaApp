@@ -1,4 +1,5 @@
 // lib/services/sync/sync_tables_config.dart
+import 'package:flutter/foundation.dart';
 
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
@@ -126,7 +127,7 @@ class SyncTablesConfig {
         );
         counts[config.tableName] = result.length;
       } catch (e) {
-        print('Error obteniendo conteo de ${config.tableName}: $e');
+        debugPrint('Error obteniendo conteo de ${config.tableName}: $e');
         counts[config.tableName] = 0;
       }
     }
@@ -175,7 +176,7 @@ class SyncTablesConfig {
         error: censosFallidos > 0 ? '$censosFallidos censos fallaron' : null,
       );
     } catch (e) {
-      print('Error sincronizando censos: $e');
+      debugPrint('Error sincronizando censos: $e');
       return TableSyncResult(
         success: false,
         itemsSent: 0,
@@ -198,7 +199,7 @@ class SyncTablesConfig {
         );
       }
 
-      print('📤 Reintentando ${items.length} operaciones comerciales...');
+      debugPrint('📤 Reintentando ${items.length} operaciones comerciales...');
 
       int sentCount = 0;
       final errors = <String>[];
@@ -222,7 +223,7 @@ class SyncTablesConfig {
 
             if (operacionActualizada?.syncStatus == 'migrado') {
               sentCount++;
-              print('✅ Operación $operacionId sincronizada');
+              debugPrint('✅ Operación $operacionId sincronizada');
             } else {
               errors.add(
                 'Operación $operacionId: ${operacionActualizada?.syncError ?? "Error desconocido"}',
@@ -230,7 +231,7 @@ class SyncTablesConfig {
             }
           }
         } catch (e) {
-          print('❌ Error sincronizando operación $operacionId: $e');
+          debugPrint('❌ Error sincronizando operación $operacionId: $e');
           errors.add('Operación $operacionId: $e');
         }
 
@@ -244,7 +245,7 @@ class SyncTablesConfig {
         error: errors.isNotEmpty ? errors.join('; ') : null,
       );
     } catch (e) {
-      print('Error sincronizando operaciones comerciales: $e');
+      debugPrint('Error sincronizando operaciones comerciales: $e');
       return TableSyncResult(
         success: false,
         itemsSent: 0,

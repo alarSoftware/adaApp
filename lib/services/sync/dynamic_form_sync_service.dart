@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
@@ -42,7 +43,7 @@ class DynamicFormSyncService extends BaseSyncService {
           await db.eliminar('dynamic_form');
           await db.eliminar('dynamic_form_detail');
         } catch (e) {
-          print('Error limpiando formularios: $e');
+          debugPrint('Error limpiando formularios: $e');
         }
 
         return SyncResult(
@@ -355,7 +356,7 @@ class DynamicFormSyncService extends BaseSyncService {
             final db = DatabaseHelper();
             await db.eliminar('dynamic_form_detail');
           } catch (e) {
-            print('Error limpiando detalles: $e');
+            debugPrint('Error limpiando detalles: $e');
           }
 
           return SyncResult(
@@ -494,7 +495,7 @@ class DynamicFormSyncService extends BaseSyncService {
             await db.eliminar('dynamic_form_response_detail');
             await db.eliminar('dynamic_form_response_image');
           } catch (e) {
-            print('Error limpiando respuestas: $e');
+            debugPrint('Error limpiando respuestas: $e');
           }
 
           return SyncResult(
