@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:ada_app/services/sync/operacion_comercial_sync_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/sync/producto_sync_service.dart';
@@ -109,6 +110,8 @@ class SyncService {
         return resultado;
       }
 
+      final currentUser = await AuthService().getCurrentUser();
+
       // ==================== DEVICE LOGS (Upload & Clean) - START ====================
       try {
         onProgress?.call(
@@ -134,7 +137,6 @@ class SyncService {
 
       // 1. Intentar subir censos pendientes (REINTENTO)
       try {
-        final currentUser = await AuthService().getCurrentUser();
         if (currentUser != null && currentUser.id != null) {
           onProgress?.call(0.05, 'Subiendo censos pendientes...');
           final censoUploadService = CensoUploadService();
@@ -159,21 +161,27 @@ class SyncService {
 
       try {
         onProgress?.call(0.25, 'Sincronizando clientes...');
-        final resultadoClientes = await ClientSyncService.sincronizarClientesDelUsuario();
+        final resultadoClientes =
+            await ClientSyncService.sincronizarClientesDelUsuario();
         resultado.clientesSincronizados = resultadoClientes.itemsSincronizados;
         resultado.clientesExito = resultadoClientes.exito;
 
         if (!resultadoClientes.exito) {
           resultado.erroresClientes = resultadoClientes.mensaje;
         }
-
       } catch (e, stackTrace) {
         resultado.clientesExito = false;
         resultado.erroresClientes = 'Error al sincronizar clientes: $e';
         resultado.clientesSincronizados = 0;
-        print("ERROR CONTROLADO: $stackTrace");
-        //TODO TENER UN SOLO METODO PUBLICO PARA OBTENER USUARIO Y SETEAR ACA
-        await ErrorLogService.manejarExcepcion(e, null, 'getCliente', null, 'clientes');
+        debugPrint("ERROR CONTROLADO: $stackTrace");
+
+        await ErrorLogService.manejarExcepcion(
+          e,
+          null,
+          'getCliente',
+          currentUser?.id,
+          'clientes',
+        );
       }
 
       try {
@@ -552,37 +560,6 @@ class SyncService {
       }
 
       rethrow;
-    }
-  }
-
-  static Future<Map<String, dynamic>> obtenerEstadisticas() async {
-    try {
-      final estadisticasDB = await _clienteRepo.obtenerEstadisticas();
-      final conexion = await BaseSyncService.testConnection();
-      final baseUrl = await BaseSyncService.getBaseUrl();
-
-      return {
-        ...estadisticasDB,
-        'conexionServidor': conexion.exito,
-        'mensajeConexion': conexion.mensaje,
-        'ultimaVerificacion': DateTime.now().toIso8601String(),
-        'servidorURL': baseUrl,
-      };
-    } catch (e) {
-      final baseUrl = await BaseSyncService.getBaseUrl();
-
-      await ErrorLogService.logError(
-        tableName: 'sync_general',
-        operation: 'obtener_estadisticas',
-        errorMessage: e.toString(),
-        errorType: 'statistics',
-      );
-
-      return {
-        'error': e.toString(),
-        'conexionServidor': false,
-        'servidorURL': baseUrl,
-      };
     }
   }
 }

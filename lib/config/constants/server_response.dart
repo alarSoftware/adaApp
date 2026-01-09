@@ -23,7 +23,6 @@ class ServerResponse {
 
   /// Factory principal que convierte la respuesta HTTP cruda en un objeto tipado
   factory ServerResponse.fromHttp(http.Response response) {
-    // 1. Validación HTTP básica
     if (response.statusCode < 200 || response.statusCode >= 300) {
       return ServerResponse(
         success: false,
@@ -35,7 +34,6 @@ class ServerResponse {
     try {
       final body = json.decode(response.body);
 
-      // 2. Validación de estructura JSON
       if (body is! Map) {
         return ServerResponse(
           success: false,
@@ -44,7 +42,6 @@ class ServerResponse {
         );
       }
 
-      // 3. Extracción de datos clave
       final serverAction = body['serverAction'] as int?;
       final resultMessage =
           body['resultMessage'] as String? ??
@@ -52,7 +49,6 @@ class ServerResponse {
           '';
       final resultId = body['resultId'] ?? body['id'];
 
-      // Robust handling of resultJson
       String? resultJson;
       if (body['resultJson'] is Map) {
         resultJson = jsonEncode(body['resultJson']);
@@ -60,7 +56,6 @@ class ServerResponse {
         resultJson = body['resultJson'];
       }
 
-      // 4. Lógica de Negocio (ServerConstants)
       if (serverAction == ServerConstants.SUCCESS_TRANSACTION) {
         return ServerResponse(
           success: true,
@@ -73,7 +68,6 @@ class ServerResponse {
           httpStatusCode: response.statusCode,
         );
       } else if (serverAction == ServerConstants.ERROR) {
-        // DETECCIÓN DE DUPLICADOS
         final msgUpper = resultMessage.toUpperCase();
         final esDuplicado =
             msgUpper.contains('DUPLICADO') ||
@@ -81,17 +75,15 @@ class ServerResponse {
             msgUpper.contains('ALREADY EXISTS');
 
         return ServerResponse(
-          success:
-              false, // Sigue siendo false para que el flujo principal lo sepa
+          success: false,
           message: resultMessage.isNotEmpty
               ? resultMessage
               : 'Error de negocio',
           serverAction: serverAction,
-          isDuplicate: esDuplicado, // Flag vital para tu UI/DB local
+          isDuplicate: esDuplicado,
           httpStatusCode: response.statusCode,
         );
       } else {
-        // Otros errores (Stop transaction, etc)
         return ServerResponse(
           success: false,
           message: resultMessage.isNotEmpty
@@ -109,18 +101,4 @@ class ServerResponse {
       );
     }
   }
-
-  /// Factory para crear respuestas de error local (excepciones, sin internet, etc)
-  factory ServerResponse.localError(String message) {
-    return ServerResponse(
-      success: false,
-      message: message,
-      httpStatusCode: 0, // 0 indica error local
-    );
-  }
-
-  // Helper para logs
-  @override
-  String toString() =>
-      'ServerResponse(success: $success, action: $serverAction, msg: $message, dup: $isDuplicate, json: $resultJson)';
 }

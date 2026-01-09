@@ -15,7 +15,6 @@ class DynamicFormFieldWidget extends StatelessWidget {
   final int depth;
   final bool isReadOnly;
 
-  // 🆕 NUEVO: Callbacks para guardar imágenes
   final Future<bool> Function(String fieldId, String imagePath)?
   onImageSelected;
   final Future<bool> Function(String fieldId)? onImageDeleted;
@@ -783,7 +782,7 @@ class DynamicFormFieldWidget extends StatelessWidget {
       width: double.infinity,
       child: TextButton.icon(
         onPressed: () async {
-          // 🎯 Si hay callback de eliminación de imagen, usarlo
+          // Si hay callback de eliminación de imagen, usarlo
           if (onImageDeleted != null) {
             final success = await onImageDeleted!(fieldId);
             if (success) {
@@ -823,7 +822,7 @@ class DynamicFormFieldWidget extends StatelessWidget {
 
       if (image == null) return;
 
-      // 🔄 Mostrar indicador de carga
+      // Mostrar indicador de carga
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -847,7 +846,7 @@ class DynamicFormFieldWidget extends StatelessWidget {
         );
       }
 
-      // 🎯 GUARDAR IMAGEN EN LA BD
+      // GUARDAR IMAGEN EN LA BD
       final targetFieldId = isNested && fieldId != null ? fieldId : field.id;
 
       if (onImageSelected != null) {

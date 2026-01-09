@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 
 import 'dart:isolate';
@@ -86,7 +87,6 @@ class CensusSyncService extends BaseSyncService {
         itemsSincronizados: processedResult.length,
         totalEnAPI: processedResult.length,
       );
-
     } catch (e) {
       await ErrorLogService.manejarExcepcion(
         e,
@@ -247,7 +247,6 @@ class CensusSyncService extends BaseSyncService {
         );
       }
     } catch (e) {
-     
       await ErrorLogService.manejarExcepcion(
         e,
         codigoBarras,
@@ -511,7 +510,7 @@ class CensusSyncService extends BaseSyncService {
             final censoParaGuardar = _mapApiToLocalFormat(censoMap);
             censosParaGuardar.add(censoParaGuardar);
           } catch (e) {
-            print('Error procesando censo individual: $e');
+            debugPrint('Error procesando censo individual: $e');
             // Error procesando censo
           }
         }
@@ -519,7 +518,7 @@ class CensusSyncService extends BaseSyncService {
 
       return censosParaGuardar;
     } catch (e) {
-      print('Error general procesando JSON de censos: $e');
+      debugPrint('Error general procesando JSON de censos: $e');
       return null;
     }
   }

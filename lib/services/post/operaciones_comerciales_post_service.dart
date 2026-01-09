@@ -1,13 +1,12 @@
 import 'dart:convert';
 import 'dart:async';
-import 'dart:io';
+
 import 'package:ada_app/config/constants/server_response.dart';
 
 import 'package:ada_app/repositories/producto_repository.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:ada_app/services/api/api_config_service.dart';
-import 'package:ada_app/config/constants/server_constants.dart';
 
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
@@ -140,83 +139,5 @@ class OperacionesComercialesPostService {
     }
 
     return detalleBase;
-  }
-
-  static Map<String, dynamic> _procesarRespuesta(http.Response response) {
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      return {
-        'exito': false,
-        'mensaje': 'Error del servidor: ${response.statusCode}',
-        'status_code': response.statusCode,
-      };
-    }
-
-    try {
-      final responseBody = json.decode(response.body);
-
-      if (responseBody is Map && responseBody.containsKey('serverAction')) {
-        final serverAction = responseBody['serverAction'];
-        final mensaje = responseBody['resultMessage'] ?? '';
-        final error = responseBody['resultError'] ?? '';
-
-        if (serverAction == ServerConstants.SUCCESS_TRANSACTION) {
-          return {
-            'exito': true,
-            'mensaje': mensaje.isNotEmpty
-                ? mensaje
-                : 'Operación procesada correctamente',
-            'serverAction': serverAction,
-            'id': responseBody['resultId'],
-          };
-        } else if (_esDuplicado(mensaje) || _esDuplicado(error)) {
-          return {
-            'exito': true,
-            'duplicado': true,
-            'mensaje': mensaje.isNotEmpty ? mensaje : error,
-            'serverAction': serverAction,
-          };
-        } else {
-          return {
-            'exito': false,
-            'mensaje': error.isNotEmpty
-                ? error
-                : mensaje.isNotEmpty
-                ? mensaje
-                : 'Error del servidor',
-            'serverAction': serverAction,
-          };
-        }
-      }
-
-      return {
-        'exito': true,
-        'mensaje': 'Operación enviada correctamente',
-        'data': responseBody,
-      };
-    } catch (e) {
-      return {
-        'exito': false,
-        'mensaje': 'Error al procesar respuesta del servidor',
-      };
-    }
-  }
-
-  static bool _esDuplicado(String mensaje) {
-    if (mensaje.isEmpty) return false;
-
-    final mensajeLower = mensaje.toLowerCase();
-    return mensajeLower.contains('duplicado') ||
-        mensajeLower.contains('duplicate') ||
-        mensajeLower.contains('ya existe') ||
-        mensajeLower.contains('already exists');
-  }
-
-  static String _obtenerMensajeUsuario(dynamic excepcion) {
-    if (excepcion is SocketException || excepcion is http.ClientException) {
-      return 'Error de conexión. Verifique su internet.';
-    } else if (excepcion is TimeoutException) {
-      return 'El servidor tardó demasiado en responder.';
-    }
-    return 'Error interno al enviar operación';
   }
 }

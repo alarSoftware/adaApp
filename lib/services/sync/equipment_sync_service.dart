@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 
 import 'dart:isolate';
@@ -6,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
-import 'package:ada_app/models/equipos.dart';
+
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
 class EquipmentSyncService extends BaseSyncService {
@@ -197,7 +198,7 @@ class EquipmentSyncService extends BaseSyncService {
     final endpoint = '$baseUrl/api/getEdfEquipos';
 
     try {
-      print('INICIO DESCARGA: ${DateTime.now()}');
+      debugPrint('INICIO DESCARGA: ${DateTime.now()}');
       final stopwatchDownload = Stopwatch()..start();
 
       final response = await http
@@ -205,7 +206,7 @@ class EquipmentSyncService extends BaseSyncService {
           .timeout(const Duration(minutes: 5));
 
       stopwatchDownload.stop();
-      print(
+      debugPrint(
         'FIN DESCARGA: ${DateTime.now()} - Duracion: ${stopwatchDownload.elapsedMilliseconds} ms',
       );
 
@@ -253,7 +254,7 @@ class EquipmentSyncService extends BaseSyncService {
       }
 
       try {
-        print(
+        debugPrint(
           'INICIO INSERCION BD: ${DateTime.now()} (Total: ${equiposMapas.length} items)',
         );
         final stopwatch = Stopwatch()..start();
@@ -261,7 +262,7 @@ class EquipmentSyncService extends BaseSyncService {
         await _equipoRepo.limpiarYSincronizarEnChunks(equiposMapas);
 
         stopwatch.stop();
-        print(
+        debugPrint(
           'FIN INSERCION BD: ${DateTime.now()} - Duracion: ${stopwatch.elapsedMilliseconds} ms',
         );
       } catch (dbError) {

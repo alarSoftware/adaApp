@@ -39,6 +39,8 @@ class ShowPendingRecordsDialogEvent extends LoginUIEvent {
   ShowPendingRecordsDialogEvent(this.validationResult);
 }
 
+class ShowPermissionDeniedDialogEvent extends LoginUIEvent {}
+
 class SyncProgressEvent extends LoginUIEvent {
   final double progress;
   final String currentStep;
@@ -262,8 +264,12 @@ class LoginScreenViewModel extends ChangeNotifier {
 
       await _checkBiometricAvailability();
 
-      // Solicitud de permisos proactiva
-      await checkAndRequestPermissions();
+      // Solicitud de permisos proactiva y BLOQUEANTE
+      final permissionsGranted = await checkAndRequestPermissions();
+      if (!permissionsGranted) {
+        _eventController.add(ShowPermissionDeniedDialogEvent());
+        return;
+      }
 
       _eventController.add(
         ShowSuccessEvent(
@@ -331,8 +337,12 @@ class LoginScreenViewModel extends ChangeNotifier {
         return;
       }
 
-      // Solicitud de permisos proactiva
-      await checkAndRequestPermissions();
+      // Solicitud de permisos proactiva y BLOQUEANTE
+      final permissionsGranted = await checkAndRequestPermissions();
+      if (!permissionsGranted) {
+        _eventController.add(ShowPermissionDeniedDialogEvent());
+        return;
+      }
 
       _eventController.add(
         ShowSuccessEvent(
@@ -418,8 +428,31 @@ class LoginScreenViewModel extends ChangeNotifier {
   }
 
   /// 🛡️ Validar y solicitar permisos críticos antes de entrar a la app
-  Future<void> checkAndRequestPermissions() async {
+  /// Retorna TRUE si se tienen los permisos necesarios (o si no se pueden verificar/pedir)
+  /// Retorna FALSE si el usuario rechazó explícitamente el permiso de NOTIFICACIONES
+  Future<bool> checkAndRequestPermissions() async {
     try {
+      // 1. Notificaciones (Android 13+) - CRÍTICO PARA BACKGROUND
+      // Requerido para ver la notificación persistente
+      var notifStatus = await Permission.notification.status;
+      debugPrint(
+        '🔍 DEBUG PERMISOS: Status inicial Notificaciones: $notifStatus',
+      );
+
+      if (notifStatus.isDenied) {
+        debugPrint('🔍 DEBUG PERMISOS: Solicitando permiso...');
+        notifStatus = await Permission.notification.request();
+        debugPrint('🔍 DEBUG PERMISOS: Status post-request: $notifStatus');
+      }
+
+      // Si después de pedirlo sigue denegado o está permanentemente denegado: BLOQUEAR
+      if (notifStatus.isDenied || notifStatus.isPermanentlyDenied) {
+        debugPrint('⛔ DEBUG PERMISOS: Acceso DENEGADO (Bloqueando login)');
+        return false;
+      }
+
+      debugPrint('✅ DEBUG PERMISOS: Notificaciones OK');
+
       // 2. Ubicación
       // Primero 'location' (precisa/coarse en uso)
       var locStatus = await Permission.location.status;
@@ -428,7 +461,6 @@ class LoginScreenViewModel extends ChangeNotifier {
       }
 
       // Si se concedió ubicación básica, intentar 'locationAlways' para background
-      // Nota: En Android 11+ el sistema puede requerir hacerlo en pasos separados o ajustes
       if (locStatus.isGranted) {
         if (await Permission.locationAlways.isDenied) {
           // No bloqueamos el login si esto falla, pero lo intentamos
@@ -436,19 +468,17 @@ class LoginScreenViewModel extends ChangeNotifier {
         }
       }
 
-      // 1. Notificaciones (Android 13+)
-      // Requerido para ver la notificación persistente
-      if (await Permission.notification.isDenied) {
-        await Permission.notification.request();
-      }
-
       // 3. Optimización de batería
       // Importante para que el servicio no muera
       if (await Permission.ignoreBatteryOptimizations.isDenied) {
         await Permission.ignoreBatteryOptimizations.request();
       }
+
+      return true;
     } catch (e) {
       debugPrint('Error solicitando permisos: $e');
+      // En caso de error de plataforma, dejamos pasar por seguridad (o bloqueamos? mejor pasar para no brickear)
+      return true;
     }
   }
 

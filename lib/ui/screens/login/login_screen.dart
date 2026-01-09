@@ -11,6 +11,7 @@ import 'package:ada_app/ui/widgets/login/sync_dialog.dart';
 import 'package:ada_app/ui/common/snackbar_helper.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -98,6 +99,8 @@ class _LoginScreenContentState extends State<_LoginScreenContent>
         _handleSyncProgress(event);
       } else if (event is SyncCompletedEvent) {
         _handleSyncCompleted(event);
+      } else if (event is ShowPermissionDeniedDialogEvent) {
+        _handleShowPermissionDeniedDialog();
       }
     });
   }
@@ -141,8 +144,53 @@ class _LoginScreenContentState extends State<_LoginScreenContent>
   }
 
   void _handleSyncCompleted(SyncCompletedEvent event) {
-    // El evento de completado se maneja en el ViewModel
     // Este método está disponible por si necesitas hacer algo adicional en la UI
+  }
+
+  void _handleShowPermissionDeniedDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.notifications_off_outlined, color: AppColors.error),
+            SizedBox(width: 10),
+            Expanded(child: Text('Permiso Requerido')),
+          ],
+        ),
+        content: const Text(
+          'Para que la aplicación funcione correctamente y no se cierre en segundo plano, es NECESARIO permitir las notificaciones.\n\n'
+          'Sin este permiso, la sincronización de datos y el rastreo de ubicación fallarán.\n\n'
+          'Por favor, habilite las notificaciones en la configuración.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          /* Botón de reintento manual si el usuario vuelve de settings */
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Trigger a retry logic if needed, or simply pop lets user click login again
+            },
+            child: const Text('Reintentar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              openAppSettings();
+              // No cerramos el diálogo automáticamente
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Ir a Configuración'),
+          ),
+        ],
+      ),
+    );
   }
 
   // ========== ACCIONES DE UI ==========

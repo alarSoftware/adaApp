@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:ada_app/services/data/database_helper.dart';
@@ -31,8 +32,8 @@ class ErrorLogService {
   }) async {
     try {
       final now = DateTime.now();
-      print('INICIANDO logError para $tableName - $operation');
-      print('Error detectado: $tableName - $errorMessage');
+      debugPrint('INICIANDO logError para $tableName - $operation');
+      debugPrint('Error detectado: $tableName - $errorMessage');
 
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
@@ -65,7 +66,7 @@ class ErrorLogService {
             final nuevoRetryCount =
                 ((existente.first['retry_count'] as int?) ?? 0) + 1;
 
-            print(
+            debugPrint(
               'Error pendiente encontrado. Actualizando retry_count a $nuevoRetryCount',
             );
 
@@ -90,7 +91,7 @@ class ErrorLogService {
               ],
             );
 
-            print('Error log actualizado con ID: $errorId');
+            debugPrint('Error log actualizado con ID: $errorId');
           } else {
             errorId = _uuid.v4();
 
@@ -123,7 +124,7 @@ class ErrorLogService {
               ],
             );
 
-            print('Error log nuevo guardado con ID: $errorId');
+            debugPrint('Error log nuevo guardado con ID: $errorId');
           }
         });
 
@@ -138,14 +139,16 @@ class ErrorLogService {
           );
 
           if (verificacion.isNotEmpty) {
-            print('VERIFICACION: Registro encontrado para envío inmediato');
+            debugPrint(
+              'VERIFICACION: Registro encontrado para envío inmediato',
+            );
 
             final enviadoExitosamente = await _enviarErrorLogIndividual(
               verificacion.first,
             );
 
             if (enviadoExitosamente) {
-              print('Error log enviado inmediatamente al servidor');
+              debugPrint('Error log enviado inmediatamente al servidor');
               await db.rawUpdate(
                 '''
               UPDATE error_log 
@@ -155,14 +158,14 @@ class ErrorLogService {
             ''',
                 [DateTime.now().toIso8601String(), errorId],
               );
-              print('Marcado como sincronizado');
+              debugPrint('Marcado como sincronizado');
             }
           }
         }
       });
     } catch (e, stackTrace) {
-      print('Error en logError: $e');
-      print('Stack trace: $stackTrace');
+      debugPrint('Error en logError: $e');
+      debugPrint('Stack trace: $stackTrace');
     }
   }
 
@@ -221,12 +224,12 @@ class ErrorLogService {
     int limit = 50,
   }) async {
     try {
-      print('Iniciando envío de error logs pendientes...');
+      debugPrint('Iniciando envío de error logs pendientes...');
 
       final errores = await _getErrorsReadyForRetry(limit: limit);
 
       if (errores.isEmpty) {
-        print('No hay error logs pendientes para enviar');
+        debugPrint('No hay error logs pendientes para enviar');
         return SyncErrorLogsResult(
           exito: true,
           mensaje: 'No hay error logs pendientes',
@@ -234,7 +237,7 @@ class ErrorLogService {
         );
       }
 
-      print('Encontrados ${errores.length} error logs para reintento');
+      debugPrint('Encontrados ${errores.length} error logs para reintento');
 
       int enviados = 0;
       int fallidos = 0;
@@ -296,7 +299,7 @@ class ErrorLogService {
 
       return result;
     } catch (e) {
-      print('Error obteniendo errores listos: $e');
+      debugPrint('Error obteniendo errores listos: $e');
       return [];
     }
   }
@@ -340,7 +343,7 @@ class ErrorLogService {
         'Error log ${error['id']} programado para reintento #$retryCount en ${delay.inMinutes} minutos',
       );
     } catch (e) {
-      print('Error actualizando para reintento: $e');
+      debugPrint('Error actualizando para reintento: $e');
     }
   }
 
@@ -369,7 +372,7 @@ class ErrorLogService {
 
       final payload = {'jsonData': jsonEncode(jsonData)};
 
-      print('Enviando error log: ${errorLog['id']}');
+      debugPrint('Enviando error log: ${errorLog['id']}');
 
       final response = await http
           .post(
@@ -383,14 +386,16 @@ class ErrorLogService {
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        print('Error log enviado exitosamente');
+        debugPrint('Error log enviado exitosamente');
         return true;
       } else {
-        print('Error del servidor: ${response.statusCode} - ${response.body}');
+        debugPrint(
+          'Error del servidor: ${response.statusCode} - ${response.body}',
+        );
         return false;
       }
     } catch (e) {
-      print('Error enviando log: $e');
+      debugPrint('Error enviando log: $e');
       return false;
     }
   }
@@ -410,9 +415,9 @@ class ErrorLogService {
         whereArgs: ids,
       );
 
-      print('${ids.length} error logs marcados como sincronizados');
+      debugPrint('${ids.length} error logs marcados como sincronizados');
     } catch (e) {
-      print('Error marcando logs como enviados: $e');
+      debugPrint('Error marcando logs como enviados: $e');
     }
   }
 
@@ -441,7 +446,7 @@ class ErrorLogService {
         );
       }
     } catch (e) {
-      print('Error marcando errores como resueltos: $e');
+      debugPrint('Error marcando errores como resueltos: $e');
     }
   }
 
@@ -460,7 +465,7 @@ class ErrorLogService {
 
       return result;
     } catch (e) {
-      print('Error obteniendo errores: $e');
+      debugPrint('Error obteniendo errores: $e');
       return [];
     }
   }
@@ -480,7 +485,7 @@ class ErrorLogService {
 
       return result;
     } catch (e) {
-      print('Error obteniendo errores: $e');
+      debugPrint('Error obteniendo errores: $e');
       return [];
     }
   }
@@ -502,7 +507,7 @@ class ErrorLogService {
 
       return result;
     } catch (e) {
-      print('Error obteniendo errores de tabla $tableName: $e');
+      debugPrint('Error obteniendo errores de tabla $tableName: $e');
       return [];
     }
   }
@@ -524,7 +529,7 @@ class ErrorLogService {
 
       return result;
     } catch (e) {
-      print('Error obteniendo errores por tipo $errorType: $e');
+      debugPrint('Error obteniendo errores por tipo $errorType: $e');
       return [];
     }
   }
@@ -594,7 +599,7 @@ class ErrorLogService {
         'errors_by_table': tableResult,
       };
     } catch (e) {
-      print('Error obteniendo estadísticas: $e');
+      debugPrint('Error obteniendo estadísticas: $e');
       return {
         'total_pending_errors': 0,
         'total_resolved_errors': 0,
@@ -628,7 +633,7 @@ class ErrorLogService {
 
       return deleted;
     } catch (e) {
-      print('Error en limpieza: $e');
+      debugPrint('Error en limpieza: $e');
       return 0;
     }
   }
@@ -639,9 +644,9 @@ class ErrorLogService {
       final db = await dbHelper.database;
 
       await db.delete('error_log');
-      print('Todos los error logs eliminados (USAR SOLO PARA DEBUG)');
+      debugPrint('Todos los error logs eliminados (USAR SOLO PARA DEBUG)');
     } catch (e) {
-      print('Error limpiando todos los errores: $e');
+      debugPrint('Error limpiando todos los errores: $e');
     }
   }
 

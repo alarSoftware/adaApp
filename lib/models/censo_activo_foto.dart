@@ -86,15 +86,6 @@ class CensoActivoFoto {
   bool get tieneImagen => imagenPath != null || imagenBase64 != null;
 
   bool get necesitaSincronizar => tieneImagen && !estaSincronizado;
-
-  String get tamanoFormateado {
-    if (imagenTamano == null) return '? MB';
-    final tamanoMB = imagenTamano! / (1024 * 1024);
-    return '${tamanoMB.toStringAsFixed(1)} MB';
-  }
-
-  String get infoCompleta =>
-      'Foto ${orden} (${tamanoFormateado}) - ${estaSincronizado ? 'Sincronizada' : 'Pendiente'}';
 }
 
 // Clase helper para trabajar con múltiples fotos de un censo

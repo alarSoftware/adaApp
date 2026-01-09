@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 import 'route_constants.dart';
@@ -14,7 +15,7 @@ class NavigationGuardService {
     try {
       final user = await _authService.getCurrentUser();
       if (user == null) {
-        print('NavigationGuard: No user logged in');
+        debugPrint('NavigationGuard: No user logged in');
         return false;
       }
 
@@ -68,7 +69,7 @@ class NavigationGuardService {
 
       return isAllowed;
     } catch (e) {
-      print('NavigationGuard Error: $e');
+      debugPrint('NavigationGuard Error: $e');
       return false; // Fail safe
     }
   }

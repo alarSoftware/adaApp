@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 
@@ -10,7 +11,7 @@ class PermissionsService {
     try {
       final user = await _authService.getCurrentUser();
       if (user == null) {
-        print('Verificación de permiso sin usuario logueado');
+        debugPrint('Verificación de permiso sin usuario logueado');
         return false;
       }
 
@@ -24,7 +25,7 @@ class PermissionsService {
 
       return result.isNotEmpty;
     } catch (e) {
-      print('Error verificando permiso para $moduleName: $e');
+      debugPrint('Error verificando permiso para $moduleName: $e');
       // En caso de error (ej: tabla no existe?), denegar por seguridad
       // O permitir si es el admin? Mejor denegar por defecto (fail-safe).
       return false;

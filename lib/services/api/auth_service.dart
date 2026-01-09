@@ -1,6 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bcrypt/bcrypt.dart';
-import 'package:http/http.dart' as http;
+
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/sync/dynamic_form_sync_service.dart';

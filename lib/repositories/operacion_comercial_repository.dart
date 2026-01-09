@@ -1,5 +1,6 @@
 // lib/repositories/operacion_comercial_repository.dart
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
@@ -155,7 +156,9 @@ class OperacionComercialRepositoryImpl
         String? adaSequence;
 
         if (serverResponse.resultJson != null) {
-          print('DEBUG: ResultJson received: ${serverResponse.resultJson}');
+          debugPrint(
+            'DEBUG: ResultJson received: ${serverResponse.resultJson}',
+          );
           try {
             final jsonMap = jsonDecode(serverResponse.resultJson!);
             odooName =
@@ -167,11 +170,11 @@ class OperacionComercialRepositoryImpl
                 jsonMap['adaSequence'] as String? ??
                 jsonMap['ada_sequence'] as String?;
 
-            print(
+            debugPrint(
               'DEBUG: Parsed odooName: $odooName, adaSequence: $adaSequence',
             );
           } catch (e) {
-            print('DEBUG: Error parsing resultJson: $e');
+            debugPrint('DEBUG: Error parsing resultJson: $e');
           }
         }
 
@@ -360,6 +363,7 @@ class OperacionComercialRepositoryImpl
     }
   }
 
+  @override
   Future<void> marcarComoMigrado(
     String operacionId,
     dynamic serverId, {

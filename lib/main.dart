@@ -14,6 +14,7 @@ import 'models/cliente.dart';
 import 'package:ada_app/config/app_config.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:ada_app/ui/widgets/debug_ribbon_wrapper.dart';
 //IMPORTS PARA EL RESET TEMPORAL - COMENTADOS PARA PRODUCCIÓN
 // import 'package:ada_app/services/database_helper.dart';
 
@@ -56,6 +57,9 @@ class MyApp extends StatelessWidget {
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        return DebugRibbonWrapper(child: child!);
+      },
       home: const InitializationScreen(),
       navigatorObservers: [routeObserver],
       routes: {
@@ -232,9 +236,21 @@ class _InitializationScreenState extends State<InitializationScreen> {
         notifStatus = await Permission.notification.request();
       }
 
+      // Validar ambos permisos estrictamente
       bool isLocationReady = locAlwaysStatus.isGranted || locStatus.isGranted;
+      bool isNotificationReady =
+          notifStatus.isGranted ||
+          // Si el sistema no soporta notificacionesruntime (Android < 13), siempre es granted/restricted pero no negado
+          ((await Permission.notification.status).isRestricted);
 
-      if (isLocationReady) {
+      // En Android <13, status suele ser granted. En 13+, si es denied, bloqueamos.
+      if (notifStatus.isDenied || notifStatus.isPermanentlyDenied) {
+        isNotificationReady = false;
+      } else {
+        isNotificationReady = true;
+      }
+
+      if (isLocationReady && isNotificationReady) {
         permissionsGranted = true;
       } else {
         if (mounted) {
@@ -242,17 +258,17 @@ class _InitializationScreenState extends State<InitializationScreen> {
             context: context,
             barrierDismissible: false,
             builder: (context) => AlertDialog(
-              title: const Text('Permiso Requerido'),
-              content: const Text(
-                'Esta aplicación requiere permisos de ubicación para funcionar.\n\n'
-                'Por favor, otorgue el permiso "Permitir todo el tiempo" en la configuración para un funcionamiento óptimo.\n'
-                'Si no logra avanzar, vaya a Configuración manualmente.',
+              title: const Text('Permisos Requeridos'),
+              content: Text(
+                'Esta aplicación requiere los siguientes permisos para funcionar:\n\n'
+                '${!isLocationReady ? "- Ubicación (Permitir siempre)\n" : ""}'
+                '${!isNotificationReady ? "- Notificaciones\n" : ""}\n'
+                'Por favor, otorgue estos permisos en la configuración para que la app no se cierre en segundo plano.',
               ),
               actions: [
                 TextButton(
                   onPressed: () {
                     openAppSettings();
-                    Navigator.of(context).pop(false);
                   },
                   child: const Text('Ir a Configuración'),
                 ),

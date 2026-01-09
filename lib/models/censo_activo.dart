@@ -178,14 +178,13 @@ class CensoActivo {
   }
 
   // Estados del censo
-  EstadoEquipoCenso get estadoCensoEnum =>
-      EstadoEquipoCensoExtension.fromString(estadoCenso);
+
   bool get estaCreado => estadoCenso == EstadoEquipoCenso.creado.valor;
   bool get estaMigrado => estadoCenso == EstadoEquipoCenso.migrado.valor;
   bool get tieneError => estadoCenso == EstadoEquipoCenso.error.valor;
 
   // Helpers para reintentos
-  bool get necesitaReintento => !estaMigrado && intentosSync < 10;
+
   bool get puedeReintentar {
     if (ultimoIntento == null) return true;
     final minutos = _calcularEsperaMinutos(intentosSync);

@@ -85,53 +85,6 @@ class DynamicFormField {
 
   int? get maxLength => type == 'resp_abierta' ? 500 : null;
 
-  // ==================== VALIDACIÓN ====================
-
-  String? validate(dynamic value) {
-    if (required) {
-      if (value == null) return 'Este campo es obligatorio';
-      if (value is String && value.trim().isEmpty)
-        return 'Este campo es obligatorio';
-      if (value is Iterable && value.isEmpty)
-        return 'Selecciona al menos una opción';
-    }
-    return null;
-  }
-
-  // ==================== BÚSQUEDA RECURSIVA ====================
-
-  /// Busca un campo por ID en este campo y sus hijos recursivamente
-  DynamicFormField? findById(String targetId) {
-    if (id == targetId) return this;
-
-    for (var child in children) {
-      final found = child.findById(targetId);
-      if (found != null) return found;
-    }
-
-    return null;
-  }
-
-  /// Obtiene todos los campos que pueden responderse (recursivo)
-  List<DynamicFormField> getAllAnswerableFields() {
-    final List<DynamicFormField> result = [];
-
-    if (isAnswerable) {
-      result.add(this);
-    }
-
-    for (var child in children) {
-      result.addAll(child.getAllAnswerableFields());
-    }
-
-    return result;
-  }
-
-  /// Obtiene todos los campos obligatorios (recursivo)
-  List<DynamicFormField> getAllRequiredFields() {
-    return getAllAnswerableFields().where((f) => f.required).toList();
-  }
-
   // ==================== COPIA Y MODIFICACIÓN ====================
 
   DynamicFormField withChildren(List<DynamicFormField> children) {
@@ -206,10 +159,5 @@ class DynamicFormField {
         'children': children.map((c) => c.toJson()).toList(),
       if (metadata != null) 'metadata': metadata,
     };
-  }
-
-  @override
-  String toString() {
-    return 'DynamicFormField(id: $id, type: $type, label: $label, children: ${children.length})';
   }
 }

@@ -1,4 +1,5 @@
 // lib/services/sync/operacion_comercial_sync_service.dart
+import 'package:flutter/foundation.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -8,8 +9,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
-import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
-import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
+
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
@@ -42,7 +42,7 @@ class OperacionComercialSyncService extends BaseSyncService {
     int? partnerId,
     String? tipo,
   }) async {
-    print('INICIO DESCARGA DE OPERACIONES');
+    debugPrint('INICIO DESCARGA DE OPERACIONES');
     try {
       final queryParams = <String, String>{};
 
@@ -103,7 +103,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       final operacionesData = await _parseResponse(operacionesResponse);
 
       if (operacionesData.isEmpty) {
-        print('FIN DE DESCARGA');
+        debugPrint('FIN DE DESCARGA');
         return SyncResult(
           exito: true,
           mensaje: 'No hay operaciones para sincronizar',
@@ -134,7 +134,7 @@ class OperacionComercialSyncService extends BaseSyncService {
 
       _ultimasOperaciones = processedResult;
 
-      print('FIN DE DESCARGA');
+      debugPrint('FIN DE DESCARGA');
       return SyncResult(
         exito: true,
         mensaje: 'Operaciones sincronizadas correctamente',
@@ -143,7 +143,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       );
     } catch (e) {
       _ultimasOperaciones = [];
-      print('FIN DE DESCARGA CON ERROR: $e');
+      debugPrint('FIN DE DESCARGA CON ERROR: $e');
 
       // Manejo centralizado de excepciones
       await ErrorLogService.manejarExcepcion(
@@ -200,7 +200,7 @@ class OperacionComercialSyncService extends BaseSyncService {
 
       return null;
     } catch (e) {
-      print('Error obteniendo odooName: $e');
+      debugPrint('Error obteniendo odooName: $e');
       return null;
     }
   }
@@ -343,7 +343,7 @@ class OperacionComercialSyncService extends BaseSyncService {
         operacionesParaGuardar.add(operacionParaGuardar);
       } catch (e) {
         operacionesInvalidas++;
-        print('Error procesando operación: $e');
+        debugPrint('Error procesando operación: $e');
       }
     }
 
@@ -362,7 +362,7 @@ class OperacionComercialSyncService extends BaseSyncService {
     }
 
     if (operacionesInvalidas > 0) {
-      print(
+      debugPrint(
         'Se saltaron $operacionesInvalidas operaciones con datos incompletos',
       );
     }

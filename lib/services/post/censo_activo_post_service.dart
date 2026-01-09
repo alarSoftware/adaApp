@@ -3,21 +3,14 @@ import 'dart:async';
 
 import 'package:http/http.dart' as http;
 
-import 'package:uuid/uuid.dart';
-
 import 'package:ada_app/services/api/api_config_service.dart';
 import 'package:ada_app/config/app_config.dart';
 
 import '../../config/constants/server_response.dart';
 import '../censo/censo_upload_service.dart';
-import '../../repositories/censo_activo_repository.dart';
-import '../error_log/error_log_service.dart';
-import '../../models/censo_activo.dart';
 
 class CensoActivoPostService {
-  static const String _tableName = 'censo_activo';
   static const String _endpoint = '/censoActivo/insertCensoActivo';
-  static const Uuid _uuid = Uuid();
 
   static Future<void> enviarCensoActivo({
     String? censoId,
@@ -55,8 +48,7 @@ class CensoActivoPostService {
 
       if (censoId != null) {}
 
-      final equipoIdFinal =
-          equipoId ?? codigoBarras ?? 'EQUIPO_${censoIdFinal}';
+      final equipoIdFinal = equipoId ?? codigoBarras ?? 'EQUIPO_$censoIdFinal';
 
       final payloadUnificado = _construirPayloadUnificado(
         equipoId: equipoIdFinal,
@@ -312,10 +304,8 @@ class CensoActivoPostService {
       'equipoId': equipoId,
       'clienteNombre': clienteNombre ?? '',
       'clienteId': clienteId,
-      'usuarioId': usuarioId,
       'observaciones': observaciones ?? '',
       'estadoGeneral': observaciones ?? 'Registro desde APP móvil',
-      'enLocal': enLocal,
       'dispositivo': 'android',
       'esCenso': true,
       'versionApp': AppConfig.currentAppVersion,

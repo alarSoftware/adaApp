@@ -49,10 +49,6 @@ extension TipoOperacionExtension on TipoOperacion {
     return this == TipoOperacion.notaReposicion;
   }
 
-  bool get requiereReemplazo {
-    return this == TipoOperacion.notaRetiroDiscontinuos;
-  }
-
   /// Valida si la unidad de medida es correcta para este tipo de operación
   /// Retorna null si es válido, o un mensaje de error si no lo es
 
