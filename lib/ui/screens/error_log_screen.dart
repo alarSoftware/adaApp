@@ -161,6 +161,7 @@ class _ErrorLogScreenState extends State<ErrorLogScreen> {
                 final date = log['timestamp'] as String?;
                 final table = log['table_name'] as String?;
                 final operation = log['operation'] as String?;
+                final sincronizado = log['sincronizado'] as int? ?? 0;
 
                 return Card(
                   elevation: 2,
@@ -204,6 +205,20 @@ class _ErrorLogScreenState extends State<ErrorLogScreen> {
                         ),
                       ],
                     ),
+                    trailing: Tooltip(
+                      message: sincronizado == 1
+                          ? 'Sincronizado con el servidor'
+                          : 'Pendiente de envío',
+                      child: Icon(
+                        sincronizado == 1
+                            ? Icons.cloud_done_rounded
+                            : Icons.cloud_off_rounded,
+                        color: sincronizado == 1
+                            ? Colors.green
+                            : Colors.red[300],
+                        size: 24,
+                      ),
+                    ),
                     children: [
                       Padding(
                         padding: const EdgeInsets.all(16),
@@ -216,6 +231,15 @@ class _ErrorLogScreenState extends State<ErrorLogScreen> {
                               'ID Registro',
                               log['registro_fail_id']?.toString(),
                             ),
+                            _buildDetailRow(
+                              'Estado Sync',
+                              sincronizado == 1 ? 'Enviado' : 'Pendiente',
+                            ),
+                            if (sincronizado == 0 && log['retry_count'] != null)
+                              _buildDetailRow(
+                                'Reintentos',
+                                log['retry_count'].toString(),
+                              ),
                             const Divider(),
                             const Text(
                               'Detalle del Error:',

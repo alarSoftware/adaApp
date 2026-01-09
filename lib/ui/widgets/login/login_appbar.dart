@@ -4,14 +4,9 @@ import 'package:ada_app/viewmodels/login_screen_viewmodel.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 
 class LoginAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final VoidCallback onSync; // ✅ CAMBIO: Ya no recibe LoginScreenViewModel
-  final VoidCallback onDeleteUsers;
+  final VoidCallback onSync;
 
-  const LoginAppBar({
-    super.key,
-    required this.onSync,
-    required this.onDeleteUsers,
-  });
+  const LoginAppBar({super.key, required this.onSync});
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -46,9 +41,7 @@ class LoginAppBar extends StatelessWidget implements PreferredSizeWidget {
                       onSync(); // ✅ CAMBIO: Sin parámetro
                     }
                     break;
-                  case 'delete_users':
-                    onDeleteUsers();
-                    break;
+
                   case 'api_settings':
                     Navigator.of(context).pushNamed('/api-settings');
                     break;
@@ -93,28 +86,7 @@ class LoginAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ],
                   ),
                 ),
-                const PopupMenuDivider(),
-                PopupMenuItem<String>(
-                  value: 'delete_users',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.person_remove,
-                        color: AppColors.error,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Eliminar usuarios',
-                        style: TextStyle(
-                          color: AppColors.error,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+
                 const PopupMenuDivider(),
                 PopupMenuItem<String>(
                   value: 'api_settings',

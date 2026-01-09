@@ -1,5 +1,4 @@
 // lib/repositories/operacion_comercial_repository.dart
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
@@ -159,23 +158,16 @@ class OperacionComercialRepositoryImpl
           debugPrint(
             'DEBUG: ResultJson received: ${serverResponse.resultJson}',
           );
-          try {
-            final jsonMap = jsonDecode(serverResponse.resultJson!);
-            odooName =
-                jsonMap['name'] as String? ?? jsonMap['odooName'] as String?;
+          final parsedData =
+              OperacionesComercialesPostService.parsearRespuestaJson(
+                serverResponse.resultJson,
+              );
+          odooName = parsedData['odooName'];
+          adaSequence = parsedData['adaSequence'];
 
-            // Intentar varias claves posibles para adaSequence
-            adaSequence =
-                jsonMap['sequence'] as String? ??
-                jsonMap['adaSequence'] as String? ??
-                jsonMap['ada_sequence'] as String?;
-
-            debugPrint(
-              'DEBUG: Parsed odooName: $odooName, adaSequence: $adaSequence',
-            );
-          } catch (e) {
-            debugPrint('DEBUG: Error parsing resultJson: $e');
-          }
+          debugPrint(
+            'DEBUG: Parsed odooName: $odooName, adaSequence: $adaSequence',
+          );
         }
 
         await marcarComoMigrado(

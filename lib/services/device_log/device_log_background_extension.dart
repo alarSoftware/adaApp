@@ -12,6 +12,7 @@ import 'package:ada_app/services/api/auth_service.dart';
 
 import 'package:ada_app/services/device_log/device_log_upload_service.dart';
 import 'package:ada_app/services/api/api_config_service.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -282,6 +283,14 @@ class DeviceLogBackgroundExtension {
 
       // Trigger sync general
       await DeviceLogUploadService.sincronizarDeviceLogsPendientes();
+
+      // 🔴 NUEVO: Intentar reenvío de Error Logs pendientes
+      try {
+        print('Intentando reenviar error logs pendientes...');
+        await ErrorLogService.enviarErrorLogsAlServidor();
+      } catch (e) {
+        print('Error en reenvío automático de error logs: $e');
+      }
 
       print('Proceso de logging completado para: ${log.id}');
     } catch (e) {

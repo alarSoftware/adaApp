@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
-import 'package:ada_app/ui/widgets/debug_permissions_dialog.dart';
+// import 'package:ada_app/ui/widgets/debug_permissions_dialog.dart';
 import 'package:ada_app/ui/widgets/app_connection_indicator.dart';
 import 'package:ada_app/ui/screens/menu_principal/equipos_screen.dart';
 import 'package:ada_app/ui/screens/menu_principal/modelos_screen.dart';
@@ -29,6 +29,7 @@ import 'package:ada_app/services/device/location_service.dart';
 import 'package:ada_app/ui/screens/settings/work_hours_settings_screen.dart';
 import 'package:ada_app/services/navigation/navigation_guard_service.dart';
 import 'package:ada_app/services/navigation/route_constants.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -44,6 +45,7 @@ class _SelectScreenState extends State<SelectScreen>
   late StreamSubscription<UIEvent> _eventSubscription;
 
   int _pendingDataCount = 0;
+  int _pendingErrorLogs = 0; // 🔴 NUEVO: Estado de logs de error
   Timer? _pendingDataTimer;
 
   bool _batteryOptimizationChecked = false;
@@ -95,6 +97,28 @@ class _SelectScreenState extends State<SelectScreen>
 
   void _startPendingDataMonitoring() {
     _checkPendingData();
+    _checkErrorLogs(); // Chequeo inicial
+
+    _pendingDataTimer?.cancel();
+    _pendingDataTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _checkPendingData();
+      _checkErrorLogs();
+    });
+  }
+
+  Future<void> _checkErrorLogs() async {
+    if (!mounted) return;
+    try {
+      final stats = await ErrorLogService.getErrorStats();
+      final count = stats['total_pending_errors'] as int? ?? 0;
+      if (mounted) {
+        setState(() {
+          _pendingErrorLogs = count;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking error logs: $e');
+    }
   }
 
   Future<void> _checkPendingData() async {
@@ -104,8 +128,8 @@ class _SelectScreenState extends State<SelectScreen>
 
       final censosPendientes = await db.query(
         'censo_activo',
-        where: 'sincronizado = ?',
-        whereArgs: [0],
+        where: 'estado_censo IN (?, ?)',
+        whereArgs: ['creado', 'error'],
       );
 
       final cantidadCensos = censosPendientes.length;
@@ -1212,6 +1236,15 @@ class _SelectScreenState extends State<SelectScreen>
                     );
                   },
                 ),
+                _buildDrawerItem(
+                  icon: Icons.delete_forever,
+                  label: 'Borrar Base de Datos',
+                  color: AppColors.error,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _viewModel.requestDeleteDatabase();
+                  },
+                ),
                 Divider(),
                 _buildDrawerItem(
                   icon: Icons.access_time,
@@ -1226,6 +1259,7 @@ class _SelectScreenState extends State<SelectScreen>
                     );
                   },
                 ),
+
                 _buildDrawerItem(
                   icon: Icons.logout,
                   label: 'Cerrar Sesión',
@@ -1305,6 +1339,34 @@ class _SelectScreenState extends State<SelectScreen>
               );
             },
           ),
+          // 🔴 NUEVO: Icono de estado de migración de errores
+          if (_pendingErrorLogs > 0)
+            IconButton(
+              icon: Stack(
+                children: [
+                  Icon(Icons.cloud_off, color: AppColors.error),
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: BoxConstraints(minWidth: 8, minHeight: 8),
+                    ),
+                  ),
+                ],
+              ),
+              tooltip: 'Error Logs Pendientes: $_pendingErrorLogs',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ErrorLogScreen()),
+                );
+              },
+            ),
           _buildPendingDataButton(),
           ListenableBuilder(
             listenable: _viewModel,
@@ -1315,20 +1377,11 @@ class _SelectScreenState extends State<SelectScreen>
                     case 'probar_conexion':
                       _viewModel.testConnection();
                       break;
-                    case 'borrar_bd':
-                      _viewModel.requestDeleteDatabase();
-                      break;
+
                     case 'acerca_de':
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => AboutScreen()),
-                      );
-                      break;
-                    case 'debug_menu':
-                      showDialog(
-                        context: context,
-                        builder: (context) =>
-                            DebugPermissionsDialog(viewModel: _viewModel),
                       );
                       break;
                   }
@@ -1363,22 +1416,7 @@ class _SelectScreenState extends State<SelectScreen>
                       ],
                     ),
                   ),
-                  PopupMenuItem<String>(
-                    value: 'borrar_bd',
-                    enabled:
-                        !_viewModel.isSyncing &&
-                        !_viewModel.isTestingConnection,
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete_forever, color: AppColors.error),
-                        SizedBox(width: 8),
-                        Text(
-                          'Borrar Base de Datos',
-                          style: TextStyle(color: AppColors.textPrimary),
-                        ),
-                      ],
-                    ),
-                  ),
+
                   PopupMenuItem<String>(
                     value: 'acerca_de',
                     child: Row(
@@ -1388,22 +1426,6 @@ class _SelectScreenState extends State<SelectScreen>
                         Text(
                           'Acerca de',
                           style: TextStyle(color: AppColors.textPrimary),
-                        ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem<String>(
-                    value: 'debug_menu',
-                    child: Row(
-                      children: [
-                        Icon(Icons.bug_report, color: AppColors.error),
-                        SizedBox(width: 8),
-                        Text(
-                          '🛠️ Debug Menu',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.bold,
-                          ),
                         ),
                       ],
                     ),

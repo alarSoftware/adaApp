@@ -140,4 +140,25 @@ class OperacionesComercialesPostService {
 
     return detalleBase;
   }
+
+  static Map<String, String?> parsearRespuestaJson(String? resultJson) {
+    String? odooName;
+    String? adaSequence;
+
+    if (resultJson != null) {
+      try {
+        final jsonMap = jsonDecode(resultJson);
+        odooName = jsonMap['name'] as String? ?? jsonMap['odooName'] as String?;
+
+        adaSequence =
+            jsonMap['sequence'] as String? ??
+            jsonMap['adaSequence'] as String? ??
+            jsonMap['ada_sequence'] as String?;
+      } catch (e) {
+        // Error silencioso o loguear si es necesario
+      }
+    }
+
+    return {'odooName': odooName, 'adaSequence': adaSequence};
+  }
 }

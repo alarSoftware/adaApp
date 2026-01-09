@@ -6,7 +6,7 @@ import 'package:ada_app/ui/widgets/login/login_header.dart';
 import 'package:ada_app/ui/widgets/login/login_form.dart';
 import 'package:ada_app/ui/widgets/login/biometric_button.dart';
 import 'package:ada_app/ui/widgets/login/login_appbar.dart';
-import 'package:ada_app/ui/widgets/login/delete_users_dialog.dart';
+
 import 'package:ada_app/ui/widgets/login/sync_dialog.dart';
 import 'package:ada_app/ui/common/snackbar_helper.dart';
 import 'dart:async';
@@ -212,14 +212,6 @@ class _LoginScreenContentState extends State<_LoginScreenContent>
     await viewModel.syncUsers();
   }
 
-  Future<void> _handleDeleteUsers() async {
-    final confirmed = await DeleteUsersDialog.show(context);
-    if (confirmed == true && mounted) {
-      final viewModel = context.read<LoginScreenViewModel>();
-      await viewModel.deleteUsersTable();
-    }
-  }
-
   // ========== DIÁLOGOS ==========
 
   Widget _buildPendingRecordsDialog(dynamic validationResult) {
@@ -363,10 +355,7 @@ class _LoginScreenContentState extends State<_LoginScreenContent>
     return Scaffold(
       backgroundColor: AppColors.background,
       extendBodyBehindAppBar: true,
-      appBar: LoginAppBar(
-        onSync: _handleSync,
-        onDeleteUsers: _handleDeleteUsers,
-      ),
+      appBar: LoginAppBar(onSync: _handleSync),
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnimation,
