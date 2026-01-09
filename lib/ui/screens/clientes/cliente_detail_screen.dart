@@ -269,8 +269,8 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
             _buildEquiposTab(
               equipos: _viewModel.equiposPendientesList,
               isAsignado: false,
-              emptyTitle: 'Sin equipos pendientes',
-              emptySubtitle: 'No hay equipos pendientes de confirmación',
+              emptyTitle: 'Sin equipos no asignados',
+              emptySubtitle: 'No hay equipos no asignados a este cliente',
               emptyIcon: Icons.pending_outlined,
             ),
           ],
