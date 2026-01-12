@@ -29,7 +29,7 @@ import 'package:ada_app/services/device/location_service.dart';
 import 'package:ada_app/ui/screens/settings/work_hours_settings_screen.dart';
 import 'package:ada_app/services/navigation/navigation_guard_service.dart';
 import 'package:ada_app/services/navigation/route_constants.dart';
-import 'package:ada_app/services/error_log/error_log_service.dart';
+
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -45,7 +45,7 @@ class _SelectScreenState extends State<SelectScreen>
   late StreamSubscription<UIEvent> _eventSubscription;
 
   int _pendingDataCount = 0;
-  int _pendingErrorLogs = 0; // 🔴 NUEVO: Estado de logs de error
+
   Timer? _pendingDataTimer;
 
   bool _batteryOptimizationChecked = false;
@@ -97,28 +97,11 @@ class _SelectScreenState extends State<SelectScreen>
 
   void _startPendingDataMonitoring() {
     _checkPendingData();
-    _checkErrorLogs(); // Chequeo inicial
 
     _pendingDataTimer?.cancel();
     _pendingDataTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       _checkPendingData();
-      _checkErrorLogs();
     });
-  }
-
-  Future<void> _checkErrorLogs() async {
-    if (!mounted) return;
-    try {
-      final stats = await ErrorLogService.getErrorStats();
-      final count = stats['total_pending_errors'] as int? ?? 0;
-      if (mounted) {
-        setState(() {
-          _pendingErrorLogs = count;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error checking error logs: $e');
-    }
   }
 
   Future<void> _checkPendingData() async {
@@ -1339,34 +1322,7 @@ class _SelectScreenState extends State<SelectScreen>
               );
             },
           ),
-          // 🔴 NUEVO: Icono de estado de migración de errores
-          if (_pendingErrorLogs > 0)
-            IconButton(
-              icon: Stack(
-                children: [
-                  Icon(Icons.cloud_off, color: AppColors.error),
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      constraints: BoxConstraints(minWidth: 8, minHeight: 8),
-                    ),
-                  ),
-                ],
-              ),
-              tooltip: 'Error Logs Pendientes: $_pendingErrorLogs',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ErrorLogScreen()),
-                );
-              },
-            ),
+
           _buildPendingDataButton(),
           ListenableBuilder(
             listenable: _viewModel,

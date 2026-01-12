@@ -92,11 +92,12 @@ class _DynamicFormResponsesScreenState
           onPressed: _navigateToFormList,
           tooltip: 'Nuevo Formulario',
         ),
-        IconButton(
-          icon: Icon(Icons.logout, color: AppColors.onPrimary),
-          onPressed: _handleLogout,
-          tooltip: 'Cerrar Sesión',
-        ),
+        if (widget.cliente == null)
+          IconButton(
+            icon: Icon(Icons.logout, color: AppColors.onPrimary),
+            onPressed: _handleLogout,
+            tooltip: 'Cerrar Sesión',
+          ),
       ],
     );
   }

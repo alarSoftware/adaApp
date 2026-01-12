@@ -212,7 +212,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
             child: Column(
               children: [
                 // A. Banner de Advertencia (Naranja)
-                if (_necesitaSincronizar && !_isSyncing)
+                /*if (_necesitaSincronizar && !_isSyncing)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
@@ -268,7 +268,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                         ),
                       ],
                     ),
-                  ),
+                  ),*/
 
                 // B. Banner de Carga (Azul)
                 if (_isSyncing)
@@ -446,12 +446,14 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                         ),
                       )
                     : Icon(
-                        _necesitaSincronizar
+                        /*_necesitaSincronizar
                             ? Icons.notification_important
-                            : Icons.sync,
-                        color: _necesitaSincronizar
+                            : */
+                        Icons.sync,
+                        color: /*_necesitaSincronizar
                             ? Colors.orangeAccent
-                            : AppColors.appBarForeground,
+                            : */
+                            AppColors.appBarForeground,
                       ),
                 tooltip: 'Sincronizar clientes',
               ),
