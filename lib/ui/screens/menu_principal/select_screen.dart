@@ -29,6 +29,7 @@ import 'package:ada_app/services/device/location_service.dart';
 import 'package:ada_app/ui/screens/settings/work_hours_settings_screen.dart';
 import 'package:ada_app/services/navigation/navigation_guard_service.dart';
 import 'package:ada_app/services/navigation/route_constants.dart';
+import 'package:ada_app/ui/screens/operaciones_comerciales/operaciones_comerciales_history_screen.dart';
 
 import 'dart:async';
 
@@ -1174,6 +1175,20 @@ class _SelectScreenState extends State<SelectScreen>
                       context,
                       MaterialPageRoute(
                         builder: (_) => const ProductosScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.history_edu,
+                  label: 'Historial Operaciones',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const OperacionesComercialesHistoryScreen(),
                       ),
                     );
                   },

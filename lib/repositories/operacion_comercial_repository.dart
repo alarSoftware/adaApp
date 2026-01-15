@@ -44,6 +44,10 @@ abstract class OperacionComercialRepository {
 
   Future<void> eliminarOperacionesPorCliente(int clienteId);
   Future<void> eliminarTodasLasOperaciones();
+
+  Future<List<OperacionComercial>> obtenerTodasLasOperaciones({
+    DateTime? fecha,
+  });
 }
 
 class OperacionComercialRepositoryImpl
@@ -614,5 +618,44 @@ class OperacionComercialRepositoryImpl
     }
 
     return false;
+  }
+
+  @override
+  Future<List<OperacionComercial>> obtenerTodasLasOperaciones({
+    DateTime? fecha,
+  }) async {
+    try {
+      String? whereClause;
+      List<dynamic> whereArgs = [];
+
+      if (fecha != null) {
+        // Filter by date (ignoring time)
+        final startOfDay = DateTime(fecha.year, fecha.month, fecha.day);
+        final endOfDay = startOfDay.add(const Duration(days: 1));
+
+        whereClause = 'fecha_creacion >= ? AND fecha_creacion < ?';
+        whereArgs = [startOfDay.toIso8601String(), endOfDay.toIso8601String()];
+      }
+
+      final operacionesMaps = await dbHelper.consultar(
+        tableName,
+        where: whereClause,
+        whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
+        orderBy: 'fecha_creacion DESC',
+      );
+
+      final operaciones = <OperacionComercial>[];
+
+      for (final operacionMap in operacionesMaps) {
+        final operacionId = operacionMap['id'];
+        final detalles = await _obtenerDetallesConCodigoBarras(operacionId);
+        final operacion = fromMap(operacionMap).copyWith(detalles: detalles);
+        operaciones.add(operacion);
+      }
+
+      return operaciones;
+    } catch (e) {
+      return [];
+    }
   }
 }
