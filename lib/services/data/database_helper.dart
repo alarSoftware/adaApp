@@ -16,7 +16,7 @@ class DatabaseHelper {
   static Database? _database;
 
   static const String _databaseName = 'AdaApp.db';
-  static const int _databaseVersion = 1;
+  static const int _databaseVersion = 2;
 
   late final tables.DatabaseTables _tables;
   late final sync.DatabaseSync _sync;

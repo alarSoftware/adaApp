@@ -8,6 +8,7 @@ class Cliente {
   final String propietario;
   final String? condicionVenta;
   final String? rutaDia;
+  final String? sucursal;
   final bool tieneCensoHoy;
   final bool tieneFormularioCompleto;
   final bool tieneOperacionComercialHoy;
@@ -22,6 +23,7 @@ class Cliente {
     required this.propietario,
     this.condicionVenta,
     this.rutaDia,
+    this.sucursal,
     this.tieneCensoHoy = false,
     this.tieneFormularioCompleto = false,
     this.tieneOperacionComercialHoy = false,
@@ -60,6 +62,7 @@ class Cliente {
         json['terminoPago'] ?? json['condicionVenta'],
       ),
       rutaDia: _parseString(json['ruta_dia'] ?? json['rutaDia']),
+      sucursal: _parseString(json['sucursal']),
       tieneCensoHoy:
           json['tiene_censo_hoy'] == 1 || json['tiene_censo_hoy'] == true,
       tieneFormularioCompleto:
@@ -89,6 +92,7 @@ class Cliente {
       propietario: map['propietario']?.toString() ?? '',
       condicionVenta: map['condicion_venta']?.toString(),
       rutaDia: map['ruta_dia']?.toString(),
+      sucursal: map['sucursal']?.toString(),
 
       tieneCensoHoy:
           map['tiene_censo_hoy'] == 1 || map['tiene_censo_hoy'] == true,
@@ -112,6 +116,7 @@ class Cliente {
       'propietario': propietario,
       'condicion_venta': condicionVenta,
       'ruta_dia': rutaDia,
+      'sucursal': sucursal,
     };
   }
 
@@ -128,6 +133,7 @@ class Cliente {
     if (id != null) json['id'] = id;
     if (condicionVenta != null) json['terminoPago'] = condicionVenta;
     if (rutaDia != null) json['rutaDia'] = rutaDia;
+    if (sucursal != null) json['sucursal'] = sucursal;
     return json;
   }
 
@@ -141,6 +147,7 @@ class Cliente {
     String? propietario,
     String? condicionVenta,
     String? rutaDia,
+    String? sucursal,
     bool? tieneCensoHoy,
     bool? tieneFormularioCompleto,
     bool? tieneOperacionComercialHoy,
@@ -155,6 +162,7 @@ class Cliente {
       propietario: propietario ?? this.propietario,
       condicionVenta: condicionVenta ?? this.condicionVenta,
       rutaDia: rutaDia ?? this.rutaDia,
+      sucursal: sucursal ?? this.sucursal,
       tieneCensoHoy: tieneCensoHoy ?? this.tieneCensoHoy,
       tieneFormularioCompleto:
           tieneFormularioCompleto ?? this.tieneFormularioCompleto,

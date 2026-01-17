@@ -13,7 +13,13 @@ class DatabaseTables {
 
   Future<void> onUpgrade(Database db, int oldVersion, int newVersion) async {
     print('Actualizando base de datos de v$oldVersion a v$newVersion');
-    // Aquí irían las migraciones futuras
+
+    if (oldVersion < 2) {
+      // Migración a v2: Agregar columna sucursal a Users y clientes
+      await db.execute('ALTER TABLE Users ADD COLUMN sucursal TEXT');
+      await db.execute('ALTER TABLE clientes ADD COLUMN sucursal TEXT');
+      print('Migración v2: Columna sucursal agregada a Users y clientes');
+    }
   }
 
   Future<void> _crearTablasMaestras(Database db) async {
@@ -74,7 +80,8 @@ class DatabaseTables {
       ruc_ci TEXT,
       propietario TEXT,
       condicion_venta TEXT,
-      ruta_dia TEXT
+    ruta_dia TEXT,
+    sucursal TEXT
     )
   ''';
 
@@ -127,7 +134,8 @@ class DatabaseTables {
     code INTEGER,
     username TEXT NOT NULL,
     password TEXT NOT NULL,   
-    fullname TEXT NOT NULL
+    fullname TEXT NOT NULL,
+    sucursal TEXT
   )
 ''';
 

@@ -542,7 +542,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                         '${cliente.tipoDocumento}: ${cliente.rucCi}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textTertiary,
+                          color: AppColors.textSecondary,
                           fontFamily: 'monospace',
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -587,6 +587,18 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                   ],
                 ),
               ),
+              if (cliente.sucursal != null && cliente.sucursal!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    cliente.sucursal!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

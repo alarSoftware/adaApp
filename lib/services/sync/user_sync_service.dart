@@ -102,6 +102,7 @@ class UserSyncService {
             'username': usuario['username'],
             'password': password,
             'fullname': usuario['fullname'],
+            'sucursal': usuario['sucursal']?.toString(), // Nuevo campo
             'sincronizado': 1,
             'fecha_creacion': usuario['fecha_creacion'] ?? now,
             'fecha_actualizacion': usuario['fecha_actualizacion'] ?? now,

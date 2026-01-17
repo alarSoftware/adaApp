@@ -59,18 +59,24 @@ class ClientInfoCard extends StatelessWidget {
                   ),
                 ),
 
-
               // Condición de Venta
-              if (cliente.condicionVenta != null && cliente.condicionVenta!.isNotEmpty) ...[
+              if (cliente.condicionVenta != null &&
+                  cliente.condicionVenta!.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 _buildInfoRow(
                   ClientInfoRow(
-                    icon: cliente.esCredito ? Icons.credit_card_outlined : cliente.esContado
-                        ? Icons.payments_outlined : null,
+                    icon: cliente.esCredito
+                        ? Icons.credit_card_outlined
+                        : cliente.esContado
+                        ? Icons.payments_outlined
+                        : null,
                     label: 'Condición de Venta',
                     value: cliente.displayCondicionVenta,
-                    valueColor: cliente.esCredito ? Colors.orange.shade700
-                        : cliente.esContado? Colors.green.shade700:null,
+                    valueColor: cliente.esCredito
+                        ? Colors.orange.shade700
+                        : cliente.esContado
+                        ? Colors.green.shade700
+                        : null,
                   ),
                 ),
               ],
@@ -107,6 +113,18 @@ class ClientInfoCard extends StatelessWidget {
                     icon: Icons.location_on_outlined,
                     label: 'Dirección',
                     value: cliente.direccion,
+                  ),
+                ),
+              ],
+
+              // Sucursal
+              if (cliente.sucursal != null && cliente.sucursal!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _buildInfoRow(
+                  ClientInfoRow(
+                    icon: Icons.store_mall_directory_outlined,
+                    label: 'Sucursal',
+                    value: cliente.sucursal!,
                   ),
                 ),
               ],

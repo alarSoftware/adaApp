@@ -137,6 +137,7 @@ class ClientSyncService {
         propietario: data['propietario']?.toString().trim() ?? '',
         condicionVenta: data['terminoPago']?.toString().trim(),
         rutaDia: data['diasVisita']?.toString().trim(),
+        sucursal: data['sucursal']?.toString().trim(),
       );
     } catch (e) {
       rethrow;
