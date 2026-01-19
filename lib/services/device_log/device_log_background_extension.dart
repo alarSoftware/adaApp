@@ -196,7 +196,7 @@ class DeviceLogBackgroundExtension {
         service.invoke('updateConfig');
         print('Señal updateConfig enviada al servicio');
       } else {
-        // Fallback porsi el servicio no corre (raro)
+        // Fallback porsi el servicio no corre
         // No llamamos inicializar() aqui para no duplicar timers en UI
         print('Servicio no corriendo - configuración guardada solo en disco');
       }
@@ -284,7 +284,7 @@ class DeviceLogBackgroundExtension {
       // Trigger sync general
       await DeviceLogUploadService.sincronizarDeviceLogsPendientes();
 
-      // 🔴 NUEVO: Intentar reenvío de Error Logs pendientes
+      // NUEVO: Intentar reenvío de Error Logs pendientes
       try {
         print('Intentando reenviar error logs pendientes...');
         await ErrorLogService.enviarErrorLogsAlServidor();

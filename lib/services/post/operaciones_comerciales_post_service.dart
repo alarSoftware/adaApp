@@ -155,7 +155,8 @@ class OperacionesComercialesPostService {
             jsonMap['adaSequence'] as String? ??
             jsonMap['ada_sequence'] as String?;
       } catch (e) {
-        // Error silencioso o loguear si es necesario
+        // Manejar el error aquí
+        print('Error al analizar el JSON: $e');
       }
     }
 
