@@ -934,73 +934,101 @@ class _SelectScreenState extends State<SelectScreen>
     String? routeName,
     Widget? page,
     VoidCallback? onTap,
+    bool enabled = true,
   }) {
+    final effectiveColor = enabled ? color : Colors.grey;
+    final contentOpacity = enabled ? 1.0 : 0.6;
+
     return Card(
-      elevation: 2,
-      color: AppColors.surface,
+      elevation: enabled ? 2 : 0,
+      color: enabled ? AppColors.surface : Colors.grey[100],
       shadowColor: AppColors.shadowLight,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.border, width: 0.5),
+        side: BorderSide(
+          color: enabled ? AppColors.border : Colors.grey[300]!,
+          width: 0.5,
+        ),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap:
-            onTap ??
-            () {
-              if (routeName != null) {
-                Navigator.pushNamed(context, routeName);
-              } else if (page != null) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => page),
+        onTap: enabled
+            ? (onTap ??
+                  () {
+                    if (routeName != null) {
+                      Navigator.pushNamed(context, routeName);
+                    } else if (page != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => page),
+                      );
+                    }
+                  })
+            : () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'No tienes permiso para acceder a este módulo',
+                    ),
+                    duration: Duration(seconds: 2),
+                    backgroundColor: Colors.grey[700],
+                  ),
                 );
-              }
-            },
+              },
         child: Padding(
           padding: EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: color.withValues(alpha: 0.2)),
-                ),
-                child: Icon(icon, color: color, size: 28),
-              ),
-              SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
+          child: Opacity(
+            opacity: contentOpacity,
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: effectiveColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: effectiveColor.withValues(alpha: 0.2),
                     ),
-                    SizedBox(height: 4),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+                  ),
+                  child: Icon(icon, color: effectiveColor, size: 28),
                 ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: AppColors.textSecondary,
-              ),
-            ],
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: enabled ? AppColors.textPrimary : Colors.grey,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        description,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: enabled
+                              ? AppColors.textSecondary
+                              : Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (enabled)
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: AppColors.textSecondary,
+                  )
+                else
+                  Icon(Icons.lock, size: 16, color: Colors.grey),
+              ],
+            ),
           ),
         ),
       ),
@@ -1547,10 +1575,8 @@ class _SelectScreenState extends State<SelectScreen>
                                 label: 'Formularios Dinámicos',
                                 description: 'Completar y enviar formularios',
                                 icon: Icons.assignment,
-                                color: AppColors
-                                    .secondary, // Ensure this color exists or use another
-                                routeName:
-                                    '/dynamicForms', // Need to ensure this route exists or push manually
+                                color: AppColors.secondary,
+                                routeName: '/dynamicForms',
                                 onTap: () {
                                   Navigator.push(
                                     context,

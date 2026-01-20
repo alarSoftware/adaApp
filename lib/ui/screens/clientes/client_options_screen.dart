@@ -76,66 +76,41 @@ class ClientOptionsScreen extends StatelessWidget {
                     return ListView(
                       padding: EdgeInsets.symmetric(horizontal: 16),
                       children: [
-                        if (canCreateOperacion)
-                          _buildOptionCard(
-                            context: context,
-                            title: 'Operaciones Comerciales',
-                            description: 'Reposiciones y retiros',
-                            icon: Icons.receipt_long,
-                            color: AppColors.success,
-                            onTap: () =>
-                                _navigateToOperacionesComerciales(context),
-                          ),
+                        _buildOptionCard(
+                          context: context,
+                          title: 'Operaciones Comerciales',
+                          description: 'Reposiciones y retiros',
+                          icon: Icons.receipt_long,
+                          color: AppColors.success,
+                          onTap: () =>
+                              _navigateToOperacionesComerciales(context),
+                          enabled: canCreateOperacion,
+                        ),
 
-                        if (canCreateOperacion) SizedBox(height: 12),
+                        SizedBox(height: 12),
 
-                        if (canCreateCenso)
-                          _buildOptionCard(
-                            context: context,
-                            title: 'Realizar Censo de Equipo',
-                            description:
-                                'Censo de los equipos de frio del cliente',
-                            icon: Icons.barcode_reader,
-                            color: AppColors.primary,
-                            onTap: () => _navigateToCenso(context),
-                          ),
+                        _buildOptionCard(
+                          context: context,
+                          title: 'Realizar Censo de Equipo',
+                          description:
+                              'Censo de los equipos de frio del cliente',
+                          icon: Icons.barcode_reader,
+                          color: AppColors.primary,
+                          onTap: () => _navigateToCenso(context),
+                          enabled: canCreateCenso,
+                        ),
 
-                        if (canCreateCenso && canViewForms)
-                          SizedBox(height: 12),
+                        SizedBox(height: 12),
 
-                        if (canViewForms)
-                          _buildOptionCard(
-                            context: context,
-                            title: 'Formularios Dinámicos',
-                            description: 'Ver historial y completar nuevos',
-                            icon: Icons.assignment_turned_in,
-                            color: AppColors.secondary,
-                            onTap: () => _navigateToForms(context),
-                          ),
-
-                        if (!canCreateCenso &&
-                            !canCreateOperacion &&
-                            !canViewForms)
-                          Padding(
-                            padding: const EdgeInsets.all(32.0),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.lock_outline,
-                                  size: 48,
-                                  color: AppColors.textSecondary,
-                                ),
-                                SizedBox(height: 16),
-                                Text(
-                                  "No tienes rutas de navegación habilitadas desde esta pantalla.",
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        _buildOptionCard(
+                          context: context,
+                          title: 'Formularios Dinámicos',
+                          description: 'Ver historial y completar nuevos',
+                          icon: Icons.assignment_turned_in,
+                          color: AppColors.secondary,
+                          onTap: () => _navigateToForms(context),
+                          enabled: canViewForms,
+                        ),
                       ],
                     );
                   },
@@ -178,62 +153,91 @@ class ClientOptionsScreen extends StatelessWidget {
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
+    bool enabled = true,
   }) {
+    final effectiveColor = enabled ? color : Colors.grey;
+    final contentOpacity = enabled ? 1.0 : 0.6;
+
     return Card(
-      elevation: 2,
-      color: AppColors.surface,
+      elevation: enabled ? 2 : 0,
+      color: enabled ? AppColors.surface : Colors.grey[100],
       shadowColor: AppColors.shadowLight,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.border, width: 0.5),
+        side: BorderSide(
+          color: enabled ? AppColors.border : Colors.grey[300]!,
+          width: 0.5,
+        ),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
+        onTap: enabled
+            ? onTap
+            : () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'No tienes permiso para acceder a esta opción',
+                    ),
+                    duration: Duration(seconds: 2),
+                    backgroundColor: Colors.grey[700],
+                  ),
+                );
+              },
         child: Padding(
           padding: EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: color.withValues(alpha: 0.2)),
-                ),
-                child: Icon(icon, color: color, size: 28),
-              ),
-              SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
+          child: Opacity(
+            opacity: contentOpacity,
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: effectiveColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: effectiveColor.withValues(alpha: 0.2),
                     ),
-                    SizedBox(height: 4),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+                  ),
+                  child: Icon(icon, color: effectiveColor, size: 28),
                 ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: AppColors.textSecondary,
-              ),
-            ],
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: enabled ? AppColors.textPrimary : Colors.grey,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        description,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: enabled
+                              ? AppColors.textSecondary
+                              : Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (enabled)
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: AppColors.textSecondary,
+                  )
+                else
+                  Icon(Icons.lock, size: 16, color: Colors.grey),
+              ],
+            ),
           ),
         ),
       ),
