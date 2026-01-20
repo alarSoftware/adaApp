@@ -139,7 +139,7 @@ class _OperacionesComercialesMenuViewState
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: ClientInfoCard(cliente: widget.cliente),
             ),
             if (_availableTabs.length > 1) _buildTabBar(),
@@ -269,44 +269,34 @@ class _OperacionesComercialesMenuViewState
               const SizedBox(height: 16),
               if (_canCreateOperacion)
                 SizedBox(
-                  height: 54,
+                  height: 44,
                   child: ElevatedButton.icon(
                     onPressed: () =>
                         _navigateToCreateOperacion(tipoOperacion, viewModel),
-                    icon: const Icon(Icons.add_circle_outline_rounded),
+                    icon: const Icon(
+                      Icons.add_circle_outline_rounded,
+                      size: 20,
+                    ),
                     label: const Text(
                       'Nueva Solicitud',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: color,
                       foregroundColor: Colors.white,
-                      elevation: 4,
-                      shadowColor: color.withValues(alpha: 0.4),
+                      elevation: 2,
+                      shadowColor: color.withValues(alpha: 0.3),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      padding: EdgeInsets.symmetric(horizontal: 16),
                     ),
                   ),
                 ),
               if (_canCreateOperacion) const SizedBox(height: 24),
-              Row(
-                children: [
-                  Icon(Icons.history, size: 20, color: AppColors.textSecondary),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Historial Reciente',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
               const SizedBox(height: 12),
               Expanded(
                 child: _buildOperacionesList(viewModel, tipoOperacion, color),

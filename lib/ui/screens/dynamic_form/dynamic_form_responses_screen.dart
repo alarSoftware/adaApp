@@ -157,7 +157,7 @@ class _DynamicFormResponsesScreenState
 
   Widget _buildClientInfo() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: ClientInfoCard(cliente: widget.cliente!),
     );
   }

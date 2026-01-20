@@ -36,7 +36,7 @@ class ClientOptionsScreen extends StatelessWidget {
             children: [
               // Header con información del cliente (DISEÑO CONSISTENTE)
               Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 child: ClientInfoCard(cliente: cliente),
               ),
 

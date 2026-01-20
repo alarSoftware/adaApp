@@ -48,83 +48,96 @@ class ClientInfoCard extends StatelessWidget {
             // Información básica del cliente
             if (showFullDetails) ...[
               const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (cliente.rucCi.isNotEmpty)
+                    Expanded(
+                      flex: 3,
+                      child: _buildInfoRow(
+                        ClientInfoRow(
+                          icon: Icons.badge_outlined,
+                          label: cliente.tipoDocumento,
+                          value: cliente.rucCi,
+                        ),
+                      ),
+                    ),
 
-              // RUC/CI
-              if (cliente.rucCi.isNotEmpty)
-                _buildInfoRow(
-                  ClientInfoRow(
-                    icon: Icons.badge_outlined,
-                    label: cliente.tipoDocumento,
-                    value: cliente.rucCi,
-                  ),
-                ),
-
-              // Condición de Venta
-              if (cliente.condicionVenta != null &&
-                  cliente.condicionVenta!.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                _buildInfoRow(
-                  ClientInfoRow(
-                    icon: cliente.esCredito
-                        ? Icons.credit_card_outlined
-                        : cliente.esContado
-                        ? Icons.payments_outlined
-                        : null,
-                    label: 'Condición de Venta',
-                    value: cliente.displayCondicionVenta,
-                    valueColor: cliente.esCredito
-                        ? Colors.orange.shade700
-                        : cliente.esContado
-                        ? Colors.green.shade700
-                        : null,
-                  ),
-                ),
-              ],
-
-              // Propietario
+                  if (cliente.rucCi.isNotEmpty &&
+                      cliente.condicionVenta != null &&
+                      cliente.condicionVenta!.isNotEmpty)
+                    const SizedBox(width: 12),
+                  if (cliente.condicionVenta != null &&
+                      cliente.condicionVenta!.isNotEmpty)
+                    Expanded(
+                      flex: 4,
+                      child: _buildInfoRow(
+                        ClientInfoRow(
+                          icon: cliente.esCredito
+                              ? Icons.credit_card_outlined
+                              : cliente.esContado
+                              ? Icons.payments_outlined
+                              : null,
+                          label: 'Condición venta',
+                          value: cliente.displayCondicionVenta,
+                          valueColor: cliente.esCredito
+                              ? Colors.orange.shade700
+                              : cliente.esContado
+                              ? Colors.green.shade700
+                              : null,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
               if (cliente.propietario.isNotEmpty) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 _buildInfoRow(
                   ClientInfoRow(
                     icon: Icons.person_outline,
                     label: 'Propietario',
                     value: cliente.propietario,
+                    fontSize: 13, // Letra más pequeña solicitada
                   ),
                 ),
               ],
 
               // Teléfono
               if (cliente.telefono.isNotEmpty) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 _buildInfoRow(
                   ClientInfoRow(
                     icon: Icons.phone_outlined,
                     label: 'Teléfono',
                     value: cliente.telefono,
+                    fontSize: 13,
                   ),
                 ),
               ],
 
               // Dirección
               if (cliente.direccion.isNotEmpty) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 _buildInfoRow(
                   ClientInfoRow(
                     icon: Icons.location_on_outlined,
                     label: 'Dirección',
                     value: cliente.direccion,
+                    fontSize: 12, // Letra aún más pequeña para dirección larga
+                    maxLines: 2,
                   ),
                 ),
               ],
 
               // Sucursal
               if (cliente.sucursal != null && cliente.sucursal!.isNotEmpty) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 _buildInfoRow(
                   ClientInfoRow(
                     icon: Icons.store_mall_directory_outlined,
                     label: 'Sucursal',
                     value: cliente.sucursal!,
+                    fontSize: 13,
                   ),
                 ),
               ],
@@ -204,8 +217,10 @@ class ClientInfoCard extends StatelessWidget {
               // Valor
               Text(
                 info.value,
+                maxLines: info.maxLines ?? 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: info.fontSize ?? 14,
                   fontWeight: FontWeight.w500,
                   color: info.valueColor ?? AppColors.textPrimary,
                   height: 1.2,
@@ -225,11 +240,15 @@ class ClientInfoRow {
   final String? label;
   final String value;
   final Color? valueColor;
+  final double? fontSize;
+  final int? maxLines;
 
   ClientInfoRow({
     required this.icon,
     this.label,
     required this.value,
     this.valueColor,
+    this.fontSize,
+    this.maxLines,
   });
 }
