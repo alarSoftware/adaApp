@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 import 'package:ada_app/config/constants/server_response.dart';
 
@@ -7,6 +8,7 @@ import 'package:ada_app/repositories/producto_repository.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:ada_app/services/api/api_config_service.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart';
 
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
@@ -15,6 +17,7 @@ import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart
 class OperacionesComercialesPostService {
   static const String _endpoint =
       '/operacionComercial/insertOperacionComercial';
+  static const String _tableName = 'operacion_comercial';
 
   static Future<ServerResponse> enviarOperacion(
     OperacionComercial operacion, {
@@ -54,13 +57,40 @@ class OperacionesComercialesPostService {
       ServerResponse resultObject = ServerResponse.fromHttp(response);
 
       if (!resultObject.success) {
-        if (!resultObject.isDuplicate && resultObject.message != '') {
+        if (resultObject.isDuplicate) {
+          // Log duplicado pero NO lanzar excepción
+          await ErrorLogService.logServerError(
+            tableName: _tableName,
+            operation: 'enviar_operacion',
+            errorMessage: 'ID duplicado: ${resultObject.message}',
+            errorCode: 'DUPLICATE_ID',
+            endpoint: fullUrl,
+            registroFailId: operacion.id,
+          );
+          // Retornar sin lanzar excepción
+        } else if (resultObject.message != '') {
+          // Log error del servidor y lanzar excepción
+          await ErrorLogService.logServerError(
+            tableName: _tableName,
+            operation: 'enviar_operacion',
+            errorMessage: resultObject.message,
+            errorCode: response.statusCode.toString(),
+            endpoint: fullUrl,
+            registroFailId: operacion.id,
+          );
           throw Exception(resultObject.message);
         }
       }
 
       return resultObject;
     } catch (e) {
+      await ErrorLogService.manejarExcepcion(
+        e,
+        operacion.id,
+        fullUrl,
+        operacion.usuarioId,
+        _tableName,
+      );
       rethrow;
     }
   }
@@ -155,8 +185,7 @@ class OperacionesComercialesPostService {
             jsonMap['adaSequence'] as String? ??
             jsonMap['ada_sequence'] as String?;
       } catch (e) {
-        // Manejar el error aquí
-        print('Error al analizar el JSON: $e');
+        debugPrint('Error al analizar el JSON: $e');
       }
     }
 
