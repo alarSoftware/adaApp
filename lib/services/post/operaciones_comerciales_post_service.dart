@@ -58,26 +58,10 @@ class OperacionesComercialesPostService {
 
       if (!resultObject.success) {
         if (resultObject.isDuplicate) {
-          // Log duplicado pero NO lanzar excepción
-          await ErrorLogService.logServerError(
-            tableName: _tableName,
-            operation: 'enviar_operacion',
-            errorMessage: 'ID duplicado: ${resultObject.message}',
-            errorCode: 'DUPLICATE_ID',
-            endpoint: fullUrl,
-            registroFailId: operacion.id,
-          );
-          // Retornar sin lanzar excepción
+          // Retornar sin lanzar excepción para duplicados
+          return resultObject;
         } else if (resultObject.message != '') {
-          // Log error del servidor y lanzar excepción
-          await ErrorLogService.logServerError(
-            tableName: _tableName,
-            operation: 'enviar_operacion',
-            errorMessage: resultObject.message,
-            errorCode: response.statusCode.toString(),
-            endpoint: fullUrl,
-            registroFailId: operacion.id,
-          );
+          // Lanzar excepción para que el catch la maneje
           throw Exception(resultObject.message);
         }
       }

@@ -48,11 +48,18 @@ abstract class OperacionComercialRepository {
   Future<List<OperacionComercial>> obtenerTodasLasOperaciones({
     DateTime? fecha,
   });
+
+  Future<List<OperacionComercial>> obtenerOperacionesSinOdooName();
+  Future<void> actualizarOdooName(String id, String odooName);
+
+  Future<Map<String, String>> obtenerNombresOdooMap(List<String> ids);
 }
 
 class OperacionComercialRepositoryImpl
     extends BaseRepository<OperacionComercial>
     implements OperacionComercialRepository {
+  // ... existing methods ...
+
   final Uuid _uuid = Uuid();
 
   @override
@@ -656,6 +663,65 @@ class OperacionComercialRepositoryImpl
       return operaciones;
     } catch (e) {
       return [];
+    }
+  }
+
+  @override
+  Future<List<OperacionComercial>> obtenerOperacionesSinOdooName() async {
+    try {
+      final operacionesMaps = await dbHelper.consultar(
+        tableName,
+        where:
+            '(odoo_name IS NULL OR odoo_name = "") AND ada_sequence IS NOT NULL',
+        limit: 20,
+      );
+
+      final operaciones = <OperacionComercial>[];
+      for (final operacionMap in operacionesMaps) {
+        operaciones.add(fromMap(operacionMap));
+      }
+      return operaciones;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  @override
+  Future<Map<String, String>> obtenerNombresOdooMap(List<String> ids) async {
+    if (ids.isEmpty) return {};
+    try {
+      // Usar parámetros dinámicos para el IN clause
+      final placeholders = List.filled(ids.length, '?').join(',');
+
+      // Usar query personalizada para ser más eficiente y seleccionar solo campos necesarios
+      final sql =
+          'SELECT id, odoo_name FROM $tableName WHERE id IN ($placeholders) AND odoo_name IS NOT NULL';
+      final resultados = await dbHelper.consultarPersonalizada(sql, ids);
+
+      final mapa = <String, String>{};
+      for (final fila in resultados) {
+        if (fila['id'] != null && fila['odoo_name'] != null) {
+          mapa[fila['id'] as String] = fila['odoo_name'] as String;
+        }
+      }
+      return mapa;
+    } catch (e) {
+      debugPrint('Error obteniendo mapa de odoo_names: $e');
+      return {};
+    }
+  }
+
+  @override
+  Future<void> actualizarOdooName(String id, String odooName) async {
+    try {
+      await dbHelper.actualizar(
+        tableName,
+        {'odoo_name': odooName},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } catch (e) {
+      rethrow;
     }
   }
 }

@@ -82,14 +82,138 @@ class _ErrorLogScreenState extends State<ErrorLogScreen> {
     }
   }
 
+  int _countNoMigrados() {
+    return _logs.where((log) => (log['sincronizado'] as int? ?? 0) == 0).length;
+  }
+
+  Future<void> _retryPendingLogs() async {
+    final noMigrados = _countNoMigrados();
+
+    if (noMigrados == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay error logs no migrados para enviar'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reintentar Envío'),
+        content: Text(
+          '¿Deseas reintentar el envío de $noMigrados error log${noMigrados > 1 ? "s" : ""} no migrado${noMigrados > 1 ? "s" : ""} al servidor?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Reintentar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Enviando error logs...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final resultado = await ErrorLogService.enviarErrorLogsAlServidor();
+
+      if (!mounted) return;
+      Navigator.pop(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(resultado.mensaje),
+          backgroundColor: resultado.exito ? Colors.green : Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+
+      if (resultado.logsEnviados > 0) {
+        await _loadLogs();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al reintentar: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final noMigrados = _countNoMigrados();
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Registro de Errores'),
+        title: Row(
+          children: [
+            const Text('Registro de Errores'),
+            if (noMigrados > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$noMigrados no migrado${noMigrados > 1 ? "s" : ""}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
         backgroundColor: Colors.red[700],
         foregroundColor: Colors.white,
         actions: [
+          if (noMigrados > 0)
+            IconButton(
+              icon: const Icon(Icons.send),
+              onPressed: _retryPendingLogs,
+              tooltip: 'Reintentar Envío',
+            ),
           IconButton(
             icon: const Icon(Icons.delete_sweep),
             onPressed: () async {
@@ -207,8 +331,8 @@ class _ErrorLogScreenState extends State<ErrorLogScreen> {
                     ),
                     trailing: Tooltip(
                       message: sincronizado == 1
-                          ? 'Sincronizado con el servidor'
-                          : 'Pendiente de envío',
+                          ? 'Migrado al servidor'
+                          : 'No migrado',
                       child: Icon(
                         sincronizado == 1
                             ? Icons.cloud_done_rounded
@@ -232,8 +356,8 @@ class _ErrorLogScreenState extends State<ErrorLogScreen> {
                               log['registro_fail_id']?.toString(),
                             ),
                             _buildDetailRow(
-                              'Estado Sync',
-                              sincronizado == 1 ? 'Enviado' : 'Pendiente',
+                              'Estado',
+                              sincronizado == 1 ? 'Migrado' : 'No migrado',
                             ),
                             if (sincronizado == 0 && log['retry_count'] != null)
                               _buildDetailRow(

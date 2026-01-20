@@ -727,9 +727,70 @@ class OperacionComercialSyncService extends BaseSyncService {
 
       final service = OperacionComercialSyncService();
       await service.sincronizarOperacionesPendientes(_usuarioActual!);
+
+      // Sincronizar Odoo Names pendientes
+      await service.sincronizarOdooNamesPendientes();
     } catch (e) {
     } finally {
       _syncEnProgreso = false;
+    }
+  }
+
+  Future<void> sincronizarOdooNamesPendientes() async {
+    try {
+      // DEBUG: Log para verificar que el ciclo corre
+      // debugPrint('Verificando Odoo Names pendientes...');
+
+      final operaciones = await _operacionRepository
+          .obtenerOperacionesSinOdooName();
+
+      if (operaciones.isEmpty) {
+        // debugPrint('No se encontraron operaciones sin Odoo Name.');
+        return;
+      }
+
+      debugPrint(
+        '🔍 [OdooName Sync] Encontradas ${operaciones.length} operaciones sin Odoo Name. Iniciando sincronización...',
+      );
+
+      for (final operacion in operaciones) {
+        if (operacion.adaSequence == null) {
+          debugPrint(
+            '⚠️ [OdooName Sync] Operación ${operacion.id} ignorada: adaSequence es nulo.',
+          );
+          continue;
+        }
+
+        try {
+          debugPrint(
+            '🔄 [OdooName Sync] Consultando para AdaSequence: ${operacion.adaSequence}',
+          );
+          final odooName = await obtenerOdooName(operacion.adaSequence!);
+
+          if (odooName != null && odooName.isNotEmpty) {
+            await _operacionRepository.actualizarOdooName(
+              operacion.id!,
+              odooName,
+            );
+            debugPrint(
+              '✅ [OdooName Sync] ACTUALIZADO EXITOSAMENTE: ${operacion.adaSequence} -> $odooName',
+            );
+          } else {
+            debugPrint(
+              '❌ [OdooName Sync] No se encontró Odoo Name para ${operacion.adaSequence} (Respuesta nula o vacía)',
+            );
+          }
+        } catch (e) {
+          debugPrint(
+            '🔥 [OdooName Sync] Excepción obteniendo Odoo Name para ${operacion.adaSequence}: $e',
+          );
+        }
+
+        // Pequeña pausa para no saturar
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+    } catch (e) {
+      debugPrint('🔥 [OdooName Sync] Error general en el proceso: $e');
     }
   }
 
