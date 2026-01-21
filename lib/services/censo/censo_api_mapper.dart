@@ -4,6 +4,20 @@ import 'package:uuid/uuid.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/config/app_config.dart';
 
+/// Formatea DateTime sin 'T' ni 'Z' para el backend
+/// Formato: "yyyy-MM-dd HH:mm:ss.SSSSSS"
+String _formatTimestampForBackend(DateTime dt) {
+  String year = dt.year.toString().padLeft(4, '0');
+  String month = dt.month.toString().padLeft(2, '0');
+  String day = dt.day.toString().padLeft(2, '0');
+  String hour = dt.hour.toString().padLeft(2, '0');
+  String minute = dt.minute.toString().padLeft(2, '0');
+  String second = dt.second.toString().padLeft(2, '0');
+  String microsecond = dt.microsecond.toString().padLeft(6, '0');
+
+  return '$year-$month-$day $hour:$minute:$second.$microsecond';
+}
+
 class CensoApiMapper {
   static final Uuid _uuid = const Uuid();
 
@@ -21,14 +35,14 @@ class CensoApiMapper {
     String? imagenId1,
     String? imagenId2,
   }) {
-    final now = DateTime.now().toLocal();
+    final now = DateTime.now();
     final timestampId = _uuid.v4();
 
     return {
       'id': estadoId,
       'timestamp_id': timestampId,
       'estado_sincronizacion': 'pendiente',
-      'fecha_creacion': _formatearFechaLocal(now),
+      'fecha_creacion': _formatTimestampForBackend(now),
       'equipo_id': equipoId,
       'cliente_id': cliente.id,
       'usuario_id': usuarioId,
@@ -71,7 +85,7 @@ class CensoApiMapper {
       // Metadata
       'version_app': AppConfig.currentAppVersion,
       'dispositivo': datosOriginales['dispositivo'] ?? 'android',
-      'fecha_revision': _formatearFechaLocal(now),
+      'fecha_revision': _formatTimestampForBackend(now),
       'en_local': true,
       'sincronizado': 0,
       'estado_censo': 'creado',
@@ -87,13 +101,13 @@ class CensoApiMapper {
     Map<String, dynamic>? equipoCompleto,
   }) {
     final idLocal = _uuid.v4();
-    final now = DateTime.now().toLocal();
+    final now = DateTime.now();
 
     return {
       'id_local': idLocal,
       'timestamp_id': idLocal,
       'estado_sincronizacion': 'pendiente',
-      'fecha_creacion_local': _formatearFechaLocal(now),
+      'fecha_creacion_local': _formatTimestampForBackend(now),
       'equipo_id': equipoCompleto?['id'],
       'cliente_id': cliente.id,
       'funcionando': true,
@@ -116,11 +130,5 @@ class CensoApiMapper {
       'version_app': AppConfig.currentAppVersion,
       'dispositivo': datos['dispositivo'] ?? 'android',
     };
-  }
-
-  // Helper privado para formatear fechas
-  static String _formatearFechaLocal(DateTime fecha) {
-    final local = fecha.toLocal();
-    return local.toIso8601String().replaceAll('Z', '');
   }
 }

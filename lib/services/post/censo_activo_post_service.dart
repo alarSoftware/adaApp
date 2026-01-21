@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:ada_app/services/api/api_config_service.dart';
@@ -8,6 +9,20 @@ import 'package:ada_app/config/app_config.dart';
 
 import '../../config/constants/server_response.dart';
 import '../censo/censo_upload_service.dart';
+
+/// Formatea DateTime sin 'T' ni 'Z' para el backend
+/// Formato: "yyyy-MM-dd HH:mm:ss.SSSSSS"
+String _formatTimestampForBackend(DateTime dt) {
+  String year = dt.year.toString().padLeft(4, '0');
+  String month = dt.month.toString().padLeft(2, '0');
+  String day = dt.day.toString().padLeft(2, '0');
+  String hour = dt.hour.toString().padLeft(2, '0');
+  String minute = dt.minute.toString().padLeft(2, '0');
+  String second = dt.second.toString().padLeft(2, '0');
+  String microsecond = dt.microsecond.toString().padLeft(6, '0');
+
+  return '$year-$month-$day $hour:$minute:$second.$microsecond';
+}
 
 class CensoActivoPostService {
   static const String _endpoint = '/censoActivo/insertCensoActivo';
@@ -43,7 +58,7 @@ class CensoActivoPostService {
     String? fullUrl;
 
     try {
-      final now = DateTime.now().toLocal();
+      final now = DateTime.now();
       final censoIdFinal = censoId.toString();
 
       if (censoId != null) {}
@@ -81,6 +96,9 @@ class CensoActivoPostService {
       final baseUrl = await ApiConfigService.getBaseUrl();
       fullUrl = '$baseUrl$_endpoint';
 
+      final jsonBody = jsonEncode(payloadUnificado);
+      debugPrint('DEBUG CENSO TIMESTAMP - Payload: $jsonBody');
+
       final response = await http
           .post(
             Uri.parse(fullUrl),
@@ -89,7 +107,7 @@ class CensoActivoPostService {
               'Accept': 'application/json',
               'ngrok-skip-browser-warning': 'true',
             },
-            body: jsonEncode(payloadUnificado),
+            body: jsonBody,
           )
           .timeout(Duration(seconds: timeoutSegundos));
 
@@ -152,7 +170,7 @@ class CensoActivoPostService {
           marcaId != null &&
           modeloId != null &&
           logoId != null) {
-        payload['equipo'] = _construirJsonEquipo(equipoDataMap);
+        payload['equipo'] = _construirJsonEquipo(equipoDataMap, now);
       } else {
         payload['equipo'] = {};
       }
@@ -193,8 +211,10 @@ class CensoActivoPostService {
     return payload;
   }
 
-  static Map<String, dynamic> _construirJsonEquipo(var equipoDataMap) {
-    final now = DateTime.now().toIso8601String();
+  static Map<String, dynamic> _construirJsonEquipo(
+    var equipoDataMap,
+    DateTime now,
+  ) {
     var id = equipoDataMap['id'];
     var edfEquipoId = equipoDataMap['cod_barras'];
     var codigoBarras = equipoDataMap['cod_barras'];
@@ -211,7 +231,7 @@ class CensoActivoPostService {
       'marcaId': marcaId.toString(),
       'logoId': logoId.toString(),
       'serie': numeroSerie ?? '',
-      'fechaCreacion': now,
+      'fechaCreacion': _formatTimestampForBackend(now),
     };
   }
 
@@ -278,22 +298,17 @@ class CensoActivoPostService {
     required DateTime now,
     required bool esNuevoEquipo,
   }) {
-    String formatearFechaLocal(DateTime fecha) {
-      final local = fecha.toLocal();
-      return local.toIso8601String().replaceAll('Z', '');
-    }
-
     final censo = {
       'id': censoId,
       'edfVendedorSucursalId': employeeId,
       'employeeId': employeeId, // Añadido para consistencia
       'edfEquipoId': equipoId,
       'usuarioId': usuarioId,
-      'fechaRevision': formatearFechaLocal(now),
+      'fechaRevision': _formatTimestampForBackend(now),
       'latitud': latitud,
       'longitud': longitud,
       'enLocal': enLocal,
-      'fechaDeRevision': formatearFechaLocal(now),
+      'fechaDeRevision': _formatTimestampForBackend(now),
       'estadoCenso': estadoCenso,
       'esNuevoEquipo': esNuevoEquipo,
       'equipoCodigoBarras': codigoBarras,

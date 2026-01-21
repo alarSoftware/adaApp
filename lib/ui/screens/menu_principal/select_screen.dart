@@ -140,7 +140,7 @@ class _SelectScreenState extends State<SelectScreen>
 
       final totalPendientes = cantidadCensos + otrosDatos;
 
-      if (mounted) {
+      if (mounted && _pendingDataCount != totalPendientes) {
         setState(() {
           _pendingDataCount = totalPendientes;
         });

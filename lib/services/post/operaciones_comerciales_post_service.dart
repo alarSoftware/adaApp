@@ -14,6 +14,20 @@ import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart'
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 
+/// Formatea DateTime sin 'T' ni 'Z' para el backend
+/// Formato: "yyyy-MM-dd HH:mm:ss.SSSSSS"
+String _formatTimestampForBackend(DateTime dt) {
+  String year = dt.year.toString().padLeft(4, '0');
+  String month = dt.month.toString().padLeft(2, '0');
+  String day = dt.day.toString().padLeft(2, '0');
+  String hour = dt.hour.toString().padLeft(2, '0');
+  String minute = dt.minute.toString().padLeft(2, '0');
+  String second = dt.second.toString().padLeft(2, '0');
+  String microsecond = dt.microsecond.toString().padLeft(6, '0');
+
+  return '$year-$month-$day $hour:$minute:$second.$microsecond';
+}
+
 class OperacionesComercialesPostService {
   static const String _endpoint =
       '/operacionComercial/insertOperacionComercial';
@@ -42,6 +56,9 @@ class OperacionesComercialesPostService {
           : baseUrl;
       fullUrl = '$cleanBaseUrl$_endpoint';
 
+      final jsonBody = jsonEncode(payload);
+      debugPrint('DEBUG OPERACION TIMESTAMP - Payload: $jsonBody');
+
       final response = await http
           .post(
             Uri.parse(fullUrl),
@@ -50,7 +67,7 @@ class OperacionesComercialesPostService {
               'Accept': 'application/json',
               'ngrok-skip-browser-warning': 'true',
             },
-            body: jsonEncode(payload),
+            body: jsonBody,
           )
           .timeout(Duration(seconds: timeoutSegundos));
 
@@ -87,8 +104,10 @@ class OperacionesComercialesPostService {
       'id': operacion.id,
       'clienteId': operacion.clienteId,
       'tipoOperacion': operacion.tipoOperacion.valor,
-      'fechaCreacion': operacion.fechaCreacion.toIso8601String(),
-      'fechaRetiro': operacion.fechaRetiro?.toIso8601String(),
+      'fechaCreacion': _formatTimestampForBackend(operacion.fechaCreacion),
+      'fechaRetiro': operacion.fechaRetiro != null
+          ? _formatTimestampForBackend(operacion.fechaRetiro!)
+          : null,
       if (operacion.snc != null) 'snc': operacion.snc,
       'usuarioId': operacion.usuarioId,
       'totalProductos': operacion.totalProductos,

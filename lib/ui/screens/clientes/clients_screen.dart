@@ -457,11 +457,6 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                       ),
                 tooltip: 'Sincronizar clientes',
               ),
-              IconButton(
-                onPressed: _onRefresh,
-                icon: Icon(Icons.refresh, color: AppColors.appBarForeground),
-                tooltip: 'Actualizar lista',
-              ),
               PopupMenuButton<String>(
                 icon: Icon(Icons.more_vert, color: AppColors.appBarForeground),
                 onSelected: (value) {
