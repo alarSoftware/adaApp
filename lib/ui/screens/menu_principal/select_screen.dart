@@ -22,14 +22,15 @@ import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/ui/screens/menu_principal/productos_screen.dart';
 import 'package:ada_app/ui/screens/menu_principal/about_screen.dart';
-import 'package:ada_app/ui/screens/device_log_screen.dart';
+import 'package:ada_app/config/app_config.dart';
 import 'package:ada_app/ui/screens/error_log_screen.dart';
-import 'package:ada_app/repositories/device_log_repository.dart'; // Needed for DeviceLogScreen
+
 import 'package:ada_app/services/device/location_service.dart';
-import 'package:ada_app/ui/screens/settings/work_hours_settings_screen.dart';
+
 import 'package:ada_app/services/navigation/navigation_guard_service.dart';
 import 'package:ada_app/services/navigation/route_constants.dart';
 import 'package:ada_app/ui/screens/operaciones_comerciales/operaciones_comerciales_history_screen.dart';
+import 'package:ada_app/ui/screens/settings/system_options_screen.dart';
 
 import 'dart:async';
 
@@ -1234,24 +1235,6 @@ class _SelectScreenState extends State<SelectScreen>
                   ),
                 ),
                 _buildDrawerItem(
-                  icon: Icons.history,
-                  label: 'Device Logs',
-                  onTap: () async {
-                    Navigator.pop(context);
-                    final db = await DatabaseHelper().database;
-                    if (context.mounted) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DeviceLogScreen(
-                            repository: DeviceLogRepository(db),
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                ),
-                _buildDrawerItem(
                   icon: Icons.bug_report,
                   label: 'Log de Errores',
                   onTap: () {
@@ -1263,24 +1246,14 @@ class _SelectScreenState extends State<SelectScreen>
                   },
                 ),
                 _buildDrawerItem(
-                  icon: Icons.delete_forever,
-                  label: 'Borrar Base de Datos',
-                  color: AppColors.error,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _viewModel.requestDeleteDatabase();
-                  },
-                ),
-                Divider(),
-                _buildDrawerItem(
-                  icon: Icons.access_time,
-                  label: 'Horario de Trabajo',
+                  icon: Icons.settings,
+                  label: 'Opciones de Sistema',
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const WorkHoursSettingsScreen(),
+                        builder: (_) => const SystemOptionsScreen(),
                       ),
                     );
                   },
@@ -1303,7 +1276,7 @@ class _SelectScreenState extends State<SelectScreen>
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(
-              'Versión 1.0.0',
+              'Versión ${AppConfig.currentAppVersion}',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
             ),
           ),

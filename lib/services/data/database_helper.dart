@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:ada_app/config/app_config.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -16,7 +17,7 @@ class DatabaseHelper {
   static Database? _database;
 
   static const String _databaseName = 'AdaApp.db';
-  static const int _databaseVersion = 2;
+  static const int _databaseVersion = AppConfig.databaseVersion;
 
   late final tables.DatabaseTables _tables;
   late final sync.DatabaseSync _sync;
