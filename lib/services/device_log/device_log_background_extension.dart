@@ -19,7 +19,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class BackgroundLogConfig {
   static int horaInicio = 9;
   static int horaFin = 17;
-  static List<int> diasTrabajo = [1, 2, 3, 4, 5, 6]; // Default: Lun-Sab
+  static List<int> diasTrabajo = [1, 2, 3, 4, 5, 6];
 
   /// Keys para SharedPreferences
   static const String keyHoraInicio = 'work_hours_start';
@@ -28,7 +28,7 @@ class BackgroundLogConfig {
   static const String keyDiasTrabajo = 'work_days_list';
 
   /// INTERVALO ENTRE REGISTROS (Dinámico)
-  static Duration intervalo = Duration(minutes: 15);
+  static Duration intervalo = Duration(minutes: 5);
 
   /// NÚMERO MÁXIMO DE REINTENTOS
   static const int maxReintentos = 3;
