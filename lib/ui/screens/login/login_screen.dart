@@ -12,6 +12,8 @@ import 'package:ada_app/ui/common/snackbar_helper.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:showcaseview/showcaseview.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -20,7 +22,7 @@ class LoginScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => LoginScreenViewModel(),
-      child: const _LoginScreenContent(),
+      child: ShowCaseWidget(builder: (context) => const _LoginScreenContent()),
     );
   }
 }
@@ -35,6 +37,8 @@ class _LoginScreenContent extends StatefulWidget {
 class _LoginScreenContentState extends State<_LoginScreenContent>
     with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
+  final GlobalKey _threeDotsKey = GlobalKey();
+  final GlobalKey _loginButtonKey = GlobalKey();
   StreamSubscription? _eventSubscription;
 
   late AnimationController _fadeController;
@@ -46,6 +50,57 @@ class _LoginScreenContentState extends State<_LoginScreenContent>
   void initState() {
     super.initState();
     _setupAnimations();
+    _checkFirstTime();
+  }
+
+  Future<void> _checkFirstTime() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool tutorialVisto = prefs.getBool('login_tutorial_visto') ?? false;
+
+    if (!tutorialVisto) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Un pequeño delay para que las animaciones de entrada terminen
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (mounted) {
+            ShowCaseWidget.of(
+              context,
+            ).startShowCase([_threeDotsKey, _loginButtonKey]);
+            prefs.setBool('login_tutorial_visto', true);
+
+            // DESACTIVADO TEMPORALMENTE: Después del tutorial, verificar optimización de fabricante
+            /*
+            Future.delayed(const Duration(seconds: 5), () {
+              if (mounted) _checkManufacturerOptimization();
+            });
+            */
+          }
+        });
+      });
+    } else {
+      // DESACTIVADO TEMPORALMENTE: Si ya vio el tutorial, verificar optimización de fabricante
+      // _checkManufacturerOptimization();
+    }
+  }
+
+  Future<void> _checkManufacturerOptimization() async {
+    /* DESACTIVADO TEMPORALMENTE
+    try {
+      final manufacturer =
+          await BatteryOptimizationService.getDeviceManufacturer();
+      if (BatteryOptimizationService.isAggressiveManufacturer(manufacturer)) {
+        final prefs = await SharedPreferences.getInstance();
+        final bool optimizedSeen =
+            prefs.getBool('battery_optimization_seen') ?? false;
+
+        if (!optimizedSeen && mounted) {
+          ManufacturerOptimizationDialog.show(context, manufacturer);
+          prefs.setBool('battery_optimization_seen', true);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking manufacturer optimization: $e');
+    }
+    */
   }
 
   @override
@@ -355,7 +410,7 @@ class _LoginScreenContentState extends State<_LoginScreenContent>
     return Scaffold(
       backgroundColor: AppColors.background,
       extendBodyBehindAppBar: true,
-      appBar: LoginAppBar(onSync: _handleSync),
+      appBar: LoginAppBar(onSync: _handleSync, syncKey: _threeDotsKey),
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnimation,
@@ -384,6 +439,7 @@ class _LoginScreenContentState extends State<_LoginScreenContent>
                           formKey: _formKey,
                           viewModel: viewModel,
                           onSubmit: _handleLogin,
+                          loginButtonKey: _loginButtonKey,
                         ),
                         if (viewModel.biometricAvailable) ...[
                           const SizedBox(height: 24),

@@ -148,7 +148,9 @@ class _ErrorLogScreenState extends State<ErrorLogScreen> {
     );
 
     try {
-      final resultado = await ErrorLogService.enviarErrorLogsAlServidor();
+      final resultado = await ErrorLogService.enviarErrorLogsAlServidor(
+        force: true,
+      );
 
       if (!mounted) return;
       Navigator.pop(context);
@@ -177,6 +179,26 @@ class _ErrorLogScreenState extends State<ErrorLogScreen> {
     }
   }
 
+  Future<void> _retryIndividualLog(String id) async {
+    setState(() => _isLoading = true);
+    try {
+      final success = await ErrorLogService.enviarErrorLogPorId(id);
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success ? 'Log enviado exitosamente' : 'Error al enviar log',
+          ),
+          backgroundColor: success ? Colors.green : Colors.red,
+        ),
+      );
+      await _loadLogs();
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final noMigrados = _countNoMigrados();
@@ -184,21 +206,28 @@ class _ErrorLogScreenState extends State<ErrorLogScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Registro de Errores'),
+            const Flexible(
+              child: Text(
+                'Registro de Errores',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             if (noMigrados > 0) ...[
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: Colors.orange,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '$noMigrados no migrado${noMigrados > 1 ? "s" : ""}',
+                  '$noMigrados pend.',
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.bold,
+                    color: Colors.black,
                   ),
                 ),
               ),
@@ -214,43 +243,6 @@ class _ErrorLogScreenState extends State<ErrorLogScreen> {
               onPressed: _retryPendingLogs,
               tooltip: 'Reintentar Envío',
             ),
-          IconButton(
-            icon: const Icon(Icons.delete_sweep),
-            onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Limpiar Registros'),
-                  content: const Text(
-                    '¿Estás seguro de borrar todos los registros de error?',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Cancelar'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Borrar'),
-                    ),
-                  ],
-                ),
-              );
-
-              if (confirm == true) {
-                await ErrorLogService.limpiarLogsAntiguos(
-                  diasAntiguedad: 0,
-                ); // 0 = borrar todo
-                _loadLogs();
-              }
-            },
-            tooltip: 'Limpiar Todo',
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadLogs,
-            tooltip: 'Actualizar',
-          ),
         ],
       ),
       body: _isLoading
@@ -397,6 +389,22 @@ class _ErrorLogScreenState extends State<ErrorLogScreen> {
                                 ),
                               ),
                             ],
+                            const Divider(),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                if (sincronizado == 0)
+                                  TextButton.icon(
+                                    onPressed: () =>
+                                        _retryIndividualLog(log['id']),
+                                    icon: const Icon(Icons.send),
+                                    label: const Text('Reintentar'),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.orange,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ],
                         ),
                       ),

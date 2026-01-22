@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class BatteryOptimizationService {
   static const MethodChannel _channel = MethodChannel('battery_optimization');
@@ -86,6 +87,32 @@ class BatteryOptimizationService {
       print('Error verificando permisos de background: $e');
       return false;
     }
+  }
+
+  /// Obtiene el fabricante del dispositivo
+  static Future<String> getDeviceManufacturer() async {
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      final androidInfo = await deviceInfo.androidInfo;
+      return androidInfo.manufacturer.toUpperCase();
+    } catch (e) {
+      print('Error obteniendo fabricante: $e');
+      return 'UNKNOWN';
+    }
+  }
+
+  /// Verifica si el fabricante es conocido por tener gestión de energía agresiva
+  static bool isAggressiveManufacturer(String manufacturer) {
+    final aggressiveBrands = [
+      'HONOR',
+      'XIAOMI',
+      'HUAWEI',
+      'REALME',
+      'OPPO',
+      'VIVO',
+      'SAMSUNG',
+    ];
+    return aggressiveBrands.contains(manufacturer.toUpperCase());
   }
 }
 

@@ -13,7 +13,6 @@ import 'censo_log_service.dart';
 class CensoUploadService {
   final CensoActivoRepository censoActivoRepository;
   final CensoActivoFotoRepository _fotoRepository;
-  final CensoLogService _logService;
   final EquipoPendienteRepository _equipoPendienteRepository;
   final EquipoRepository _equipoRepository;
 
@@ -36,7 +35,6 @@ class CensoUploadService {
   }) : censoActivoRepository =
            estadoEquipoRepository ?? CensoActivoRepository(),
        _fotoRepository = fotoRepository ?? CensoActivoFotoRepository(),
-       _logService = logService ?? CensoLogService(),
        _equipoPendienteRepository =
            equipoPendienteRepository ?? EquipoPendienteRepository(),
        _equipoRepository = equipoRepository ?? EquipoRepository();
