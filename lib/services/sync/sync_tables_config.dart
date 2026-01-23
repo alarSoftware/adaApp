@@ -76,8 +76,8 @@ class SyncTablesConfig {
         tableName: 'dynamic_form_response',
         displayName: 'Formularios',
         description: 'Respuestas de formularios completados',
-        whereClause: 'sync_status = ?',
-        whereArgs: ['pending'],
+        whereClause: 'sync_status IN (?, ?)',
+        whereArgs: ['pending', 'error'],
         syncFunction: _syncFormularios,
       ),
 

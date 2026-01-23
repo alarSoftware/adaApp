@@ -4,9 +4,11 @@ import 'package:intl/intl.dart';
 import 'package:ada_app/viewmodels/pending_data_viewmodel.dart';
 import 'package:ada_app/ui/screens/pantallaPendientesMigrado/censos_pendientes_detail_screen.dart';
 import 'package:ada_app/ui/screens/pantallaPendientesMigrado/operaciones_pendientes_detail_screen.dart';
+import 'package:ada_app/ui/screens/pantallaPendientesMigrado/dynamic_forms_pendientes_detail_screen.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 
 class PendingDataScreen extends StatefulWidget {
+  // ... existing code ...
   static const String routeName = '/pending-data';
 
   const PendingDataScreen({super.key});
@@ -324,6 +326,8 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
             _navigateToCensosDetail(group);
           } else if (group.type == PendingDataType.operations) {
             _navigateToOperacionesDetail(group);
+          } else if (group.type == PendingDataType.forms) {
+            _navigateToFormsDetail(group);
           }
         },
         borderRadius: BorderRadius.circular(12),
@@ -401,6 +405,21 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
       MaterialPageRoute(
         builder: (context) =>
             CensosPendientesDetailScreen(viewModel: _viewModel, group: group),
+      ),
+    ).then((_) {
+      // Recargar cuando regrese de la pantalla de detalle
+      _viewModel.refresh();
+    });
+  }
+
+  void _navigateToFormsDetail(PendingDataGroup group) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DynamicFormsPendientesDetailScreen(
+          viewModel: _viewModel,
+          group: group,
+        ),
       ),
     ).then((_) {
       // Recargar cuando regrese de la pantalla de detalle
