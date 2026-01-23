@@ -503,6 +503,31 @@ class EquipoRepository extends BaseRepository<Equipo> {
     return result;
   }
 
+  /// Recuperar equipo con nombres de marcas/modelos
+  Future<Map<String, dynamic>?> obtenerEquipoCompletoPorId(
+    String equipoId,
+  ) async {
+    try {
+      final sql = '''
+        SELECT e.*, 
+               m.nombre as marca_nombre, 
+               mo.nombre as modelo_nombre, 
+               l.nombre as logo_nombre
+        FROM equipos e
+        LEFT JOIN marcas m ON e.marca_id = m.id
+        LEFT JOIN modelos mo ON e.modelo_id = mo.id
+        LEFT JOIN logo l ON e.logo_id = l.id
+        WHERE e.id = ?
+        LIMIT 1
+      ''';
+
+      final results = await dbHelper.consultarPersonalizada(sql, [equipoId]);
+      return results.isNotEmpty ? results.first : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> obtenerMarcas() async =>
       dbHelper.consultar('marcas', orderBy: 'nombre ASC');
   Future<List<Map<String, dynamic>>> obtenerModelos() async =>

@@ -412,7 +412,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
               }
 
               if (widget.datos['es_historial'] == true) {
-                _volverDesdeHistorial();
+                if (widget.datos['es_historial_global'] == true) {
+                  Navigator.of(context).pop();
+                } else {
+                  _volverDesdeHistorial();
+                }
               } else {
                 Navigator.of(context).pop();
               }
