@@ -2,13 +2,13 @@ import 'dart:convert';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 
 import 'package:ada_app/services/api/api_config_service.dart';
 import 'package:ada_app/config/app_config.dart';
 
 import '../../config/constants/server_response.dart';
 import '../censo/censo_upload_service.dart';
+import 'package:ada_app/services/network/monitored_http_client.dart';
 
 /// Formatea DateTime sin 'T' ni 'Z' para el backend
 /// Formato: "yyyy-MM-dd HH:mm:ss.SSSSSS"
@@ -99,17 +99,16 @@ class CensoActivoPostService {
       final jsonBody = jsonEncode(payloadUnificado);
       debugPrint('DEBUG CENSO TIMESTAMP - Payload: $jsonBody');
 
-      final response = await http
-          .post(
-            Uri.parse(fullUrl),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'ngrok-skip-browser-warning': 'true',
-            },
-            body: jsonBody,
-          )
-          .timeout(Duration(seconds: timeoutSegundos));
+      final response = await MonitoredHttpClient.post(
+        url: Uri.parse(fullUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: jsonBody,
+        timeout: Duration(seconds: timeoutSegundos),
+      );
 
       ServerResponse resultObject = ServerResponse.fromHttp(response);
 

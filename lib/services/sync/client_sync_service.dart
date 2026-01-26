@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:http/http.dart' as http;
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/repositories/cliente_repository.dart';
 import 'package:ada_app/services/sync/user_sync_service.dart';
 import 'package:ada_app/models/cliente.dart';
+import 'package:ada_app/services/network/monitored_http_client.dart';
 
 class ClientSyncService {
   static final _clienteRepo = ClienteRepository();
@@ -38,9 +38,11 @@ class ClientSyncService {
       final url = await _getClientesUrl(employeeId);
       currentEndpoint = url;
 
-      final response = await http
-          .get(Uri.parse(url), headers: BaseSyncService.headers)
-          .timeout(BaseSyncService.timeout);
+      final response = await MonitoredHttpClient.get(
+        url: Uri.parse(url),
+        headers: BaseSyncService.headers,
+        timeout: BaseSyncService.timeout,
+      );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final List<dynamic> clientesData = BaseSyncService.parseResponse(

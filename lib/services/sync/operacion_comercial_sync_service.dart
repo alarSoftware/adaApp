@@ -6,6 +6,7 @@ import 'dart:convert';
 
 import 'dart:isolate';
 import 'package:http/http.dart' as http;
+import 'package:ada_app/services/network/monitored_http_client.dart';
 
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
@@ -214,9 +215,11 @@ class OperacionComercialSyncService extends BaseSyncService {
       '$baseUrl$endpoint',
     ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
-    return await http
-        .get(uri, headers: BaseSyncService.headers)
-        .timeout(BaseSyncService.timeout);
+    return await MonitoredHttpClient.get(
+      url: uri,
+      headers: BaseSyncService.headers,
+      timeout: BaseSyncService.timeout,
+    );
   }
 
   static bool _isSuccessStatusCode(int statusCode) {

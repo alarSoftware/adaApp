@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
-import 'package:http/http.dart' as http;
+
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
+import 'package:ada_app/services/network/monitored_http_client.dart';
 
 class UserSyncService {
   static final _dbHelper = DatabaseHelper();
@@ -17,9 +18,11 @@ class UserSyncService {
       final baseUrl = await BaseSyncService.getBaseUrl();
       currentEndpoint = '$baseUrl/api/getUsers';
 
-      final response = await http
-          .get(Uri.parse(currentEndpoint), headers: BaseSyncService.headers)
-          .timeout(BaseSyncService.timeout);
+      final response = await MonitoredHttpClient.get(
+        url: Uri.parse(currentEndpoint),
+        headers: BaseSyncService.headers,
+        timeout: BaseSyncService.timeout,
+      );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final responseData = jsonDecode(response.body);

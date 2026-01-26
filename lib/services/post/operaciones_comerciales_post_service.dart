@@ -5,10 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:ada_app/config/constants/server_response.dart';
 
 import 'package:ada_app/repositories/producto_repository.dart';
-import 'package:http/http.dart' as http;
 
 import 'package:ada_app/services/api/api_config_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
+import 'package:ada_app/services/network/monitored_http_client.dart';
 
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
@@ -59,17 +59,16 @@ class OperacionesComercialesPostService {
       final jsonBody = jsonEncode(payload);
       debugPrint('DEBUG OPERACION TIMESTAMP - Payload: $jsonBody');
 
-      final response = await http
-          .post(
-            Uri.parse(fullUrl),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'ngrok-skip-browser-warning': 'true',
-            },
-            body: jsonBody,
-          )
-          .timeout(Duration(seconds: timeoutSegundos));
+      final response = await MonitoredHttpClient.post(
+        url: Uri.parse(fullUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: jsonBody,
+        timeout: Duration(seconds: timeoutSegundos),
+      );
 
       ServerResponse resultObject = ServerResponse.fromHttp(response);
 

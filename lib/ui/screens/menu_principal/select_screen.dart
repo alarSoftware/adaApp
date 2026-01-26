@@ -24,6 +24,7 @@ import 'package:ada_app/ui/screens/menu_principal/productos_screen.dart';
 import 'package:ada_app/ui/screens/menu_principal/about_screen.dart';
 import 'package:ada_app/config/app_config.dart';
 import 'package:ada_app/ui/screens/error_log_screen.dart';
+import 'package:ada_app/ui/screens/settings/data_usage_screen.dart';
 
 import 'package:ada_app/services/device/location_service.dart';
 
@@ -1242,6 +1243,19 @@ class _SelectScreenState extends State<SelectScreen>
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const ErrorLogScreen()),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.data_usage,
+                  label: 'Consumo de Datos',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const DataUsageScreen(),
+                      ),
                     );
                   },
                 ),
