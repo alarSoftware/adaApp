@@ -22,8 +22,10 @@ class OperacionComercialSyncService extends BaseSyncService {
   static const String _tableName = 'operacion_comercial';
   static const int maxIntentos = 10;
   static const Duration intervaloTimer = Duration(minutes: 1);
+  static const Duration intervaloOdooName = Duration(minutes: 30);
 
   static Timer? _syncTimer;
+  static Timer? _odooNameTimer;
   static bool _syncActivo = false;
   static bool _syncEnProgreso = false;
   static int? _usuarioActual;
@@ -702,6 +704,13 @@ class OperacionComercialSyncService extends BaseSyncService {
       await _ejecutarSincronizacionAutomatica();
     });
 
+    // Timer independiente para OdooName (cada 30 min)
+    _odooNameTimer = Timer.periodic(intervaloOdooName, (timer) async {
+      if (!_syncActivo || _usuarioActual == null) return;
+      final service = OperacionComercialSyncService();
+      await service.sincronizarOdooNamesPendientes();
+    });
+
     Timer(const Duration(seconds: 15), () async {
       await _ejecutarSincronizacionAutomatica();
     });
@@ -711,10 +720,14 @@ class OperacionComercialSyncService extends BaseSyncService {
     if (_syncTimer != null) {
       _syncTimer!.cancel();
       _syncTimer = null;
-      _syncActivo = false;
-      _syncEnProgreso = false;
-      _usuarioActual = null;
     }
+    if (_odooNameTimer != null) {
+      _odooNameTimer!.cancel();
+      _odooNameTimer = null;
+    }
+    _syncActivo = false;
+    _syncEnProgreso = false;
+    _usuarioActual = null;
   }
 
   static Future<void> _ejecutarSincronizacionAutomatica() async {
@@ -731,8 +744,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       final service = OperacionComercialSyncService();
       await service.sincronizarOperacionesPendientes(_usuarioActual!);
 
-      // Sincronizar Odoo Names pendientes
-      await service.sincronizarOdooNamesPendientes();
+      // OdooName se sincroniza en su propio timer independiente
     } catch (e) {
     } finally {
       _syncEnProgreso = false;
@@ -796,8 +808,4 @@ class OperacionComercialSyncService extends BaseSyncService {
       debugPrint('🔥 [OdooName Sync] Error general en el proceso: $e');
     }
   }
-
-  static bool get esSincronizacionActiva => _syncActivo;
-  static bool get estaEnProgreso => _syncEnProgreso;
-  static int? get usuarioActual => _usuarioActual;
 }

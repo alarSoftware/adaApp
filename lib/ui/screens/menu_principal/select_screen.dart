@@ -292,6 +292,40 @@ class _SelectScreenState extends State<SelectScreen>
   }
 
   Future<void> _handleLogout() async {
+    // 1. Mostrar confirmación simple
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.logout, color: AppColors.textPrimary),
+            SizedBox(width: 8),
+            Text('Cerrar Sesión'),
+          ],
+        ),
+        content: const Text(
+          '¿Estás seguro que deseas cerrar la sesión actual?',
+          style: TextStyle(fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Cerrar Sesión'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     try {
       showDialog(
         context: context,
@@ -308,7 +342,18 @@ class _SelectScreenState extends State<SelectScreen>
                   SizedBox(height: 16),
                   Text(
                     'Cerrando sesión...',
-                    style: TextStyle(color: AppColors.textPrimary),
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Enviando reporte final...',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
@@ -317,6 +362,7 @@ class _SelectScreenState extends State<SelectScreen>
         ),
       );
 
+      // AuthService.logout() ahora incluye el reporte a la API
       await AuthService().logout();
 
       if (mounted) Navigator.of(context).pop();
@@ -727,9 +773,10 @@ class _SelectScreenState extends State<SelectScreen>
   }
 
   Future<void> _handleSyncConfirmation() async {
-    final confirmar = await _mostrarDialogoSincronizacion();
-    if (confirmar == true) {
-      _viewModel.executeSync();
+    final result = await _mostrarDialogoSincronizacion();
+    if (result != null && result['confirm'] == true) {
+      final syncEquipments = result['syncEquipments'] as bool? ?? true;
+      _viewModel.executeSync(syncEquipments: syncEquipments);
     }
   }
 
@@ -740,83 +787,152 @@ class _SelectScreenState extends State<SelectScreen>
     }
   }
 
-  Future<bool?> _mostrarDialogoSincronizacion() async {
-    return showDialog<bool>(
+  Future<Map<String, dynamic>?> _mostrarDialogoSincronizacion() async {
+    bool descargarEquipos = false;
+
+    return showDialog<Map<String, dynamic>>(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppColors.surface,
-          title: Row(
-            children: [
-              Icon(Icons.sync, color: AppColors.neutral700),
-              SizedBox(width: 8),
-              Text(
-                'Sincronizar Datos',
-                style: TextStyle(color: AppColors.textPrimary),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: AppColors.surface,
+              title: Row(
+                children: [
+                  Icon(Icons.sync, color: AppColors.neutral700),
+                  SizedBox(width: 8),
+                  Text(
+                    'Sincronizar Datos',
+                    style: TextStyle(color: AppColors.textPrimary),
+                  ),
+                ],
               ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Esta acción descargará todos los datos del servidor:',
-                style: TextStyle(color: AppColors.textPrimary),
-              ),
-              SizedBox(height: 12),
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '• Clientes',
-                      style: TextStyle(color: AppColors.textSecondary),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Esta acción descargará todos los datos del servidor:',
+                    style: TextStyle(color: AppColors.textPrimary),
+                  ),
+                  SizedBox(height: 12),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
                     ),
-                    Text(
-                      '• Equipos',
-                      style: TextStyle(color: AppColors.textSecondary),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '• Clientes',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                        Text(
+                          '• Formularios',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                        // Opcional: mostrar visualmente si equipos se descargarán o no
+                        if (descargarEquipos)
+                          Text(
+                            '• Equipos (Se descargarán)',
+                            style: TextStyle(
+                              color: AppColors.success,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        else
+                          Text(
+                            '• NO SE DESCARGARÁN EQUIPOS',
+                            style: TextStyle(
+                              color: AppColors.error,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                      ],
                     ),
-                    Text(
-                      '• Formularios',
-                      style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                  SizedBox(height: 16),
+                  Row(
+                    children: [
+                      SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: Checkbox(
+                          value: descargarEquipos,
+                          activeColor: AppColors.success,
+                          side: WidgetStateBorderSide.resolveWith(
+                            (states) => BorderSide(
+                              width: 2.0,
+                              color: descargarEquipos
+                                  ? AppColors.success
+                                  : AppColors.error,
+                            ),
+                          ),
+                          onChanged: (bool? value) {
+                            setState(() {
+                              descargarEquipos = value ?? true;
+                            });
+                          },
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              descargarEquipos = !descargarEquipos;
+                            });
+                          },
+                          child: Text(
+                            'Descargar equipos',
+                            style: TextStyle(
+                              color: descargarEquipos
+                                  ? AppColors.textPrimary
+                                  : AppColors.error,
+                              fontSize: 14,
+                              fontWeight: descargarEquipos
+                                  ? FontWeight.normal
+                                  : FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'Los datos locales serán actualizados.',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
                     ),
-                  ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  child: Text(
+                    'Cancelar',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
                 ),
-              ),
-              SizedBox(height: 12),
-              Text(
-                'Los datos locales serán actualizados.',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                ElevatedButton(
+                  onPressed: () => Navigator.of(
+                    context,
+                  ).pop({'confirm': true, 'syncEquipments': descargarEquipos}),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.info,
+                    foregroundColor: AppColors.onPrimary,
+                  ),
+                  child: Text('Sincronizar Todo'),
                 ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(
-                'Cancelar',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.info,
-                foregroundColor: AppColors.onPrimary,
-              ),
-              child: Text('Sincronizar Todo'),
-            ),
-          ],
+              ],
+            );
+          },
         );
       },
     );

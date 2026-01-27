@@ -20,6 +20,7 @@ class FullSyncService {
     String? edfVendedorNombre,
     String? previousVendedorId,
     bool forceClear = false,
+    bool syncEquipments = true,
     required SyncProgressCallback onProgress,
   }) async {
     final completedSteps = <String>[];
@@ -87,6 +88,7 @@ class FullSyncService {
         );
 
         final syncResult = await SyncService.sincronizarTodosLosDatos(
+          syncEquipments: syncEquipments,
           onProgress: (progress, message) {
             // Mapeamos el progreso interno (0.0 - 1.0) al rango global (0.2 - 0.8)
             // Range = 0.6
