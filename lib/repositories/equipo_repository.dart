@@ -535,6 +535,18 @@ class EquipoRepository extends BaseRepository<Equipo> {
   Future<List<Map<String, dynamic>>> obtenerLogos() async =>
       dbHelper.consultar('logo', orderBy: 'nombre ASC');
 
+  Future<int> contarEquipos() async {
+    try {
+      final db = await dbHelper.database;
+      final result = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM $tableName',
+      );
+      return Sqflite.firstIntValue(result) ?? 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
   Future<Map<String, dynamic>> obtenerEstadisticas() async {
     final sql = '''
       SELECT 

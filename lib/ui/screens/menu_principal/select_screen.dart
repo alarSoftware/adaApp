@@ -110,7 +110,6 @@ class _SelectScreenState extends State<SelectScreen>
 
   Future<void> _checkPendingData() async {
     try {
-      debugPrint('🔍 [Badge] Verificando datos pendientes...');
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
 
@@ -121,14 +120,11 @@ class _SelectScreenState extends State<SelectScreen>
       );
 
       final cantidadCensos = censosPendientes.length;
-      debugPrint('📊 [Badge] Censos pendientes: $cantidadCensos');
 
       final validationService = DatabaseValidationService(db);
       final summary = await validationService.getPendingSyncSummary();
       final pendingByTable =
           summary['pending_by_table'] as List<dynamic>? ?? [];
-
-      debugPrint('📋 [Badge] Tablas con datos: ${pendingByTable.length}');
 
       final tablasExcluidas = {
         'censo_activo',
@@ -141,33 +137,19 @@ class _SelectScreenState extends State<SelectScreen>
         final tableName = item['table'] as String;
         final count = item['count'] as int;
         if (!tablasExcluidas.contains(tableName)) {
-          debugPrint('  ✅ $tableName: $count');
           otrosDatos += count;
-        } else {
-          debugPrint('  ⏭️ $tableName: $count (excluida)');
         }
       }
 
       final totalPendientes = cantidadCensos + otrosDatos;
-      debugPrint(
-        '🔢 [Badge] Total pendientes: $totalPendientes (censos: $cantidadCensos + otros: $otrosDatos)',
-      );
-      debugPrint('🔢 [Badge] Contador actual: $_pendingDataCount');
 
       if (mounted && _pendingDataCount != totalPendientes) {
-        debugPrint(
-          '✨ [Badge] Actualizando contador de $_pendingDataCount a $totalPendientes',
-        );
         setState(() {
           _pendingDataCount = totalPendientes;
         });
-      } else if (!mounted) {
-        debugPrint('⚠️ [Badge] Widget no montado - no se actualiza');
-      } else {
-        debugPrint('ℹ️ [Badge] Contador sin cambios');
       }
     } catch (e) {
-      debugPrint('❌ [Badge] Error checking pending data: $e');
+      // Silent fail
     }
   }
 
@@ -180,7 +162,7 @@ class _SelectScreenState extends State<SelectScreen>
         context,
       );
     } catch (e) {
-      debugPrint('Error checking battery optimization: $e');
+      // Silent fail
     }
   }
 
@@ -213,7 +195,7 @@ class _SelectScreenState extends State<SelectScreen>
         await Permission.notification.request();
       }
     } catch (e) {
-      debugPrint('Error checking notification permissions: $e');
+      // Silent fail
     }
   }
 
@@ -226,7 +208,7 @@ class _SelectScreenState extends State<SelectScreen>
         }
       }
     } catch (e) {
-      debugPrint('Error checking fake GPS: $e');
+      // Silent fail
     }
   }
 

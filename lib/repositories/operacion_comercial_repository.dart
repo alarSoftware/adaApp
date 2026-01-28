@@ -10,6 +10,7 @@ import 'package:sqflite/sqflite.dart';
 import 'base_repository.dart';
 
 import 'package:uuid/uuid.dart';
+import 'package:ada_app/services/events/operacion_event_service.dart';
 
 abstract class OperacionComercialRepository {
   Future<String> crearOperacion(OperacionComercial operacion);
@@ -155,6 +156,9 @@ class OperacionComercialRepositoryImpl
         }
       });
       await marcarPendienteSincronizacion(operacionId);
+
+      // Notificar creación
+      OperacionEventService().notificarCreacion(operacionId);
 
       try {
         final serverResponse =
@@ -316,6 +320,8 @@ class OperacionComercialRepositoryImpl
 
         await txn.delete(tableName, where: 'id = ?', whereArgs: [id]);
       });
+
+      OperacionEventService().notificarEliminacion(id);
     } catch (e) {
       rethrow;
     }
@@ -401,6 +407,8 @@ class OperacionComercialRepositoryImpl
         registroFailId: operacionId,
         tableName: tableName,
       );
+
+      OperacionEventService().notificarCambioEstado(operacionId, 'migrado');
     } catch (e) {
       rethrow;
     }
@@ -450,6 +458,8 @@ class OperacionComercialRepositoryImpl
         where: 'id = ?',
         whereArgs: [operacionId],
       );
+
+      OperacionEventService().notificarCambioEstado(operacionId, 'error');
     } catch (e) {
       rethrow;
     }
@@ -720,6 +730,8 @@ class OperacionComercialRepositoryImpl
         where: 'id = ?',
         whereArgs: [id],
       );
+
+      OperacionEventService().notificarActualizacion(id);
     } catch (e) {
       rethrow;
     }

@@ -179,12 +179,9 @@ class _OperacionesPendientesDetailScreenState
         [operacionId],
       );
 
-      // Parsear tipo de operación
-      final tipoOperacionStr = operacionData['tipo_operacion'] as String;
-      final tipoOperacion = TipoOperacion.values.firstWhere(
-        (t) => t.name == tipoOperacionStr,
-        orElse: () => TipoOperacion.notaRetiroDiscontinuos,
-      );
+      // Parsear tipo de operación usando el método correcto
+      final tipoOperacionStr = operacionData['tipo_operacion'] as String?;
+      final tipoOperacion = TipoOperacionExtension.fromString(tipoOperacionStr);
 
       // Construir OperacionComercial base usando fromMap
       final operacion = OperacionComercial.fromMap(operacionData);

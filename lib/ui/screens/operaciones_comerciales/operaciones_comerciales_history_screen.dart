@@ -520,12 +520,12 @@ class _HistoryViewState extends State<_HistoryView>
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {
+          onTap: () async {
             final vm = context.read<OperacionesComercialesHistoryViewModel>();
             final cliente = vm.getCliente(operacion.clienteId);
 
             if (cliente != null) {
-              Navigator.push(
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => OperacionComercialFormScreen(
@@ -536,6 +536,11 @@ class _HistoryViewState extends State<_HistoryView>
                   ),
                 ),
               );
+
+              // Recargar datos al regresar
+              if (context.mounted) {
+                vm.init();
+              }
             }
           },
           child: Padding(

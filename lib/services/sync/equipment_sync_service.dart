@@ -201,6 +201,25 @@ class EquipmentSyncService extends BaseSyncService {
   }
 
   static Future<SyncResult> sincronizarEquipos() async {
+    // Verificar si ya hay equipos en la base de datos
+    try {
+      final totalEquipos = await _equipoRepo.contarEquipos();
+      if (totalEquipos > 0) {
+        debugPrint(
+          '📦 Equipos ya existen en BD ($totalEquipos equipos). Saltando descarga para ahorrar datos.',
+        );
+        return SyncResult(
+          exito: true,
+          mensaje: 'Equipos ya sincronizados previamente ($totalEquipos)',
+          itemsSincronizados: totalEquipos,
+          totalEnAPI: totalEquipos,
+        );
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error verificando equipos existentes: $e');
+      // Continuar con la descarga en caso de error
+    }
+
     final baseUrl = await BaseSyncService.getBaseUrl();
     final endpoint = '$baseUrl/api/getEdfEquipos';
 
