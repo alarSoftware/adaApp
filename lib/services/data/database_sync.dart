@@ -24,6 +24,11 @@ class DatabaseSync {
     Database db,
     List<Map<String, dynamic>> usuariosMapas,
   ) async {
+    // PRIMERO: Limpiar TODA la tabla de rutas antes de sincronizar usuarios
+    await db.delete('app_routes');
+    print('Tabla app_routes limpiada completamente');
+
+    // SEGUNDO: Sincronizar usuarios
     await _sincronizarEntidades<Map<String, dynamic>>(
       db: db,
       tabla: 'Users',

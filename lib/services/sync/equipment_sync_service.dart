@@ -1,9 +1,10 @@
 import 'dart:convert';
+import 'package:ada_app/services/network/monitored_http_client.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 
 import 'dart:isolate';
-import 'package:http/http.dart' as http;
+
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
@@ -19,9 +20,11 @@ class EquipmentSyncService extends BaseSyncService {
     final endpoint = '$baseUrl/api/getEdfMarcas';
 
     try {
-      final response = await http
-          .get(Uri.parse(endpoint), headers: BaseSyncService.headers)
-          .timeout(BaseSyncService.timeout);
+      final response = await MonitoredHttpClient.get(
+        url: Uri.parse(endpoint),
+        headers: BaseSyncService.headers,
+        timeout: BaseSyncService.timeout,
+      );
 
       if (response.statusCode != 200) {
         final mensaje = BaseSyncService.extractErrorMessage(response);
@@ -83,9 +86,11 @@ class EquipmentSyncService extends BaseSyncService {
     final endpoint = '$baseUrl/api/getEdfModelos';
 
     try {
-      final response = await http
-          .get(Uri.parse(endpoint), headers: BaseSyncService.headers)
-          .timeout(BaseSyncService.timeout);
+      final response = await MonitoredHttpClient.get(
+        url: Uri.parse(endpoint),
+        headers: BaseSyncService.headers,
+        timeout: BaseSyncService.timeout,
+      );
 
       if (response.statusCode != 200) {
         return SyncResult(
@@ -144,9 +149,11 @@ class EquipmentSyncService extends BaseSyncService {
     final endpoint = '$baseUrl/api/getEdfLogos';
 
     try {
-      final response = await http
-          .get(Uri.parse(endpoint), headers: BaseSyncService.headers)
-          .timeout(BaseSyncService.timeout);
+      final response = await MonitoredHttpClient.get(
+        url: Uri.parse(endpoint),
+        headers: BaseSyncService.headers,
+        timeout: BaseSyncService.timeout,
+      );
 
       if (response.statusCode != 200) {
         return SyncResult(
@@ -194,6 +201,25 @@ class EquipmentSyncService extends BaseSyncService {
   }
 
   static Future<SyncResult> sincronizarEquipos() async {
+    // Verificar si ya hay equipos en la base de datos
+    try {
+      final totalEquipos = await _equipoRepo.contarEquipos();
+      if (totalEquipos > 0) {
+        debugPrint(
+          '📦 Equipos ya existen en BD ($totalEquipos equipos). Saltando descarga para ahorrar datos.',
+        );
+        return SyncResult(
+          exito: true,
+          mensaje: 'Equipos ya sincronizados previamente ($totalEquipos)',
+          itemsSincronizados: totalEquipos,
+          totalEnAPI: totalEquipos,
+        );
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error verificando equipos existentes: $e');
+      // Continuar con la descarga en caso de error
+    }
+
     final baseUrl = await BaseSyncService.getBaseUrl();
     final endpoint = '$baseUrl/api/getEdfEquipos';
 
@@ -201,9 +227,11 @@ class EquipmentSyncService extends BaseSyncService {
       debugPrint('INICIO DESCARGA: ${DateTime.now()}');
       final stopwatchDownload = Stopwatch()..start();
 
-      final response = await http
-          .get(Uri.parse(endpoint), headers: BaseSyncService.headers)
-          .timeout(const Duration(minutes: 5));
+      final response = await MonitoredHttpClient.get(
+        url: Uri.parse(endpoint),
+        headers: BaseSyncService.headers,
+        timeout: const Duration(minutes: 5),
+      );
 
       stopwatchDownload.stop();
       debugPrint(

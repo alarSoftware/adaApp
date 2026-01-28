@@ -8,6 +8,7 @@ class Usuario {
   final String username;
   final String password;
   final String fullname;
+  final String? sucursal;
 
   const Usuario({
     this.id,
@@ -17,6 +18,7 @@ class Usuario {
     required this.username,
     required this.password,
     required this.fullname,
+    this.sucursal,
   });
 
   // ========== FACTORY CONSTRUCTORS ==========
@@ -31,6 +33,7 @@ class Usuario {
       username: ParsingHelpers.parseString(map['username']) ?? '',
       password: ParsingHelpers.parseString(map['password']) ?? '',
       fullname: ParsingHelpers.parseString(map['fullname']) ?? '',
+      sucursal: ParsingHelpers.parseString(map['sucursal']),
     );
   }
 
@@ -48,6 +51,7 @@ class Usuario {
       username: ParsingHelpers.parseString(json['username']) ?? '',
       password: ParsingHelpers.parseString(json['password']) ?? '',
       fullname: ParsingHelpers.parseString(json['fullname']) ?? '',
+      sucursal: ParsingHelpers.parseString(json['sucursal']),
     );
   }
 
@@ -63,6 +67,7 @@ class Usuario {
       'username': username,
       'password': password,
       'fullname': fullname,
+      'sucursal': sucursal,
     };
   }
 
@@ -76,6 +81,7 @@ class Usuario {
       'username': username,
       'password': password,
       'fullname': fullname,
+      'sucursal': sucursal,
     };
   }
 
@@ -89,6 +95,7 @@ class Usuario {
     String? username,
     String? password,
     String? fullname,
+    String? sucursal,
   }) {
     return Usuario(
       id: id ?? this.id,
@@ -98,6 +105,7 @@ class Usuario {
       username: username ?? this.username,
       password: password ?? this.password,
       fullname: fullname ?? this.fullname,
+      sucursal: sucursal ?? this.sucursal,
     );
   }
 

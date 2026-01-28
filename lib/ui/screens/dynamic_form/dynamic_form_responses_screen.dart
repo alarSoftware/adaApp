@@ -92,11 +92,12 @@ class _DynamicFormResponsesScreenState
           onPressed: _navigateToFormList,
           tooltip: 'Nuevo Formulario',
         ),
-        IconButton(
-          icon: Icon(Icons.logout, color: AppColors.onPrimary),
-          onPressed: _handleLogout,
-          tooltip: 'Cerrar Sesión',
-        ),
+        if (widget.cliente == null)
+          IconButton(
+            icon: Icon(Icons.logout, color: AppColors.onPrimary),
+            onPressed: _handleLogout,
+            tooltip: 'Cerrar Sesión',
+          ),
       ],
     );
   }
@@ -156,7 +157,7 @@ class _DynamicFormResponsesScreenState
 
   Widget _buildClientInfo() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 16.0),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: ClientInfoCard(cliente: widget.cliente!),
     );
   }
@@ -471,9 +472,10 @@ class _DynamicFormResponsesScreenState
 
   Widget _buildEmptyView() {
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(32.0),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(

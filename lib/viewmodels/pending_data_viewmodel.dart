@@ -6,6 +6,7 @@ import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/sync/sync_service.dart';
 import 'package:ada_app/services/sync/sync_tables_config.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
+import 'package:ada_app/repositories/dynamic_form_response_repository.dart';
 
 import 'dart:async';
 
@@ -555,6 +556,8 @@ class PendingDataViewModel extends ChangeNotifier {
     }
   }
 
+  // ========== MÉTODOS PRIVADOS ==========
+
   /// Eliminar un censo manualmente
   Future<void> deleteCenso(String censoId) async {
     try {
@@ -571,7 +574,83 @@ class PendingDataViewModel extends ChangeNotifier {
     }
   }
 
-  // ========== MÉTODOS PRIVADOS ==========
+  /// Obtiene la lista de formularios dinámicos fallidos
+  Future<List<Map<String, dynamic>>> getFormulariosFallidos() async {
+    try {
+      final db = await _dbHelper.database;
+
+      // Join para obtener nombre del formulario y cliente si es necesario
+      final formularios = await db.rawQuery('''
+      SELECT 
+        dfr.*,
+        dfr.creation_date as fecha_creacion,
+        df.name as formulario_nombre,
+        c.nombre as cliente_nombre,
+        u.username as usuario_nombre
+      FROM dynamic_form_response dfr
+      LEFT JOIN dynamic_form df ON dfr.dynamic_form_id = df.id
+      LEFT JOIN clientes c ON dfr.contacto_id = c.id
+      LEFT JOIN Users u ON dfr.usuario_id = u.id
+      WHERE dfr.sync_status = 'error'
+      ORDER BY dfr.creation_date DESC
+    ''');
+
+      return formularios;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Obtiene los detalles (respuestas) de un formulario específico
+  Future<List<Map<String, dynamic>>> getFormDetails(String responseId) async {
+    try {
+      final db = await _dbHelper.database;
+
+      final detalles = await db.rawQuery(
+        '''
+        SELECT 
+          dfrd.*,
+          dfd.label as pregunta,
+          dfd.type as tipo_pregunta
+        FROM dynamic_form_response_detail dfrd
+        LEFT JOIN dynamic_form_detail dfd ON dfrd.dynamic_form_detail_id = dfd.id
+        WHERE dfrd.dynamic_form_response_id = ?
+        ORDER BY dfd.sequence ASC
+      ''',
+        [responseId],
+      );
+
+      return detalles;
+    } catch (e) {
+      // Si falla, devolvemos lista vacía para no romper la UI
+      debugPrint('Error obteniendo detalles del formulario: $e');
+      return [];
+    }
+  }
+
+  /// Eliminar una respuesta de formulario manualmente
+  Future<void> deleteDynamicFormResponse(String responseId) async {
+    try {
+      final repo = DynamicFormResponseRepository();
+      final success = await repo.delete(responseId);
+
+      if (!success) {
+        throw Exception(
+          'Error al eliminar el formulario (Repository retornó false)',
+        );
+      }
+
+      // Recargar datos para actualizar contadores
+      await loadPendingData();
+
+      _eventController.add(
+        ShowSuccessEvent('Respuesta eliminada correctamente'),
+      );
+    } catch (e) {
+      _eventController.add(ShowErrorEvent('Error eliminando respuesta: $e'));
+      rethrow;
+    }
+  }
 
   void _setLoading(bool loading) {
     _isLoading = loading;

@@ -361,7 +361,7 @@ class FormsScreenViewModel extends ChangeNotifier {
       _showSuccess('¡Equipo encontrado!');
     } else {
       _showWarning(
-        'Equipo encontrado pero no asignado al cliente, se censara como pendiente',
+        'Equipo encontrado pero no asignado al cliente, se censara como no asignado',
       );
     }
   }

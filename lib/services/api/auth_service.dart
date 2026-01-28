@@ -11,6 +11,10 @@ import 'package:ada_app/services/app_services.dart';
 import 'package:ada_app/services/device_log/device_log_background_extension.dart';
 import 'package:ada_app/services/background/app_background_service.dart';
 import 'package:ada_app/models/usuario.dart';
+import 'package:ada_app/utils/device_info_helper.dart';
+import 'package:ada_app/models/device_log.dart';
+import 'package:ada_app/services/post/device_log_post_service.dart';
+import 'package:ada_app/repositories/device_log_repository.dart';
 
 class SyncValidationResult {
   final bool requiereSincronizacion;
@@ -367,6 +371,10 @@ class AuthService {
 
   Future<void> logout() async {
     try {
+      // 1. Reportar logout a la API (Intento de "best effort")
+      await _reportLogout();
+
+      // 2. Detener servicios background
       try {
         await AppBackgroundService.stopService();
       } catch (e) {}
@@ -376,6 +384,62 @@ class AuthService {
       await prefs.remove(_keyCurrentUser);
       await prefs.remove(_keyCurrentUserRole);
     } catch (e) {}
+  }
+
+  /// Envía un DeviceLog final indicando el cierre de sesión
+  Future<void> _reportLogout() async {
+    try {
+      print('Reporting logout to API...');
+      final currentUser = await getCurrentUser();
+      if (currentUser == null) return;
+
+      final log = await DeviceInfoHelper.crearDeviceLog();
+
+      if (log != null) {
+        final parts = log.latitudLongitud.split(',');
+        double lat = 0.0;
+        double long = 0.0;
+        if (parts.length == 2) {
+          lat = double.tryParse(parts[0]) ?? 0.0;
+          long = double.tryParse(parts[1]) ?? 0.0;
+        }
+
+        // Guardar en BD local primero
+        final db = await _dbHelper.database;
+        final repository = DeviceLogRepository(db);
+
+        // Crear una instancia nueva con la marca [LOGOUT]
+        final logId = await repository.guardarLog(
+          id: log.id,
+          employeeId: log.employeeId,
+          latitud: lat,
+          longitud: long,
+          bateria: log.bateria,
+          modelo: '${log.modelo} [LOGOUT]',
+        );
+
+        // Recuperar el objeto completo desde la BD
+        final logParaEnviar = await repository.obtenerPorId(logId);
+
+        if (logParaEnviar != null) {
+          final resultado = await DeviceLogPostService.enviarDeviceLog(
+            logParaEnviar,
+            userId: currentUser.id.toString(),
+          );
+
+          if (resultado['exito'] == true) {
+            await repository.marcarComoSincronizado(logId);
+            print('Logout report sent and synced successfully');
+          } else {
+            print(
+              'Logout report saved locally but failed to send: ${resultado['mensaje']}',
+            );
+          }
+        }
+      }
+    } catch (e) {
+      print('Error reporting logout: $e');
+    }
   }
 
   Future<void> clearAllData() async {

@@ -222,11 +222,12 @@ class ErrorLogService {
 
   static Future<SyncErrorLogsResult> enviarErrorLogsAlServidor({
     int limit = 50,
+    bool force = false,
   }) async {
     try {
-      debugPrint('Iniciando envío de error logs pendientes...');
+      debugPrint('Iniciando envío de error logs pendientes (force: $force)...');
 
-      final errores = await _getErrorsReadyForRetry(limit: limit);
+      final errores = await _getErrorsReadyForRetry(limit: limit, force: force);
 
       if (errores.isEmpty) {
         debugPrint('No hay error logs pendientes para enviar');
@@ -281,6 +282,7 @@ class ErrorLogService {
 
   static Future<List<Map<String, dynamic>>> _getErrorsReadyForRetry({
     required int limit,
+    bool force = false,
   }) async {
     try {
       final dbHelper = DatabaseHelper();
@@ -290,10 +292,11 @@ class ErrorLogService {
 
       final result = await db.query(
         'error_log',
-        where:
-            'next_retry_at <= ? AND error_type != ? AND (sincronizado IS NULL OR sincronizado = 0)',
-        whereArgs: [now, 'resuelto'],
-        orderBy: 'next_retry_at ASC',
+        where: force
+            ? '(error_status IS NULL OR error_status != ?) AND (sincronizado IS NULL OR sincronizado = 0)'
+            : 'next_retry_at <= ? AND (error_status IS NULL OR error_status != ?) AND (sincronizado IS NULL OR sincronizado = 0)',
+        whereArgs: force ? ['resuelto'] : [now, 'resuelto'],
+        orderBy: force ? 'timestamp DESC' : 'next_retry_at ASC',
         limit: limit,
       );
 
@@ -432,12 +435,12 @@ class ErrorLogService {
       final updated = await db.update(
         'error_log',
         {
-          'error_status': 'done',
+          'error_status': 'resuelto',
           'next_retry_at': null,
           'last_retry_at': DateTime.now().toIso8601String(),
         },
         where: 'registro_fail_id = ? AND table_name = ? AND error_status != ?',
-        whereArgs: [registroFailId, tableName, 'done'],
+        whereArgs: [registroFailId, tableName, 'resuelto'],
       );
 
       if (updated > 0) {
@@ -450,6 +453,36 @@ class ErrorLogService {
     }
   }
 
+  static Future<bool> enviarErrorLogPorId(String id) async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final db = await dbHelper.database;
+
+      final result = await db.query(
+        'error_log',
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+
+      if (result.isEmpty) return false;
+
+      final error = result.first;
+      final enviado = await _enviarErrorLogIndividual(error);
+
+      if (enviado) {
+        await _marcarErrorsComoEnviados([id]);
+        return true;
+      } else {
+        await _actualizarParaReintento(error);
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Error enviando log individual: $e');
+      return false;
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> getAllErrors({int? limit}) async {
     try {
       final dbHelper = DatabaseHelper();
@@ -457,7 +490,8 @@ class ErrorLogService {
 
       final result = await db.query(
         'error_log',
-        where: 'error_type != ? AND (sincronizado IS NULL OR sincronizado = 0)',
+        where:
+            'error_status != ? AND (sincronizado IS NULL OR sincronizado = 0)',
         whereArgs: ['resuelto'],
         orderBy: 'timestamp DESC',
         limit: limit ?? 100,

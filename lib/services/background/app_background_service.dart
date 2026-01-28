@@ -31,7 +31,8 @@ void onStart(ServiceInstance service) async {
     'ada_background_service', // id (must match internal config)
     'AdaApp Service', // title
     description: 'Servicio de monitoreo en segundo plano',
-    importance: Importance.low, // Low para no molestar con sonido constante
+    importance:
+        Importance.high, // Cambiado de low a high para mayor persistencia
     showBadge: false,
     playSound: false,
   );
@@ -116,8 +117,8 @@ void onStart(ServiceInstance service) async {
     onGpsAlert: showGpsNotification,
   );
 
-  // Watchdog & Notification Update Loop
-  Timer.periodic(const Duration(seconds: 30), (timer) async {
+  // Watchdog & Notification Update Loop (Más frecuente para evitar Doze Mode profundo)
+  Timer.periodic(const Duration(seconds: 20), (timer) async {
     try {
       if (service is AndroidServiceInstance) {
         if (await service.isForegroundService()) {
@@ -125,18 +126,18 @@ void onStart(ServiceInstance service) async {
           flutterLocalNotificationsPlugin.show(
             888, // Notification ID (Matches SDK config)
             'AdaApp Activa',
-            'Última actividad: ${DateTime.now().toString().split('.')[0]}',
+            'La app esta funcionando correctamente',
             NotificationDetails(
               android: AndroidNotificationDetails(
                 channel.id,
                 channel.name,
                 channelDescription: channel.description,
-                icon: '@mipmap/ic_launcher', // Icono de la app
-                ongoing: true, // 🔒 FIJA (No swipeable en Android <14)
+                icon: '@mipmap/ic_launcher',
+                ongoing: true,
                 autoCancel: false,
                 onlyAlertOnce: true,
-                importance: Importance.low,
-                priority: Priority.low,
+                importance: Importance.high,
+                priority: Priority.high,
                 showWhen: true,
               ),
             ),
@@ -144,17 +145,22 @@ void onStart(ServiceInstance service) async {
         }
       }
 
-      // Check Watchdog
-      if (!DeviceLogBackgroundExtension.estaActivo) {
-        print('Watchdog: Timer de logs inactivo. Reinicializando...');
+      // Check Watchdog - Si la extensión se durmió, la forzamos a despertar
+      bool extensionActiva = DeviceLogBackgroundExtension.estaActivo;
+
+      if (!extensionActiva) {
+        print('Watchdog: Extensión inactiva detectada. Reinicializando...');
         await DeviceLogBackgroundExtension.inicializar(
           verificarSesion: true,
           serviceInstance: service,
           onGpsAlert: showGpsNotification,
         );
+      } else {
+        // PING: Ejecutar una verificación rápida de horario para mantener el proceso "caliente"
+        DeviceLogBackgroundExtension.estaEnHorarioTrabajo();
       }
     } catch (e) {
-      print("Error en ciclo principal de background: $e");
+      print("Error en ciclo principal de watchdog: $e");
     }
   });
 }

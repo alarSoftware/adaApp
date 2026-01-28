@@ -139,7 +139,7 @@ class _OperacionesComercialesMenuViewState
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: ClientInfoCard(cliente: widget.cliente),
             ),
             if (_availableTabs.length > 1) _buildTabBar(),
@@ -269,44 +269,34 @@ class _OperacionesComercialesMenuViewState
               const SizedBox(height: 16),
               if (_canCreateOperacion)
                 SizedBox(
-                  height: 54,
+                  height: 44,
                   child: ElevatedButton.icon(
                     onPressed: () =>
                         _navigateToCreateOperacion(tipoOperacion, viewModel),
-                    icon: const Icon(Icons.add_circle_outline_rounded),
+                    icon: const Icon(
+                      Icons.add_circle_outline_rounded,
+                      size: 20,
+                    ),
                     label: const Text(
                       'Nueva Solicitud',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: color,
                       foregroundColor: Colors.white,
-                      elevation: 4,
-                      shadowColor: color.withValues(alpha: 0.4),
+                      elevation: 2,
+                      shadowColor: color.withValues(alpha: 0.3),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      padding: EdgeInsets.symmetric(horizontal: 16),
                     ),
                   ),
                 ),
               if (_canCreateOperacion) const SizedBox(height: 24),
-              Row(
-                children: [
-                  Icon(Icons.history, size: 20, color: AppColors.textSecondary),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Historial Reciente',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
               const SizedBox(height: 12),
               Expanded(
                 child: _buildOperacionesList(viewModel, tipoOperacion, color),
@@ -349,9 +339,13 @@ class _OperacionesComercialesMenuViewState
     Color color,
     OperacionesComercialesMenuViewModel viewModel,
   ) {
-    final fechaStr = DateFormat(
+    final fechaCreacionStr = DateFormat(
       'dd/MM/yyyy HH:mm',
     ).format(operacion.fechaCreacion);
+
+    final isReposicion =
+        operacion.tipoOperacion == TipoOperacion.notaReposicion;
+    final fechaRetiroLabel = isReposicion ? 'Fecha Reposicion' : 'Fecha Retiro';
 
     return Container(
       decoration: BoxDecoration(
@@ -413,37 +407,88 @@ class _OperacionesComercialesMenuViewState
                           ),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(fechaStr),
+                      const SizedBox(height: 8),
+                      if (operacion.odooName != null &&
+                          operacion.odooName!.isNotEmpty)
+                        Text(
+                          'Odoo: ${operacion.odooName}',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      if (operacion.adaSequence != null &&
+                          operacion.adaSequence!.isNotEmpty)
+                        Text(
+                          'Seq: ${operacion.adaSequence}',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      if ((operacion.odooName == null ||
+                              operacion.odooName!.isEmpty) &&
+                          (operacion.adaSequence == null ||
+                              operacion.adaSequence!.isEmpty))
+                        Text(
+                          'Sin Identificadores',
+                          style: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontStyle: FontStyle.italic,
+                            fontSize: 12,
+                          ),
+                        ),
                     ],
                   ),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if (operacion.odooName != null &&
-                        operacion.odooName!.isNotEmpty)
+                    Text(
+                      'Creado:',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    Text(
+                      fechaCreacionStr,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (operacion.fechaRetiro != null) ...[
+                      const SizedBox(height: 8),
                       Text(
-                        'Odoo: ${operacion.odooName}',
+                        '$fechaRetiroLabel:',
                         style: TextStyle(
+                          fontSize: 10,
                           color: AppColors.textSecondary,
-                          fontSize: 11,
                         ),
                       ),
-                    if (operacion.adaSequence != null &&
-                        operacion.adaSequence!.isNotEmpty)
-                      Text(
-                        '${operacion.adaSequence}',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 11,
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            DateFormat(
+                              'dd/MM/yyyy',
+                            ).format(operacion.fechaRetiro!),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
-                    if ((operacion.odooName == null ||
-                            operacion.odooName!.isEmpty) &&
-                        (operacion.adaSequence == null ||
-                            operacion.adaSequence!.isEmpty)) ...[
-                      // Fallback or just empty if no data
                     ],
                   ],
                 ),

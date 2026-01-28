@@ -3,11 +3,12 @@ import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
-import 'package:http/http.dart' as http;
+
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/repositories/dynamic_form_repository.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
+import 'package:ada_app/services/network/monitored_http_client.dart';
 
 class DynamicFormSyncService extends BaseSyncService {
   static const String _getDynamicFormEndpoint = '/api/getDynamicForm';
@@ -98,9 +99,11 @@ class DynamicFormSyncService extends BaseSyncService {
       final baseUrl = await BaseSyncService.getBaseUrl();
       currentEndpoint = '$baseUrl/api/getFormularios/$formId';
 
-      final response = await http
-          .get(Uri.parse(currentEndpoint), headers: BaseSyncService.headers)
-          .timeout(BaseSyncService.timeout);
+      final response = await MonitoredHttpClient.get(
+        url: Uri.parse(currentEndpoint),
+        headers: BaseSyncService.headers,
+        timeout: BaseSyncService.timeout,
+      );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final responseData = jsonDecode(response.body);
@@ -203,9 +206,11 @@ class DynamicFormSyncService extends BaseSyncService {
       currentEndpoint =
           '$baseUrl$_getDynamicFormDetailEndpoint?dynamicFormId=$formId';
 
-      final response = await http
-          .get(Uri.parse(currentEndpoint), headers: BaseSyncService.headers)
-          .timeout(BaseSyncService.timeout);
+      final response = await MonitoredHttpClient.get(
+        url: Uri.parse(currentEndpoint),
+        headers: BaseSyncService.headers,
+        timeout: BaseSyncService.timeout,
+      );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final detallesData = await _parseListResponse(response.body);
@@ -327,9 +332,11 @@ class DynamicFormSyncService extends BaseSyncService {
       final uri = Uri.parse('$baseUrl$_getDynamicFormDetailEndpoint');
       currentEndpoint = uri.toString();
 
-      final response = await http
-          .get(uri, headers: BaseSyncService.headers)
-          .timeout(BaseSyncService.timeout);
+      final response = await MonitoredHttpClient.get(
+        url: uri,
+        headers: BaseSyncService.headers,
+        timeout: BaseSyncService.timeout,
+      );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final detallesData = await _parseListResponse(response.body);
@@ -473,9 +480,11 @@ class DynamicFormSyncService extends BaseSyncService {
       ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
       currentEndpoint = uri.toString();
 
-      final response = await http
-          .get(uri, headers: BaseSyncService.headers)
-          .timeout(BaseSyncService.timeout);
+      final response = await MonitoredHttpClient.get(
+        url: uri,
+        headers: BaseSyncService.headers,
+        timeout: BaseSyncService.timeout,
+      );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final responsesData = await _parseListResponse(response.body);
@@ -582,9 +591,11 @@ class DynamicFormSyncService extends BaseSyncService {
       ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
       currentEndpoint = uri.toString();
 
-      final response = await http
-          .get(uri, headers: BaseSyncService.headers)
-          .timeout(BaseSyncService.timeout);
+      final response = await MonitoredHttpClient.get(
+        url: uri,
+        headers: BaseSyncService.headers,
+        timeout: BaseSyncService.timeout,
+      );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final imagenesData = await _parseListResponse(response.body);
@@ -707,9 +718,11 @@ class DynamicFormSyncService extends BaseSyncService {
       ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
       currentEndpoint = uri.toString();
 
-      final response = await http
-          .get(uri, headers: BaseSyncService.headers)
-          .timeout(BaseSyncService.timeout);
+      final response = await MonitoredHttpClient.get(
+        url: uri,
+        headers: BaseSyncService.headers,
+        timeout: BaseSyncService.timeout,
+      );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return await _parseListResponse(response.body);
@@ -762,9 +775,11 @@ class DynamicFormSyncService extends BaseSyncService {
       final uriDetalles = Uri.parse('$baseUrl$_getDynamicFormDetailEndpoint');
       currentEndpoint = uriDetalles.toString();
 
-      final responseDetalles = await http
-          .get(uriDetalles, headers: BaseSyncService.headers)
-          .timeout(BaseSyncService.timeout);
+      final responseDetalles = await MonitoredHttpClient.get(
+        url: uriDetalles,
+        headers: BaseSyncService.headers,
+        timeout: BaseSyncService.timeout,
+      );
 
       if (responseDetalles.statusCode >= 200 &&
           responseDetalles.statusCode < 300) {

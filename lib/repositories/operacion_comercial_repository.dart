@@ -1,5 +1,4 @@
 // lib/repositories/operacion_comercial_repository.dart
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
@@ -11,6 +10,7 @@ import 'package:sqflite/sqflite.dart';
 import 'base_repository.dart';
 
 import 'package:uuid/uuid.dart';
+import 'package:ada_app/services/events/operacion_event_service.dart';
 
 abstract class OperacionComercialRepository {
   Future<String> crearOperacion(OperacionComercial operacion);
@@ -45,11 +45,22 @@ abstract class OperacionComercialRepository {
 
   Future<void> eliminarOperacionesPorCliente(int clienteId);
   Future<void> eliminarTodasLasOperaciones();
+
+  Future<List<OperacionComercial>> obtenerTodasLasOperaciones({
+    DateTime? fecha,
+  });
+
+  Future<List<OperacionComercial>> obtenerOperacionesSinOdooName();
+  Future<void> actualizarOdooName(String id, String odooName);
+
+  Future<Map<String, String>> obtenerNombresOdooMap(List<String> ids);
 }
 
 class OperacionComercialRepositoryImpl
     extends BaseRepository<OperacionComercial>
     implements OperacionComercialRepository {
+  // ... existing methods ...
+
   final Uuid _uuid = Uuid();
 
   @override
@@ -146,6 +157,9 @@ class OperacionComercialRepositoryImpl
       });
       await marcarPendienteSincronizacion(operacionId);
 
+      // Notificar creación
+      OperacionEventService().notificarCreacion(operacionId);
+
       try {
         final serverResponse =
             await OperacionesComercialesPostService.enviarOperacion(
@@ -159,23 +173,16 @@ class OperacionComercialRepositoryImpl
           debugPrint(
             'DEBUG: ResultJson received: ${serverResponse.resultJson}',
           );
-          try {
-            final jsonMap = jsonDecode(serverResponse.resultJson!);
-            odooName =
-                jsonMap['name'] as String? ?? jsonMap['odooName'] as String?;
+          final parsedData =
+              OperacionesComercialesPostService.parsearRespuestaJson(
+                serverResponse.resultJson,
+              );
+          odooName = parsedData['odooName'];
+          adaSequence = parsedData['adaSequence'];
 
-            // Intentar varias claves posibles para adaSequence
-            adaSequence =
-                jsonMap['sequence'] as String? ??
-                jsonMap['adaSequence'] as String? ??
-                jsonMap['ada_sequence'] as String?;
-
-            debugPrint(
-              'DEBUG: Parsed odooName: $odooName, adaSequence: $adaSequence',
-            );
-          } catch (e) {
-            debugPrint('DEBUG: Error parsing resultJson: $e');
-          }
+          debugPrint(
+            'DEBUG: Parsed odooName: $odooName, adaSequence: $adaSequence',
+          );
         }
 
         await marcarComoMigrado(
@@ -313,6 +320,8 @@ class OperacionComercialRepositoryImpl
 
         await txn.delete(tableName, where: 'id = ?', whereArgs: [id]);
       });
+
+      OperacionEventService().notificarEliminacion(id);
     } catch (e) {
       rethrow;
     }
@@ -398,6 +407,8 @@ class OperacionComercialRepositoryImpl
         registroFailId: operacionId,
         tableName: tableName,
       );
+
+      OperacionEventService().notificarCambioEstado(operacionId, 'migrado');
     } catch (e) {
       rethrow;
     }
@@ -447,6 +458,8 @@ class OperacionComercialRepositoryImpl
         where: 'id = ?',
         whereArgs: [operacionId],
       );
+
+      OperacionEventService().notificarCambioEstado(operacionId, 'error');
     } catch (e) {
       rethrow;
     }
@@ -622,5 +635,105 @@ class OperacionComercialRepositoryImpl
     }
 
     return false;
+  }
+
+  @override
+  Future<List<OperacionComercial>> obtenerTodasLasOperaciones({
+    DateTime? fecha,
+  }) async {
+    try {
+      String? whereClause;
+      List<dynamic> whereArgs = [];
+
+      if (fecha != null) {
+        // Filter by date (ignoring time)
+        final startOfDay = DateTime(fecha.year, fecha.month, fecha.day);
+        final endOfDay = startOfDay.add(const Duration(days: 1));
+
+        whereClause = 'fecha_creacion >= ? AND fecha_creacion < ?';
+        whereArgs = [startOfDay.toIso8601String(), endOfDay.toIso8601String()];
+      }
+
+      final operacionesMaps = await dbHelper.consultar(
+        tableName,
+        where: whereClause,
+        whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
+        orderBy: 'fecha_creacion DESC',
+      );
+
+      final operaciones = <OperacionComercial>[];
+
+      for (final operacionMap in operacionesMaps) {
+        final operacionId = operacionMap['id'];
+        final detalles = await _obtenerDetallesConCodigoBarras(operacionId);
+        final operacion = fromMap(operacionMap).copyWith(detalles: detalles);
+        operaciones.add(operacion);
+      }
+
+      return operaciones;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  @override
+  Future<List<OperacionComercial>> obtenerOperacionesSinOdooName() async {
+    try {
+      final operacionesMaps = await dbHelper.consultar(
+        tableName,
+        where:
+            '(odoo_name IS NULL OR odoo_name = "") AND ada_sequence IS NOT NULL',
+        limit: 20,
+      );
+
+      final operaciones = <OperacionComercial>[];
+      for (final operacionMap in operacionesMaps) {
+        operaciones.add(fromMap(operacionMap));
+      }
+      return operaciones;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  @override
+  Future<Map<String, String>> obtenerNombresOdooMap(List<String> ids) async {
+    if (ids.isEmpty) return {};
+    try {
+      // Usar parámetros dinámicos para el IN clause
+      final placeholders = List.filled(ids.length, '?').join(',');
+
+      // Usar query personalizada para ser más eficiente y seleccionar solo campos necesarios
+      final sql =
+          'SELECT id, odoo_name FROM $tableName WHERE id IN ($placeholders) AND odoo_name IS NOT NULL';
+      final resultados = await dbHelper.consultarPersonalizada(sql, ids);
+
+      final mapa = <String, String>{};
+      for (final fila in resultados) {
+        if (fila['id'] != null && fila['odoo_name'] != null) {
+          mapa[fila['id'] as String] = fila['odoo_name'] as String;
+        }
+      }
+      return mapa;
+    } catch (e) {
+      debugPrint('Error obteniendo mapa de odoo_names: $e');
+      return {};
+    }
+  }
+
+  @override
+  Future<void> actualizarOdooName(String id, String odooName) async {
+    try {
+      await dbHelper.actualizar(
+        tableName,
+        {'odoo_name': odooName},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+      OperacionEventService().notificarActualizacion(id);
+    } catch (e) {
+      rethrow;
+    }
   }
 }

@@ -80,6 +80,7 @@ class SyncService {
 
   static Future<SyncResultUnificado> sincronizarTodosLosDatos({
     Function(double progress, String message)? onProgress,
+    bool syncEquipments = true,
   }) async {
     final resultado = SyncResultUnificado();
 
@@ -152,12 +153,16 @@ class SyncService {
         );
       }
 
-      onProgress?.call(0.1, 'Sincronizando marcas...');
-      await EquipmentSyncService.sincronizarMarcas();
-      onProgress?.call(0.15, 'Sincronizando modelos...');
-      await EquipmentSyncService.sincronizarModelos();
-      onProgress?.call(0.2, 'Sincronizando logos...');
-      await EquipmentSyncService.sincronizarLogos();
+      if (syncEquipments) {
+        onProgress?.call(0.1, 'Sincronizando marcas...');
+        await EquipmentSyncService.sincronizarMarcas();
+        onProgress?.call(0.15, 'Sincronizando modelos...');
+        await EquipmentSyncService.sincronizarModelos();
+        onProgress?.call(0.2, 'Sincronizando logos...');
+        await EquipmentSyncService.sincronizarLogos();
+      } else {
+        onProgress?.call(0.1, 'Saltando sincronización de equipos...');
+      }
 
       try {
         onProgress?.call(0.25, 'Sincronizando clientes...');
@@ -184,19 +189,24 @@ class SyncService {
         );
       }
 
-      try {
-        onProgress?.call(0.35, 'Sincronizando equipos...');
-        final resultadoEquipos =
-            await EquipmentSyncService.sincronizarEquipos();
-        resultado.equiposSincronizados = resultadoEquipos.itemsSincronizados;
-        resultado.equiposExito = resultadoEquipos.exito;
+      if (syncEquipments) {
+        try {
+          onProgress?.call(0.35, 'Sincronizando equipos...');
+          final resultadoEquipos =
+              await EquipmentSyncService.sincronizarEquipos();
+          resultado.equiposSincronizados = resultadoEquipos.itemsSincronizados;
+          resultado.equiposExito = resultadoEquipos.exito;
 
-        if (!resultadoEquipos.exito) {
-          resultado.erroresEquipos = resultadoEquipos.mensaje;
+          if (!resultadoEquipos.exito) {
+            resultado.erroresEquipos = resultadoEquipos.mensaje;
+          }
+        } catch (e) {
+          resultado.equiposExito = false;
+          resultado.erroresEquipos = 'Error al sincronizar equipos: $e';
+          resultado.equiposSincronizados = 0;
         }
-      } catch (e) {
-        resultado.equiposExito = false;
-        resultado.erroresEquipos = 'Error al sincronizar equipos: $e';
+      } else {
+        resultado.equiposExito = true; // Consider success if skipped
         resultado.equiposSincronizados = 0;
       }
 

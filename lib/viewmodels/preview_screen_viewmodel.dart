@@ -373,6 +373,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
   }
 
   // Wrapper de instancia para compatibilidad si fuera necesario
+  //TODO Ronaldo borrar despues
   Future<String> _crearEquipoNuevo(
     Map<String, dynamic> datos,
     int? clienteId,
@@ -400,13 +401,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // Future<bool> _verificarAsignacionLocal(String equipoId, int clienteId) async {
-  //   return _verificarAsignacionLocalStatic(
-  //     equipoId,
-  //     clienteId,
-  //     _equipoRepository,
-  //   );
-  // }
 
   static Future<String?> _crearCensoLocalConUsuarioStatic({
     required String equipoId,
@@ -465,29 +459,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       rethrow;
     }
   }
-
-  // Wrapper instancia
-  // Future<String?> _crearCensoLocalConUsuario({
-  //   required String equipoId,
-  //   required int clienteId,
-  //   required int usuarioId,
-  //   required Map<String, dynamic> datos,
-  //   required String processId,
-  //   required bool yaAsignado,
-  //   required String employeeId,
-  // }) {
-  //   return _crearCensoLocalConUsuarioStatic(
-  //     equipoId: equipoId,
-  //     clienteId: clienteId,
-  //     usuarioId: usuarioId,
-  //     datos: datos,
-  //     processId: processId,
-  //     yaAsignado: yaAsignado,
-  //     employeeId: employeeId,
-  //     estadoEquipoRepo: _estadoEquipoRepository,
-  //       enLocal:enLocal
-  //   );
-  // }
 
   String formatearFecha(String? fechaIso) {
     if (fechaIso == null) return 'No disponible';

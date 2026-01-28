@@ -428,6 +428,7 @@ class SelectScreenViewModel extends ChangeNotifier {
     String? edfVendedorNombre,
     String? previousVendedorId,
     bool forceClear = false,
+    bool syncEquipments = true,
   }) async {
     _setSyncLoading(true);
     _resetSyncProgress();
@@ -438,6 +439,7 @@ class SelectScreenViewModel extends ChangeNotifier {
         edfVendedorNombre: edfVendedorNombre,
         previousVendedorId: previousVendedorId,
         forceClear: forceClear,
+        syncEquipments: syncEquipments,
         onProgress:
             ({
               required double progress,
@@ -544,7 +546,7 @@ class SelectScreenViewModel extends ChangeNotifier {
   }
 
   /// Ejecuta la sincronización opcional (después de confirmación)
-  Future<void> executeSync() async {
+  Future<void> executeSync({bool syncEquipments = true}) async {
     if (_currentUser == null) {
       _eventController.add(ShowErrorEvent('No hay usuario válido'));
       return;
@@ -566,6 +568,7 @@ class SelectScreenViewModel extends ChangeNotifier {
       edfVendedorNombre: nombreVendedor,
       previousVendedorId: null,
       forceClear: true,
+      syncEquipments: syncEquipments,
     );
   }
 

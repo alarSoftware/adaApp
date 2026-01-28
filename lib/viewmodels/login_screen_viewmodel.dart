@@ -636,26 +636,6 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> deleteUsersTable() async {
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      await _dbHelper.eliminar('Users');
-      _eventController.add(
-        ShowSuccessEvent(
-          'Tabla de usuarios eliminada correctamente',
-          Icons.delete_sweep,
-        ),
-      );
-    } catch (e) {
-      _eventController.add(ShowErrorEvent('Error al eliminar usuarios: $e'));
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
   Future<void> performDebugAdminLogin() async {
     _isLoading = true;
     notifyListeners();

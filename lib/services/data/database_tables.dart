@@ -6,6 +6,7 @@ class DatabaseTables {
 
     await _crearTablasMaestras(db);
     await _crearTablasPrincipales(db);
+    await _crearTablasMonitoreo(db);
     await _crearIndices(db);
 
     print('Todas las tablas e índices creados exitosamente');
@@ -13,7 +14,20 @@ class DatabaseTables {
 
   Future<void> onUpgrade(Database db, int oldVersion, int newVersion) async {
     print('Actualizando base de datos de v$oldVersion a v$newVersion');
-    // Aquí irían las migraciones futuras
+
+    if (oldVersion < 2) {
+      // Migración a v2: Agregar columna sucursal a Users y clientes
+      await db.execute('ALTER TABLE Users ADD COLUMN sucursal TEXT');
+      await db.execute('ALTER TABLE clientes ADD COLUMN sucursal TEXT');
+      print('Migración v2: Columna sucursal agregada a Users y clientes');
+    }
+
+    if (oldVersion < 3) {
+      // Migración a v3: Agregar tabla data_usage
+      await db.execute(_sqlDataUsage());
+      await _crearIndicesDataUsage(db);
+      print('Migración v3: Tabla data_usage creada');
+    }
   }
 
   Future<void> _crearTablasMaestras(Database db) async {
@@ -41,6 +55,10 @@ class DatabaseTables {
     await db.execute(_sqlOperacionComercial());
     await db.execute(_sqlOperacionComercialDetalle());
     await db.execute(_sqlAppRoutes());
+  }
+
+  Future<void> _crearTablasMonitoreo(Database db) async {
+    await db.execute(_sqlDataUsage());
   }
 
   String _sqlModelos() => '''
@@ -74,7 +92,8 @@ class DatabaseTables {
       ruc_ci TEXT,
       propietario TEXT,
       condicion_venta TEXT,
-      ruta_dia TEXT
+    ruta_dia TEXT,
+    sucursal TEXT
     )
   ''';
 
@@ -127,7 +146,8 @@ class DatabaseTables {
     code INTEGER,
     username TEXT NOT NULL,
     password TEXT NOT NULL,   
-    fullname TEXT NOT NULL
+    fullname TEXT NOT NULL,
+    sucursal TEXT
   )
 ''';
 
@@ -350,6 +370,21 @@ class DatabaseTables {
   )
 ''';
 
+  String _sqlDataUsage() => '''
+  CREATE TABLE data_usage (
+    id TEXT PRIMARY KEY,
+    timestamp TEXT NOT NULL,
+    operation_type TEXT NOT NULL,
+    endpoint TEXT NOT NULL,
+    bytes_sent INTEGER NOT NULL DEFAULT 0,
+    bytes_received INTEGER NOT NULL DEFAULT 0,
+    total_bytes INTEGER NOT NULL DEFAULT 0,
+    status_code INTEGER,
+    user_id TEXT,
+    error_message TEXT
+  )
+''';
+
   // ==================== ÍNDICES ====================
 
   Future<void> _crearIndices(Database db) async {
@@ -363,6 +398,7 @@ class DatabaseTables {
     await _crearIndicesErrorLog(db);
     await _crearIndicesOperacionesComerciales(db);
     await _crearIndicesAppRoutes(db);
+    await _crearIndicesDataUsage(db);
   }
 
   Future<void> _crearIndicesClientes(Database db) async {
@@ -516,6 +552,18 @@ class DatabaseTables {
     final indices = [
       'CREATE INDEX IF NOT EXISTS idx_app_routes_user_id ON app_routes (user_id)',
       'CREATE INDEX IF NOT EXISTS idx_app_routes_module_name ON app_routes (module_name)',
+    ];
+
+    for (final indice in indices) {
+      await db.execute(indice);
+    }
+  }
+
+  Future<void> _crearIndicesDataUsage(Database db) async {
+    final indices = [
+      'CREATE INDEX IF NOT EXISTS idx_data_usage_timestamp ON data_usage (timestamp)',
+      'CREATE INDEX IF NOT EXISTS idx_data_usage_operation_type ON data_usage (operation_type)',
+      'CREATE INDEX IF NOT EXISTS idx_data_usage_user_id ON data_usage (user_id)',
     ];
 
     for (final indice in indices) {

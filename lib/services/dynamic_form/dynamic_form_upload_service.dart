@@ -8,13 +8,13 @@ import 'package:ada_app/services/error_log/error_log_service.dart';
 
 class DynamicFormUploadService {
   final DynamicFormSyncRepository _syncRepository;
-  final DynamicFormLogService _logService;
+  // final DynamicFormLogService _logService;
 
   DynamicFormUploadService({
     DynamicFormSyncRepository? syncRepository,
     DynamicFormLogService? logService,
-  }) : _syncRepository = syncRepository ?? DynamicFormSyncRepository(),
-       _logService = logService ?? DynamicFormLogService();
+  }) : _syncRepository = syncRepository ?? DynamicFormSyncRepository();
+  // _logService = logService ?? DynamicFormLogService();
 
   /// Envía una respuesta de formulario al servidor
   Future<Map<String, dynamic>> enviarRespuestaAlServidor(
@@ -52,10 +52,12 @@ class DynamicFormUploadService {
         userId,
       );
 
-      final timestamp = DateTime.now().toIso8601String();
+      // final timestamp = DateTime.now().toIso8601String();
 
       // Guardar log si está habilitado
       if (guardarLog) {
+        // LOG DESHABILITADO POR SOLICITUD
+        /*
         await _logService.guardarLogPost(
           url: 'API_ENDPOINT',
           headers: {'Content-Type': 'application/json'},
@@ -63,6 +65,7 @@ class DynamicFormUploadService {
           timestamp: timestamp,
           responseId: responseId,
         );
+        */
       }
 
       // USAR DynamicFormPostService con userId

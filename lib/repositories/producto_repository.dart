@@ -63,18 +63,35 @@ class ProductoRepositoryImpl implements ProductoRepository {
 
     try {
       final db = await _dbHelper.database;
-      final searchLower = '%${searchTerm.toLowerCase()}%';
+      final term = searchTerm.toLowerCase();
+      // Patrones para las comparaciones
+      final exact = term;
+      final startWord = '$term %';
+      final midWord = '% $term %';
+      final endWord = '% $term';
+      final startsWith = '$term%';
+      final contains = '%$term%';
 
-      final List<Map<String, dynamic>> maps = await db.query(
-        'productos',
-        where: '''
-          (LOWER(codigo) LIKE ? OR 
-           LOWER(nombre) LIKE ? OR 
-           LOWER(codigo_barras) LIKE ?)
-        ''',
-        whereArgs: [searchLower, searchLower, searchLower],
-        orderBy: 'nombre ASC',
-        limit: 50,
+      // Usamos rawQuery para poder usar parámetros en el ORDER BY de forma segura
+      // y dar prioridad a las coincidencias más relevantes.
+      final List<Map<String, dynamic>> maps = await db.rawQuery(
+        '''
+        SELECT * FROM productos 
+        WHERE LOWER(codigo) LIKE ? OR LOWER(nombre) LIKE ? OR LOWER(codigo_barras) LIKE ?
+        ORDER BY 
+          CASE 
+            WHEN LOWER(nombre) = ? THEN 1
+            WHEN LOWER(nombre) LIKE ? OR LOWER(nombre) LIKE ? OR LOWER(nombre) LIKE ? THEN 2
+            WHEN LOWER(nombre) LIKE ? THEN 3
+            ELSE 4 
+          END,
+          nombre ASC
+        LIMIT 100
+      ''',
+        [
+          contains, contains, contains, // WHERE args
+          exact, startWord, midWord, endWord, startsWith, // ORDER BY args
+        ],
       );
 
       final productos = maps.map((map) => Producto.fromMap(map)).toList();

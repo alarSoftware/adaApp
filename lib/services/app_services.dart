@@ -2,6 +2,7 @@ import 'package:ada_app/services/device_log/device_log_background_extension.dart
 import 'package:ada_app/services/background/app_background_service.dart';
 
 import 'package:ada_app/services/device_log/device_log_upload_service.dart';
+import 'package:ada_app/services/sync/operacion_comercial_sync_service.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/models/usuario.dart';
 
@@ -73,6 +74,14 @@ class AppServices {
       // Sincronización de Formularios Dinámicos (cada 2 minutos)
       if (usuario.employeeId != null && usuario.employeeId!.isNotEmpty) {}
 
+      // Sincronización de Operaciones Comerciales
+      if (usuario.id != null) {
+        OperacionComercialSyncService.iniciarSincronizacionAutomatica(
+          usuario.id!,
+        );
+        print('  Operaciones Comerciales Sync: iniciado');
+      }
+
       // Sincronización de Device Logs (cada 10 minutos)
       // NOTA: Esto NO inicia el BackgroundExtension, solo sincroniza logs existentes
       DeviceLogUploadService.iniciarSincronizacionAutomatica();
@@ -112,7 +121,7 @@ class AppServices {
     try {
       // Detener Censos
       // CensoUploadService.detenerSincronizacionAutomatica();
-      // OperacionComercialSyncService.detenerSincronizacionAutomatica();
+      OperacionComercialSyncService.detenerSincronizacionAutomatica();
 
       // Detener Device Logs
       DeviceLogUploadService.detenerSincronizacionAutomatica();
@@ -139,6 +148,15 @@ class AppServices {
         await AppBackgroundService.initialize();
 
         print('Servicios básicos y background service inicializados');
+
+        // 🔴 CRITICAL FIX: Iniciar sincronizaciones automáticas si el usuario ya está logueado
+        final usuario = await _obtenerUsuarioActual();
+        if (usuario != null) {
+          await _iniciarSincronizacionesAutomaticas(usuario);
+          print(
+            'Sincronizaciones automáticas restauradas para usuario: ${usuario.username}',
+          );
+        }
       } else {
         print('Usuario no logueado - servicios no iniciados');
       }

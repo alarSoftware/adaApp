@@ -761,16 +761,16 @@ class _FormsScreenState extends State<FormsScreen> {
 
             _buildSingleImageField(
               imagen: _viewModel.imagenSeleccionada,
-              titulo: 'Foto',
+              titulo: 'Foto 1',
               onTomar: () => _viewModel.tomarFoto(esPrimeraFoto: true),
               onEliminar: () => _viewModel.eliminarImagen(esPrimeraFoto: true),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             _buildSingleImageField(
               imagen: _viewModel.imagenSeleccionada2,
-              titulo: 'Foto',
+              titulo: 'Foto 2',
               onTomar: () => _viewModel.tomarFoto(esPrimeraFoto: false),
               onEliminar: () => _viewModel.eliminarImagen(esPrimeraFoto: false),
             ),
@@ -786,89 +786,80 @@ class _FormsScreenState extends State<FormsScreen> {
     required VoidCallback onTomar,
     required VoidCallback onEliminar,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          titulo,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
-          ),
+    if (imagen != null) {
+      // Diseño compacto cuando hay imagen: miniatura horizontal
+      return Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.border),
         ),
-        const SizedBox(height: 8),
-        if (imagen != null)
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.file(
-                  imagen,
-                  height: 200,
-                  width: double.infinity,
-                  cacheHeight: 200, // Optimización de memoria
-                  fit: BoxFit.cover,
-                ),
+        child: Row(
+          children: [
+            // Miniatura de la imagen
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(8),
+                bottomLeft: Radius.circular(8),
               ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    onPressed: onEliminar,
-                  ),
-                ),
-              ),
-            ],
-          )
-        else
-          InkWell(
-            onTap: onTomar,
-            child: Container(
-              height: 150,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: AppColors.border,
-                  style: BorderStyle.solid,
-                  width: 2,
-                ),
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.add_a_photo,
-                      size: 48,
-                      color: AppColors.textSecondary,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Tomar foto',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
+              child: Image.file(
+                imagen,
+                height: 80,
+                width: 80,
+                cacheHeight: 80,
+                fit: BoxFit.cover,
               ),
             ),
-          ),
-      ],
-    );
+            const SizedBox(width: 12),
+            // Información
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    titulo,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Imagen capturada',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Botón eliminar
+            IconButton(
+              icon: Icon(Icons.close, color: AppColors.error, size: 20),
+              onPressed: onEliminar,
+              tooltip: 'Eliminar foto',
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+      );
+    } else {
+      // Diseño compacto cuando está vacío: botón simple
+      return OutlinedButton.icon(
+        onPressed: onTomar,
+        icon: const Icon(Icons.add_a_photo, size: 20),
+        label: Text(titulo),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          side: BorderSide(color: AppColors.border, width: 1.5),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          alignment: Alignment.centerLeft,
+        ),
+      );
+    }
   }
 
   Widget _buildObservacionesField() {

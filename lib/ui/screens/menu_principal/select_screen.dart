@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
-import 'package:ada_app/ui/widgets/debug_permissions_dialog.dart';
+// import 'package:ada_app/ui/widgets/debug_permissions_dialog.dart';
 import 'package:ada_app/ui/widgets/app_connection_indicator.dart';
 import 'package:ada_app/ui/screens/menu_principal/equipos_screen.dart';
 import 'package:ada_app/ui/screens/menu_principal/modelos_screen.dart';
@@ -22,13 +22,17 @@ import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/ui/screens/menu_principal/productos_screen.dart';
 import 'package:ada_app/ui/screens/menu_principal/about_screen.dart';
-import 'package:ada_app/ui/screens/device_log_screen.dart';
+import 'package:ada_app/config/app_config.dart';
 import 'package:ada_app/ui/screens/error_log_screen.dart';
-import 'package:ada_app/repositories/device_log_repository.dart'; // Needed for DeviceLogScreen
+import 'package:ada_app/ui/screens/settings/data_usage_screen.dart';
+
 import 'package:ada_app/services/device/location_service.dart';
-import 'package:ada_app/ui/screens/settings/work_hours_settings_screen.dart';
+
 import 'package:ada_app/services/navigation/navigation_guard_service.dart';
 import 'package:ada_app/services/navigation/route_constants.dart';
+import 'package:ada_app/ui/screens/operaciones_comerciales/operaciones_comerciales_history_screen.dart';
+import 'package:ada_app/ui/screens/settings/system_options_screen.dart';
+
 import 'dart:async';
 
 class SelectScreen extends StatefulWidget {
@@ -44,6 +48,7 @@ class _SelectScreenState extends State<SelectScreen>
   late StreamSubscription<UIEvent> _eventSubscription;
 
   int _pendingDataCount = 0;
+
   Timer? _pendingDataTimer;
 
   bool _batteryOptimizationChecked = false;
@@ -95,6 +100,12 @@ class _SelectScreenState extends State<SelectScreen>
 
   void _startPendingDataMonitoring() {
     _checkPendingData();
+
+    _pendingDataTimer?.cancel();
+    // 🔄 Actualización casi en tiempo real (cada 5 segundos)
+    _pendingDataTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      _checkPendingData();
+    });
   }
 
   Future<void> _checkPendingData() async {
@@ -104,8 +115,8 @@ class _SelectScreenState extends State<SelectScreen>
 
       final censosPendientes = await db.query(
         'censo_activo',
-        where: 'sincronizado = ?',
-        whereArgs: [0],
+        where: 'estado_censo IN (?, ?)',
+        whereArgs: ['creado', 'error'],
       );
 
       final cantidadCensos = censosPendientes.length;
@@ -124,20 +135,21 @@ class _SelectScreenState extends State<SelectScreen>
       int otrosDatos = 0;
       for (var item in pendingByTable) {
         final tableName = item['table'] as String;
+        final count = item['count'] as int;
         if (!tablasExcluidas.contains(tableName)) {
-          otrosDatos += item['count'] as int;
+          otrosDatos += count;
         }
       }
 
       final totalPendientes = cantidadCensos + otrosDatos;
 
-      if (mounted) {
+      if (mounted && _pendingDataCount != totalPendientes) {
         setState(() {
           _pendingDataCount = totalPendientes;
         });
       }
     } catch (e) {
-      debugPrint('Error checking pending data: $e');
+      // Silent fail
     }
   }
 
@@ -150,7 +162,7 @@ class _SelectScreenState extends State<SelectScreen>
         context,
       );
     } catch (e) {
-      debugPrint('Error checking battery optimization: $e');
+      // Silent fail
     }
   }
 
@@ -183,7 +195,7 @@ class _SelectScreenState extends State<SelectScreen>
         await Permission.notification.request();
       }
     } catch (e) {
-      debugPrint('Error checking notification permissions: $e');
+      // Silent fail
     }
   }
 
@@ -196,7 +208,7 @@ class _SelectScreenState extends State<SelectScreen>
         }
       }
     } catch (e) {
-      debugPrint('Error checking fake GPS: $e');
+      // Silent fail
     }
   }
 
@@ -282,6 +294,40 @@ class _SelectScreenState extends State<SelectScreen>
   }
 
   Future<void> _handleLogout() async {
+    // 1. Mostrar confirmación simple
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.logout, color: AppColors.textPrimary),
+            SizedBox(width: 8),
+            Text('Cerrar Sesión'),
+          ],
+        ),
+        content: const Text(
+          '¿Estás seguro que deseas cerrar la sesión actual?',
+          style: TextStyle(fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Cerrar Sesión'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     try {
       showDialog(
         context: context,
@@ -298,7 +344,18 @@ class _SelectScreenState extends State<SelectScreen>
                   SizedBox(height: 16),
                   Text(
                     'Cerrando sesión...',
-                    style: TextStyle(color: AppColors.textPrimary),
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Enviando reporte final...',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
@@ -307,6 +364,7 @@ class _SelectScreenState extends State<SelectScreen>
         ),
       );
 
+      // AuthService.logout() ahora incluye el reporte a la API
       await AuthService().logout();
 
       if (mounted) Navigator.of(context).pop();
@@ -717,9 +775,10 @@ class _SelectScreenState extends State<SelectScreen>
   }
 
   Future<void> _handleSyncConfirmation() async {
-    final confirmar = await _mostrarDialogoSincronizacion();
-    if (confirmar == true) {
-      _viewModel.executeSync();
+    final result = await _mostrarDialogoSincronizacion();
+    if (result != null && result['confirm'] == true) {
+      final syncEquipments = result['syncEquipments'] as bool? ?? true;
+      _viewModel.executeSync(syncEquipments: syncEquipments);
     }
   }
 
@@ -730,83 +789,152 @@ class _SelectScreenState extends State<SelectScreen>
     }
   }
 
-  Future<bool?> _mostrarDialogoSincronizacion() async {
-    return showDialog<bool>(
+  Future<Map<String, dynamic>?> _mostrarDialogoSincronizacion() async {
+    bool descargarEquipos = false;
+
+    return showDialog<Map<String, dynamic>>(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppColors.surface,
-          title: Row(
-            children: [
-              Icon(Icons.sync, color: AppColors.neutral700),
-              SizedBox(width: 8),
-              Text(
-                'Sincronizar Datos',
-                style: TextStyle(color: AppColors.textPrimary),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: AppColors.surface,
+              title: Row(
+                children: [
+                  Icon(Icons.sync, color: AppColors.neutral700),
+                  SizedBox(width: 8),
+                  Text(
+                    'Sincronizar Datos',
+                    style: TextStyle(color: AppColors.textPrimary),
+                  ),
+                ],
               ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Esta acción descargará todos los datos del servidor:',
-                style: TextStyle(color: AppColors.textPrimary),
-              ),
-              SizedBox(height: 12),
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '• Clientes',
-                      style: TextStyle(color: AppColors.textSecondary),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Esta acción descargará todos los datos del servidor:',
+                    style: TextStyle(color: AppColors.textPrimary),
+                  ),
+                  SizedBox(height: 12),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
                     ),
-                    Text(
-                      '• Equipos',
-                      style: TextStyle(color: AppColors.textSecondary),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '• Clientes',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                        Text(
+                          '• Formularios',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                        // Opcional: mostrar visualmente si equipos se descargarán o no
+                        if (descargarEquipos)
+                          Text(
+                            '• Equipos (Se descargarán)',
+                            style: TextStyle(
+                              color: AppColors.success,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        else
+                          Text(
+                            '• NO SE DESCARGARÁN EQUIPOS',
+                            style: TextStyle(
+                              color: AppColors.error,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                      ],
                     ),
-                    Text(
-                      '• Formularios',
-                      style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                  SizedBox(height: 16),
+                  Row(
+                    children: [
+                      SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: Checkbox(
+                          value: descargarEquipos,
+                          activeColor: AppColors.success,
+                          side: WidgetStateBorderSide.resolveWith(
+                            (states) => BorderSide(
+                              width: 2.0,
+                              color: descargarEquipos
+                                  ? AppColors.success
+                                  : AppColors.error,
+                            ),
+                          ),
+                          onChanged: (bool? value) {
+                            setState(() {
+                              descargarEquipos = value ?? true;
+                            });
+                          },
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              descargarEquipos = !descargarEquipos;
+                            });
+                          },
+                          child: Text(
+                            'Descargar equipos',
+                            style: TextStyle(
+                              color: descargarEquipos
+                                  ? AppColors.textPrimary
+                                  : AppColors.error,
+                              fontSize: 14,
+                              fontWeight: descargarEquipos
+                                  ? FontWeight.normal
+                                  : FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'Los datos locales serán actualizados.',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
                     ),
-                  ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  child: Text(
+                    'Cancelar',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
                 ),
-              ),
-              SizedBox(height: 12),
-              Text(
-                'Los datos locales serán actualizados.',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                ElevatedButton(
+                  onPressed: () => Navigator.of(
+                    context,
+                  ).pop({'confirm': true, 'syncEquipments': descargarEquipos}),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.info,
+                    foregroundColor: AppColors.onPrimary,
+                  ),
+                  child: Text('Sincronizar Todo'),
                 ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(
-                'Cancelar',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.info,
-                foregroundColor: AppColors.onPrimary,
-              ),
-              child: Text('Sincronizar Todo'),
-            ),
-          ],
+              ],
+            );
+          },
         );
       },
     );
@@ -926,73 +1054,101 @@ class _SelectScreenState extends State<SelectScreen>
     String? routeName,
     Widget? page,
     VoidCallback? onTap,
+    bool enabled = true,
   }) {
+    final effectiveColor = enabled ? color : Colors.grey;
+    final contentOpacity = enabled ? 1.0 : 0.6;
+
     return Card(
-      elevation: 2,
-      color: AppColors.surface,
+      elevation: enabled ? 2 : 0,
+      color: enabled ? AppColors.surface : Colors.grey[100],
       shadowColor: AppColors.shadowLight,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.border, width: 0.5),
+        side: BorderSide(
+          color: enabled ? AppColors.border : Colors.grey[300]!,
+          width: 0.5,
+        ),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap:
-            onTap ??
-            () {
-              if (routeName != null) {
-                Navigator.pushNamed(context, routeName);
-              } else if (page != null) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => page),
+        onTap: enabled
+            ? (onTap ??
+                  () {
+                    if (routeName != null) {
+                      Navigator.pushNamed(context, routeName);
+                    } else if (page != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => page),
+                      );
+                    }
+                  })
+            : () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'No tienes permiso para acceder a este módulo',
+                    ),
+                    duration: Duration(seconds: 2),
+                    backgroundColor: Colors.grey[700],
+                  ),
                 );
-              }
-            },
+              },
         child: Padding(
           padding: EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: color.withValues(alpha: 0.2)),
-                ),
-                child: Icon(icon, color: color, size: 28),
-              ),
-              SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
+          child: Opacity(
+            opacity: contentOpacity,
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: effectiveColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: effectiveColor.withValues(alpha: 0.2),
                     ),
-                    SizedBox(height: 4),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+                  ),
+                  child: Icon(icon, color: effectiveColor, size: 28),
                 ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: AppColors.textSecondary,
-              ),
-            ],
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: enabled ? AppColors.textPrimary : Colors.grey,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        description,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: enabled
+                              ? AppColors.textSecondary
+                              : Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (enabled)
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: AppColors.textSecondary,
+                  )
+                else
+                  Icon(Icons.lock, size: 16, color: Colors.grey),
+              ],
+            ),
           ),
         ),
       ),
@@ -1171,6 +1327,20 @@ class _SelectScreenState extends State<SelectScreen>
                     );
                   },
                 ),
+                _buildDrawerItem(
+                  icon: Icons.history_edu,
+                  label: 'Historial Operaciones',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const OperacionesComercialesHistoryScreen(),
+                      ),
+                    );
+                  },
+                ),
                 Divider(),
                 Padding(
                   padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
@@ -1184,24 +1354,6 @@ class _SelectScreenState extends State<SelectScreen>
                   ),
                 ),
                 _buildDrawerItem(
-                  icon: Icons.history,
-                  label: 'Device Logs',
-                  onTap: () async {
-                    Navigator.pop(context);
-                    final db = await DatabaseHelper().database;
-                    if (context.mounted) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DeviceLogScreen(
-                            repository: DeviceLogRepository(db),
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                ),
-                _buildDrawerItem(
                   icon: Icons.bug_report,
                   label: 'Log de Errores',
                   onTap: () {
@@ -1212,20 +1364,33 @@ class _SelectScreenState extends State<SelectScreen>
                     );
                   },
                 ),
-                Divider(),
                 _buildDrawerItem(
-                  icon: Icons.access_time,
-                  label: 'Horario de Trabajo',
+                  icon: Icons.data_usage,
+                  label: 'Consumo de Datos',
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const WorkHoursSettingsScreen(),
+                        builder: (_) => const DataUsageScreen(),
                       ),
                     );
                   },
                 ),
+                _buildDrawerItem(
+                  icon: Icons.settings,
+                  label: 'Opciones de Sistema',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SystemOptionsScreen(),
+                      ),
+                    );
+                  },
+                ),
+
                 _buildDrawerItem(
                   icon: Icons.logout,
                   label: 'Cerrar Sesión',
@@ -1243,7 +1408,7 @@ class _SelectScreenState extends State<SelectScreen>
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(
-              'Versión 1.0.0',
+              'Versión ${AppConfig.currentAppVersion}',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
             ),
           ),
@@ -1305,6 +1470,7 @@ class _SelectScreenState extends State<SelectScreen>
               );
             },
           ),
+
           _buildPendingDataButton(),
           ListenableBuilder(
             listenable: _viewModel,
@@ -1315,20 +1481,11 @@ class _SelectScreenState extends State<SelectScreen>
                     case 'probar_conexion':
                       _viewModel.testConnection();
                       break;
-                    case 'borrar_bd':
-                      _viewModel.requestDeleteDatabase();
-                      break;
+
                     case 'acerca_de':
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => AboutScreen()),
-                      );
-                      break;
-                    case 'debug_menu':
-                      showDialog(
-                        context: context,
-                        builder: (context) =>
-                            DebugPermissionsDialog(viewModel: _viewModel),
                       );
                       break;
                   }
@@ -1363,22 +1520,7 @@ class _SelectScreenState extends State<SelectScreen>
                       ],
                     ),
                   ),
-                  PopupMenuItem<String>(
-                    value: 'borrar_bd',
-                    enabled:
-                        !_viewModel.isSyncing &&
-                        !_viewModel.isTestingConnection,
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete_forever, color: AppColors.error),
-                        SizedBox(width: 8),
-                        Text(
-                          'Borrar Base de Datos',
-                          style: TextStyle(color: AppColors.textPrimary),
-                        ),
-                      ],
-                    ),
-                  ),
+
                   PopupMenuItem<String>(
                     value: 'acerca_de',
                     child: Row(
@@ -1388,22 +1530,6 @@ class _SelectScreenState extends State<SelectScreen>
                         Text(
                           'Acerca de',
                           style: TextStyle(color: AppColors.textPrimary),
-                        ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem<String>(
-                    value: 'debug_menu',
-                    child: Row(
-                      children: [
-                        Icon(Icons.bug_report, color: AppColors.error),
-                        SizedBox(width: 8),
-                        Text(
-                          '🛠️ Debug Menu',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.bold,
-                          ),
                         ),
                       ],
                     ),
@@ -1554,10 +1680,8 @@ class _SelectScreenState extends State<SelectScreen>
                                 label: 'Formularios Dinámicos',
                                 description: 'Completar y enviar formularios',
                                 icon: Icons.assignment,
-                                color: AppColors
-                                    .secondary, // Ensure this color exists or use another
-                                routeName:
-                                    '/dynamicForms', // Need to ensure this route exists or push manually
+                                color: AppColors.secondary,
+                                routeName: '/dynamicForms',
                                 onTap: () {
                                   Navigator.push(
                                     context,

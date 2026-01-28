@@ -12,13 +12,14 @@ import 'package:ada_app/services/api/auth_service.dart';
 
 import 'package:ada_app/services/device_log/device_log_upload_service.dart';
 import 'package:ada_app/services/api/api_config_service.dart';
+import 'package:ada_app/services/error_log/error_log_service.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
 class BackgroundLogConfig {
   static int horaInicio = 9;
   static int horaFin = 17;
-  static List<int> diasTrabajo = [1, 2, 3, 4, 5, 6]; // Default: Lun-Sab
+  static List<int> diasTrabajo = [1, 2, 3, 4, 5, 6];
 
   /// Keys para SharedPreferences
   static const String keyHoraInicio = 'work_hours_start';
@@ -27,7 +28,7 @@ class BackgroundLogConfig {
   static const String keyDiasTrabajo = 'work_days_list';
 
   /// INTERVALO ENTRE REGISTROS (Dinámico)
-  static Duration intervalo = Duration(minutes: 15);
+  static Duration intervalo = Duration(minutes: 5);
 
   /// NÚMERO MÁXIMO DE REINTENTOS
   static const int maxReintentos = 3;
@@ -195,7 +196,7 @@ class DeviceLogBackgroundExtension {
         service.invoke('updateConfig');
         print('Señal updateConfig enviada al servicio');
       } else {
-        // Fallback porsi el servicio no corre (raro)
+        // Fallback porsi el servicio no corre
         // No llamamos inicializar() aqui para no duplicar timers en UI
         print('Servicio no corriendo - configuración guardada solo en disco');
       }
@@ -282,6 +283,14 @@ class DeviceLogBackgroundExtension {
 
       // Trigger sync general
       await DeviceLogUploadService.sincronizarDeviceLogsPendientes();
+
+      // NUEVO: Intentar reenvío de Error Logs pendientes
+      try {
+        print('Intentando reenviar error logs pendientes...');
+        await ErrorLogService.enviarErrorLogsAlServidor();
+      } catch (e) {
+        print('Error en reenvío automático de error logs: $e');
+      }
 
       print('Proceso de logging completado para: ${log.id}');
     } catch (e) {
@@ -424,20 +433,49 @@ class DeviceLogBackgroundExtension {
   static bool get estaActivo =>
       _isInitialized && (_backgroundTimer?.isActive ?? false);
 
-  /// Obtener información completa del estado
+  /// Obtener información completa del estado (Diagnóstico Real)
   static Future<Map<String, dynamic>> obtenerEstado() async {
     final now = DateTime.now();
     final urlActual = await ApiConfigService.getBaseUrl();
     final tieneSesion = await _verificarSesionActiva();
 
+    // 1. Verificar si el servicio background está corriendo (Cross-Isolate)
+    final service = FlutterBackgroundService();
+    final isServiceRunning = await service.isRunning();
+
+    // 2. Verificar último log en BD (Evidencia real de funcionamiento)
+    String? ultimoLogStr;
+    bool timerPareceActivo = false;
+    try {
+      final db = await DatabaseHelper().database;
+      final result = await db.query(
+        'device_log',
+        orderBy: 'fecha_registro DESC',
+        limit: 1,
+      );
+      if (result.isNotEmpty) {
+        ultimoLogStr = result.first['fecha_registro'] as String;
+        final ultimoLogDate = DateTime.parse(ultimoLogStr);
+        // Si el último log es reciente (menos de 2x intervalo + 2 min buffer), el timer funciona
+        final diferencia = now.difference(ultimoLogDate);
+        final umbral = Duration(
+          minutes: (BackgroundLogConfig.intervalo.inMinutes * 2) + 2,
+        );
+        timerPareceActivo = diferencia < umbral;
+      }
+    } catch (e) {
+      print('Error consultando último log: $e');
+    }
+
     return {
-      'activo': estaActivo,
-      'inicializado': _isInitialized,
-      'timer_activo': _backgroundTimer?.isActive ?? false,
+      'activo': isServiceRunning, // Estado real del proceso
+      'inicializado': _isInitialized, // Estado en este isolate (UI)
+      'timer_activo': timerPareceActivo, // Inferido por actividad reciente
       'ejecutando': _isExecuting,
       'sesion_activa': tieneSesion,
       'en_horario': estaEnHorarioTrabajo(),
       'hora_actual': now.hour,
+      'ultimo_log': ultimoLogStr,
       'intervalo_minutos': BackgroundLogConfig.intervalo.inMinutes,
       'horario':
           '${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00',

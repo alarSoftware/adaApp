@@ -49,21 +49,18 @@ extension TipoOperacionExtension on TipoOperacion {
     return this == TipoOperacion.notaReposicion;
   }
 
-  /// Valida si la unidad de medida es correcta para este tipo de operación
-  /// Retorna null si es válido, o un mensaje de error si no lo es
-
   String? validarUnidadMedida(String unidadMedida) {
-    // REGLA 1: Las notas de retiro SOLO pueden ser en unidades simples
-    if (esNotaRetiro && !UnidadMedidaHelper.esUnidadSimple(unidadMedida)) {
-      return 'Las notas de retiro solo pueden ser en unidades simples (Units)';
+    // REGLA 1: Las notas de retiro y reposición SOLO pueden ser en unidades simples
+    if ((esNotaRetiro || esNotaReposicion) && !UnidadMedidaHelper.esUnidadSimple(unidadMedida)) {
+      return 'Las notas de retiro y reposición solo pueden ser en unidades simples (Units)';
     }
 
-    // REGLA 2: Las notas de reposición DEBEN ser en packs/cajas (no unidades simples)
-    if (esNotaReposicion && !UnidadMedidaHelper.esPack(unidadMedida)) {
-      return 'Las notas de reposición deben ser en packs/cajas (X 6, X 12, X 24, etc.)';
-    }
+    // // REGLA 2: Las notas de reposición DEBEN ser en packs/cajas (no unidades simples)
+    // if (esNotaReposicion && !UnidadMedidaHelper.esPack(unidadMedida)) {
+    //   return 'Las notas de reposición deben ser en packs/cajas (X 6, X 12, X 24, etc.)';
+    // }
 
-    return null; // válido
+    return null;
   }
 
   static TipoOperacion fromString(String? tipo) {

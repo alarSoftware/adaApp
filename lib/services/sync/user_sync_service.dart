@@ -1,12 +1,12 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:io';
-import 'package:http/http.dart' as http;
+
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
+import 'package:ada_app/services/network/monitored_http_client.dart';
 
 class UserSyncService {
   static final _dbHelper = DatabaseHelper();
@@ -18,9 +18,11 @@ class UserSyncService {
       final baseUrl = await BaseSyncService.getBaseUrl();
       currentEndpoint = '$baseUrl/api/getUsers';
 
-      final response = await http
-          .get(Uri.parse(currentEndpoint), headers: BaseSyncService.headers)
-          .timeout(BaseSyncService.timeout);
+      final response = await MonitoredHttpClient.get(
+        url: Uri.parse(currentEndpoint),
+        headers: BaseSyncService.headers,
+        timeout: BaseSyncService.timeout,
+      );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final responseData = jsonDecode(response.body);
@@ -41,8 +43,11 @@ class UserSyncService {
           );
         }
 
-        // === AQUÍ ES DONDE SE AGREGA LA NUEVA COLUMNA ===
-        final usuariosProcesados = usuariosAPI.map((usuario) {
+        // === PROCESAR USUARIOS Y PREPARAR DATOS ===
+        final usuariosProcesados = <Map<String, dynamic>>[];
+        final usuariosConRutas = <Map<String, dynamic>>[];
+
+        for (final usuario in usuariosAPI) {
           String password = usuario['password'].toString();
           if (password.startsWith('{bcrypt}')) {
             password = password.substring(8);
@@ -68,33 +73,16 @@ class UserSyncService {
                 }
               }
             } catch (e) {
-              // Fail silently or log error if strictly needed, but print removal requested.
+              // Fail silently
             }
           }
 
+          // Guardar usuario y sus rutas para procesarlas DESPUÉS de sincronizar usuarios
           if (rutas != null && rutas is List && usuarioId != null) {
-            debugPrint(
-              'Intentando sincronizar rutas para usuario $usuarioId...',
-            );
-            _dbHelper
-                .sincronizarRutas(usuarioId, rutas)
-                .then((_) {
-                  debugPrint(
-                    'Rutas sincronizadas exitosamente para $usuarioId',
-                  );
-                })
-                .catchError((e) {
-                  debugPrint(
-                    'Error sincronizando rutas para usuario $usuarioId: $e',
-                  );
-                });
-          } else {
-            debugPrint(
-              'No se llamará a sincronizarRutas. Rutas: $rutas, UsuarioId: $usuarioId',
-            );
+            usuariosConRutas.add({'usuario_id': usuarioId, 'rutas': rutas});
           }
 
-          return {
+          usuariosProcesados.add({
             'id': usuarioId, // FIX: Asignar ID explícitamente a la PK
             'employee_id': usuario['employeeId']?.toString(),
             'employeeName': usuario['employeeName']?.toString(),
@@ -102,12 +90,14 @@ class UserSyncService {
             'username': usuario['username'],
             'password': password,
             'fullname': usuario['fullname'],
+            'sucursal': usuario['sucursal']?.toString(), // Nuevo campo
             'sincronizado': 1,
             'fecha_creacion': usuario['fecha_creacion'] ?? now,
             'fecha_actualizacion': usuario['fecha_actualizacion'] ?? now,
-          };
-        }).toList();
+          });
+        }
 
+        // PRIMERO: Sincronizar usuarios (esto limpia app_routes al inicio)
         try {
           await _dbHelper.sincronizarUsuarios(usuariosProcesados);
         } catch (dbError) {
@@ -118,6 +108,18 @@ class UserSyncService {
           );
 
           // No fallar, los datos se descargaron correctamente pero hubo error local
+        }
+
+        // SEGUNDO: Sincronizar rutas (DESPUÉS de que se limpió y sincronizaron usuarios)
+        for (final usuarioConRutas in usuariosConRutas) {
+          final usuarioId = usuarioConRutas['usuario_id'] as int;
+          final rutas = usuarioConRutas['rutas'] as List<dynamic>;
+
+          try {
+            await _dbHelper.sincronizarRutas(usuarioId, rutas);
+          } catch (e) {
+            // Error silencioso - no fallar toda la sincronización por rutas
+          }
         }
 
         return SyncResult(

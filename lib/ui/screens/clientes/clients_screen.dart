@@ -212,7 +212,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
             child: Column(
               children: [
                 // A. Banner de Advertencia (Naranja)
-                if (_necesitaSincronizar && !_isSyncing)
+                /*if (_necesitaSincronizar && !_isSyncing)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
@@ -268,7 +268,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                         ),
                       ],
                     ),
-                  ),
+                  ),*/
 
                 // B. Banner de Carga (Azul)
                 if (_isSyncing)
@@ -446,19 +446,16 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                         ),
                       )
                     : Icon(
-                        _necesitaSincronizar
+                        /*_necesitaSincronizar
                             ? Icons.notification_important
-                            : Icons.sync,
-                        color: _necesitaSincronizar
+                            : */
+                        Icons.sync,
+                        color: /*_necesitaSincronizar
                             ? Colors.orangeAccent
-                            : AppColors.appBarForeground,
+                            : */
+                            AppColors.appBarForeground,
                       ),
                 tooltip: 'Sincronizar clientes',
-              ),
-              IconButton(
-                onPressed: _onRefresh,
-                icon: Icon(Icons.refresh, color: AppColors.appBarForeground),
-                tooltip: 'Actualizar lista',
               ),
               PopupMenuButton<String>(
                 icon: Icon(Icons.more_vert, color: AppColors.appBarForeground),
@@ -540,7 +537,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                         '${cliente.tipoDocumento}: ${cliente.rucCi}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textTertiary,
+                          color: AppColors.textSecondary,
                           fontFamily: 'monospace',
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -585,6 +582,18 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                   ],
                 ),
               ),
+              if (cliente.sucursal != null && cliente.sucursal!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    cliente.sucursal!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

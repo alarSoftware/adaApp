@@ -141,6 +141,12 @@ class _AboutScreenState extends State<AboutScreen> {
             ),
             Divider(height: 24),
             _buildInfoRow(
+              icon: Icons.store_mall_directory_outlined,
+              label: 'Sucursal',
+              value: _currentUser?.sucursal ?? 'No asignado',
+            ),
+            Divider(height: 24),
+            _buildInfoRow(
               icon: Icons.badge_outlined,
               label: 'Employee Name',
               value: _currentUser?.employeeName ?? 'No asignado',

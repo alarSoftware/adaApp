@@ -815,8 +815,27 @@ class _OperacionComercialFormViewState
 
     try {
       final repository = OperacionComercialRepositoryImpl();
-      await OperacionesComercialesPostService.enviarOperacion(operacion);
-      await repository.marcarComoMigrado(operacion.id!, null);
+      final serverResponse =
+          await OperacionesComercialesPostService.enviarOperacion(operacion);
+
+      String? odooName;
+      String? adaSequence;
+
+      if (serverResponse.resultJson != null) {
+        final parsedData =
+            OperacionesComercialesPostService.parsearRespuestaJson(
+              serverResponse.resultJson,
+            );
+        odooName = parsedData['odooName'];
+        adaSequence = parsedData['adaSequence'];
+      }
+
+      await repository.marcarComoMigrado(
+        operacion.id!,
+        serverResponse.resultId,
+        odooName: odooName,
+        adaSequence: adaSequence,
+      );
 
       if (!mounted) return;
 

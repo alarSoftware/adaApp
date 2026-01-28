@@ -135,6 +135,51 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
     }
   }
 
+  /// Obtener todos los censos con filtro de fecha opcional
+  Future<List<CensoActivo>> obtenerTodos({DateTime? fecha}) async {
+    try {
+      String? whereClause;
+      List<dynamic>? whereArgs;
+
+      if (fecha != null) {
+        // Generar rango del día completo
+        final startOfDay = DateTime(fecha.year, fecha.month, fecha.day);
+        final endOfDay = startOfDay
+            .add(const Duration(days: 1))
+            .subtract(const Duration(milliseconds: 1));
+
+        whereClause = 'fecha_creacion BETWEEN ? AND ?';
+        whereArgs = [startOfDay.toIso8601String(), endOfDay.toIso8601String()];
+      }
+
+      final maps = await dbHelper.consultar(
+        tableName,
+        where: whereClause,
+        whereArgs: whereArgs,
+        orderBy: 'fecha_creacion DESC', // Ordenar por fecha descendente
+      );
+
+      return maps.map((map) => fromMap(map)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Obtener fotos de un censo
+  Future<List<Map<String, dynamic>>> obtenerFotos(String censoId) async {
+    try {
+      final maps = await dbHelper.consultar(
+        'censo_activo_foto',
+        where: 'censo_activo_id = ?',
+        whereArgs: [censoId],
+        orderBy: 'orden ASC',
+      );
+      return maps;
+    } catch (e) {
+      return [];
+    }
+  }
+
   /// Obtener estados por usuario - NUEVO MÉTODO
   Future<List<CensoActivo>> obtenerPorUsuario(int usuarioId) async {
     try {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:ada_app/config/app_config.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -16,7 +17,7 @@ class DatabaseHelper {
   static Database? _database;
 
   static const String _databaseName = 'AdaApp.db';
-  static const int _databaseVersion = 1;
+  static const int _databaseVersion = AppConfig.databaseVersion;
 
   late final tables.DatabaseTables _tables;
   late final sync.DatabaseSync _sync;
@@ -232,11 +233,12 @@ class DatabaseHelper {
 
   Future<void> sincronizarRutas(int userId, List<dynamic> rutas) async {
     final db = await database;
-    await db.transaction((txn) async {
-      // 1. Limpiar rutas anteriores de este usuario
-      await txn.delete('app_routes', where: 'user_id = ?', whereArgs: [userId]);
 
-      // 2. Insertar nuevas rutas
+    await db.transaction((txn) async {
+      // Nota: La tabla app_routes ya fue limpiada completamente
+      // al inicio de sincronizarUsuarios(), no es necesario limpiar por usuario
+
+      // Insertar nuevas rutas
       final batch = txn.batch();
       final now = DateTime.now().toIso8601String();
 

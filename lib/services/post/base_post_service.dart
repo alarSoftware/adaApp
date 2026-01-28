@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 import 'package:ada_app/services/api/api_config_service.dart';
+import 'package:ada_app/services/network/monitored_http_client.dart';
 
 import 'package:ada_app/config/constants/server_constants.dart';
 
@@ -37,13 +38,12 @@ class BasePostService {
       debugPrint('POST a $fullUrl');
       debugPrint('Body size: ${jsonBody.length} caracteres');
 
-      final response = await http
-          .post(
-            Uri.parse(fullUrl),
-            headers: customHeaders ?? headers,
-            body: jsonBody,
-          )
-          .timeout(timeout);
+      final response = await MonitoredHttpClient.post(
+        url: Uri.parse(fullUrl),
+        headers: customHeaders ?? headers,
+        body: jsonBody,
+        timeout: timeout,
+      );
 
       debugPrint('Response: ${response.statusCode}');
 

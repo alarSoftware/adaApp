@@ -7,11 +7,15 @@ import 'package:ada_app/ui/widgets/exit_confimation_dialog.dart';
 class DynamicFormFillScreen extends StatefulWidget {
   final DynamicFormViewModel viewModel;
   final bool isReadOnly;
+  final VoidCallback? onRetry;
+  final VoidCallback? onDelete;
 
   const DynamicFormFillScreen({
     super.key,
     required this.viewModel,
     this.isReadOnly = false,
+    this.onRetry,
+    this.onDelete,
   });
 
   @override
@@ -146,7 +150,7 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
       children: [
         if (widget.isReadOnly) _buildReadOnlyBanner(),
         Expanded(child: _buildFormContent(template)),
-        widget.isReadOnly ? _buildCloseButton() : _buildCompleteButton(),
+        widget.isReadOnly ? _buildReadOnlyActions() : _buildCompleteButton(),
       ],
     );
   }
@@ -257,7 +261,42 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
     );
   }
 
-  Widget _buildCloseButton() {
+  Widget _buildReadOnlyActions() {
+    if (widget.onRetry == null && widget.onDelete == null) {
+      return Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: Border(top: BorderSide(color: AppColors.border)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.shadowLight,
+              blurRadius: 8,
+              offset: Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.pop(context),
+              icon: Icon(Icons.close),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              label: Text('Cerrar'),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -272,21 +311,69 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
         ],
       ),
       child: SafeArea(
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () => Navigator.pop(context),
-            icon: Icon(Icons.close),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.onRetry != null) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: widget.onRetry,
+                  icon: Icon(Icons.sync),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  label: Text('Reintentar Envío'),
+                ),
               ),
+              SizedBox(height: 12),
+            ],
+            Row(
+              children: [
+                if (widget.onDelete != null)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: widget.onDelete,
+                      icon: Icon(Icons.delete_outline, color: AppColors.error),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        side: BorderSide(color: AppColors.error),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      label: Text(
+                        'Eliminar',
+                        style: TextStyle(color: AppColors.error),
+                      ),
+                    ),
+                  ),
+                if (widget.onDelete != null) SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(Icons.close),
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      side: BorderSide(color: AppColors.border),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    label: Text(
+                      'Cerrar',
+                      style: TextStyle(color: AppColors.textPrimary),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            label: Text('Cerrar'),
-          ),
+          ],
         ),
       ),
     );
@@ -315,7 +402,7 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
 
       if (success) {
         _showSnackBar(
-          message: '✅ Formulario completado exitosamente',
+          message: 'Formulario completado exitosamente',
           backgroundColor: AppColors.success,
         );
         Navigator.pop(context);
@@ -323,7 +410,7 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
         final errorMessage =
             widget.viewModel.errorMessage ?? 'Error al completar formulario';
         _showSnackBar(
-          message: '❌ $errorMessage',
+          message: errorMessage,
           backgroundColor: AppColors.error,
           duration: Duration(seconds: 3),
         );

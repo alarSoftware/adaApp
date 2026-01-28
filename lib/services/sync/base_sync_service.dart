@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:ada_app/services/api/api_config_service.dart';
+import 'package:ada_app/services/network/monitored_http_client.dart';
 
 abstract class BaseSyncService {
   static const Duration timeout = Duration(minutes: 1);
@@ -101,9 +102,11 @@ abstract class BaseSyncService {
     try {
       final baseUrl = await getBaseUrl();
 
-      final response = await http
-          .get(Uri.parse('$baseUrl/api/getPing'), headers: headers)
-          .timeout(const Duration(seconds: 10));
+      final response = await MonitoredHttpClient.get(
+        url: Uri.parse('$baseUrl/api/getPing'),
+        headers: headers,
+        timeout: const Duration(seconds: 10),
+      );
 
       if (response.statusCode == 200) {
         Map<String, dynamic>? serverInfo;

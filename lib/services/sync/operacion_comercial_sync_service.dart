@@ -6,6 +6,7 @@ import 'dart:convert';
 
 import 'dart:isolate';
 import 'package:http/http.dart' as http;
+import 'package:ada_app/services/network/monitored_http_client.dart';
 
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
@@ -19,10 +20,12 @@ class OperacionComercialSyncService extends BaseSyncService {
   final OperacionComercialRepositoryImpl _operacionRepository;
 
   static const String _tableName = 'operacion_comercial';
-  static const int maxIntentos = 10;
+  static const int maxIntentos = 60; // 60 min = 1 hora
   static const Duration intervaloTimer = Duration(minutes: 1);
+  static const Duration intervaloOdooName = Duration(minutes: 30);
 
   static Timer? _syncTimer;
+  static Timer? _odooNameTimer;
   static bool _syncActivo = false;
   static bool _syncEnProgreso = false;
   static int? _usuarioActual;
@@ -214,9 +217,11 @@ class OperacionComercialSyncService extends BaseSyncService {
       '$baseUrl$endpoint',
     ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
-    return await http
-        .get(uri, headers: BaseSyncService.headers)
-        .timeout(BaseSyncService.timeout);
+    return await MonitoredHttpClient.get(
+      url: uri,
+      headers: BaseSyncService.headers,
+      timeout: BaseSyncService.timeout,
+    );
   }
 
   static bool _isSuccessStatusCode(int statusCode) {
@@ -538,34 +543,79 @@ class OperacionComercialSyncService extends BaseSyncService {
   Future<Map<String, int>> sincronizarOperacionesPendientes(
     int usuarioId,
   ) async {
+    debugPrint(
+      '🔄 [SYNC] Iniciando sincronización de operaciones pendientes...',
+    );
     int operacionesExitosas = 0;
     int totalFallidas = 0;
 
     try {
       final operacionesCreadas = await _operacionRepository
           .obtenerOperacionesPendientes();
+      debugPrint(
+        '🔍 [SYNC] Operaciones pendientes (creado): ${operacionesCreadas.length}',
+      );
+
       final operacionesError = await _operacionRepository
           .obtenerOperacionesConError();
+      debugPrint(
+        '🔍 [SYNC] Operaciones con error (antes de filtrar): ${operacionesError.length}',
+      );
+
       final operacionesErrorListas =
           await _filtrarOperacionesListasParaReintento(operacionesError);
+      debugPrint(
+        '🔍 [SYNC] Operaciones listas para reintentar: ${operacionesErrorListas.length}',
+      );
 
       final todasLasOperaciones = [
         ...operacionesCreadas,
         ...operacionesErrorListas,
       ];
 
+      debugPrint(
+        '📊 [SYNC] Total de operaciones a procesar: ${todasLasOperaciones.length}',
+      );
+
       final operacionesAProcesar = todasLasOperaciones.take(20);
+      debugPrint(
+        '📤 [SYNC] Procesando ${operacionesAProcesar.length} operaciones',
+      );
 
       for (final operacion in operacionesAProcesar) {
+        debugPrint(
+          '🔹 [SYNC] Intentando operación ${operacion.id} (intento ${operacion.syncRetryCount + 1}/${maxIntentos})',
+        );
         try {
           await _sincronizarOperacionIndividual(operacion, usuarioId);
           operacionesExitosas++;
+          debugPrint(
+            '✅ [SYNC] Operación ${operacion.id} sincronizada exitosamente',
+          );
         } catch (e) {
           totalFallidas++;
+          debugPrint('❌ [SYNC] Error en operación ${operacion.id}: $e');
+
+          // Marcar la operación como error en la BD
+          if (operacion.id != null) {
+            try {
+              await _operacionRepository.marcarComoError(
+                operacion.id!,
+                e.toString().replaceAll('Exception: ', ''),
+              );
+            } catch (repoError) {
+              // Si falla marcar como error, solo logueamos
+              debugPrint('⚠️ Error marcando operación como error: $repoError');
+            }
+          }
         }
 
         await Future.delayed(Duration(milliseconds: 500));
       }
+
+      debugPrint(
+        '✅ [SYNC] Resumen: ${operacionesExitosas} exitosas | ${totalFallidas} fallidas',
+      );
 
       return {
         'operaciones_exitosas': operacionesExitosas,
@@ -602,12 +652,50 @@ class OperacionComercialSyncService extends BaseSyncService {
       final intentosPrevios = operacion.syncRetryCount;
       final numeroIntento = intentosPrevios + 1;
 
+      debugPrint(
+        '📝 [SYNC] Operación $operacionId: intento $numeroIntento de $maxIntentos',
+      );
+
       if (numeroIntento > maxIntentos) {
+        debugPrint('⛔ [SYNC] Máximo de intentos alcanzado para $operacionId');
+        await _operacionRepository.marcarComoError(
+          operacionId,
+          'Máximo de intentos alcanzado ($maxIntentos)',
+        );
         return;
       }
       await _actualizarIntentoSincronizacion(operacionId, numeroIntento);
+      debugPrint('🚀 [SYNC] Enviando operación $operacionId al servidor...');
 
-      await OperacionesComercialesPostService.enviarOperacion(operacion);
+      final serverResponse =
+          await OperacionesComercialesPostService.enviarOperacion(operacion);
+      debugPrint('✅ [SYNC] Operación $operacionId enviada exitosamente');
+
+      // Parsear respuesta del servidor para obtener odooName y adaSequence
+      String? odooName;
+      String? adaSequence;
+
+      if (serverResponse.resultJson != null) {
+        debugPrint('📦 [SYNC] Parseando respuesta del servidor...');
+        final parsedData =
+            OperacionesComercialesPostService.parsearRespuestaJson(
+              serverResponse.resultJson,
+            );
+        odooName = parsedData['odooName'];
+        adaSequence = parsedData['adaSequence'];
+        debugPrint(
+          '📦 [SYNC] Parsed - odooName: $odooName, adaSequence: $adaSequence',
+        );
+      }
+
+      // Marcar como migrado en la BD
+      await _operacionRepository.marcarComoMigrado(
+        operacionId,
+        null,
+        odooName: odooName,
+        adaSequence: adaSequence,
+      );
+      debugPrint('✅ [SYNC] Operación $operacionId marcada como migrada');
     } catch (e) {
       rethrow;
     }
@@ -619,56 +707,63 @@ class OperacionComercialSyncService extends BaseSyncService {
     final operacionesListas = <OperacionComercial>[];
     final ahora = DateTime.now();
 
+    debugPrint(
+      '🔍 [FILTER] Filtrando ${operacionesError.length} operaciones con error...',
+    );
+
     for (final operacion in operacionesError) {
       try {
         final intentos = operacion.syncRetryCount;
+        debugPrint(
+          '🔍 [FILTER] Operación ${operacion.id}: $intentos intentos de $maxIntentos',
+        );
 
         if (intentos >= maxIntentos) {
+          debugPrint(
+            '⛔ [FILTER] Operación ${operacion.id} excede max intentos',
+          );
           continue;
         }
 
         if (operacion.syncedAt == null) {
+          debugPrint(
+            '✅ [FILTER] Operación ${operacion.id} sin syncedAt, agregando',
+          );
           operacionesListas.add(operacion);
           continue;
         }
 
-        final minutosEspera = _calcularProximoIntento(intentos);
-        if (minutosEspera < 0) continue;
-
+        // Reintento simple cada 1 minuto (sin backoff exponencial)
         final tiempoProximoIntento = operacion.syncedAt!.add(
-          Duration(minutes: minutosEspera),
+          const Duration(minutes: 1),
+        );
+
+        final tiempoRestante = tiempoProximoIntento.difference(ahora);
+        debugPrint(
+          '⏱️ [FILTER] Operación ${operacion.id}: tiempo restante ${tiempoRestante.inSeconds}s',
         );
 
         if (ahora.isAfter(tiempoProximoIntento)) {
+          debugPrint(
+            '✅ [FILTER] Operación ${operacion.id} lista para reintentar',
+          );
           operacionesListas.add(operacion);
+        } else {
+          debugPrint(
+            '⏸️ [FILTER] Operación ${operacion.id} aún no es tiempo (faltan ${tiempoRestante.inSeconds}s)',
+          );
         }
       } catch (e) {
+        debugPrint('❌ [FILTER] Error procesando operación ${operacion.id}: $e');
         operacionesListas.add(operacion);
       }
     }
 
+    debugPrint(
+      '✅ [FILTER] Resultado: ${operacionesListas.length} operaciones listas',
+    );
+
     return operacionesListas;
-  }
-
-  int _calcularProximoIntento(int numeroIntento) {
-    if (numeroIntento > maxIntentos) return -1;
-
-    switch (numeroIntento) {
-      case 1:
-        return 1;
-      case 2:
-        return 5;
-      case 3:
-        return 10;
-      case 4:
-        return 15;
-      case 5:
-        return 20;
-      case 6:
-        return 25;
-      default:
-        return 30;
-    }
   }
 
   Future<void> _actualizarIntentoSincronizacion(
@@ -695,11 +790,25 @@ class OperacionComercialSyncService extends BaseSyncService {
     _usuarioActual = usuarioId;
     _syncActivo = true;
 
+    debugPrint(
+      '⏰ [TIMER] Iniciando timer automático para usuario $usuarioId (cada ${intervaloTimer.inMinutes} min)',
+    );
+
     _syncTimer = Timer.periodic(intervaloTimer, (timer) async {
       await _ejecutarSincronizacionAutomatica();
     });
 
+    // Timer independiente para OdooName (cada 30 min)
+    _odooNameTimer = Timer.periodic(intervaloOdooName, (timer) async {
+      if (!_syncActivo || _usuarioActual == null) return;
+      final service = OperacionComercialSyncService();
+      await service.sincronizarOdooNamesPendientes();
+    });
+
     Timer(const Duration(seconds: 15), () async {
+      debugPrint(
+        '⏰ [TIMER] Ejecutando primera sincronización (15s después del login)',
+      );
       await _ejecutarSincronizacionAutomatica();
     });
   }
@@ -708,32 +817,104 @@ class OperacionComercialSyncService extends BaseSyncService {
     if (_syncTimer != null) {
       _syncTimer!.cancel();
       _syncTimer = null;
-      _syncActivo = false;
-      _syncEnProgreso = false;
-      _usuarioActual = null;
     }
+    if (_odooNameTimer != null) {
+      _odooNameTimer!.cancel();
+      _odooNameTimer = null;
+    }
+    _syncActivo = false;
+    _syncEnProgreso = false;
+    _usuarioActual = null;
   }
 
   static Future<void> _ejecutarSincronizacionAutomatica() async {
-    if (_syncEnProgreso || !_syncActivo || _usuarioActual == null) return;
+    if (_syncEnProgreso || !_syncActivo || _usuarioActual == null) {
+      if (_syncEnProgreso)
+        debugPrint('⏸️ [TIMER] Sync ya en progreso, saltando...');
+      if (!_syncActivo) debugPrint('⏸️ [TIMER] Sync no está activo');
+      if (_usuarioActual == null)
+        debugPrint('⏸️ [TIMER] Usuario no establecido');
+      return;
+    }
+
+    debugPrint('⏰ [TIMER] Ejecutando sincronización automática...');
 
     _syncEnProgreso = true;
 
     try {
       final conexion = await BaseSyncService.testConnection();
       if (!conexion.exito) {
+        debugPrint('❌ [TIMER] Sin conexión, saltando sincronización');
         return;
       }
 
+      debugPrint('✅ [TIMER] Conexión OK, sincronizando operaciones...');
+
       final service = OperacionComercialSyncService();
       await service.sincronizarOperacionesPendientes(_usuarioActual!);
+
+      // OdooName se sincroniza en su propio timer independiente
     } catch (e) {
     } finally {
       _syncEnProgreso = false;
     }
   }
 
-  static bool get esSincronizacionActiva => _syncActivo;
-  static bool get estaEnProgreso => _syncEnProgreso;
-  static int? get usuarioActual => _usuarioActual;
+  Future<void> sincronizarOdooNamesPendientes() async {
+    try {
+      // DEBUG: Log para verificar que el ciclo corre
+      // debugPrint('Verificando Odoo Names pendientes...');
+
+      final operaciones = await _operacionRepository
+          .obtenerOperacionesSinOdooName();
+
+      if (operaciones.isEmpty) {
+        // debugPrint('No se encontraron operaciones sin Odoo Name.');
+        return;
+      }
+
+      debugPrint(
+        '🔍 [OdooName Sync] Encontradas ${operaciones.length} operaciones sin Odoo Name. Iniciando sincronización...',
+      );
+
+      for (final operacion in operaciones) {
+        if (operacion.adaSequence == null) {
+          debugPrint(
+            '⚠️ [OdooName Sync] Operación ${operacion.id} ignorada: adaSequence es nulo.',
+          );
+          continue;
+        }
+
+        try {
+          debugPrint(
+            '🔄 [OdooName Sync] Consultando para AdaSequence: ${operacion.adaSequence}',
+          );
+          final odooName = await obtenerOdooName(operacion.adaSequence!);
+
+          if (odooName != null && odooName.isNotEmpty) {
+            await _operacionRepository.actualizarOdooName(
+              operacion.id!,
+              odooName,
+            );
+            debugPrint(
+              '✅ [OdooName Sync] ACTUALIZADO EXITOSAMENTE: ${operacion.adaSequence} -> $odooName',
+            );
+          } else {
+            debugPrint(
+              '❌ [OdooName Sync] No se encontró Odoo Name para ${operacion.adaSequence} (Respuesta nula o vacía)',
+            );
+          }
+        } catch (e) {
+          debugPrint(
+            '🔥 [OdooName Sync] Excepción obteniendo Odoo Name para ${operacion.adaSequence}: $e',
+          );
+        }
+
+        // Pequeña pausa para no saturar
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+    } catch (e) {
+      debugPrint('🔥 [OdooName Sync] Error general en el proceso: $e');
+    }
+  }
 }
