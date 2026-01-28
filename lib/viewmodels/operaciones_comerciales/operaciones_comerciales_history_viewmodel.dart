@@ -121,15 +121,6 @@ class OperacionesComercialesHistoryViewModel extends ChangeNotifier {
         fecha: _selectedDate,
       );
 
-      // DEBUG: Mostrar estado de las primeras operaciones para verificar cambios
-      if (_operaciones.isNotEmpty) {
-        final estados = _operaciones
-            .take(3)
-            .map((o) => '${o.id?.substring(0, 4)}..:${o.syncStatus}')
-            .join(', ');
-        debugPrint('📋 [HISTORY] Primeras ops cargadas: $estados');
-      }
-
       // Cargar censos
       _censos = await _censoRepository.obtenerTodos(fecha: _selectedDate);
 
