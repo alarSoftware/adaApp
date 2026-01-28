@@ -102,13 +102,15 @@ class _SelectScreenState extends State<SelectScreen>
     _checkPendingData();
 
     _pendingDataTimer?.cancel();
-    _pendingDataTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    // 🔄 Actualización casi en tiempo real (cada 5 segundos)
+    _pendingDataTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       _checkPendingData();
     });
   }
 
   Future<void> _checkPendingData() async {
     try {
+      debugPrint('🔍 [Badge] Verificando datos pendientes...');
       final dbHelper = DatabaseHelper();
       final db = await dbHelper.database;
 
@@ -119,11 +121,14 @@ class _SelectScreenState extends State<SelectScreen>
       );
 
       final cantidadCensos = censosPendientes.length;
+      debugPrint('📊 [Badge] Censos pendientes: $cantidadCensos');
 
       final validationService = DatabaseValidationService(db);
       final summary = await validationService.getPendingSyncSummary();
       final pendingByTable =
           summary['pending_by_table'] as List<dynamic>? ?? [];
+
+      debugPrint('📋 [Badge] Tablas con datos: ${pendingByTable.length}');
 
       final tablasExcluidas = {
         'censo_activo',
@@ -134,20 +139,35 @@ class _SelectScreenState extends State<SelectScreen>
       int otrosDatos = 0;
       for (var item in pendingByTable) {
         final tableName = item['table'] as String;
+        final count = item['count'] as int;
         if (!tablasExcluidas.contains(tableName)) {
-          otrosDatos += item['count'] as int;
+          debugPrint('  ✅ $tableName: $count');
+          otrosDatos += count;
+        } else {
+          debugPrint('  ⏭️ $tableName: $count (excluida)');
         }
       }
 
       final totalPendientes = cantidadCensos + otrosDatos;
+      debugPrint(
+        '🔢 [Badge] Total pendientes: $totalPendientes (censos: $cantidadCensos + otros: $otrosDatos)',
+      );
+      debugPrint('🔢 [Badge] Contador actual: $_pendingDataCount');
 
       if (mounted && _pendingDataCount != totalPendientes) {
+        debugPrint(
+          '✨ [Badge] Actualizando contador de $_pendingDataCount a $totalPendientes',
+        );
         setState(() {
           _pendingDataCount = totalPendientes;
         });
+      } else if (!mounted) {
+        debugPrint('⚠️ [Badge] Widget no montado - no se actualiza');
+      } else {
+        debugPrint('ℹ️ [Badge] Contador sin cambios');
       }
     } catch (e) {
-      debugPrint('Error checking pending data: $e');
+      debugPrint('❌ [Badge] Error checking pending data: $e');
     }
   }
 

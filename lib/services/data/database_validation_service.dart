@@ -80,7 +80,7 @@ class DatabaseValidationService {
   }
 
   /// Verifica tablas que usan sync_status (pending, synced, draft, error)
-  /// Solo bloquea si hay registros con sync_status que NO sean 'synced' o 'draft'
+  /// Solo cuenta registros con ERROR
   Future<void> _checkSyncStatusTables(
     List<PendingSyncInfo> pendingItems,
   ) async {
@@ -88,6 +88,7 @@ class DatabaseValidationService {
       'dynamic_form_response': 'Respuestas de Formularios',
       'dynamic_form_response_detail': 'Detalles de Respuestas',
       'dynamic_form_response_image': 'Imágenes de Formularios',
+      'operacion_comercial': 'Operaciones Comerciales',
     };
 
     for (var entry in tables.entries) {
@@ -95,9 +96,10 @@ class DatabaseValidationService {
       final displayName = entry.value;
 
       try {
+        // Solo contar ERRORES, no pendientes
         final result = await db.rawQuery(
-          'SELECT COUNT(*) as count FROM $tableName WHERE sync_status NOT IN (?, ?)',
-          ['synced', 'draft'],
+          'SELECT COUNT(*) as count FROM $tableName WHERE sync_status = ?',
+          ['error'],
         );
 
         final count = Sqflite.firstIntValue(result) ?? 0;
@@ -160,12 +162,11 @@ class DatabaseValidationService {
 
   /// Verifica tablas con estados específicos que no deben eliminarse
   Future<void> _checkEstadoTables(List<PendingSyncInfo> pendingItems) async {
-    // Verificar censo_activo con estados pendientes o en error
-    // Estados válidos: 'creado', 'error', etc. - solo permitir eliminar si está 'migrado' o 'completado'
+    // Verificar censo_activo - SOLO con ERROR
     try {
       final result = await db.rawQuery(
-        'SELECT COUNT(*) as count FROM censo_activo WHERE estado_censo NOT IN (?, ?)',
-        ['migrado', 'completado'],
+        'SELECT COUNT(*) as count FROM censo_activo WHERE estado_censo = ?',
+        ['error'],
       );
 
       final count = Sqflite.firstIntValue(result) ?? 0;
@@ -175,7 +176,7 @@ class DatabaseValidationService {
           PendingSyncInfo(
             tableName: 'censo_activo',
             count: count,
-            displayName: 'Censos Pendientes o con Error',
+            displayName: 'Censos con Error',
           ),
         );
       }

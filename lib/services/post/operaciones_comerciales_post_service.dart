@@ -13,6 +13,7 @@ import 'package:ada_app/services/network/monitored_http_client.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
+import 'package:ada_app/repositories/operacion_comercial_detalle_repository.dart';
 
 /// Formatea DateTime sin 'T' ni 'Z' para el backend
 /// Formato: "yyyy-MM-dd HH:mm:ss.SSSSSS"
@@ -40,6 +41,14 @@ class OperacionesComercialesPostService {
   }) async {
     String? fullUrl;
     try {
+      //TODO cargar objeto operacion.detalles desde una consulta a operacon_detalles where operacion_id = operacion.id
+      // Re-cargar detalles desde BD para asegurar consistencia
+      final detallesDesdeDB = await OperacionComercialDetalleRepositoryImpl()
+          .obtenerDetallesPorOperacionId(operacion.id!);
+
+      // Crear nueva instancia con detalles recargados
+      operacion = operacion.copyWith(detalles: detallesDesdeDB);
+
       if (operacion.id == null || operacion.id!.isEmpty) {
         throw Exception('ID de operación es requerido');
       }
