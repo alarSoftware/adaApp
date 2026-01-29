@@ -156,8 +156,8 @@ void onStart(ServiceInstance service) async {
           onGpsAlert: showGpsNotification,
         );
       } else {
-        // PING: Ejecutar una verificación rápida de horario para mantener el proceso "caliente"
-        DeviceLogBackgroundExtension.estaEnHorarioTrabajo();
+        // Verificación periódica de logs (frecuencia configurada por usuario)
+        await DeviceLogBackgroundExtension.ejecutarLoggingConHorario();
       }
     } catch (e) {
       print("Error en ciclo principal de watchdog: $e");

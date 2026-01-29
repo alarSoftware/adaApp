@@ -15,6 +15,7 @@ import 'package:ada_app/services/api/api_config_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class BackgroundLogConfig {
   static int horaInicio = 9;
@@ -28,7 +29,7 @@ class BackgroundLogConfig {
   static const String keyDiasTrabajo = 'work_days_list';
 
   /// INTERVALO ENTRE REGISTROS (Dinámico)
-  static Duration intervalo = Duration(minutes: 5);
+  static Duration intervalo = Duration(minutes: 15);
 
   /// NÚMERO MÁXIMO DE REINTENTOS
   static const int maxReintentos = 3;
@@ -44,7 +45,7 @@ class BackgroundLogConfig {
 }
 
 class DeviceLogBackgroundExtension {
-  static Timer? _backgroundTimer;
+  // static Timer? _backgroundTimer; // REMOVED: Managed by WorkManager
   static bool _isInitialized = false;
   static bool _isExecuting = false;
   static Function? _onGpsAlertListener;
@@ -78,7 +79,7 @@ class DeviceLogBackgroundExtension {
       _onGpsAlertListener = onGpsAlert;
     }
     try {
-      _backgroundTimer?.cancel();
+      // _backgroundTimer?.cancel(); // Removed
 
       _isInitialized = true;
 
@@ -87,13 +88,11 @@ class DeviceLogBackgroundExtension {
       // Cargar configuración de horario
       await cargarConfiguracionHorario();
 
-      // INICIAR TIMER INTERNO
+      // ELIMINADO: Timer interno. Ahora usamos WorkManager.
+      // _backgroundTimer = Timer.periodic(...)
+
       print(
-        'Iniciando timer interno con intervalo de ${BackgroundLogConfig.intervalo.inMinutes} min',
-      );
-      _backgroundTimer = Timer.periodic(
-        BackgroundLogConfig.intervalo,
-        (timer) async => await ejecutarLoggingConHorario(),
+        'DeviceLog Extension: Configuración cargada. Scheduling delegado a WorkManager.',
       );
 
       // Verificar disponibilidad de servicios
@@ -135,22 +134,17 @@ class DeviceLogBackgroundExtension {
       }
 
       // Cargar intervalo
-      final intervaloMin = prefs.getInt(BackgroundLogConfig.keyIntervalo) ?? 5;
+      final intervaloMin = prefs.getInt(BackgroundLogConfig.keyIntervalo) ?? 15;
       final nuevoIntervalo = Duration(minutes: intervaloMin);
       // SOLO reiniciar si el intervalo cambió
+      // Solo actualizar variable estática, WorkManager usará el nuevo valor en su siguiente ejecución
       if (nuevoIntervalo != BackgroundLogConfig.intervalo) {
         BackgroundLogConfig.intervalo = nuevoIntervalo;
+        print(
+          "Intervalo actualizado a ${nuevoIntervalo.inMinutes} min (Efectivo para WorkManager)",
+        );
 
-        if (_isInitialized &&
-            _backgroundTimer != null &&
-            _backgroundTimer!.isActive) {
-          // Detener y reiniciar el timer
-          _backgroundTimer?.cancel();
-          _backgroundTimer = Timer.periodic(
-            BackgroundLogConfig.intervalo,
-            (timer) async => await ejecutarLoggingConHorario(),
-          );
-        }
+        // NOTA: WorkManager tiene un mínimo de 15m. Si el usuario pone 5m, WorkManager lo ignorará (limite OS).
       }
     } catch (e) {
       print('Error cargando configuración: $e');
@@ -207,7 +201,7 @@ class DeviceLogBackgroundExtension {
   }
 
   /// Ejecutar logging con verificación de horario y sesión
-  static Future<void> ejecutarLoggingConHorario() async {
+  static Future<void> ejecutarLoggingConHorario({bool forzar = false}) async {
     try {
       await cargarConfiguracionHorario();
 
@@ -216,22 +210,49 @@ class DeviceLogBackgroundExtension {
         return;
       }
 
-      // Verificar horario
-      if (!estaEnHorarioTrabajo()) {
+      // Verificar horario (si no se fuerza)
+      if (!forzar && !estaEnHorarioTrabajo()) {
         print(
           'Fuera del horario de trabajo (${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00)',
         );
         return;
       }
 
-      await _ejecutarLogging();
+      // 3. Verificar intervalo (Throttling) para evitar duplicados entre WorkManager y Service
+      if (!forzar) {
+        final db = await DatabaseHelper().database;
+        final result = await db.query(
+          'device_log',
+          orderBy: 'fecha_registro DESC',
+          limit: 1,
+        );
+
+        if (result.isNotEmpty) {
+          final ultimoLogStr = result.first['fecha_registro'] as String;
+          final ultimoLogDate = DateTime.parse(ultimoLogStr);
+          final now = DateTime.now();
+          final diferencia = now.difference(ultimoLogDate);
+
+          // Margen de tolerancia pequeño (pej. 30s) para evitar saltos por inexactitud del timer
+          // Si hace menos de (Intervalo - 0.5 min) que se hizo un log, saltamos.
+          if (diferencia.inSeconds <
+              (BackgroundLogConfig.intervalo.inSeconds - 30)) {
+            print(
+              'LOGGING SKIPPED: Intervalo no cumplido. Último: ${diferencia.inMinutes} min (Config: ${BackgroundLogConfig.intervalo.inMinutes})',
+            );
+            return;
+          }
+        }
+      }
+
+      await _ejecutarLogging(forzar: forzar);
     } catch (e) {
       print('Error en logging con horario: $e');
     }
   }
 
   /// Ejecutar proceso completo de logging
-  static Future<void> _ejecutarLogging() async {
+  static Future<void> _ejecutarLogging({bool forzar = false}) async {
     // LOCK DE CONCURRENCIA
     if (_isExecuting) {
       print('Ya hay un proceso de logging en ejecución - saltando...');
@@ -369,6 +390,7 @@ class DeviceLogBackgroundExtension {
         if (resultado['exito'] == true) {
           print('Enviado exitosamente en intento $intento');
           await _marcarComoSincronizado(log.id);
+          await _mostrarNotificacionExito(log.id); // Notificar éxito
           return;
         } else {
           print('Fallo en intento $intento: ${resultado['mensaje']}');
@@ -381,6 +403,39 @@ class DeviceLogBackgroundExtension {
         final esperaSegundos = BackgroundLogConfig.obtenerTiempoEspera(intento);
         await Future.delayed(Duration(seconds: esperaSegundos));
       }
+    }
+  }
+
+  /// Mostrar notificación local de éxito
+  static Future<void> _mostrarNotificacionExito(String logId) async {
+    try {
+      final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+      const androidSettings = AndroidInitializationSettings(
+        '@mipmap/ic_launcher',
+      );
+      const initSettings = InitializationSettings(android: androidSettings);
+
+      // Inicializar (safe to call multiple times)
+      await flutterLocalNotificationsPlugin.initialize(initSettings);
+
+      const androidDetails = AndroidNotificationDetails(
+        'device_log_success', // Canal separado para éxitos
+        'Device Log Exitoso',
+        channelDescription: 'Notificaciones de envío exitoso de logs',
+        importance: Importance.high,
+        priority: Priority.high,
+        playSound: true,
+      );
+      const details = NotificationDetails(android: androidDetails);
+
+      await flutterLocalNotificationsPlugin.show(
+        DateTime.now().millisecond, // ID único
+        'Log Enviado',
+        'Device Log enviado correctamente.',
+        details,
+      );
+    } catch (e) {
+      print('Error mostrando notificación: $e');
     }
   }
 
@@ -404,8 +459,7 @@ class DeviceLogBackgroundExtension {
     try {
       print('Deteniendo extensión de logging...');
 
-      _backgroundTimer?.cancel();
-      _backgroundTimer = null;
+      // _backgroundTimer?.cancel(); // Removed
       _isInitialized = false;
       _isExecuting = false;
 
@@ -429,9 +483,8 @@ class DeviceLogBackgroundExtension {
     }
   }
 
-  /// Verificar si el servicio está activo
-  static bool get estaActivo =>
-      _isInitialized && (_backgroundTimer?.isActive ?? false);
+  /// Verificar si el servicio está activo (Inicializado)
+  static bool get estaActivo => _isInitialized;
 
   /// Obtener información completa del estado (Diagnóstico Real)
   static Future<Map<String, dynamic>> obtenerEstado() async {

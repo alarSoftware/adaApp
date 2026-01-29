@@ -15,6 +15,7 @@ import 'package:ada_app/config/app_config.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:ada_app/ui/widgets/debug_ribbon_wrapper.dart';
+import 'package:ada_app/services/background/workmanager_service.dart';
 //IMPORTS PARA EL RESET TEMPORAL - COMENTADOS PARA PRODUCCIÓN
 // import 'package:ada_app/services/database_helper.dart';
 
@@ -100,6 +101,9 @@ class _InitializationScreenState extends State<InitializationScreen> {
   }
 
   Future<void> _initializeApp() async {
+    // Permitir que se dibuje el primer frame para evitar bloqueos (onPreDraw loop)
+    await Future.delayed(const Duration(milliseconds: 200));
+
     try {
       setState(() {
         _loadingMessage = 'Inicializando servicios...';
@@ -109,6 +113,9 @@ class _InitializationScreenState extends State<InitializationScreen> {
       await _checkAndRequestPermissions();
 
       await AppServices().inicializar();
+
+      // Inicializar WorkManager para logs garantizados en background
+      await WorkmanagerService.initialize();
 
       setState(() {
         _loadingMessage = 'Verificando autenticación...';
