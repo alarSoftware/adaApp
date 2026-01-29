@@ -45,7 +45,6 @@ class BackgroundLogConfig {
 }
 
 class DeviceLogBackgroundExtension {
-  // static Timer? _backgroundTimer; // REMOVED: Managed by WorkManager
   static bool _isInitialized = false;
   static bool _isExecuting = false;
   static Function? _onGpsAlertListener;
@@ -134,17 +133,13 @@ class DeviceLogBackgroundExtension {
       }
 
       // Cargar intervalo
-      final intervaloMin = prefs.getInt(BackgroundLogConfig.keyIntervalo) ?? 15;
-      final nuevoIntervalo = Duration(minutes: intervaloMin);
-      // SOLO reiniciar si el intervalo cambió
-      // Solo actualizar variable estática, WorkManager usará el nuevo valor en su siguiente ejecución
-      if (nuevoIntervalo != BackgroundLogConfig.intervalo) {
-        BackgroundLogConfig.intervalo = nuevoIntervalo;
-        print(
-          "Intervalo actualizado a ${nuevoIntervalo.inMinutes} min (Efectivo para WorkManager)",
-        );
+      // ELIMINADO: Intervalo ya no es configurable. Se usa fijo 15 min.
+      // BackgroundLogConfig.intervalo = Duration(minutes: 15); (Default)
 
-        // NOTA: WorkManager tiene un mínimo de 15m. Si el usuario pone 5m, WorkManager lo ignorará (limite OS).
+      // FORZAR INTERVALO FIJO - 15 minutos (Hardcoded)
+      if (BackgroundLogConfig.intervalo.inMinutes != 15) {
+        BackgroundLogConfig.intervalo = const Duration(minutes: 15);
+        print("Intervalo restablecido a 15 min (Hardcoded Fixed)");
       }
     } catch (e) {
       print('Error cargando configuración: $e');
@@ -166,23 +161,7 @@ class DeviceLogBackgroundExtension {
       BackgroundLogConfig.horaInicio = inicio;
       BackgroundLogConfig.horaFin = fin;
 
-      if (intervaloMinutos != null) {
-        await prefs.setInt(BackgroundLogConfig.keyIntervalo, intervaloMinutos);
-        BackgroundLogConfig.intervalo = Duration(minutes: intervaloMinutos);
-      }
-
-      if (diasTrabajo != null) {
-        final diasString = diasTrabajo.map((e) => e.toString()).toList();
-        await prefs.setStringList(
-          BackgroundLogConfig.keyDiasTrabajo,
-          diasString,
-        );
-        BackgroundLogConfig.diasTrabajo = diasTrabajo;
-      }
-
-      print(
-        'Nueva configuración guardada - Intervalo: ${intervaloMinutos ?? BackgroundLogConfig.intervalo.inMinutes}min',
-      );
+      print('Nueva configuración guardada - Horario: $inicio:00 - $fin:00');
 
       // Enviar señal al servicio background para que recargue inmediatamente
       final service = FlutterBackgroundService();
@@ -262,6 +241,9 @@ class DeviceLogBackgroundExtension {
     _isExecuting = true;
 
     try {
+      // ⚡ WAKELOCK: Eliminado porque 'wakelock_plus' requiere Activity (UI) y crashea en background.
+      // El ForegroundService y WorkManager ya gestionan el ciclo de vida.
+
       // Re-verificar sesión
       if (!await _verificarSesionActiva()) {
         print('LOGGING SKIPPED: No hay sesión activa');
@@ -317,6 +299,7 @@ class DeviceLogBackgroundExtension {
     } catch (e) {
       print('Error en proceso de logging: $e');
     } finally {
+      // ⚡ RELEASE WAKELOCK: Eliminado
       _isExecuting = false;
     }
   }
