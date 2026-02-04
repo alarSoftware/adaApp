@@ -3,6 +3,20 @@ import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/post/base_post_service.dart';
 import 'package:ada_app/services/api/api_config_service.dart';
 
+/// Formatea DateTime sin 'T' ni 'Z' para el backend
+/// Formato: "yyyy-MM-dd HH:mm:ss.SSSSSS"
+String _formatTimestampForBackend(DateTime dt) {
+  String year = dt.year.toString().padLeft(4, '0');
+  String month = dt.month.toString().padLeft(2, '0');
+  String day = dt.day.toString().padLeft(2, '0');
+  String hour = dt.hour.toString().padLeft(2, '0');
+  String minute = dt.minute.toString().padLeft(2, '0');
+  String second = dt.second.toString().padLeft(2, '0');
+  String microsecond = dt.microsecond.toString().padLeft(6, '0');
+
+  return '$year-$month-$day $hour:$minute:$second.$microsecond';
+}
+
 class DeviceLogPostService {
   static const String _endpoint = '/appDeviceLog/insertAppDeviceLog';
   static const String _tableName = 'device_log';
@@ -14,8 +28,22 @@ class DeviceLogPostService {
   }) async {
     try {
       final Map<String, dynamic> body = log.toMap();
-      // Establecer userId (puede ser null)
       body['userId'] = userId;
+
+      // FIX: Formatear fecha para eliminar la 'T' ISO8601
+      if (log.fechaRegistro.isNotEmpty) {
+        try {
+          debugPrint('DEBUG DATE: Original: ${log.fechaRegistro}');
+          final fechaDt = DateTime.parse(log.fechaRegistro);
+          body['fechaRegistro'] = _formatTimestampForBackend(fechaDt);
+          debugPrint('DEBUG DATE: Formatted: ${body['fechaRegistro']}');
+        } catch (e) {
+          debugPrint('Error formateando fecha log: $e');
+        }
+      }
+
+      debugPrint('Enviando DeviceLog Body: $body');
+
       final resultado = await BasePostService.post(
         endpoint: _endpoint,
         body: body,

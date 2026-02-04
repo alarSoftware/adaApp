@@ -649,15 +649,45 @@ class _DataUsageScreenState extends State<DataUsageScreen> {
   }
 
   String _extractEndpointLabel(String endpoint) {
+    String label = endpoint;
     final uri = Uri.tryParse(endpoint);
-    if (uri != null) {
-      return uri.pathSegments.isNotEmpty
-          ? uri.pathSegments.last
-          : uri.path.isNotEmpty
-          ? uri.path
-          : endpoint;
+
+    if (uri != null && uri.pathSegments.isNotEmpty) {
+      // Tomar el último segmento significativo
+      // Si el último es un ID numérico, tomamos el anterior
+      var segment = uri.pathSegments.last;
+      if (int.tryParse(segment) != null && uri.pathSegments.length > 1) {
+        segment = uri.pathSegments[uri.pathSegments.length - 2];
+      }
+      label = segment;
     }
-    return endpoint;
+
+    return _formatFriendlyName(label);
+  }
+
+  String _formatFriendlyName(String text) {
+    if (text.isEmpty) return text;
+
+    // 1. Reemplazar caracteres especiales (guiones, bajos) por espacios
+    String formatted = text.replaceAll(RegExp(r'[_-]'), ' ');
+
+    // 2. Separar camelCase (ej: "getUsuarios" -> "get Usuarios")
+    formatted = formatted.replaceAllMapped(
+      RegExp(r'(?<=[a-z])(?=[A-Z])'),
+      (match) => ' ',
+    );
+
+    // 3. Capitalizar cada palabra (Title Case)
+    formatted = formatted
+        .split(' ')
+        .map((word) {
+          if (word.trim().isEmpty) return '';
+          if (word.length == 1) return word.toUpperCase();
+          return '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}';
+        })
+        .join(' ');
+
+    return formatted.trim();
   }
 
   String _formatTime(DateTime timestamp) {

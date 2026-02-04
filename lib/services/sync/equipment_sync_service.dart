@@ -206,7 +206,7 @@ class EquipmentSyncService extends BaseSyncService {
       final totalEquipos = await _equipoRepo.contarEquipos();
       if (totalEquipos > 0) {
         debugPrint(
-          '📦 Equipos ya existen en BD ($totalEquipos equipos). Saltando descarga para ahorrar datos.',
+          ' Equipos ya existen en BD ($totalEquipos equipos). Saltando descarga para ahorrar datos.',
         );
         return SyncResult(
           exito: true,
@@ -216,7 +216,7 @@ class EquipmentSyncService extends BaseSyncService {
         );
       }
     } catch (e) {
-      debugPrint('⚠️ Error verificando equipos existentes: $e');
+      debugPrint('Error verificando equipos existentes: $e');
       // Continuar con la descarga en caso de error
     }
 
