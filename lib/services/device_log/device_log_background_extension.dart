@@ -373,7 +373,7 @@ class DeviceLogBackgroundExtension {
         if (resultado['exito'] == true) {
           print('Enviado exitosamente en intento $intento');
           await _marcarComoSincronizado(log.id);
-          await _mostrarNotificacionExito(log.id); // Notificar éxito
+          // await _mostrarNotificacionExito(log.id); // Notificar éxito
           return;
         } else {
           print('Fallo en intento $intento: ${resultado['mensaje']}');
@@ -388,39 +388,39 @@ class DeviceLogBackgroundExtension {
       }
     }
   }
-
-  /// Mostrar notificación local de éxito
-  static Future<void> _mostrarNotificacionExito(String logId) async {
-    try {
-      final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-      const androidSettings = AndroidInitializationSettings(
-        '@mipmap/ic_launcher',
-      );
-      const initSettings = InitializationSettings(android: androidSettings);
-
-      // Inicializar (safe to call multiple times)
-      await flutterLocalNotificationsPlugin.initialize(initSettings);
-
-      const androidDetails = AndroidNotificationDetails(
-        'device_log_success', // Canal separado para éxitos
-        'Device Log Exitoso',
-        channelDescription: 'Notificaciones de envío exitoso de logs',
-        importance: Importance.high,
-        priority: Priority.high,
-        playSound: true,
-      );
-      const details = NotificationDetails(android: androidDetails);
-
-      await flutterLocalNotificationsPlugin.show(
-        DateTime.now().millisecond, // ID único
-        'Log Enviado',
-        'Device Log enviado correctamente.',
-        details,
-      );
-    } catch (e) {
-      print('Error mostrando notificación: $e');
-    }
-  }
+//Ronaldo Notificacion local
+  // /// Mostrar notificación local de éxito
+  // static Future<void> _mostrarNotificacionExito(String logId) async {
+  //   try {
+  //     final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  //     const androidSettings = AndroidInitializationSettings(
+  //       '@mipmap/ic_launcher',
+  //     );
+  //     const initSettings = InitializationSettings(android: androidSettings);
+  //
+  //     // Inicializar (safe to call multiple times)
+  //     await flutterLocalNotificationsPlugin.initialize(initSettings);
+  //
+  //     const androidDetails = AndroidNotificationDetails(
+  //       'device_log_success', // Canal separado para éxitos
+  //       'Device Log Exitoso',
+  //       channelDescription: 'Notificaciones de envío exitoso de logs',
+  //       importance: Importance.high,
+  //       priority: Priority.high,
+  //       playSound: true,
+  //     );
+  //     const details = NotificationDetails(android: androidDetails);
+  //
+  //     await flutterLocalNotificationsPlugin.show(
+  //       DateTime.now().millisecond, // ID único
+  //       'Log Enviado',
+  //       'Device Log enviado correctamente.',
+  //       details,
+  //     );
+  //   } catch (e) {
+  //     print('Error mostrando notificación: $e');
+  //   }
+  // }
 
   static Future<void> _marcarComoSincronizado(String logId) async {
     try {

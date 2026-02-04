@@ -105,7 +105,7 @@ class DeviceInfoHelper {
       );
       return log;
     } catch (e) {
-      print('❌ Error al crear log: $e');
+      print('Error al crear log: $e');
       return null;
     }
   }
@@ -155,12 +155,12 @@ class DeviceInfoHelper {
     }
   }
 
-  /// 📊 Mostrar estado de disponibilidad
+  ///Mostrar estado de disponibilidad
   static Future<void> mostrarEstadoDisponibilidad() async {
     final disponibilidad = await verificarDisponibilidad();
 
     print('═══════════════════════════════════════');
-    print('📊 DISPONIBILIDAD DE SERVICIOS');
+    print('DISPONIBILIDAD DE SERVICIOS');
     print('═══════════════════════════════════════');
     disponibilidad.forEach((servicio, disponible) {
       final icono = disponible ? '✅' : '❌';
