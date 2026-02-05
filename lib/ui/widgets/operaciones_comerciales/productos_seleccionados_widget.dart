@@ -170,7 +170,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
                             child: _buildProductInfo(producto, esDiscontinuos),
                           ),
                           const SizedBox(width: 12),
-                          _buildQuantityField(index, detalle),
+                          _buildQuantityField(context, index, detalle),
                           if (!isReadOnly) ...[
                             const SizedBox(width: 8),
                             _buildDeleteButton(index),
@@ -320,7 +320,11 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildQuantityField(int index, OperacionComercialDetalle detalle) {
+  Widget _buildQuantityField(
+    BuildContext context,
+    int index,
+    OperacionComercialDetalle detalle,
+  ) {
     return Container(
       width: 70,
       decoration: BoxDecoration(
@@ -376,6 +380,22 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           if (!isReadOnly) {
             final cantidad = int.tryParse(value) ?? 0;
             onActualizarCantidad(index, cantidad.toDouble());
+          }
+        },
+        onTap: () {
+          if (!isReadOnly) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              Future.delayed(const Duration(milliseconds: 300), () {
+                if (context.mounted) {
+                  Scrollable.ensureVisible(
+                    context,
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.fastOutSlowIn,
+                    alignment: 0.5, // Center the item in the viewport
+                  );
+                }
+              });
+            });
           }
         },
         validator: (value) {
@@ -462,7 +482,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
           const SizedBox(height: 16),
 
           if (detalle.productoReemplazoId == null)
-            _buildSelectReplacementButton(index, detalle)
+            _buildSelectReplacementButton(context, index, detalle)
           else
             _buildReplacementInfo(index, detalle),
         ],
@@ -471,6 +491,7 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
   }
 
   Widget _buildSelectReplacementButton(
+    BuildContext context,
     int index,
     OperacionComercialDetalle detalle,
   ) {
@@ -504,7 +525,21 @@ class ProductosSeleccionadosWidget extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => onSeleccionarReemplazo?.call(index, detalle),
+        onTap: () {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (context.mounted) {
+                Scrollable.ensureVisible(
+                  context,
+                  duration: const Duration(milliseconds: 500),
+                  curve: Curves.fastOutSlowIn,
+                  alignment: 0.5,
+                );
+              }
+            });
+          });
+          onSeleccionarReemplazo?.call(index, detalle);
+        },
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.all(16),

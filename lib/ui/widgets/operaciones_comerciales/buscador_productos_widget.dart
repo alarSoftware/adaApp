@@ -43,6 +43,26 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
         _controller.text != widget.searchQuery) {
       _controller.text = widget.searchQuery;
     }
+
+    // Auto-scroll cuando hay resultados nuevos
+    if (widget.productosFiltrados.isNotEmpty &&
+        widget.searchQuery.isNotEmpty &&
+        widget.searchQuery != oldWidget.searchQuery) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) {
+              Scrollable.ensureVisible(
+                context,
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.fastOutSlowIn,
+                alignment: 0.0, // Alinearse al top del viewport
+              );
+            }
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -83,6 +103,20 @@ class _BuscadorProductosWidgetState extends State<BuscadorProductosWidget> {
       child: TextField(
         controller: _controller,
         onChanged: widget.onSearchChanged,
+        onTap: () {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (mounted) {
+                Scrollable.ensureVisible(
+                  context,
+                  duration: const Duration(milliseconds: 500),
+                  curve: Curves.fastOutSlowIn,
+                  alignment: 0.0,
+                );
+              }
+            });
+          });
+        },
         decoration: InputDecoration(
           hintText: 'Buscar por código, nombre o código de barras...',
           hintStyle: TextStyle(color: AppColors.textSecondary),
