@@ -5,6 +5,7 @@ import 'package:ada_app/services/device_log/device_log_upload_service.dart';
 import 'package:ada_app/services/sync/operacion_comercial_sync_service.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/models/usuario.dart';
+import 'package:ada_app/services/websocket/socket_service.dart';
 
 class AppServices {
   static AppServices? _instance;
@@ -38,6 +39,9 @@ class AppServices {
       } else {
         print('No se pudo obtener información del usuario');
       }
+
+      // 3. Conectar WebSocket para rastreo de usuarios activos
+      await SocketService().connect(username: usuario?.username);
 
       print('Servicios básicos iniciados correctamente');
       print(
@@ -110,6 +114,9 @@ class AppServices {
       // 2. Detener sincronizaciones automáticas
       await _detenerSincronizacionesAutomaticas();
 
+      // 3. Desconectar WebSocket
+      SocketService().disconnect();
+
       print('Todos los servicios detenidos por logout');
     } catch (e) {
       print('Error deteniendo servicios en logout: $e');
@@ -157,6 +164,9 @@ class AppServices {
             'Sincronizaciones automáticas restauradas para usuario: ${usuario.username}',
           );
         }
+
+        // Conectar WebSocket si ya está logueado
+        await SocketService().connect(username: usuario?.username);
       } else {
         print('Usuario no logueado - servicios no iniciados');
       }

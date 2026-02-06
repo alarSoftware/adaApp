@@ -806,9 +806,6 @@ class OperacionComercialSyncService extends BaseSyncService {
     });
 
     Timer(const Duration(seconds: 15), () async {
-      debugPrint(
-        '⏰ [TIMER] Ejecutando primera sincronización (15s después del login)',
-      );
       await _ejecutarSincronizacionAutomatica();
     });
   }

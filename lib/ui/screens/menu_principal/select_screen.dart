@@ -21,6 +21,7 @@ import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
 import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/ui/screens/menu_principal/productos_screen.dart';
+import 'package:ada_app/ui/widgets/websocket_status_dot.dart';
 import 'package:ada_app/ui/screens/menu_principal/about_screen.dart';
 import 'package:ada_app/config/app_config.dart';
 import 'package:ada_app/ui/screens/error_log_screen.dart';
@@ -1472,6 +1473,10 @@ class _SelectScreenState extends State<SelectScreen>
           ),
 
           _buildPendingDataButton(),
+          const Tooltip(
+            message: 'Estado de conexión (Rastreo)',
+            child: WebSocketStatusDot(),
+          ),
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {
