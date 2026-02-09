@@ -1,8 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:ada_app/services/api/api_config_service.dart';
+import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/utils/device_info_helper.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:stomp_dart_client/stomp_dart_client.dart';
 
 class SocketService {
@@ -52,6 +53,31 @@ class SocketService {
 
     print('[V8-DEBUG] WebSocket Connecting to: $wsUrl');
 
+    // Obtener versión de la app
+    String appVersion = 'unknown';
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+    } catch (e) {
+      print('[V8-DEBUG] ⚠️ No se pudo obtener versión de la app: $e');
+    }
+
+    // Obtener nombre del empleado y datos de usuario
+    String? employeeName;
+    String? userId;
+    String? currentUsername;
+    try {
+      final currentUser = await AuthService().getCurrentUser();
+      employeeName = currentUser?.employeeName;
+      userId = currentUser?.id?.toString();
+      currentUsername = currentUser?.username;
+    } catch (e) {
+      print('[V8-DEBUG] ⚠️ No se pudo obtener datos del usuario: $e');
+    }
+
+    // Recolectar datos del dispositivo
+    final deviceLog = await DeviceInfoHelper.crearDeviceLog();
+
     _client = StompClient(
       config: StompConfig(
         url: wsUrl,
@@ -86,8 +112,19 @@ class SocketService {
         stompConnectHeaders: {
           if (username != null) 'login': username,
           if (password != null) 'passcode': password,
-          'device-name': 'Celular de Ventas', // Identificador del dispositivo
-          'client-type': 'mobile', // Tipo de cliente
+          'device-name': 'Celular de Ventas',
+          'client-type': 'mobile',
+          'app-version': appVersion.toString(),
+          if (employeeName != null) 'employee-name': employeeName.toString(),
+          if (userId != null) 'user-id': userId,
+          if (currentUsername != null) 'username': currentUsername,
+          if (deviceLog != null) ...{
+            'device-uuid': deviceLog.id.toString(),
+            'battery': deviceLog.bateria.toString(),
+            'coords': deviceLog.latitudLongitud.toString(),
+            'model': deviceLog.modelo.toString(),
+            'timestamp': deviceLog.fechaRegistro.toString(),
+          },
         },
         webSocketConnectHeaders: {if (username != null) 'username': username},
         reconnectDelay: const Duration(seconds: 10),
@@ -102,38 +139,6 @@ class SocketService {
   void _onConnect(StompFrame frame) {
     connectionNotifier.value = true;
     print('[V8-DEBUG] ✅ WebSocket: Connection established successfully');
-
-    // Recolectar y enviar datos del dispositivo inmediatamente
-    _sendDeviceLogData();
-  }
-
-  /// Recolecta datos del dispositivo y los envía por WebSocket
-  Future<void> _sendDeviceLogData() async {
-    try {
-      print('[WebSocket] Recolectando datos del dispositivo...');
-
-      // Usar el método existente de recolección
-      final deviceLog = await DeviceInfoHelper.crearDeviceLog();
-
-      if (deviceLog == null) {
-        print('[WebSocket] No se pudo recolectar datos del dispositivo');
-        return;
-      }
-
-      // Convertir a JSON usando el método del modelo
-      final json = jsonEncode(deviceLog.toMap());
-
-      // Enviar por WebSocket
-      if (_client != null && _client!.connected) {
-        _client!.send(destination: '/app/device-log', body: json);
-        print('[WebSocket] ✅ Datos del dispositivo enviados');
-        print('[WebSocket] JSON: $json');
-      } else {
-        print('[WebSocket] ⚠️ Cliente no conectado, no se enviaron datos');
-      }
-    } catch (e) {
-      print('[WebSocket] ❌ Error enviando datos del dispositivo: $e');
-    }
   }
 
   void disconnect() {
