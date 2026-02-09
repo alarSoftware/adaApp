@@ -18,8 +18,7 @@ class AppServices {
   }
 
   // ==================== INICIALIZACIÓN EN LOGIN ====================
-
-  Future<void> inicializarEnLogin() async {
+  Future<void> inicializarEnLogin({String? password}) async {
     try {
       print(
         'User logged in - Initializing basic services (no device logging yet)',
@@ -41,7 +40,10 @@ class AppServices {
       }
 
       // 3. Conectar WebSocket para rastreo de usuarios activos
-      await SocketService().connect(username: usuario?.username);
+      await SocketService().connect(
+        username: usuario?.username,
+        password: password,
+      );
 
       print('Servicios básicos iniciados correctamente');
       print(

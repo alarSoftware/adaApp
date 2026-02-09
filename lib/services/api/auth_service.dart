@@ -290,7 +290,7 @@ class AuthService {
       await _saveLoginSuccess(usuarioAuth);
 
       try {
-        await AppServices().inicializarEnLogin();
+        await AppServices().inicializarEnLogin(password: password);
       } catch (e) {}
 
       return AuthResult(
@@ -353,7 +353,7 @@ class AuthService {
       await _saveLoginSuccess(usuarioAuth);
 
       try {
-        await AppServices().inicializarEnLogin();
+        await AppServices().inicializarEnLogin(password: usuario.password);
       } catch (e) {}
 
       return AuthResult(
@@ -374,7 +374,7 @@ class AuthService {
       // 1. PRIMERO: Obtener usuario ANTES de limpiar (necesario para el device log)
       final currentUser = await getCurrentUser();
 
-      // 2. Detener sincronizaciones y servicios para que no bloqueen
+     // 2. Detener sincronizaciones y servicios para que no bloqueen
       try {
         await AppServices().detenerEnLogout();
       } catch (e) {
