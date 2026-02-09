@@ -536,6 +536,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     return PreviewBottomBar(
       esHistorial: esHistorial,
       isSaving: vm.isSaving,
+      isConfirming: _yaConfirmado,
       statusMessage: vm.statusMessage,
       cantidadImagenes: cantidadImagenes,
       onVolver: () => Navigator.of(context).pop(),
