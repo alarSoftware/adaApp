@@ -45,7 +45,6 @@ class OperacionComercialSyncService extends BaseSyncService {
     int? partnerId,
     String? tipo,
   }) async {
-    debugPrint('INICIO DESCARGA DE OPERACIONES');
     try {
       final queryParams = <String, String>{};
 
@@ -106,7 +105,6 @@ class OperacionComercialSyncService extends BaseSyncService {
       final operacionesData = await _parseResponse(operacionesResponse);
 
       if (operacionesData.isEmpty) {
-        debugPrint('FIN DE DESCARGA');
         return SyncResult(
           exito: true,
           mensaje: 'No hay operaciones para sincronizar',
@@ -137,7 +135,6 @@ class OperacionComercialSyncService extends BaseSyncService {
 
       _ultimasOperaciones = processedResult;
 
-      debugPrint('FIN DE DESCARGA');
       return SyncResult(
         exito: true,
         mensaje: 'Operaciones sincronizadas correctamente',
@@ -146,7 +143,6 @@ class OperacionComercialSyncService extends BaseSyncService {
       );
     } catch (e) {
       _ultimasOperaciones = [];
-      debugPrint('FIN DE DESCARGA CON ERROR: $e');
 
       // Manejo centralizado de excepciones
       await ErrorLogService.manejarExcepcion(
@@ -203,7 +199,6 @@ class OperacionComercialSyncService extends BaseSyncService {
 
       return null;
     } catch (e) {
-      debugPrint('Error obteniendo odooName: $e');
       return null;
     }
   }
@@ -543,55 +538,30 @@ class OperacionComercialSyncService extends BaseSyncService {
   Future<Map<String, int>> sincronizarOperacionesPendientes(
     int usuarioId,
   ) async {
-    debugPrint(
-      '🔄 [SYNC] Iniciando sincronización de operaciones pendientes...',
-    );
     int operacionesExitosas = 0;
     int totalFallidas = 0;
 
     try {
       final operacionesCreadas = await _operacionRepository
           .obtenerOperacionesPendientes();
-      debugPrint(
-        '🔍 [SYNC] Operaciones pendientes (creado): ${operacionesCreadas.length}',
-      );
 
       final operacionesError = await _operacionRepository
           .obtenerOperacionesConError();
-      debugPrint(
-        '🔍 [SYNC] Operaciones con error (antes de filtrar): ${operacionesError.length}',
-      );
 
       final operacionesErrorListas =
           await _filtrarOperacionesListasParaReintento(operacionesError);
-      debugPrint(
-        '🔍 [SYNC] Operaciones listas para reintentar: ${operacionesErrorListas.length}',
-      );
 
       final todasLasOperaciones = [
         ...operacionesCreadas,
         ...operacionesErrorListas,
       ];
 
-      debugPrint(
-        '📊 [SYNC] Total de operaciones a procesar: ${todasLasOperaciones.length}',
-      );
-
       final operacionesAProcesar = todasLasOperaciones.take(20);
-      debugPrint(
-        '📤 [SYNC] Procesando ${operacionesAProcesar.length} operaciones',
-      );
 
       for (final operacion in operacionesAProcesar) {
-        debugPrint(
-          '🔹 [SYNC] Intentando operación ${operacion.id} (intento ${operacion.syncRetryCount + 1}/${maxIntentos})',
-        );
         try {
           await _sincronizarOperacionIndividual(operacion, usuarioId);
           operacionesExitosas++;
-          debugPrint(
-            '✅ [SYNC] Operación ${operacion.id} sincronizada exitosamente',
-          );
         } catch (e) {
           totalFallidas++;
           debugPrint('❌ [SYNC] Error en operación ${operacion.id}: $e');
@@ -605,17 +575,12 @@ class OperacionComercialSyncService extends BaseSyncService {
               );
             } catch (repoError) {
               // Si falla marcar como error, solo logueamos
-              debugPrint('⚠️ Error marcando operación como error: $repoError');
             }
           }
         }
 
         await Future.delayed(Duration(milliseconds: 500));
       }
-
-      debugPrint(
-        '✅ [SYNC] Resumen: ${operacionesExitosas} exitosas | ${totalFallidas} fallidas',
-      );
 
       return {
         'operaciones_exitosas': operacionesExitosas,
@@ -652,12 +617,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       final intentosPrevios = operacion.syncRetryCount;
       final numeroIntento = intentosPrevios + 1;
 
-      debugPrint(
-        '📝 [SYNC] Operación $operacionId: intento $numeroIntento de $maxIntentos',
-      );
-
       if (numeroIntento > maxIntentos) {
-        debugPrint('⛔ [SYNC] Máximo de intentos alcanzado para $operacionId');
         await _operacionRepository.marcarComoError(
           operacionId,
           'Máximo de intentos alcanzado ($maxIntentos)',
@@ -665,27 +625,21 @@ class OperacionComercialSyncService extends BaseSyncService {
         return;
       }
       await _actualizarIntentoSincronizacion(operacionId, numeroIntento);
-      debugPrint('🚀 [SYNC] Enviando operación $operacionId al servidor...');
 
       final serverResponse =
           await OperacionesComercialesPostService.enviarOperacion(operacion);
-      debugPrint('✅ [SYNC] Operación $operacionId enviada exitosamente');
 
       // Parsear respuesta del servidor para obtener odooName y adaSequence
       String? odooName;
       String? adaSequence;
 
       if (serverResponse.resultJson != null) {
-        debugPrint('📦 [SYNC] Parseando respuesta del servidor...');
         final parsedData =
             OperacionesComercialesPostService.parsearRespuestaJson(
               serverResponse.resultJson,
             );
         odooName = parsedData['odooName'];
         adaSequence = parsedData['adaSequence'];
-        debugPrint(
-          '📦 [SYNC] Parsed - odooName: $odooName, adaSequence: $adaSequence',
-        );
       }
 
       // Marcar como migrado en la BD
@@ -695,7 +649,6 @@ class OperacionComercialSyncService extends BaseSyncService {
         odooName: odooName,
         adaSequence: adaSequence,
       );
-      debugPrint('✅ [SYNC] Operación $operacionId marcada como migrada');
     } catch (e) {
       rethrow;
     }
@@ -707,16 +660,9 @@ class OperacionComercialSyncService extends BaseSyncService {
     final operacionesListas = <OperacionComercial>[];
     final ahora = DateTime.now();
 
-    debugPrint(
-      '🔍 [FILTER] Filtrando ${operacionesError.length} operaciones con error...',
-    );
-
     for (final operacion in operacionesError) {
       try {
         final intentos = operacion.syncRetryCount;
-        debugPrint(
-          '🔍 [FILTER] Operación ${operacion.id}: $intentos intentos de $maxIntentos',
-        );
 
         if (intentos >= maxIntentos) {
           debugPrint(
@@ -726,9 +672,6 @@ class OperacionComercialSyncService extends BaseSyncService {
         }
 
         if (operacion.syncedAt == null) {
-          debugPrint(
-            '✅ [FILTER] Operación ${operacion.id} sin syncedAt, agregando',
-          );
           operacionesListas.add(operacion);
           continue;
         }
@@ -739,9 +682,6 @@ class OperacionComercialSyncService extends BaseSyncService {
         );
 
         final tiempoRestante = tiempoProximoIntento.difference(ahora);
-        debugPrint(
-          '⏱️ [FILTER] Operación ${operacion.id}: tiempo restante ${tiempoRestante.inSeconds}s',
-        );
 
         if (ahora.isAfter(tiempoProximoIntento)) {
           debugPrint(
@@ -754,7 +694,6 @@ class OperacionComercialSyncService extends BaseSyncService {
           );
         }
       } catch (e) {
-        debugPrint('❌ [FILTER] Error procesando operación ${operacion.id}: $e');
         operacionesListas.add(operacion);
       }
     }
@@ -790,10 +729,6 @@ class OperacionComercialSyncService extends BaseSyncService {
     _usuarioActual = usuarioId;
     _syncActivo = true;
 
-    debugPrint(
-      '⏰ [TIMER] Iniciando timer automático para usuario $usuarioId (cada ${intervaloTimer.inMinutes} min)',
-    );
-
     _syncTimer = Timer.periodic(intervaloTimer, (timer) async {
       await _ejecutarSincronizacionAutomatica();
     });
@@ -801,8 +736,8 @@ class OperacionComercialSyncService extends BaseSyncService {
     // Timer independiente para OdooName (cada 30 min)
     _odooNameTimer = Timer.periodic(intervaloOdooName, (timer) async {
       if (!_syncActivo || _usuarioActual == null) return;
-      final service = OperacionComercialSyncService();
-      await service.sincronizarOdooNamesPendientes();
+      // final service = OperacionComercialSyncService();
+      // await service.sincronizarOdooNamesPendientes();
     });
 
     Timer(const Duration(seconds: 15), () async {
@@ -834,7 +769,6 @@ class OperacionComercialSyncService extends BaseSyncService {
       return;
     }
 
-    debugPrint('⏰ [TIMER] Ejecutando sincronización automática...');
 
     _syncEnProgreso = true;
 

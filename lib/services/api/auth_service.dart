@@ -371,29 +371,40 @@ class AuthService {
 
   Future<void> logout() async {
     try {
-      // 1. Reportar logout a la API (Intento de "best effort")
-      await _reportLogout();
+      // 1. PRIMERO: Obtener usuario ANTES de limpiar (necesario para el device log)
+      final currentUser = await getCurrentUser();
 
-      // 2. Detener servicios background y socket
+     // 2. Detener sincronizaciones y servicios para que no bloqueen
       try {
         await AppServices().detenerEnLogout();
-      } catch (e) {}
+      } catch (e) {
+        print('Error deteniendo servicios: $e');
+      }
 
+      // 3. Crear y GUARDAR el device log (esperar solo el guardado, no el envío)
+      if (currentUser != null) {
+        await _guardarLogoutLog(currentUser);
+      }
+
+      // 4. Limpiar sesión
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_keyHasLoggedIn);
       await prefs.remove(_keyCurrentUser);
       await prefs.remove(_keyCurrentUserRole);
-    } catch (e) {}
+
+      print('Logout completado');
+    } catch (e) {
+      print('Error en logout: $e');
+    }
   }
 
-  /// Envía un DeviceLog final indicando el cierre de sesión
-  Future<void> _reportLogout() async {
+  /// Guarda el DeviceLog de logout en BD local y envía al servidor en segundo plano
+  Future<void> _guardarLogoutLog(Usuario currentUser) async {
     try {
-      print('Reporting logout to API...');
-      final currentUser = await getCurrentUser();
-      if (currentUser == null) return;
+      print('Guardando device log de logout...');
 
-      final log = await DeviceInfoHelper.crearDeviceLog();
+      // Usar método rápido para no bloquear (usa última ubicación conocida)
+      final log = await DeviceInfoHelper.crearDeviceLogRapido();
 
       if (log != null) {
         final parts = log.latitudLongitud.split(',');
@@ -418,27 +429,36 @@ class AuthService {
           modelo: '${log.modelo} [LOGOUT]',
         );
 
+        print('✅ Device log de logout guardado en BD local (ID: $logId)');
+
         // Recuperar el objeto completo desde la BD
         final logParaEnviar = await repository.obtenerPorId(logId);
 
         if (logParaEnviar != null) {
-          final resultado = await DeviceLogPostService.enviarDeviceLog(
-            logParaEnviar,
-            userId: currentUser.id.toString(),
-          );
-
-          if (resultado['exito'] == true) {
-            await repository.marcarComoSincronizado(logId);
-            print('Logout report sent and synced successfully');
-          } else {
-            print(
-              'Logout report saved locally but failed to send: ${resultado['mensaje']}',
-            );
-          }
+          // Enviar al servidor en segundo plano (fire and forget)
+          DeviceLogPostService.enviarDeviceLog(
+                logParaEnviar,
+                userId: currentUser.id.toString(),
+              )
+              .then((resultado) async {
+                if (resultado['exito'] == true) {
+                  await repository.marcarComoSincronizado(logId);
+                  print('✅ Logout log enviado y sincronizado');
+                } else {
+                  print(
+                    '⚠️ Logout log guardado, se sincronizará después: ${resultado['mensaje']}',
+                  );
+                }
+              })
+              .catchError((e) {
+                print('⚠️ Logout log guardado, se sincronizará después: $e');
+              });
         }
+      } else {
+        print('⚠️ No se pudo crear device log de logout');
       }
     } catch (e) {
-      print('Error reporting logout: $e');
+      print('Error guardando logout log: $e');
     }
   }
 

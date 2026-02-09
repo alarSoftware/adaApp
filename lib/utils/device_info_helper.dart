@@ -32,6 +32,35 @@ class DeviceInfoHelper {
     }
   }
 
+  /// Obtener ubicación rápida (para logout - usa última conocida o timeout corto)
+  static Future<Position?> obtenerUbicacionRapida() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        print('Servicios de ubicación desactivados');
+        return null;
+      }
+
+      // Primero intentar obtener la última ubicación conocida (instantáneo)
+      final lastPosition = await Geolocator.getLastKnownPosition();
+      if (lastPosition != null) {
+        print('Usando última ubicación conocida');
+        return lastPosition;
+      }
+
+      // Si no hay última conocida, intentar con timeout muy corto
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.low,
+          timeLimit: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      print(' No se pudo obtener ubicación rápida: $e');
+      return null;
+    }
+  }
+
   /// 🔋 Obtener nivel de batería
   static Future<int> obtenerNivelBateria() async {
     try {
@@ -106,6 +135,48 @@ class DeviceInfoHelper {
       return log;
     } catch (e) {
       print('Error al crear log: $e');
+      return null;
+    }
+  }
+
+  /// Crear DeviceLog rápido (para logout - usa última ubicación conocida)
+  static Future<DeviceLog?> crearDeviceLogRapido() async {
+    try {
+      print('Creando device log rápido para logout...');
+
+      // Obtener todos los datos en paralelo usando ubicación rápida
+      final results = await Future.wait([
+        obtenerUbicacionRapida(),
+        obtenerNivelBateria(),
+        obtenerModeloDispositivo(),
+        obtenerEmployeeId(),
+      ]);
+
+      final position = results[0] as Position?;
+      final bateria = results[1] as int;
+      final modelo = results[2] as String;
+      final employeeId = results[3] as String?;
+
+      // Si no hay ubicación, usar 0,0 para no bloquear el logout
+      final latLong = position != null
+          ? '${position.latitude},${position.longitude}'
+          : '0.0,0.0';
+
+      // Crear el log (siempre, aunque no haya ubicación)
+      final log = DeviceLog(
+        id: const Uuid().v4(),
+        employeeId: employeeId,
+        latitudLongitud: latLong,
+        bateria: bateria,
+        modelo: modelo,
+        fechaRegistro: DateTime.now().toIso8601String(),
+        sincronizado: 0,
+      );
+
+      print(' Device log rápido creado');
+      return log;
+    } catch (e) {
+      print('Error al crear log rápido: $e');
       return null;
     }
   }

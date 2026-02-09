@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:ada_app/services/app_services.dart';
 import 'package:ada_app/services/api/auth_service.dart';
-import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
+// import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
 import 'ui/screens/login/login_screen.dart';
 import 'ui/screens/clientes/clients_screen.dart';
 import 'ui/screens/menu_principal/select_screen.dart';
@@ -109,42 +109,20 @@ class _InitializationScreenState extends State<InitializationScreen> {
         _loadingMessage = 'Inicializando servicios...';
       });
 
-      // 🔴 NUEVO: Solicitar permisos ANTES de cualquier cosa
+      // 1. Verificar permisos (bloqueante si faltan)
       await _checkAndRequestPermissions();
 
-      await AppServices().inicializar();
+      // 2. Iniciar servicios en SEGUNDO PLANO (Fire & Forget)
+      _iniciarServiciosBackground();
 
-      // Inicializar WorkManager para logs garantizados en background
-      await WorkmanagerService.initialize();
+      // Servicios iniciados en background arriba ⬆️
 
-      setState(() {
-        _loadingMessage = 'Verificando autenticación...';
-      });
-
+      // 3. Verificar estado de autenticación (rápido)
       final authService = AuthService();
       final estaAutenticado = await authService.hasUserLoggedInBefore();
 
-      if (estaAutenticado) {
-        setState(() {
-          _loadingMessage = 'Preparando acceso...';
-        });
-      }
-
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      if (mounted && estaAutenticado) {
-        try {
-          setState(() {
-            _loadingMessage = 'Verificando optimización de batería...';
-          });
-
-          await BatteryOptimizationDialog.checkAndRequestBatteryOptimization(
-            context,
-          );
-        } catch (e) {}
-      } else {}
-
       if (mounted) {
+        // Navegación inmediata
         Navigator.pushReplacementNamed(
           context,
           estaAutenticado ? '/home' : '/login',
@@ -299,6 +277,23 @@ class _InitializationScreenState extends State<InitializationScreen> {
           return;
         }
       }
+    }
+  }
+
+  /// Inicia los servicios pesados en segundo plano sin bloquear la UI
+  void _iniciarServiciosBackground() async {
+    try {
+      print('Iniciando servicios en segundo plano...');
+
+      // Inicializar servicios principales
+      await AppServices().inicializar();
+
+      // Inicializar WorkManager
+      await WorkmanagerService.initialize();
+
+      print('Servicios en segundo plano iniciados correctamente');
+    } catch (e) {
+      print('Error al iniciar servicios en segundo plano: $e');
     }
   }
 
