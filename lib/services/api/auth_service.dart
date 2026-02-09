@@ -290,7 +290,7 @@ class AuthService {
       await _saveLoginSuccess(usuarioAuth);
 
       try {
-        await AppServices().inicializarEnLogin();
+        await AppServices().inicializarEnLogin(password: password);
       } catch (e) {}
 
       return AuthResult(
@@ -353,7 +353,7 @@ class AuthService {
       await _saveLoginSuccess(usuarioAuth);
 
       try {
-        await AppServices().inicializarEnLogin();
+        await AppServices().inicializarEnLogin(password: usuario.password);
       } catch (e) {}
 
       return AuthResult(
@@ -374,9 +374,9 @@ class AuthService {
       // 1. Reportar logout a la API (Intento de "best effort")
       await _reportLogout();
 
-      // 2. Detener servicios background
+      // 2. Detener servicios background y socket
       try {
-        await AppBackgroundService.stopService();
+        await AppServices().detenerEnLogout();
       } catch (e) {}
 
       final prefs = await SharedPreferences.getInstance();
