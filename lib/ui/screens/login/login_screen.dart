@@ -4,7 +4,7 @@ import 'package:ada_app/viewmodels/login_screen_viewmodel.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/ui/widgets/login/login_header.dart';
 import 'package:ada_app/ui/widgets/login/login_form.dart';
-import 'package:ada_app/ui/widgets/login/biometric_button.dart';
+
 import 'package:ada_app/ui/widgets/login/login_appbar.dart';
 
 import 'package:ada_app/ui/widgets/login/sync_dialog.dart';
@@ -257,11 +257,6 @@ class _LoginScreenContentState extends State<_LoginScreenContent>
     await viewModel.handleLogin();
   }
 
-  Future<void> _handleBiometricLogin() async {
-    final viewModel = context.read<LoginScreenViewModel>();
-    await viewModel.authenticateWithBiometric();
-  }
-
   Future<void> _handleSync() async {
     final viewModel = context.read<LoginScreenViewModel>();
     await viewModel.syncUsers();
@@ -441,12 +436,7 @@ class _LoginScreenContentState extends State<_LoginScreenContent>
                           onSubmit: _handleLogin,
                           loginButtonKey: _loginButtonKey,
                         ),
-                        if (viewModel.biometricAvailable) ...[
-                          const SizedBox(height: 24),
-                          _buildDivider(),
-                          const SizedBox(height: 24),
-                          BiometricButton(onPressed: _handleBiometricLogin),
-                        ],
+
                         const SizedBox(height: 40),
                         // _buildFooter(),
                       ],
@@ -458,26 +448,6 @@ class _LoginScreenContentState extends State<_LoginScreenContent>
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Row(
-      children: [
-        Expanded(child: Divider(color: AppColors.divider, height: 1)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'o',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        Expanded(child: Divider(color: AppColors.divider, height: 1)),
-      ],
     );
   }
 

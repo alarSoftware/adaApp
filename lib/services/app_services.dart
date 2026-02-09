@@ -39,11 +39,11 @@ class AppServices {
         print('No se pudo obtener información del usuario');
       }
 
-      // 3. Conectar WebSocket para rastreo de usuarios activos
-      await SocketService().connect(
-        username: usuario?.username,
-        password: password,
-      );
+      // 3. Conectar WebSocket para rastreo de usuarios activos (no-bloqueante)
+      // Fire & forget - se conecta en segundo plano sin bloquear el login
+      if (usuario != null) {
+        SocketService().connect(username: usuario.username, password: password);
+      }
 
       print('Servicios básicos iniciados correctamente');
       print(
@@ -158,17 +158,18 @@ class AppServices {
 
         print('Servicios básicos y background service inicializados');
 
-        // 🔴 CRITICAL FIX: Iniciar sincronizaciones automáticas si el usuario ya está logueado
         final usuario = await _obtenerUsuarioActual();
         if (usuario != null) {
           await _iniciarSincronizacionesAutomaticas(usuario);
           print(
-            'Sincronizaciones automáticas restauradas para usuario: ${usuario.username}',
+            'Sincronizaciones automaticas restauradas para usuario: ${usuario.username}',
           );
-        }
 
-        // Conectar WebSocket si ya está logueado
-        await SocketService().connect(username: usuario?.username);
+          // Conectar WebSocket en segundo plano (no-bloqueante)
+          SocketService().connect(username: usuario.username);
+        } else {
+          print('Usuario no disponible - WebSocket no conectado');
+        }
       } else {
         print('Usuario no logueado - servicios no iniciados');
       }
