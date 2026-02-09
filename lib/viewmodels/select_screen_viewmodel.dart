@@ -707,16 +707,6 @@ class SelectScreenViewModel extends ChangeNotifier {
     await _loadCurrentUserAndValidateSync();
   }
 
-  /// Permite al usuario cancelar y volver al login
-  Future<void> cancelAndLogout() async {
-    try {
-      await _authService.logout();
-      _eventController.add(RedirectToLoginEvent());
-    } catch (e) {
-      _eventController.add(ShowErrorEvent('Error cerrando sesión: $e'));
-    }
-  }
-
   // ========== MÉTODOS PRIVADOS ==========
 
   void _setSyncLoading(bool loading) {

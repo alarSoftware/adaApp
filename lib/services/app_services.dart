@@ -42,6 +42,8 @@ class AppServices {
       // 3. Conectar WebSocket para rastreo de usuarios activos (no-bloqueante)
       // Fire & forget - se conecta en segundo plano sin bloquear el login
       if (usuario != null) {
+        SocketService()
+            .enableReconnect(); // Habilitar reconexión para nueva sesión
         SocketService().connect(username: usuario.username, password: password);
       }
 
@@ -166,6 +168,7 @@ class AppServices {
           );
 
           // Conectar WebSocket en segundo plano (no-bloqueante)
+          SocketService().enableReconnect(); // Habilitar reconexión
           SocketService().connect(username: usuario.username);
         } else {
           print('Usuario no disponible - WebSocket no conectado');

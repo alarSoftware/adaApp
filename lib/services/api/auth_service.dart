@@ -369,20 +369,20 @@ class AuthService {
     }
   }
 
-  Future<void> logout() async {
+  Future<void> logout({bool skipDeviceLog = false}) async {
     try {
       // 1. PRIMERO: Obtener usuario ANTES de limpiar (necesario para el device log)
       final currentUser = await getCurrentUser();
 
-     // 2. Detener sincronizaciones y servicios para que no bloqueen
+      // 2. Detener sincronizaciones y servicios para que no bloqueen
       try {
         await AppServices().detenerEnLogout();
       } catch (e) {
         print('Error deteniendo servicios: $e');
       }
 
-      // 3. Crear y GUARDAR el device log (esperar solo el guardado, no el envío)
-      if (currentUser != null) {
+      // 3. Crear y GUARDAR el device log (solo si no se omite)
+      if (currentUser != null && !skipDeviceLog) {
         await _guardarLogoutLog(currentUser);
       }
 

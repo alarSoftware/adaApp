@@ -7,7 +7,6 @@ import 'package:ada_app/ui/widgets/login/login_form.dart';
 
 import 'package:ada_app/ui/widgets/login/login_appbar.dart';
 
-import 'package:ada_app/ui/widgets/login/sync_dialog.dart';
 import 'package:ada_app/ui/common/snackbar_helper.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -146,8 +145,6 @@ class _LoginScreenContentState extends State<_LoginScreenContent>
         _handleShowSuccess(event.message, event.icon);
       } else if (event is NavigateToHomeEvent) {
         _handleNavigateToHome();
-      } else if (event is ShowSyncRequiredDialogEvent) {
-        _handleShowSyncRequiredDialog(event);
       } else if (event is ShowPendingRecordsDialogEvent) {
         _handleShowPendingRecordsDialog(event);
       } else if (event is SyncProgressEvent) {
@@ -172,16 +169,6 @@ class _LoginScreenContentState extends State<_LoginScreenContent>
 
   void _handleNavigateToHome() {
     Navigator.of(context).pushReplacementNamed('/home');
-  }
-
-  void _handleShowSyncRequiredDialog(ShowSyncRequiredDialogEvent event) {
-    final viewModel = context.read<LoginScreenViewModel>();
-
-    SyncDialog.show(
-      context: context,
-      viewModel: viewModel,
-      validation: event.validation,
-    );
   }
 
   void _handleShowPendingRecordsDialog(ShowPendingRecordsDialogEvent event) {

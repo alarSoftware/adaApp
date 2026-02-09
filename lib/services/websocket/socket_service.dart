@@ -14,10 +14,20 @@ class SocketService {
   StompClient? _client;
   final ValueNotifier<bool> connectionNotifier = ValueNotifier<bool>(false);
   bool _isConnecting = false;
+  bool _shouldReconnect =
+      true; // Flag para controlar reconexión después de logout
 
   bool get isConnected => connectionNotifier.value;
 
   Future<void> connect({String? username, String? password}) async {
+    // Prevenir conexión si el usuario hizo logout
+    if (!_shouldReconnect) {
+      print(
+        '[V8-DEBUG] 🛰️ Socket reconnection disabled (logout in progress). Skipping.',
+      );
+      return;
+    }
+
     if (_isConnecting) {
       print('[V8-DEBUG] 🛰️ Socket already in connection process. Skipping.');
       return;
@@ -29,11 +39,14 @@ class SocketService {
     }
 
     _isConnecting = true;
+    _shouldReconnect = true; // Habilitar reconexión para esta sesión
 
     try {
       // 0. Ensure previous client is deactivated
       if (_client != null) {
-        print('[V8-DEBUG] 🛰️ Deactivating previous socket client before new connection...');
+        print(
+          '[V8-DEBUG] 🛰️ Deactivating previous socket client before new connection...',
+        );
         _client?.deactivate();
         _client = null;
       }
@@ -98,7 +111,9 @@ class SocketService {
         deviceLog = await DeviceInfoHelper.crearDeviceLog().timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            print('[V8-DEBUG] ⚠️ Device info timeout (GPS). Proceeding with basic info.');
+            print(
+              '[V8-DEBUG] ⚠️ Device info timeout (GPS). Proceeding with basic info.',
+            );
             return null;
           },
         );
@@ -170,10 +185,19 @@ class SocketService {
   }
 
   void disconnect() {
+    _shouldReconnect = false; // Deshabilitar reconexión automática
     _client?.deactivate();
     _client = null; // Clear client on manual disconnect
     connectionNotifier.value = false;
     _isConnecting = false;
-    print('[V8-DEBUG] 🔌 WebSocket: Connection deactivated manually');
+    print(
+      '[V8-DEBUG] 🔌 WebSocket: Connection deactivated manually (reconnect disabled)',
+    );
+  }
+
+  /// Habilita la reconexión (llamar antes de iniciar sesión)
+  void enableReconnect() {
+    _shouldReconnect = true;
+    print('[V8-DEBUG] 🔌 WebSocket: Reconnection enabled');
   }
 }
