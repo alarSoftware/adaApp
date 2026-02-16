@@ -1,4 +1,4 @@
-import 'dart:ui'; // Necesario para DartPluginRegistrant
+﻿import 'dart:ui'; // Necesario para DartPluginRegistrant
 import 'package:workmanager/workmanager.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart'; // Para WidgetsFlutterBinding
@@ -16,7 +16,7 @@ void callbackDispatcher() {
   DartPluginRegistrant.ensureInitialized();
 
   Workmanager().executeTask((task, inputData) async {
-    print("WorkManager Task Executing: $task");
+    debugPrint("WorkManager Task Executing: $task");
 
     try {
       if (task == taskName) {
@@ -24,13 +24,13 @@ void callbackDispatcher() {
         // DeviceLogBackgroundExtension maneja su propia inicialización de helpers
 
         // 1. Device Logs (Prioridad Alta - Trazabilidad)
-        print("WorkManager: Ejecutando logging (Device Log)...");
+        debugPrint("WorkManager: Ejecutando logging (Device Log)...");
         await DeviceLogBackgroundExtension.ejecutarLoggingConHorario();
 
-        print("WorkManager: Tarea completada exitosamente");
+        debugPrint("WorkManager: Tarea completada exitosamente");
       }
     } catch (e) {
-      print("WorkManager Error: $e");
+      debugPrint("WorkManager Error: $e");
       // Retornar true aun si falla para no reintentar infinitamente en bucle corto si es bug sistemático
       // O false si queremos retry. Para logging periódico, mejor true y esperar al siguiente ciclo.
       return Future.value(true);
@@ -43,7 +43,7 @@ void callbackDispatcher() {
 class WorkmanagerService {
   static Future<void> initialize() async {
     try {
-      print("Inicializando WorkManager...");
+      debugPrint("Inicializando WorkManager...");
       await Workmanager().initialize(
         callbackDispatcher,
         isInDebugMode: kDebugMode, // True en debug para ver notificaciones
@@ -60,9 +60,9 @@ class WorkmanagerService {
         backoffPolicy: BackoffPolicy.linear,
         backoffPolicyDelay: const Duration(seconds: 10),
       );
-      print("WorkManager: Tarea periódica registrada ($taskUniqueName)");
+      debugPrint("WorkManager: Tarea periódica registrada ($taskUniqueName)");
     } catch (e) {
-      print("Error inicializando WorkManager: $e");
+      debugPrint("Error inicializando WorkManager: $e");
     }
   }
 

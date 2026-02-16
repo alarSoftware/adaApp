@@ -97,7 +97,7 @@ class CensoActivoPostService {
       fullUrl = '$baseUrl$_endpoint';
 
       final jsonBody = jsonEncode(payloadUnificado);
-      debugPrint('DEBUG CENSO TIMESTAMP - Payload: $jsonBody');
+      debugPrint('Enviando censo activo...');
 
       final response = await MonitoredHttpClient.post(
         url: Uri.parse(fullUrl),

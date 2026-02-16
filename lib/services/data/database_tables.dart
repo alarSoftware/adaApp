@@ -1,32 +1,41 @@
-import 'package:sqflite/sqflite.dart';
+﻿import 'package:sqflite/sqflite.dart';
+import 'package:flutter/foundation.dart';
 
 class DatabaseTables {
   Future<void> onCreate(Database db, int version) async {
-    print('Creando tablas de base de datos v$version');
+    debugPrint('Creando tablas de base de datos v$version');
 
     await _crearTablasMaestras(db);
     await _crearTablasPrincipales(db);
     await _crearTablasMonitoreo(db);
     await _crearIndices(db);
 
-    print('Todas las tablas e índices creados exitosamente');
+    debugPrint('Todas las tablas e índices creados exitosamente');
   }
 
   Future<void> onUpgrade(Database db, int oldVersion, int newVersion) async {
-    print('Actualizando base de datos de v$oldVersion a v$newVersion');
+    debugPrint('Actualizando base de datos de v$oldVersion a v$newVersion');
 
     if (oldVersion < 2) {
       // Migración a v2: Agregar columna sucursal a Users y clientes
       await db.execute('ALTER TABLE Users ADD COLUMN sucursal TEXT');
       await db.execute('ALTER TABLE clientes ADD COLUMN sucursal TEXT');
-      print('Migración v2: Columna sucursal agregada a Users y clientes');
+      debugPrint('Migración v2: Columna sucursal agregada a Users y clientes');
     }
 
     if (oldVersion < 3) {
       // Migración a v3: Agregar tabla data_usage
       await db.execute(_sqlDataUsage());
       await _crearIndicesDataUsage(db);
-      print('Migración v3: Tabla data_usage creada');
+      debugPrint('Migración v3: Tabla data_usage creada');
+    }
+
+    if (oldVersion < 4) {
+      // Migración a v4: Agregar columna estado_odoo a operacion_comercial
+      await db.execute(
+        'ALTER TABLE operacion_comercial ADD COLUMN estado_odoo TEXT',
+      );
+      debugPrint('Migración v4: Columna estado_odoo agregada a operacion_comercial');
     }
   }
 
@@ -325,6 +334,7 @@ class DatabaseTables {
     sync_retry_count INTEGER DEFAULT 0,
     odoo_name TEXT,
     ada_sequence TEXT,
+    estado_odoo TEXT,
     FOREIGN KEY (cliente_id) REFERENCES clientes (id),
     FOREIGN KEY (usuario_id) REFERENCES Users (id)
   )

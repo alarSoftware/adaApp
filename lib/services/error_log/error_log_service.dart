@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -342,7 +342,7 @@ class ErrorLogService {
         whereArgs: [error['id']],
       );
 
-      print(
+      debugPrint(
         'Error log ${error['id']} programado para reintento #$retryCount en ${delay.inMinutes} minutos',
       );
     } catch (e) {
@@ -444,7 +444,7 @@ class ErrorLogService {
       );
 
       if (updated > 0) {
-        print(
+        debugPrint(
           '$updated error(es) marcado(s) como resuelto(s) para $tableName:$registroFailId',
         );
       }
@@ -660,7 +660,7 @@ class ErrorLogService {
       );
 
       if (deleted > 0) {
-        print(
+        debugPrint(
           'Eliminados $deleted error logs antiguos resueltos y sincronizados',
         );
       }

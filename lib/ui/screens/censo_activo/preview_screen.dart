@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../../../utils/logger.dart';
 import 'package:provider/provider.dart';
 import '../../../models/cliente.dart';
@@ -387,7 +388,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
         );
       }
     } catch (e) {
-      print('Error al volver desde historial: $e');
+      debugPrint('Error al volver desde historial: $e');
       if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }

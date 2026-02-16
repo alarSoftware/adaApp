@@ -35,8 +35,8 @@ class BasePostService {
 
       final jsonBody = json.encode(body);
 
-      debugPrint('POST a $fullUrl');
-      debugPrint('Body size: ${jsonBody.length} caracteres');
+      debugPrint('POST request enviado');
+      debugPrint('Body size: ${jsonBody.length} chars');
 
       final response = await MonitoredHttpClient.post(
         url: Uri.parse(fullUrl),
@@ -229,9 +229,7 @@ class BasePostService {
         'mensaje': mensaje,
       };
     } catch (e) {
-      debugPrint(
-        'Error al parsear JSON o respuesta plana: $e. Body: ${response.body}',
-      );
+      debugPrint('Error al parsear respuesta del servidor');
       // Si falla el parseo, pero el status es 2xx, asumimos éxito simple
       return {
         'exito': true,
@@ -248,13 +246,14 @@ class BasePostService {
     required Map<String, dynamic> body,
     String? additionalInfo,
   }) async {
+    if (!kDebugMode) return;
     debugPrint('═══════════════════════════════════════');
     debugPrint('REQUEST POST');
     debugPrint('Endpoint: $endpoint');
     if (additionalInfo != null) {
       debugPrint('Info: $additionalInfo');
     }
-    debugPrint('Body: ${json.encode(body)}');
+    debugPrint('Body keys: ${body.keys.toList()}');
     debugPrint('═══════════════════════════════════════');
   }
 

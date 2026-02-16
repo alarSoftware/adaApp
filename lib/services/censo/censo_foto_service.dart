@@ -1,5 +1,6 @@
-import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
+﻿import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/models/censo_activo_foto.dart';
+import 'package:flutter/foundation.dart';
 
 class CensoFotoService {
   final CensoActivoFotoRepository _fotoRepository;
@@ -13,7 +14,7 @@ class CensoFotoService {
     Map<String, dynamic> datos,
   ) async {
     try {
-      print('Guardando fotos para censo: $censoActivoId');
+      debugPrint('Guardando fotos para censo: $censoActivoId');
 
       String? imagenId1;
       String? imagenId2;
@@ -42,11 +43,11 @@ class CensoFotoService {
         );
       }
 
-      print('Fotos guardadas - ID1: $imagenId1, ID2: $imagenId2');
+      debugPrint('Fotos guardadas - ID1: $imagenId1, ID2: $imagenId2');
 
       return {'imagen_id_1': imagenId1, 'imagen_id_2': imagenId2};
     } catch (e) {
-      print('Error en guardarFotosDelCenso: $e');
+      debugPrint('Error en guardarFotosDelCenso: $e');
       return {'imagen_id_1': null, 'imagen_id_2': null};
     }
   }
@@ -56,7 +57,7 @@ class CensoFotoService {
     try {
       return await _fotoRepository.obtenerFotosPorCenso(censoActivoId);
     } catch (e) {
-      print('Error obteniendo fotos: $e');
+      debugPrint('Error obteniendo fotos: $e');
       return [];
     }
   }
@@ -69,9 +70,9 @@ class CensoFotoService {
           await _fotoRepository.marcarComoSincronizada(foto.id!);
         }
       }
-      print('${fotos.length} fotos marcadas como sincronizadas');
+      debugPrint('${fotos.length} fotos marcadas como sincronizadas');
     } catch (e) {
-      print('Error marcando fotos: $e');
+      debugPrint('Error marcando fotos: $e');
     }
   }
 
@@ -91,10 +92,10 @@ class CensoFotoService {
         imagenTamano: imagenTamano,
         orden: orden,
       );
-      print('Foto $orden guardada: ${foto.id}');
+      debugPrint('Foto $orden guardada: ${foto.id}');
       return foto.id;
     } catch (e) {
-      print('Error guardando foto $orden: $e');
+      debugPrint('Error guardando foto $orden: $e');
       return null;
     }
   }

@@ -411,6 +411,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       'sync_retry_count': 0,
       'odoo_name': apiOperacion['odooName']?.toString(),
       'ada_sequence': apiOperacion['adaSequence']?.toString(),
+      'estado_odoo': apiOperacion['estadoOdoo']?.toString(),
       'latitud': _parseDoubleSafely(apiOperacion['latitud']),
       'longitud': _parseDoubleSafely(apiOperacion['longitud']),
     };
@@ -792,7 +793,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       final conexion = await BaseSyncService.testConnection();
       if (!conexion.exito) {
         AppLogger.w(
-          'OPERACION_COMERCIAL_SYNC_SERVICE: ❌ [TIMER] Sin conexión, saltando sincronización',
+          'OPERACION_COMERCIAL_SYNC_SERVICE: [TIMER] Sin conexión, saltando sincronización',
         );
         return;
       }

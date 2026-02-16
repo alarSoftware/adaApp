@@ -22,19 +22,17 @@ class SocketService {
   Future<void> connect({String? username, String? password}) async {
     // Prevenir conexión si el usuario hizo logout
     if (!_shouldReconnect) {
-      print(
-        '[V8-DEBUG] 🛰️ Socket reconnection disabled (logout in progress). Skipping.',
-      );
+      debugPrint('[WS] Reconnection disabled. Skipping.');
       return;
     }
 
     if (_isConnecting) {
-      print('[V8-DEBUG] 🛰️ Socket already in connection process. Skipping.');
+      debugPrint('[WS] Already connecting. Skipping.');
       return;
     }
 
     if (_client != null && _client!.connected) {
-      print('[V8-DEBUG] 🛰️ Socket already connected. Skipping.');
+      debugPrint('[WS] Already connected. Skipping.');
       return;
     }
 
@@ -44,9 +42,7 @@ class SocketService {
     try {
       // 0. Ensure previous client is deactivated
       if (_client != null) {
-        print(
-          '[V8-DEBUG] 🛰️ Deactivating previous socket client before new connection...',
-        );
+        debugPrint('[WS] Deactivating previous connection...');
         _client?.deactivate();
         _client = null;
       }
@@ -81,7 +77,7 @@ class SocketService {
         }
       }
 
-      print('[V8-DEBUG] WebSocket Connecting to: $wsUrl');
+      debugPrint('[WS] Connecting...');
 
       // Obtener versión de la app
       String appVersion = 'unknown';
@@ -89,7 +85,7 @@ class SocketService {
         final packageInfo = await PackageInfo.fromPlatform();
         appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
       } catch (e) {
-        print('[V8-DEBUG] ⚠️ No se pudo obtener versión de la app: $e');
+        debugPrint('[WS] Could not get app version');
       }
 
       // Obtener nombre del empleado y datos de usuario
@@ -102,7 +98,7 @@ class SocketService {
         userId = currentUser?.id?.toString();
         currentUsername = currentUser?.username;
       } catch (e) {
-        print('[V8-DEBUG] ⚠️ No se pudo obtener datos del usuario: $e');
+        debugPrint('[WS] Could not get user data');
       }
 
       // Recolectar datos del dispositivo con TIMEOUT para evitar bloqueos (GPS puede tardar 30s)
@@ -111,14 +107,12 @@ class SocketService {
         deviceLog = await DeviceInfoHelper.crearDeviceLog().timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            print(
-              '[V8-DEBUG] ⚠️ Device info timeout (GPS). Proceeding with basic info.',
-            );
+            debugPrint('[WS] Device info timeout. Proceeding.');
             return null;
           },
         );
       } catch (e) {
-        print('[V8-DEBUG] ⚠️ Error recolectando datos del dispositivo: $e');
+        debugPrint('[WS] Error gathering device info');
       }
 
       _client = StompClient(
@@ -126,17 +120,17 @@ class SocketService {
           url: wsUrl,
           onConnect: _onConnect,
           onWebSocketError: (dynamic error) {
-            print('[V8-DEBUG] ❌ WebSocket Error: $error');
+            debugPrint('[WS] WebSocket Error');
             connectionNotifier.value = false;
             _isConnecting = false;
           },
           onStompError: (StompFrame frame) {
-            print('[V8-DEBUG] ❌ STOMP Error: ${frame.body}');
+            debugPrint('[WS] STOMP Error');
             connectionNotifier.value = false;
             _isConnecting = false;
           },
           onDisconnect: (StompFrame frame) {
-            print('[V8-DEBUG] 🔌 WebSocket Disconnected');
+            debugPrint('[WS] Disconnected');
             connectionNotifier.value = false;
             _isConnecting = false;
           },
@@ -144,7 +138,7 @@ class SocketService {
             if (message.contains('CONNECTED') ||
                 message.contains('CONNECT') ||
                 message.contains('Error')) {
-              print('[V8-DEBUG] 🛰️ STOMP: $message');
+              debugPrint('[WS] STOMP event');
             }
           },
           stompConnectHeaders: {
@@ -173,7 +167,7 @@ class SocketService {
 
       _client?.activate();
     } catch (e) {
-      print('[V8-DEBUG] ❌ Critical error in connect: $e');
+      debugPrint('[WS] Critical error in connect');
       _isConnecting = false;
     }
   }
@@ -181,7 +175,7 @@ class SocketService {
   void _onConnect(StompFrame frame) {
     connectionNotifier.value = true;
     _isConnecting = false;
-    print('[V8-DEBUG] ✅ WebSocket: Connection established successfully');
+    debugPrint('[WS] Connected successfully');
   }
 
   void disconnect() {
@@ -190,14 +184,12 @@ class SocketService {
     _client = null; // Clear client on manual disconnect
     connectionNotifier.value = false;
     _isConnecting = false;
-    print(
-      '[V8-DEBUG] 🔌 WebSocket: Connection deactivated manually (reconnect disabled)',
-    );
+    debugPrint('[WS] Disconnected manually');
   }
 
   /// Habilita la reconexión (llamar antes de iniciar sesión)
   void enableReconnect() {
     _shouldReconnect = true;
-    print('[V8-DEBUG] 🔌 WebSocket: Reconnection enabled');
+    debugPrint('[WS] Reconnection enabled');
   }
 }

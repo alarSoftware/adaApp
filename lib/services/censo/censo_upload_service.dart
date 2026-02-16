@@ -1,4 +1,5 @@
-import 'dart:async';
+﻿import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:ada_app/models/censo_activo.dart';
 
 import 'package:ada_app/repositories/censo_activo_repository.dart';
@@ -48,7 +49,7 @@ class CensoUploadService {
     String? fullUrl;
 
     try {
-      print('Enviando censo unificado: $censoActivoId');
+      debugPrint('Enviando censo unificado: $censoActivoId');
 
       final baseUrl = await BaseSyncService.getBaseUrl();
 
@@ -67,7 +68,7 @@ class CensoUploadService {
       var estado = censoActivoMap['estado_censo']?.toString();
 
       if (estado == 'migrado') {
-        print('Censo ya migrado: $censoActivoId');
+        debugPrint('Censo ya migrado: $censoActivoId');
         return;
       }
 
@@ -98,7 +99,7 @@ class CensoUploadService {
       final yaAsignado = await _verificarEquipoAsignado(equipoId, clienteId);
       final crearPendiente = !yaAsignado;
 
-      print('Flags - Nuevo: $esNuevoEquipo, Crear pendiente: $crearPendiente');
+      debugPrint('Flags - Nuevo: $esNuevoEquipo, Crear pendiente: $crearPendiente');
 
       final pendienteExistente = await _equipoPendienteRepository.dbHelper
           .consultar(
@@ -136,7 +137,7 @@ class CensoUploadService {
         equipoDataMap: equipoDataMap,
       );
     } catch (e) {
-      print('Error en enviarCensoUnificado: $e');
+      debugPrint('Error en enviarCensoUnificado: $e');
 
       await censoActivoRepository.marcarComoError(
         censoActivoId,
@@ -154,7 +155,7 @@ class CensoUploadService {
   }
 
   Future<Map<String, int>> sincronizarCensosNoMigrados(int usuarioId) async {
-    print('=== SINCRONIZACIÓN PERIÓDICA UNIFICADA ===');
+    debugPrint('=== SINCRONIZACIÓN PERIÓDICA UNIFICADA ===');
 
     int censosExitosos = 0;
     int totalFallidos = 0;
@@ -169,7 +170,7 @@ class CensoUploadService {
 
       final todosLosRegistros = [...registrosCreados, ...registrosErrorListos];
 
-      print('Total censos a procesar: ${todosLosRegistros.length}');
+      debugPrint('Total censos a procesar: ${todosLosRegistros.length}');
 
       final censoActivoList = todosLosRegistros.take(20);
 
@@ -181,7 +182,7 @@ class CensoUploadService {
           );
           censosExitosos++;
         } catch (e) {
-          print('Error en censo ${censoActivo.id}: $e');
+          debugPrint('Error en censo ${censoActivo.id}: $e');
           totalFallidos++;
           if (censoActivo.id != null) {
             await censoActivoRepository.marcarComoError(
@@ -200,9 +201,9 @@ class CensoUploadService {
         await Future.delayed(Duration(milliseconds: 500));
       }
 
-      print('=== SINCRONIZACIÓN COMPLETADA ===');
-      print('   - Exitosos: $censosExitosos');
-      print('   - Fallidos: $totalFallidos');
+      debugPrint('=== SINCRONIZACIÓN COMPLETADA ===');
+      debugPrint('   - Exitosos: $censosExitosos');
+      debugPrint('   - Fallidos: $totalFallidos');
 
       return {
         'censos_exitosos': censosExitosos,
@@ -210,7 +211,7 @@ class CensoUploadService {
         'total': censosExitosos,
       };
     } catch (e) {
-      print('Error en sincronización periódica: $e');
+      debugPrint('Error en sincronización periódica: $e');
 
       await ErrorLogService.manejarExcepcion(
         e,
@@ -242,7 +243,7 @@ class CensoUploadService {
         return;
       }
 
-      print(
+      debugPrint(
         'Sincronizando $censoActivoId (intento #$numeroIntento/$maxIntentos)',
       );
 
@@ -272,7 +273,7 @@ class CensoUploadService {
     String message = '';
 
     try {
-      print('Reintento manual: $censoActivoId');
+      debugPrint('Reintento manual: $censoActivoId');
 
       if (employeeId == null || employeeId.isEmpty) {
         throw Exception('employeeId es requerido');
@@ -308,7 +309,7 @@ class CensoUploadService {
         message = censoActivoMap['error_mensaje'] ?? 'Error desconocido';
       }
     } catch (e) {
-      print('Error en reintentarEnvioCenso: $e');
+      debugPrint('Error en reintentarEnvioCenso: $e');
       success = false;
       message = e.toString();
     }
@@ -357,10 +358,10 @@ class CensoUploadService {
         datosLocales['logo'] ??= infoEquipo['logo_nombre'];
         datosLocales['es_nuevo_equipo'] ??= (infoEquipo['app_insert'] == 1);
 
-        print('Datos enriquecidos desde equipos');
+        debugPrint('Datos enriquecidos desde equipos');
       }
     } catch (e) {
-      print('No se pudo enriquecer datos: $e');
+      debugPrint('No se pudo enriquecer datos: $e');
       rethrow;
     }
   }
@@ -464,7 +465,7 @@ class CensoUploadService {
           registrosListos.add(registro);
         }
       } catch (e) {
-        print('Error verificando ${registro.id}: $e');
+        debugPrint('Error verificando ${registro.id}: $e');
         registrosListos.add(registro);
       }
     }
@@ -501,7 +502,7 @@ class CensoUploadService {
       );
       return maps.isNotEmpty ? maps.first['intentos_sync'] as int? ?? 0 : 0;
     } catch (e) {
-      print('Error obteniendo intentos: $e');
+      debugPrint('Error obteniendo intentos: $e');
       return 0;
     }
   }
@@ -521,7 +522,7 @@ class CensoUploadService {
         }
       }
     } catch (e) {
-      print('Error obteniendo último intento: $e');
+      debugPrint('Error obteniendo último intento: $e');
       return null;
     }
     return null;
@@ -542,7 +543,7 @@ class CensoUploadService {
         whereArgs: [estadoId],
       );
     } catch (e) {
-      print('Error actualizando último intento: $e');
+      debugPrint('Error actualizando último intento: $e');
       rethrow;
     }
   }
@@ -562,7 +563,7 @@ class CensoUploadService {
           ? usuarioEncontrado.first['employee_id'] as String?
           : null;
     } catch (e) {
-      print('Error resolviendo employeeId: $e');
+      debugPrint('Error resolviendo employeeId: $e');
       rethrow;
     }
   }
@@ -579,7 +580,7 @@ class CensoUploadService {
         _convertirAInt(clienteId),
       );
     } catch (e) {
-      print('Error verificando asignación: $e');
+      debugPrint('Error verificando asignación: $e');
       rethrow;
     }
   }

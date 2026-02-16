@@ -1,5 +1,6 @@
-// services/image_service.dart
+﻿// services/image_service.dart
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
@@ -26,7 +27,7 @@ class ImageService {
       }
       return null;
     } catch (e) {
-      print('Error tomando foto: $e');
+      debugPrint('Error tomando foto: $e');
       rethrow;
     }
   }
@@ -50,7 +51,7 @@ class ImageService {
       }
       return null;
     } catch (e) {
-      print('Error seleccionando imagen: $e');
+      debugPrint('Error seleccionando imagen: $e');
       rethrow;
     }
   }
@@ -82,10 +83,10 @@ class ImageService {
       final String rutaDestino = path.join(imageDir.path, nombreArchivo);
       final File archivoDestino = await imagen.copy(rutaDestino);
 
-      print('Imagen guardada: $rutaDestino');
+      debugPrint('Imagen guardada: $rutaDestino');
       return archivoDestino;
     } catch (e) {
-      print('Error guardando imagen: $e');
+      debugPrint('Error guardando imagen: $e');
       rethrow;
     }
   }
@@ -95,12 +96,12 @@ class ImageService {
     try {
       if (await imagen.exists()) {
         await imagen.delete();
-        print('Imagen eliminada: ${imagen.path}');
+        debugPrint('Imagen eliminada: ${imagen.path}');
         return true;
       }
       return false;
     } catch (e) {
-      print('Error eliminando imagen: $e');
+      debugPrint('Error eliminando imagen: $e');
       return false;
     }
   }
@@ -127,7 +128,7 @@ class ImageService {
       final int bytes = await imagen.length();
       return bytes / (1024 * 1024); // Convertir a MB
     } catch (e) {
-      print('Error obteniendo tamaño de imagen: $e');
+      debugPrint('Error obteniendo tamaño de imagen: $e');
       return 0.0;
     }
   }

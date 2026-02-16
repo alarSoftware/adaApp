@@ -1,4 +1,5 @@
-import 'package:shared_preferences/shared_preferences.dart';
+﻿import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import '../../utils/logger.dart';
 import 'package:bcrypt/bcrypt.dart';
 
@@ -378,7 +379,7 @@ class AuthService {
       try {
         await AppServices().detenerEnLogout();
       } catch (e) {
-        print('Error deteniendo servicios: $e');
+        debugPrint('Error deteniendo servicios: $e');
       }
 
       // 3. Crear y GUARDAR el device log (solo si no se omite)
@@ -392,16 +393,16 @@ class AuthService {
       await prefs.remove(_keyCurrentUser);
       await prefs.remove(_keyCurrentUserRole);
 
-      print('Logout completado');
+      debugPrint('Logout completado');
     } catch (e) {
-      print('Error en logout: $e');
+      debugPrint('Error en logout: $e');
     }
   }
 
   /// Guarda el DeviceLog de logout en BD local y envía al servidor en segundo plano
   Future<void> _guardarLogoutLog(Usuario currentUser) async {
     try {
-      print('Guardando device log de logout...');
+      debugPrint('Guardando device log de logout...');
 
       // Usar método rápido para no bloquear (usa última ubicación conocida)
       final log = await DeviceInfoHelper.crearDeviceLogRapido();
@@ -429,7 +430,7 @@ class AuthService {
           modelo: '${log.modelo} [LOGOUT]',
         );
 
-        print('✅ Device log de logout guardado en BD local (ID: $logId)');
+        debugPrint('✅ Device log de logout guardado en BD local (ID: $logId)');
 
         // Recuperar el objeto completo desde la BD
         final logParaEnviar = await repository.obtenerPorId(logId);
@@ -443,22 +444,22 @@ class AuthService {
               .then((resultado) async {
                 if (resultado['exito'] == true) {
                   await repository.marcarComoSincronizado(logId);
-                  print('✅ Logout log enviado y sincronizado');
+                  debugPrint('✅ Logout log enviado y sincronizado');
                 } else {
-                  print(
+                  debugPrint(
                     '⚠️ Logout log guardado, se sincronizará después: ${resultado['mensaje']}',
                   );
                 }
               })
               .catchError((e) {
-                print('⚠️ Logout log guardado, se sincronizará después: $e');
+                debugPrint('⚠️ Logout log guardado, se sincronizará después: $e');
               });
         }
       } else {
-        print('⚠️ No se pudo crear device log de logout');
+        debugPrint('⚠️ No se pudo crear device log de logout');
       }
     } catch (e) {
-      print('Error guardando logout log: $e');
+      debugPrint('Error guardando logout log: $e');
     }
   }
 

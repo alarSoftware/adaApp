@@ -22,7 +22,7 @@ class ApiConfigService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(endpointKey, url);
     urlNotifier.value = url;
-    print('URL base actualizada: $url');
+    debugPrint('URL base actualizada');
   }
 
   // Obtener URL completa para un endpoint

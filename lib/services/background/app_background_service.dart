@@ -1,6 +1,7 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 // ignore: depend_on_referenced_packages
 
@@ -13,7 +14,7 @@ void onStart(ServiceInstance service) async {
   // Necesario para plugins en background
   DartPluginRegistrant.ensureInitialized();
 
-  print('Background Service: onStart ejecutado');
+  debugPrint('Background Service: onStart ejecutado');
 
   // Configuración de Notificación Persistente
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -75,13 +76,13 @@ void onStart(ServiceInstance service) async {
 
   // Listen for config updates
   service.on('updateConfig').listen((event) async {
-    print('Recibida señal de actualización de configuración');
+    debugPrint('Recibida señal de actualización de configuración');
     await DeviceLogBackgroundExtension.cargarConfiguracionHorario();
   });
 
   // Helper callback para notificación unificada
   void showGpsNotification() {
-    print('CALLBACK: Disparando alerta de GPS desactivado');
+    debugPrint('CALLBACK: Disparando alerta de GPS desactivado');
     flutterLocalNotificationsPlugin.show(
       999,
       '⚠️ GPS Desactivado',
@@ -149,7 +150,7 @@ void onStart(ServiceInstance service) async {
       bool extensionActiva = DeviceLogBackgroundExtension.estaActivo;
 
       if (!extensionActiva) {
-        print('Watchdog: Extensión inactiva detectada. Reinicializando...');
+        debugPrint('Watchdog: Extensión inactiva detectada. Reinicializando...');
         await DeviceLogBackgroundExtension.inicializar(
           verificarSesion: true,
           serviceInstance: service,
@@ -160,7 +161,7 @@ void onStart(ServiceInstance service) async {
         await DeviceLogBackgroundExtension.ejecutarLoggingConHorario();
       }
     } catch (e) {
-      print("Error en ciclo principal de watchdog: $e");
+      debugPrint("Error en ciclo principal de watchdog: $e");
     }
   });
 }
@@ -177,7 +178,7 @@ class AppBackgroundService {
   static Future<void> initialize() async {
     final service = FlutterBackgroundService();
 
-    print('Inicializando AppBackgroundService...');
+    debugPrint('Inicializando AppBackgroundService...');
 
     await service.configure(
       androidConfiguration: AndroidConfiguration(
@@ -200,7 +201,7 @@ class AppBackgroundService {
 
     if (!await service.isRunning()) {
       await service.startService();
-      print('Servicio background iniciado');
+      debugPrint('Servicio background iniciado');
     }
   }
 

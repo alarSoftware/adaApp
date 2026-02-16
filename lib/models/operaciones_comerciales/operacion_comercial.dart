@@ -20,6 +20,7 @@ class OperacionComercial {
   final double? longitud;
   final String? odooName;
   final String? adaSequence;
+  final String? estadoOdoo;
 
   final List<OperacionComercialDetalle> detalles;
 
@@ -42,6 +43,7 @@ class OperacionComercial {
     this.longitud,
     this.odooName,
     this.adaSequence,
+    this.estadoOdoo,
     this.detalles = const [],
   });
 
@@ -73,6 +75,7 @@ class OperacionComercial {
       longitud: map['longitud'] as double?,
       odooName: map['odoo_name'] as String?,
       adaSequence: map['ada_sequence'] as String?,
+      estadoOdoo: map['estado_odoo'] as String?,
     );
   }
 
@@ -96,6 +99,7 @@ class OperacionComercial {
       'longitud': longitud,
       'odoo_name': odooName,
       'ada_sequence': adaSequence,
+      'estado_odoo': estadoOdoo,
     };
   }
 
@@ -112,6 +116,7 @@ class OperacionComercial {
       'longitud': longitud,
       'odoo_name': odooName,
       'ada_sequence': adaSequence,
+      'estado_odoo': estadoOdoo,
       'detalles': detalles.map((d) => d.toJson()).toList(),
     };
   }
@@ -135,6 +140,7 @@ class OperacionComercial {
     double? longitud,
     String? odooName,
     String? adaSequence,
+    String? estadoOdoo,
     List<OperacionComercialDetalle>? detalles,
   }) {
     return OperacionComercial(
@@ -156,6 +162,7 @@ class OperacionComercial {
       longitud: longitud ?? this.longitud,
       odooName: odooName ?? this.odooName,
       adaSequence: adaSequence ?? this.adaSequence,
+      estadoOdoo: estadoOdoo ?? this.estadoOdoo,
       detalles: detalles ?? this.detalles,
     );
   }

@@ -1,5 +1,6 @@
-// lib/utils/device_info_helper.dart
+﻿// lib/utils/device_info_helper.dart
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import '../utils/logger.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:battery_plus/battery_plus.dart';
@@ -17,7 +18,7 @@ class DeviceInfoHelper {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        print('⚠️ Servicios de ubicación desactivados');
+        debugPrint('⚠️ Servicios de ubicación desactivados');
         return null;
       }
 
@@ -28,7 +29,7 @@ class DeviceInfoHelper {
         ),
       );
     } catch (e) {
-      print('❌ Error al obtener ubicación: $e');
+      debugPrint('❌ Error al obtener ubicación: $e');
       return null;
     }
   }
@@ -38,14 +39,14 @@ class DeviceInfoHelper {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        print('Servicios de ubicación desactivados');
+        debugPrint('Servicios de ubicación desactivados');
         return null;
       }
 
       // Primero intentar obtener la última ubicación conocida (instantáneo)
       final lastPosition = await Geolocator.getLastKnownPosition();
       if (lastPosition != null) {
-        print('Usando última ubicación conocida');
+        debugPrint('Usando última ubicación conocida');
         return lastPosition;
       }
 
@@ -57,7 +58,7 @@ class DeviceInfoHelper {
         ),
       );
     } catch (e) {
-      print(' No se pudo obtener ubicación rápida: $e');
+      debugPrint(' No se pudo obtener ubicación rápida: $e');
       return null;
     }
   }
@@ -68,7 +69,7 @@ class DeviceInfoHelper {
       final battery = Battery();
       return await battery.batteryLevel;
     } catch (e) {
-      print('❌ Error al obtener nivel de batería: $e');
+      debugPrint('❌ Error al obtener nivel de batería: $e');
       return 0;
     }
   }
@@ -88,7 +89,7 @@ class DeviceInfoHelper {
 
       return 'Desconocido';
     } catch (e) {
-      print('❌ Error al obtener modelo: $e');
+      debugPrint('❌ Error al obtener modelo: $e');
       return 'Desconocido';
     }
   }
@@ -133,7 +134,7 @@ class DeviceInfoHelper {
       );
       return log;
     } catch (e) {
-      print('Error al crear log: $e');
+      debugPrint('Error al crear log: $e');
       return null;
     }
   }
@@ -141,7 +142,7 @@ class DeviceInfoHelper {
   /// Crear DeviceLog rápido (para logout - usa última ubicación conocida)
   static Future<DeviceLog?> crearDeviceLogRapido() async {
     try {
-      print('Creando device log rápido para logout...');
+      debugPrint('Creando device log rápido para logout...');
 
       // Obtener todos los datos en paralelo usando ubicación rápida
       final results = await Future.wait([
@@ -172,10 +173,10 @@ class DeviceInfoHelper {
         sincronizado: 0,
       );
 
-      print(' Device log rápido creado');
+      debugPrint(' Device log rápido creado');
       return log;
     } catch (e) {
-      print('Error al crear log rápido: $e');
+      debugPrint('Error al crear log rápido: $e');
       return null;
     }
   }
@@ -220,7 +221,7 @@ class DeviceInfoHelper {
 
       return resultados;
     } catch (e) {
-      print('Error verificando disponibilidad: $e');
+      debugPrint('Error verificando disponibilidad: $e');
       return resultados;
     }
   }
@@ -229,13 +230,13 @@ class DeviceInfoHelper {
   static Future<void> mostrarEstadoDisponibilidad() async {
     final disponibilidad = await verificarDisponibilidad();
 
-    print('═══════════════════════════════════════');
-    print('DISPONIBILIDAD DE SERVICIOS');
-    print('═══════════════════════════════════════');
+    debugPrint('═══════════════════════════════════════');
+    debugPrint('DISPONIBILIDAD DE SERVICIOS');
+    debugPrint('═══════════════════════════════════════');
     disponibilidad.forEach((servicio, disponible) {
       final icono = disponible ? '✅' : '❌';
-      print('$icono $servicio: ${disponible ? "DISPONIBLE" : "NO DISPONIBLE"}');
+      debugPrint('$icono $servicio: ${disponible ? "DISPONIBLE" : "NO DISPONIBLE"}');
     });
-    print('═══════════════════════════════════════');
+    debugPrint('═══════════════════════════════════════');
   }
 }
