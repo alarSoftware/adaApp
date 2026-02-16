@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/logger.dart';
 import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/repositories/device_log_repository.dart';
 import 'package:intl/intl.dart';
@@ -45,9 +46,7 @@ class _DeviceLogScreenState extends State<DeviceLogScreen> {
     try {
       final fecha = DateTime.parse(isoDate);
       return DateFormat('dd/MM/yyyy HH:mm:ss').format(fecha);
-    } catch (e) {
-      return isoDate;
-    }
+    } catch (e) { AppLogger.e("DEVICE_LOG_SCREEN: Error", e); return isoDate; }
   }
 
   @override

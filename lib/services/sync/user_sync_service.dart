@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../utils/logger.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -34,7 +35,7 @@ class UserSyncService {
           // Si no hay usuarios en el servidor, limpiar la tabla local
           try {
             await _dbHelper.sincronizarUsuarios([]);
-          } catch (dbError) {}
+          } catch (dbError) { AppLogger.e("USER_SYNC_SERVICE: Error", dbError); }
 
           return SyncResult(
             exito: true,
@@ -212,9 +213,7 @@ class UserSyncService {
         return result.first['employee_name'] as String?;
       }
       return null;
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("USER_SYNC_SERVICE: Error", e); return null; }
   }
 
   static Future<String?> obtenerEmployeeIdUsuarioActual() async {

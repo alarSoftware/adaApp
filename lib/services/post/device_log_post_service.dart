@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../utils/logger.dart';
 import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/post/base_post_service.dart';
 import 'package:ada_app/services/api/api_config_service.dart';
@@ -51,9 +52,7 @@ class DeviceLogPostService {
         registroId: log.id,
       );
       return resultado;
-    } catch (e) {
-      return {'exito': false, 'success': false, 'mensaje': 'Error: $e'};
-    }
+    } catch (e) { AppLogger.e("DEVICE_LOG_POST_SERVICE: Error", e); return {'exito': false, 'success': false, 'mensaje': 'Error: $e'}; }
   }
 
   /// Enviar múltiples device logs en batch

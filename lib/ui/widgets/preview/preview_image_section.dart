@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/logger.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'dart:io';
 import 'dart:convert';
@@ -179,9 +180,7 @@ class PreviewImageSection extends StatelessWidget {
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) => _buildErrorWidget(),
       );
-    } catch (e) {
-      return _buildErrorWidget();
-    }
+    } catch (e) { AppLogger.e("PREVIEW_IMAGE_SECTION: Error", e); return _buildErrorWidget(); }
   }
 
   Widget _buildErrorWidget() {
@@ -230,9 +229,7 @@ class PreviewImageSection extends StatelessWidget {
           final bytes = base64Decode(imageBase64!);
           final mb = (bytes.length / (1024 * 1024)).toStringAsFixed(1);
           return 'Imagen desde archivo ($mb MB). Toca para ver completa.';
-        } catch (e) {
-          return 'Imagen desde archivo. Toca para ver completa.';
-        }
+        } catch (e) { AppLogger.e("PREVIEW_IMAGE_SECTION: Error", e); return 'Imagen desde archivo. Toca para ver completa.'; }
       }
       return 'Imagen desde archivo. Toca para ver completa.';
     } else if (imageBase64 != null && imageBase64!.isNotEmpty) {
@@ -240,9 +237,7 @@ class PreviewImageSection extends StatelessWidget {
         final bytes = base64Decode(imageBase64!);
         final mb = (bytes.length / (1024 * 1024)).toStringAsFixed(1);
         return 'Imagen desde base de datos ($mb MB). Toca para ver completa.';
-      } catch (e) {
-        return 'Imagen desde base de datos. Toca para ver completa.';
-      }
+      } catch (e) { AppLogger.e("PREVIEW_IMAGE_SECTION: Error", e); return 'Imagen desde base de datos. Toca para ver completa.'; }
     }
     return 'Sin información de imagen disponible.';
   }

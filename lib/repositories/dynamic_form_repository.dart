@@ -1,4 +1,5 @@
 import 'dynamic_form_template_repository.dart';
+import '../utils/logger.dart';
 import 'dynamic_form_response_repository.dart';
 import 'dynamic_form_sync_repository.dart';
 
@@ -25,9 +26,7 @@ class DynamicFormRepository {
       }
 
       return await responses.delete(responseId);
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_REPOSITORY: Error", e); return false; }
   }
 
   /// Obtiene estadísticas completas del sistema

@@ -1,12 +1,13 @@
 // lib/utils/device_info_helper.dart
 import 'dart:io';
+import '../utils/logger.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:uuid/uuid.dart';
 import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/sync/user_sync_service.dart';
-import 'package:logger/logger.dart';
+
 
 /// 🔧 Helper para obtener información del dispositivo
 /// Centraliza toda la lógica de obtención de datos sin duplicación
@@ -96,9 +97,7 @@ class DeviceInfoHelper {
   static Future<String?> obtenerEmployeeId() async {
     try {
       return await UserSyncService.obtenerEmployeeIdUsuarioActual();
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("DEVICE_INFO_HELPER: Error", e); return null; }
   }
 
   /// Crear DeviceLog completo (método todo-en-uno)

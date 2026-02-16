@@ -1,6 +1,7 @@
 // lib/viewmodels/operaciones_comerciales/operaciones_comerciales_menu_viewmodel.dart
 
 import 'package:flutter/foundation.dart';
+import '../../utils/logger.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
 import 'package:ada_app/repositories/operacion_comercial_repository.dart';
@@ -114,9 +115,7 @@ class OperacionesComercialesMenuViewModel extends ChangeNotifier {
         return result.first['employee_id'] as String?;
       }
       return null;
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("OPERACIONES_COMERCIALES_MENU_VIEWMODEL: Error", e); return null; }
   }
 
   // Cargar todas las operaciones del cliente

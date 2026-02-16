@@ -1,6 +1,7 @@
 // lib/viewmodels/pending_data_viewmodel.dart
 
 import 'package:flutter/foundation.dart';
+import '../utils/logger.dart';
 import 'package:flutter/material.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/sync/sync_service.dart';
@@ -249,7 +250,7 @@ class PendingDataViewModel extends ChangeNotifier {
 
     try {
       await _executarAutoSyncSilencioso();
-    } catch (e) {}
+    } catch (e) { AppLogger.e("PENDING_DATA_VIEWMODEL: Error", e); }
   }
 
   /// Ejecuta el envío automático silencioso
@@ -283,7 +284,7 @@ class PendingDataViewModel extends ChangeNotifier {
           if (result.success) {
             totalSent += result.itemsSent;
           }
-        } catch (e) {}
+        } catch (e) { AppLogger.e("PENDING_DATA_VIEWMODEL: Error", e); }
 
         await Future.delayed(const Duration(milliseconds: 100));
       }
@@ -304,8 +305,7 @@ class PendingDataViewModel extends ChangeNotifier {
           ),
         );
       }
-    } catch (e) {
-    } finally {
+    } catch (e) { AppLogger.e("PENDING_DATA_VIEWMODEL: Error", e); } finally {
       _setSending(false);
       _resetSendProgress();
     }

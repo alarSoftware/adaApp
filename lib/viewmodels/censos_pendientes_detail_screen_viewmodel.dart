@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../utils/logger.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
@@ -343,7 +344,7 @@ class CensosPendientesDetailViewModel extends ChangeNotifier {
         ''',
           [DateTime.now().toIso8601String(), 'Error interno: $e', censoId],
         );
-      } catch (dbError) {}
+      } catch (dbError) { AppLogger.e("CENSOS_PENDIENTES_DETAIL_SCREEN_VIEWMODEL: Error", dbError); }
 
       return SyncResult(
         success: false,

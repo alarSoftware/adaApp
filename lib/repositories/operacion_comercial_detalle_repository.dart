@@ -1,4 +1,5 @@
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
+import '../utils/logger.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 
 abstract class OperacionComercialDetalleRepository {
@@ -45,8 +46,6 @@ class OperacionComercialDetalleRepositoryImpl
       return resultado
           .map((map) => OperacionComercialDetalle.fromMap(map))
           .toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_DETALLE_REPOSITORY: Error", e); return []; }
   }
 }

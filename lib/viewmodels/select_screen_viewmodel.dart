@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../utils/logger.dart';
 import 'package:ada_app/repositories/cliente_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import '../services/sync/sync_service.dart';
@@ -730,18 +731,14 @@ class SelectScreenViewModel extends ChangeNotifier {
     try {
       final clienteRepo = ClienteRepository();
       return await clienteRepo.contar();
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("SELECT_SCREEN_VIEWMODEL: Error", e); return 0; }
   }
 
   Future<int> _getEstimatedEquipments() async {
     try {
       final equipoRepo = EquipoRepository();
       return await equipoRepo.contar();
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("SELECT_SCREEN_VIEWMODEL: Error", e); return 0; }
   }
 
   Future<int> _getEstimatedImages() async {
@@ -751,8 +748,6 @@ class SelectScreenViewModel extends ChangeNotifier {
         [],
       );
       return resultado.isNotEmpty ? (resultado.first['total'] as int? ?? 0) : 0;
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("SELECT_SCREEN_VIEWMODEL: Error", e); return 0; }
   }
 }

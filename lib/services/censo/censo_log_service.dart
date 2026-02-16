@@ -1,6 +1,7 @@
 // lib/services/censo/censo_log_service.dart
 
 import 'dart:io';
+import '../../utils/logger.dart';
 import 'dart:convert';
 
 import 'package:path_provider/path_provider.dart';
@@ -63,9 +64,7 @@ class CensoLogService {
           final statA = File(a).statSync();
           final statB = File(b).statSync();
           return statB.modified.compareTo(statA.modified);
-        } catch (e) {
-          return b.compareTo(a);
-        }
+        } catch (e) { AppLogger.e("CENSO_LOG_SERVICE: Error", e); return b.compareTo(a); }
       });
 
       print('${files.length} logs encontrados');

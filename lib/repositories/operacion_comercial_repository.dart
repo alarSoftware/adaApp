@@ -1,5 +1,6 @@
 // lib/repositories/operacion_comercial_repository.dart
 import 'package:flutter/foundation.dart';
+import '../utils/logger.dart';
 
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
@@ -121,9 +122,7 @@ class OperacionComercialRepositoryImpl
       return resultado
           .map((map) => OperacionComercialDetalle.fromMap(map))
           .toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e); return []; }
   }
 
   @override
@@ -220,9 +219,7 @@ class OperacionComercialRepositoryImpl
 
       final operacion = fromMap(operacionMaps.first);
       return operacion.copyWith(detalles: detalles);
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e); return null; }
   }
 
   @override
@@ -249,9 +246,7 @@ class OperacionComercialRepositoryImpl
       }
 
       return operaciones;
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e); return []; }
   }
 
   @override
@@ -267,9 +262,7 @@ class OperacionComercialRepositoryImpl
       );
 
       return operacionesMaps.map((map) => fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e); return []; }
   }
 
   @override
@@ -301,9 +294,7 @@ class OperacionComercialRepositoryImpl
       }
 
       return operaciones;
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e); return []; }
   }
 
   @override
@@ -352,9 +343,7 @@ class OperacionComercialRepositoryImpl
       );
 
       return operacionesMaps.map((map) => fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e); return []; }
   }
 
   Future<List<OperacionComercial>> obtenerOperacionesConError() async {
@@ -367,9 +356,7 @@ class OperacionComercialRepositoryImpl
       );
 
       return operacionesMaps.map((map) => fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e); return []; }
   }
 
   @override
@@ -553,9 +540,7 @@ class OperacionComercialRepositoryImpl
       );
 
       return operacionesMaps.map((map) => fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e); return []; }
   }
 
   @override
@@ -671,9 +656,7 @@ class OperacionComercialRepositoryImpl
       }
 
       return operaciones;
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e); return []; }
   }
 
   @override
@@ -691,9 +674,7 @@ class OperacionComercialRepositoryImpl
         operaciones.add(fromMap(operacionMap));
       }
       return operaciones;
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e); return []; }
   }
 
   @override

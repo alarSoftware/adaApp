@@ -1,4 +1,5 @@
 import '../models/cliente.dart';
+import '../utils/logger.dart';
 import 'base_repository.dart';
 
 class ClienteRepository extends BaseRepository<Cliente> {
@@ -311,6 +312,7 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
       return tieneCensoActivo && tieneDynamicForm;
     } catch (e) {
+      AppLogger.e('CLIENTE_REPOSITORY: Error en verificarTablasEstado', e);
       return false;
     }
   }
@@ -320,7 +322,13 @@ class ClienteRepository extends BaseRepository<Cliente> {
 
     try {
       final tieneTablasEstado = await verificarTablasEstado();
-      if (!tieneTablasEstado) {}
-    } catch (e) {}
+      if (!tieneTablasEstado) {
+        AppLogger.w(
+          'CLIENTE_REPOSITORY: Esquema incompleto - Faltan tablas de estado',
+        );
+      }
+    } catch (e) {
+      AppLogger.e('CLIENTE_REPOSITORY: Error en verificarEsquemaCompleto', e);
+    }
   }
 }

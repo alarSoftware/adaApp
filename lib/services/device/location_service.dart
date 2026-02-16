@@ -1,4 +1,5 @@
 import 'package:geolocator/geolocator.dart';
+import '../../utils/logger.dart';
 
 import 'dart:async';
 
@@ -88,7 +89,7 @@ class LocationService {
       // Intentar "despertar" el diálogo de resolución de Android pidiendo ubicación
       try {
         await Geolocator.getCurrentPosition();
-      } catch (_) {}
+      } catch (_) { AppLogger.e("LOCATION_SERVICE: Error capturado", "Error ignorado con _"); }
 
       // Verificar de nuevo
       if (!await isLocationServiceEnabled()) {

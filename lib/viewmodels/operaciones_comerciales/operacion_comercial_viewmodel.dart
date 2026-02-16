@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../utils/logger.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/models/producto.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
@@ -252,9 +253,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         final error = tipoOperacion.validarUnidadMedida(p.unidadMedida);
         return error == null;
       }).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_VIEWMODEL: Error", e); return []; }
   }
 
   Future<List<Producto>> getProductosReemplazo(
@@ -268,9 +267,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         categoriaOriginal,
         excluirId: idProductoActual,
       );
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_VIEWMODEL: Error", e); return []; }
   }
 
   void seleccionarProductoReemplazo(int index, Producto productoReemplazo) {
@@ -514,8 +511,6 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   Future<Producto?> obtenerProductoPorId(int productoId) async {
     try {
       return await _productoRepository.obtenerProductoPorId(productoId);
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_VIEWMODEL: Error", e); return null; }
   }
 }

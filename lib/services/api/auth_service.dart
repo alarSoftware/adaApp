@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../utils/logger.dart';
 import 'package:bcrypt/bcrypt.dart';
 
 import 'package:ada_app/services/data/database_helper.dart';
@@ -12,7 +13,6 @@ import 'package:ada_app/services/device_log/device_log_background_extension.dart
 import 'package:ada_app/services/background/app_background_service.dart';
 import 'package:ada_app/models/usuario.dart';
 import 'package:ada_app/utils/device_info_helper.dart';
-import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/post/device_log_post_service.dart';
 import 'package:ada_app/repositories/device_log_repository.dart';
 
@@ -125,8 +125,8 @@ class AuthService {
 
       try {
         await AppServices().inicializarDeviceLoggingDespuesDeSincronizacion();
-      } catch (e) {}
-    } catch (e) {}
+      } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
+    } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
   }
 
   Future<void> clearSyncData() async {
@@ -137,7 +137,7 @@ class AuthService {
       await prefs.remove('last_sync_date');
 
       await _dbHelper.eliminar('clientes');
-    } catch (e) {}
+    } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
   }
 
   static Future<SyncResult> sincronizarSoloUsuarios() async {
@@ -291,7 +291,7 @@ class AuthService {
 
       try {
         await AppServices().inicializarEnLogin(password: password);
-      } catch (e) {}
+      } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
 
       return AuthResult(
         exitoso: true,
@@ -330,7 +330,7 @@ class AuthService {
         if (!syncValidation.requiereSincronizacion) {
           try {
             await AppBackgroundService.initialize();
-          } catch (e) {}
+          } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
         }
       }
 
@@ -354,7 +354,7 @@ class AuthService {
 
       try {
         await AppServices().inicializarEnLogin(password: usuario.password);
-      } catch (e) {}
+      } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
 
       return AuthResult(
         exitoso: true,
@@ -474,7 +474,7 @@ class AuthService {
       await prefs.remove(_keyLastSyncedVendedor);
       await prefs.remove(_keyLastSyncedVendedorName);
       await prefs.remove('last_sync_date');
-    } catch (e) {}
+    } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
   }
 
   Future<bool> hasUserLoggedInBefore() async {
@@ -500,9 +500,7 @@ class AuthService {
       return usuarios
           .where((u) => u.username.toLowerCase() == username.toLowerCase())
           .firstOrNull;
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); return null; }
   }
 
   Future<UsuarioAuth?> getCurrentUserAuth() async {
@@ -538,9 +536,7 @@ class AuthService {
         'deviceLogActivo': deviceLogState['activo'],
         'deviceLogInicializado': deviceLogState['inicializado'],
       };
-    } catch (e) {
-      return {};
-    }
+    } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); return {}; }
   }
 }
 

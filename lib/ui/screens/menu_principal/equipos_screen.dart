@@ -1,5 +1,6 @@
 // ui/screens/equipo_list_screen.dart
 import 'package:flutter/material.dart';
+import '../../../utils/logger.dart';
 import 'dart:async';
 import 'package:ada_app/viewmodels/equipos_screen_viewmodel.dart';
 import 'package:ada_app/ui/theme/colors.dart';
@@ -143,9 +144,7 @@ class _EquipoListScreenState extends State<EquipoListScreen> {
     try {
       final date = DateTime.parse(dateStr); // SQLite devuelve ISO strings
       return DateFormat('dd/MM/yyyy HH:mm').format(date);
-    } catch (e) {
-      return dateStr;
-    }
+    } catch (e) { AppLogger.e("EQUIPOS_SCREEN: Error", e); return dateStr; }
   }
 
   @override

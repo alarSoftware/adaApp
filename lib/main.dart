@@ -16,6 +16,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:ada_app/ui/widgets/debug_ribbon_wrapper.dart';
 import 'package:ada_app/services/background/workmanager_service.dart';
+import 'package:ada_app/utils/logger.dart';
 //IMPORTS PARA EL RESET TEMPORAL - COMENTADOS PARA PRODUCCIÓN
 // import 'package:ada_app/services/database_helper.dart';
 
@@ -112,23 +113,21 @@ class _InitializationScreenState extends State<InitializationScreen> {
       // 1. Verificar permisos (bloqueante si faltan)
       await _checkAndRequestPermissions();
 
-      // 2. Iniciar servicios en SEGUNDO PLANO (Fire & Forget)
+      // 2. Iniciar servicios en SEGUNDO PLANO
       _iniciarServiciosBackground();
 
-      // Servicios iniciados en background arriba ⬆️
-
-      // 3. Verificar estado de autenticación (rápido)
+      // 3. Verificar estado de autenticación
       final authService = AuthService();
       final estaAutenticado = await authService.hasUserLoggedInBefore();
 
       if (mounted) {
-        // Navegación inmediata
         Navigator.pushReplacementNamed(
           context,
           estaAutenticado ? '/home' : '/login',
         );
       }
     } catch (e) {
+      AppLogger.e('Error al inicializar la aplicación', e);
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -195,12 +194,10 @@ class _InitializationScreenState extends State<InitializationScreen> {
         });
       }
 
-      // 1. Verificar/Solicitar Ubicación (Foreground)
-      // Esta es la que muestra la "ventanita nativa"
+      // 1. Verificar/Solicitar Ubicación
       var locStatus = await Permission.location.status;
 
       if (!locStatus.isGranted) {
-        // Intentamos mostrar la nativa
         locStatus = await Permission.location.request();
       }
 
@@ -283,17 +280,13 @@ class _InitializationScreenState extends State<InitializationScreen> {
   /// Inicia los servicios pesados en segundo plano sin bloquear la UI
   void _iniciarServiciosBackground() async {
     try {
-      print('Iniciando servicios en segundo plano...');
-
       // Inicializar servicios principales
       await AppServices().inicializar();
 
       // Inicializar WorkManager
       await WorkmanagerService.initialize();
-
-      print('Servicios en segundo plano iniciados correctamente');
     } catch (e) {
-      print('Error al iniciar servicios en segundo plano: $e');
+      AppLogger.e('Error en _iniciarServiciosBackground', e);
     }
   }
 

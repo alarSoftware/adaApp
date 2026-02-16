@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/logger.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/viewmodels/equipos_clientes_detail_screen_viewmodel.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
@@ -900,7 +901,7 @@ class _EquiposClientesDetailScreenState
             tieneImagen2 = segundaFoto.tieneImagen;
             imagenTamano2 = segundaFoto.imagenTamano;
           }
-        } catch (e) {}
+        } catch (e) { AppLogger.e("EQUIPOS_CLIENTES_DETAIL_SCREEN: Error", e); }
       }
 
       final datosFinales = {

@@ -1,4 +1,5 @@
 import '../models/censo_activo.dart';
+import '../utils/logger.dart';
 import 'base_repository.dart';
 
 import 'package:uuid/uuid.dart';
@@ -91,9 +92,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         limit: 1,
       );
       return maps.isNotEmpty ? fromMap(maps.first) : null;
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return null; }
   }
 
   /// Obtener último estado por equipo_id y cliente_id
@@ -110,9 +109,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         limit: 1,
       );
       return maps.isNotEmpty ? fromMap(maps.first) : null;
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return null; }
   }
 
   // ========== MÉTODOS DE CONSULTA ==========
@@ -130,9 +127,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         orderBy: 'fecha_revision DESC',
       );
       return maps.map((map) => fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
   }
 
   /// Obtener todos los censos con filtro de fecha opcional
@@ -160,9 +155,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
 
       return maps.map((map) => fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
   }
 
   /// Obtener fotos de un censo
@@ -175,9 +168,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         orderBy: 'orden ASC',
       );
       return maps;
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
   }
 
   /// Obtener estados por usuario - NUEVO MÉTODO
@@ -190,9 +181,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         orderBy: getDefaultOrderBy(),
       );
       return maps.map((map) => fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
   }
 
   /// Obtener estados creados (pendientes)
@@ -205,9 +194,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         orderBy: getDefaultOrderBy(),
       );
       return maps.map((map) => fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
   }
 
   /// Obtener estados migrados
@@ -220,9 +207,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         orderBy: getDefaultOrderBy(),
       );
       return maps.map((map) => fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
   }
 
   Future<List<CensoActivo>> obtenerConError() async {
@@ -234,9 +219,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         orderBy: getDefaultOrderBy(),
       );
       return maps.map((map) => fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
   }
 
   /// Eliminar censo y sus fotos asociadas
@@ -273,9 +256,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
 
       return maps.map((map) => fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
   }
 
   // ========== MÉTODOS DE ACTUALIZACIÓN ==========
@@ -350,9 +331,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'error': conError.length,
         'total': creados.length + migrados.length + conError.length,
       };
-    } catch (e) {
-      return {'creados': 0, 'migrados': 0, 'error': 0, 'total': 0};
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return {'creados': 0, 'migrados': 0, 'error': 0, 'total': 0}; }
   }
 
   /// Contar registros por usuario - NUEVO MÉTODO
@@ -375,9 +354,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'error': conError,
         'total': estados.length,
       };
-    } catch (e) {
-      return {'creados': 0, 'migrados': 0, 'error': 0, 'total': 0};
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return {'creados': 0, 'migrados': 0, 'error': 0, 'total': 0}; }
   }
 
   /// Obtener estadísticas de migración
@@ -411,9 +388,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'porcentaje_pendiente': (creados / total * 100).toDouble(),
         'porcentaje_error': (errores / total * 100).toDouble(),
       };
-    } catch (e) {
-      return {};
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return {}; }
   }
 
   /// Contar cambios por equipo_id y cliente_id
@@ -425,9 +400,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         whereArgs: [equipoId, clienteId],
       );
       return result.length;
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return 0; }
   }
 
   /// Obtener estadísticas de cambios
@@ -469,9 +442,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
     try {
       final noSincronizados = await obtenerNoSincronizados();
       return noSincronizados.map((estado) => estado.toJson()).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
   }
 
   /// Limpiar historial antiguo
@@ -517,9 +488,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
     try {
       final estado = await obtenerUltimoEstado(equipoId, clienteId);
       return estado?.toMap();
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return null; }
   }
 
   // ========== MÉTODOS PARA SYNC PANEL ==========

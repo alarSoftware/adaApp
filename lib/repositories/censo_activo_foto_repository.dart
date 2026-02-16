@@ -1,4 +1,5 @@
 import '../models/censo_activo_foto.dart';
+import '../utils/logger.dart';
 import 'base_repository.dart';
 
 import 'package:uuid/uuid.dart';
@@ -84,9 +85,7 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
       final fotos = maps.map((map) => fromMap(map)).toList();
 
       return fotos;
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_FOTO_REPOSITORY: Error", e); return []; }
   }
 
   /// Obtener foto específica por orden
@@ -103,9 +102,7 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
       );
 
       return maps.isNotEmpty ? fromMap(maps.first) : null;
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_FOTO_REPOSITORY: Error", e); return null; }
   }
 
   /// Obtener fotos pendientes de sincronización
@@ -120,9 +117,7 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
       final fotos = maps.map((map) => fromMap(map)).toList();
 
       return fotos;
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_FOTO_REPOSITORY: Error", e); return []; }
   }
 
   /// Obtener censo con todas sus fotos
@@ -130,9 +125,7 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
     try {
       final fotos = await obtenerFotosPorCenso(censoActivoId);
       return CensoConFotos(censoActivoId: censoActivoId, fotos: fotos);
-    } catch (e) {
-      return CensoConFotos(censoActivoId: censoActivoId, fotos: []);
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_FOTO_REPOSITORY: Error", e); return CensoConFotos(censoActivoId: censoActivoId, fotos: []); }
   }
 
   // ========== MÉTODOS DE ACTUALIZACIÓN ==========
@@ -240,9 +233,7 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
         'sincronizadas': sincronizadas,
         'pendientes': pendientes.length,
       };
-    } catch (e) {
-      return {'total': 0, 'sincronizadas': 0, 'pendientes': 0};
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_FOTO_REPOSITORY: Error", e); return {'total': 0, 'sincronizadas': 0, 'pendientes': 0}; }
   }
 
   /// Obtener estadísticas por censo
@@ -290,9 +281,7 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
 
       final ultimoOrden = maps.first['orden'] as int;
       return ultimoOrden + 1;
-    } catch (e) {
-      return 1;
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_FOTO_REPOSITORY: Error", e); return 1; }
   }
 
   /// Reordenar fotos de un censo
@@ -334,9 +323,7 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
     try {
       final fotosPendientes = await obtenerFotosPendientes();
       return fotosPendientes.map((foto) => foto.toJson()).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_FOTO_REPOSITORY: Error", e); return []; }
   }
 
   // ========== MÉTODOS DE COMPATIBILIDAD ==========
@@ -381,8 +368,6 @@ class CensoActivoFotoRepository extends BaseRepository<CensoActivoFoto> {
       }
 
       return migradas;
-    } catch (e) {
-      return migradas;
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_FOTO_REPOSITORY: Error", e); return migradas; }
   }
 }

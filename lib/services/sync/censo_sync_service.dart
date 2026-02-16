@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../utils/logger.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 
@@ -431,9 +432,7 @@ class CensusSyncService extends BaseSyncService {
     if (value is String) {
       try {
         return int.parse(value);
-      } catch (e) {
-        return null;
-      }
+      } catch (e) { AppLogger.e("CENSO_SYNC_SERVICE: Error", e); return null; }
     }
     return null;
   }
@@ -446,9 +445,7 @@ class CensusSyncService extends BaseSyncService {
     if (value is String) {
       try {
         return double.parse(value);
-      } catch (e) {
-        return null;
-      }
+      } catch (e) { AppLogger.e("CENSO_SYNC_SERVICE: Error", e); return null; }
     }
     return null;
   }
@@ -491,9 +488,7 @@ class CensusSyncService extends BaseSyncService {
         if (dataValue is String) {
           try {
             censosData = jsonDecode(dataValue) as List;
-          } catch (e) {
-            return null;
-          }
+          } catch (e) { AppLogger.e("CENSO_SYNC_SERVICE: Error", e); return null; }
         } else if (dataValue is List) {
           censosData = dataValue;
         }

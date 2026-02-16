@@ -1,4 +1,5 @@
 import 'package:ada_app/services/data/database_helper.dart';
+import '../utils/logger.dart';
 import '../services/dynamic_form/dynamic_form_upload_service.dart';
 
 /// Repository especializado en gestionar el estado de sincronización
@@ -23,9 +24,7 @@ class DynamicFormSyncRepository {
       );
 
       return pending;
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return []; }
   }
 
   /// Obtiene respuestas con error de sincronización
@@ -39,9 +38,7 @@ class DynamicFormSyncRepository {
       );
 
       return errors;
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return []; }
   }
 
   /// Obtiene una respuesta específica por ID
@@ -55,9 +52,7 @@ class DynamicFormSyncRepository {
       );
 
       return results.isNotEmpty ? results.first : null;
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return null; }
   }
 
   /// Obtiene los detalles de una respuesta
@@ -71,9 +66,7 @@ class DynamicFormSyncRepository {
         whereArgs: [responseId],
         orderBy: 'dynamic_form_detail_id ASC',
       );
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return []; }
   }
 
   /// Obtiene las imágenes de una respuesta
@@ -95,9 +88,7 @@ class DynamicFormSyncRepository {
         'SELECT * FROM $_imageTableName WHERE dynamic_form_response_detail_id IN ($placeholders) ORDER BY orden ASC',
         detailIds,
       );
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return []; }
   }
 
   // ==================== ACTUALIZAR ESTADO DE SINCRONIZACIÓN ====================
@@ -124,9 +115,7 @@ class DynamicFormSyncRepository {
         return true;
       }
       return false;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return false; }
   }
 
   /// Marca un detalle como sincronizado
@@ -140,9 +129,7 @@ class DynamicFormSyncRepository {
       );
 
       return updated > 0;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return false; }
   }
 
   /// Marca todos los detalles de una respuesta como sincronizados
@@ -159,9 +146,7 @@ class DynamicFormSyncRepository {
         return true;
       }
       return false;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return false; }
   }
 
   /// Marca una imagen como sincronizada
@@ -175,9 +160,7 @@ class DynamicFormSyncRepository {
       );
 
       return updated > 0;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return false; }
   }
 
   /// Marca todas las imágenes de una respuesta como sincronizadas
@@ -197,9 +180,7 @@ class DynamicFormSyncRepository {
 
       if (updated > 0) {}
       return true;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return false; }
   }
 
   /// Marca una respuesta como error con mensaje
@@ -230,9 +211,7 @@ class DynamicFormSyncRepository {
         return true;
       }
       return false;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return false; }
   }
 
   /// Actualiza el intento de sincronización
@@ -250,9 +229,7 @@ class DynamicFormSyncRepository {
       );
 
       return updated > 0;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return false; }
   }
 
   /// Reinicia el contador de intentos de una respuesta
@@ -274,9 +251,7 @@ class DynamicFormSyncRepository {
         return true;
       }
       return false;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return false; }
   }
 
   // ==================== ESTADÍSTICAS ====================
@@ -296,9 +271,7 @@ class DynamicFormSyncRepository {
         'draft': draft,
         'total': pending + synced + errors + draft,
       };
-    } catch (e) {
-      return {'pending': 0, 'synced': 0, 'error': 0, 'draft': 0, 'total': 0};
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return {'pending': 0, 'synced': 0, 'error': 0, 'draft': 0, 'total': 0}; }
   }
 
   /// Cuenta respuestas por estado
@@ -310,9 +283,7 @@ class DynamicFormSyncRepository {
         whereArgs: [status],
       );
       return result.length;
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return 0; }
   }
 
   /// Verifica si hay respuestas pendientes
@@ -320,9 +291,7 @@ class DynamicFormSyncRepository {
     try {
       final count = await _countByStatus('pending');
       return count > 0;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return false; }
   }
 
   // ==================== LIMPIEZA ====================
@@ -376,9 +345,7 @@ class DynamicFormSyncRepository {
 
       if (deleted > 0) {}
       return deleted;
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return 0; }
   }
 
   /// Limpia solo los borradores antiguos
@@ -428,9 +395,7 @@ class DynamicFormSyncRepository {
 
       if (deleted > 0) {}
       return deleted;
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return 0; }
   }
 
   // ==================== SINCRONIZACIÓN PRINCIPAL ====================
@@ -508,9 +473,7 @@ class DynamicFormSyncRepository {
         'failed': fallidos,
         'total': todasPendientes.length,
       };
-    } catch (e) {
-      return {'success': 0, 'failed': 0, 'total': 0};
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_REPOSITORY: Error", e); return {'success': 0, 'failed': 0, 'total': 0}; }
   }
 
   /// Reintentar sincronización de una respuesta específica

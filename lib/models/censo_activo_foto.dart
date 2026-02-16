@@ -1,3 +1,5 @@
+import '../utils/logger.dart';
+
 class CensoActivoFoto {
   final String? id;
   final String censoActivoId;
@@ -124,9 +126,7 @@ class CensoConFotos {
   CensoActivoFoto? getFotoPorOrden(int orden) {
     try {
       return fotos.firstWhere((f) => f.orden == orden);
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("CENSO_ACTIVO_FOTO: Error", e); return null; }
   }
 
   // Obtener la primera foto

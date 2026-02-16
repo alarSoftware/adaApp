@@ -6,6 +6,7 @@ import 'package:ada_app/services/sync/operacion_comercial_sync_service.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/models/usuario.dart';
 import 'package:ada_app/services/websocket/socket_service.dart';
+import 'package:ada_app/utils/logger.dart';
 
 class AppServices {
   static AppServices? _instance;
@@ -20,86 +21,82 @@ class AppServices {
   // ==================== INICIALIZACIÓN EN LOGIN ====================
   Future<void> inicializarEnLogin({String? password}) async {
     try {
-      print(
+      AppLogger.i(
         'User logged in - Initializing basic services (no device logging yet)',
       );
-
       _isUserLoggedIn = true;
-
       await AppBackgroundService.initialize();
-
       final usuario = await _obtenerUsuarioActual();
 
       if (usuario != null) {
-        print('Usuario: ${usuario.username} (ID: ${usuario.id})');
-
-        // 2. Iniciar SOLO sincronizaciones automáticas (sin device logging)
+        AppLogger.i('Usuario: ${usuario.username} (ID: ${usuario.id})');
         await _iniciarSincronizacionesAutomaticas(usuario);
       } else {
-        print('No se pudo obtener información del usuario');
+        AppLogger.w('No se pudo obtener información del usuario');
       }
 
-      // 3. Conectar WebSocket para rastreo de usuarios activos (no-bloqueante)
-      // Fire & forget - se conecta en segundo plano sin bloquear el login
       if (usuario != null) {
-        SocketService()
-            .enableReconnect(); // Habilitar reconexión para nueva sesión
+        SocketService().enableReconnect();
         SocketService().connect(username: usuario.username, password: password);
       }
 
-      print('Servicios básicos iniciados correctamente');
-      print(
+      AppLogger.i('Servicios básicos iniciados correctamente');
+      AppLogger.i(
         'NOTA: Device logging se iniciará después de la primera sincronización exitosa',
       );
     } catch (e) {
-      print('Error al inicializar servicios en login: $e');
+      AppLogger.e('Error al inicializar servicios en login', e);
     }
   }
 
   Future<void> inicializarDeviceLoggingDespuesDeSincronizacion() async {
     try {
-      print('Iniciando device logging después de sincronización exitosa...');
+      AppLogger.i(
+        'Iniciando device logging después de sincronización exitosa...',
+      );
 
       if (!_isUserLoggedIn) {
-        print('No se puede iniciar device logging sin usuario logueado');
+        AppLogger.w('No se puede iniciar device logging sin usuario logueado');
         return;
       }
 
       await AppBackgroundService.initialize();
 
-      print(
+      AppLogger.i(
         'Background Service iniciado exitosamente después de sincronización',
       );
     } catch (e) {
-      print('Error iniciando device logging después de sincronización: $e');
+      AppLogger.e(
+        'Error iniciando device logging después de sincronización',
+        e,
+      );
     }
   }
 
   /// Iniciar todas las sincronizaciones automáticas (SIN device logging)
   Future<void> _iniciarSincronizacionesAutomaticas(Usuario usuario) async {
     try {
-      print('Iniciando sincronizaciones automáticas (SIN device logging)...');
-      // Sincronización de Formularios Dinámicos (cada 2 minutos)
-      if (usuario.employeeId != null && usuario.employeeId!.isNotEmpty) {}
+      AppLogger.i(
+        'Iniciando sincronizaciones automáticas (SIN device logging)...',
+      );
 
-      // Sincronización de Operaciones Comerciales
       if (usuario.id != null) {
         OperacionComercialSyncService.iniciarSincronizacionAutomatica(
           usuario.id!,
         );
-        print('  Operaciones Comerciales Sync: iniciado');
+        AppLogger.i('  Operaciones Comerciales Sync: iniciado');
       }
 
-      // Sincronización de Device Logs (cada 10 minutos)
-      // NOTA: Esto NO inicia el BackgroundExtension, solo sincroniza logs existentes
       DeviceLogUploadService.iniciarSincronizacionAutomatica();
-      print('  Device Logs Upload: cada 10 minutos (para logs existentes)');
+      AppLogger.i(
+        '  Device Logs Upload: cada 10 minutos (para logs existentes)',
+      );
 
-      print(
+      AppLogger.i(
         'Sincronizaciones automáticas iniciadas (device logging pendiente)',
       );
     } catch (e) {
-      print('Error iniciando sincronizaciones: $e');
+      AppLogger.e('Error iniciando sincronizaciones', e);
     }
   }
 
@@ -108,76 +105,60 @@ class AppServices {
   /// Detener todos los servicios cuando el usuario hace logout
   Future<void> detenerEnLogout() async {
     try {
-      print('Logout detectado - Deteniendo servicios');
-
+      AppLogger.i('Logout detectado - Deteniendo servicios');
       _isUserLoggedIn = false;
-
-      // 1. Detener device logging (Service)
       await AppBackgroundService.stopService();
-
-      // 2. Detener sincronizaciones automáticas
       await _detenerSincronizacionesAutomaticas();
-
-      // 3. Desconectar WebSocket
       SocketService().disconnect();
-
-      print('Todos los servicios detenidos por logout');
+      AppLogger.i('Todos los servicios detenidos por logout');
     } catch (e) {
-      print('Error deteniendo servicios en logout: $e');
+      AppLogger.e('Error deteniendo servicios en logout', e);
     }
   }
 
   /// Detener todas las sincronizaciones automáticas
   Future<void> _detenerSincronizacionesAutomaticas() async {
     try {
-      // Detener Censos
-      // CensoUploadService.detenerSincronizacionAutomatica();
       OperacionComercialSyncService.detenerSincronizacionAutomatica();
-
-      // Detener Device Logs
       DeviceLogUploadService.detenerSincronizacionAutomatica();
-    } catch (e) {}
+    } catch (e) {
+      AppLogger.e('Error deteniendo sincronizaciones automáticas', e);
+    }
   }
 
   // ==================== MÉTODOS EXISTENTES ====================
 
   Future<void> inicializar() async {
     try {
-      print('Initializing app services');
-
-      // Load work hours config
+      AppLogger.i('Initializing app services');
       await DeviceLogBackgroundExtension.cargarConfiguracionHorario();
 
-      // Verificamos con AuthService por si acaso
       if (!_isUserLoggedIn) {
         final authService = AuthService();
         _isUserLoggedIn = await authService.hasUserLoggedInBefore();
       }
 
       if (_isUserLoggedIn) {
-        // Inicializar background service si el usuario ya tiene sesión
         await AppBackgroundService.initialize();
-
-        print('Servicios básicos y background service inicializados');
+        AppLogger.i('Servicios básicos y background service inicializados');
 
         final usuario = await _obtenerUsuarioActual();
         if (usuario != null) {
           await _iniciarSincronizacionesAutomaticas(usuario);
-          print(
+          AppLogger.i(
             'Sincronizaciones automaticas restauradas para usuario: ${usuario.username}',
           );
 
-          // Conectar WebSocket en segundo plano (no-bloqueante)
-          SocketService().enableReconnect(); // Habilitar reconexión
+          SocketService().enableReconnect();
           SocketService().connect(username: usuario.username);
         } else {
-          print('Usuario no disponible - WebSocket no conectado');
+          AppLogger.w('Usuario no disponible - WebSocket no conectado');
         }
       } else {
-        print('Usuario no logueado - servicios no iniciados');
+        AppLogger.i('Usuario no logueado - servicios no iniciados');
       }
     } catch (e) {
-      print('Error al inicializar servicios: $e');
+      AppLogger.e('Error al inicializar servicios', e);
     }
   }
 
@@ -214,7 +195,7 @@ class AppServices {
         'endpoint_completo': backgroundState['endpoint_completo'],
       };
     } catch (e) {
-      print('Error obteniendo estado de servicios: $e');
+      AppLogger.e('Error obteniendo estado de servicios', e);
       return {
         'usuario_logueado': _isUserLoggedIn,
         'extension_activa': DeviceLogBackgroundExtension.estaActivo,
@@ -227,25 +208,26 @@ class AppServices {
   }
 
   Future<void> detener() async {
-    print('Deteniendo servicios');
+    AppLogger.i('Deteniendo servicios');
     await DeviceLogBackgroundExtension.detener();
   }
 
   Future<void> reiniciarServicios() async {
     try {
-      print('Reiniciando servicios de logging');
+      AppLogger.i('Reiniciando servicios de logging');
 
       await detener();
       await Future.delayed(const Duration(seconds: 1));
 
       if (_isUserLoggedIn) {
-        // NO reiniciar automáticamente el device logging
-        print('Device logging NO reiniciado - requiere sincronización previa');
+        AppLogger.i(
+          'Device logging NO reiniciado - requiere sincronización previa',
+        );
       }
 
-      print('Servicios básicos reiniciados');
+      AppLogger.i('Servicios básicos reiniciados');
     } catch (e) {
-      print('Error reiniciando servicios: $e');
+      AppLogger.e('Error reiniciando servicios', e);
     }
   }
 
@@ -254,10 +236,9 @@ class AppServices {
   /// Fuerza la sincronización de censos pendientes
   Future<Map<String, int>?> forzarSincronizacionCensos() async {
     try {
-      print('Forzando sincronización de censos...');
-      // return await CensoUploadService.forzarSincronizacion();
+      AppLogger.i('Forzando sincronización de censos...');
     } catch (e) {
-      print('Error forzando sync de censos: $e');
+      AppLogger.e('Error forzando sync de censos', e);
       return null;
     }
     return null;
@@ -266,10 +247,12 @@ class AppServices {
   /// Fuerza la sincronización de formularios pendientes
   Future<Map<String, int>?> forzarSincronizacionFormularios() async {
     try {
-      print('Forzando sincronización de formularios... (Not implemented)');
+      AppLogger.i(
+        'Forzando sincronización de formularios... (Not implemented)',
+      );
       return null;
     } catch (e) {
-      print('Error forzando sync de formularios: $e');
+      AppLogger.e('Error forzando sync de formularios', e);
       return null;
     }
   }
@@ -277,10 +260,10 @@ class AppServices {
   /// Fuerza la sincronización de device logs pendientes
   Future<Map<String, int>?> forzarSincronizacionDeviceLogs() async {
     try {
-      print('Forzando sincronización de device logs...');
+      AppLogger.i('Forzando sincronización de device logs...');
       return await DeviceLogUploadService.forzarSincronizacion();
     } catch (e) {
-      print('Error forzando sync de device logs: $e');
+      AppLogger.e('Error forzando sync de device logs', e);
       return null;
     }
   }
@@ -288,8 +271,7 @@ class AppServices {
   /// Fuerza sincronización de TODO
   Future<Map<String, dynamic>> forzarSincronizacionCompleta() async {
     try {
-      print('Forzando sincronización completa...');
-
+      AppLogger.i('Forzando sincronización completa...');
       final censos = await forzarSincronizacionCensos();
       final formularios = await forzarSincronizacionFormularios();
       final deviceLogs = await forzarSincronizacionDeviceLogs();
@@ -301,7 +283,7 @@ class AppServices {
         'device_logs': deviceLogs ?? {'exitosos': 0, 'fallidos': 0, 'total': 0},
       };
     } catch (e) {
-      print('Error en sincronización completa: $e');
+      AppLogger.e('Error en sincronización completa', e);
       return {};
     }
   }
@@ -311,24 +293,24 @@ class AppServices {
   /// Mostrar configuración completa de todos los servicios
   Future<void> mostrarConfiguracionCompleta() async {
     try {
-      print("FULL SERVICE CONFIGURATION");
+      AppLogger.i("FULL SERVICE CONFIGURATION");
 
-      // Estado general
       final estado = await obtenerEstadoServicios();
-      print("Usuario logueado: ${estado['usuario_logueado']}");
-      print("Servicios activos:");
-      print("   • Background Extension: ${estado['extension_activa']}");
-      print("   • Censos Sync: ${estado['censo_sync_activo']}");
-      print("   • Formularios Sync: ${estado['formularios_sync_activo']}");
-      print("   • Device Logs Sync: ${estado['device_logs_sync_activo']}");
+      AppLogger.i("Usuario logueado: ${estado['usuario_logueado']}");
+      AppLogger.i("Servicios activos:");
+      AppLogger.i("   • Background Extension: ${estado['extension_activa']}");
+      AppLogger.i("   • Censos Sync: ${estado['censo_sync_activo']}");
+      AppLogger.i(
+        "   • Formularios Sync: ${estado['formularios_sync_activo']}",
+      );
+      AppLogger.i(
+        "   • Device Logs Sync: ${estado['device_logs_sync_activo']}",
+      );
 
-      // Configuración de Background Extension
       await DeviceLogBackgroundExtension.mostrarConfiguracion();
-
-      // Configuración de Upload Service
       await DeviceLogUploadService.mostrarConfiguracion();
     } catch (e) {
-      print("Error mostrando configuración: $e");
+      AppLogger.e("Error mostrando configuración", e);
     }
   }
 
@@ -340,7 +322,7 @@ class AppServices {
       final authService = AuthService();
       return await authService.getCurrentUser();
     } catch (e) {
-      print('Error obteniendo usuario actual: $e');
+      AppLogger.e('Error obteniendo usuario actual', e);
       return null;
     }
   }

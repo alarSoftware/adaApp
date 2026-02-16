@@ -216,9 +216,6 @@ class DeviceLogBackgroundExtension {
           // Si hace menos de (Intervalo - 0.5 min) que se hizo un log, saltamos.
           if (diferencia.inSeconds <
               (BackgroundLogConfig.intervalo.inSeconds - 30)) {
-            print(
-              'LOGGING SKIPPED: Intervalo no cumplido. Último: ${diferencia.inMinutes} min (Config: ${BackgroundLogConfig.intervalo.inMinutes})',
-            );
             return;
           }
         }

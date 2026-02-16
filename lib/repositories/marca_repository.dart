@@ -1,4 +1,5 @@
 import '../models/marca.dart';
+import '../utils/logger.dart';
 import 'base_repository.dart';
 
 class MarcaRepository extends BaseRepository<Marca> {
@@ -38,9 +39,7 @@ class MarcaRepository extends BaseRepository<Marca> {
       );
 
       return maps.map((map) => fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("MARCA_REPOSITORY: Error", e); return []; }
   }
 
   /// Obtener marca por nombre

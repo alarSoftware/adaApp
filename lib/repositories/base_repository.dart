@@ -78,25 +78,23 @@ abstract class BaseRepository<T> {
     await db.transaction((txn) async {
       await txn.delete(tableName);
 
+      final batch = txn.batch();
       for (var itemData in itemsAPI) {
-        try {
-          Map<String, dynamic> datos;
+        Map<String, dynamic> datos;
 
-          if (itemData is Map<String, dynamic>) {
-            datos = Map<String, dynamic>.from(itemData);
-          } else {
-            datos = toMap(itemData);
-          }
-
-          await txn.insert(
-            tableName,
-            datos,
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-        } catch (e) {
-          rethrow;
+        if (itemData is Map<String, dynamic>) {
+          datos = Map<String, dynamic>.from(itemData);
+        } else {
+          datos = toMap(itemData);
         }
+
+        batch.insert(
+          tableName,
+          datos,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
       }
+      await batch.commit(noResult: true);
     });
   }
 

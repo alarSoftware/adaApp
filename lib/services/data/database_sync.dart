@@ -120,6 +120,7 @@ class DatabaseSync {
 
       int sincronizados = 0;
       int omitidos = 0;
+      final batch = txn.batch();
 
       for (int i = 0; i < datos.length; i++) {
         final entidad = datos[i];
@@ -139,22 +140,23 @@ class DatabaseSync {
           }
 
           if (usarReplace) {
-            await txn.insert(
+            batch.insert(
               tabla,
               mapa,
               conflictAlgorithm: ConflictAlgorithm.replace,
             );
           } else {
-            await txn.insert(tabla, mapa);
+            batch.insert(tabla, mapa);
           }
 
           sincronizados++;
         } catch (e) {
-          print('Error insertando ${nombreEntidad.toLowerCase()} ${i + 1}: $e');
+          print('Error procesando ${nombreEntidad.toLowerCase()} ${i + 1}: $e');
           omitidos++;
         }
       }
 
+      await batch.commit(noResult: true);
       print('$nombreEntidad: $sincronizados sincronizados, $omitidos omitidos');
     });
 

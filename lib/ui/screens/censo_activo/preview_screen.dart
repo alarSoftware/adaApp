@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/logger.dart';
 import 'package:provider/provider.dart';
 import '../../../models/cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
@@ -88,9 +89,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
             return;
           }
-        } catch (e) {}
+        } catch (e) { AppLogger.e("PREVIEW_SCREEN: Error", e); }
       }
-    } catch (e) {}
+    } catch (e) { AppLogger.e("PREVIEW_SCREEN: Error", e); }
   }
 
   Future<void> _cargarImagen2() async {
@@ -123,9 +124,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
             return;
           }
-        } catch (e) {}
+        } catch (e) { AppLogger.e("PREVIEW_SCREEN: Error", e); }
       }
-    } catch (e) {}
+    } catch (e) { AppLogger.e("PREVIEW_SCREEN: Error", e); }
   }
 
   @override

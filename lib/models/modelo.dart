@@ -1,4 +1,5 @@
 import 'package:ada_app/services/data/database_helper.dart';
+import '../utils/logger.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/sync/equipment_sync_service.dart';
 
@@ -118,9 +119,7 @@ class ModeloRepository {
         'tabla': _tableName,
         'ultima_actualizacion': DateTime.now().toIso8601String(),
       };
-    } catch (e) {
-      return {'error': e.toString(), 'total_modelos': 0};
-    }
+    } catch (e) { AppLogger.e("MODELO: Error", e); return {'error': e.toString(), 'total_modelos': 0}; }
   }
 
   Future<bool> existePorNombre(String nombre) async {
@@ -130,8 +129,6 @@ class ModeloRepository {
         'LOWER(nombre) = LOWER(?)',
         [nombre.trim()],
       );
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("MODELO: Error", e); return false; }
   }
 }

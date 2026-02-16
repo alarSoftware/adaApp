@@ -1,3 +1,5 @@
+import '../utils/logger.dart';
+
 class ParsingHelpers {
   /// Parsear string de forma segura
   static String? parseString(dynamic value) {
@@ -31,9 +33,7 @@ class ParsingHelpers {
     if (value == null) return null;
     try {
       return DateTime.parse(value.toString());
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("PARSING_HELPERS: Error", e); return null; }
   }
 
   /// Parsear DateTime con valor por defecto (ahora)
@@ -41,9 +41,7 @@ class ParsingHelpers {
     if (value == null) return DateTime.now();
     try {
       return DateTime.parse(value.toString());
-    } catch (e) {
-      return DateTime.now();
-    }
+    } catch (e) { AppLogger.e("PARSING_HELPERS: Error", e); return DateTime.now(); }
   }
 
   /// Convertir int a bool (1 = true, 0 o cualquier otro = false)

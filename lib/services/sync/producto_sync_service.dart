@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../utils/logger.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 
@@ -176,9 +177,7 @@ class ProductoSyncService extends BaseSyncService {
     if (value is String) {
       try {
         return int.parse(value);
-      } catch (e) {
-        return null;
-      }
+      } catch (e) { AppLogger.e("PRODUCTO_SYNC_SERVICE: Error", e); return null; }
     }
     return null;
   }
@@ -204,9 +203,7 @@ class ProductoSyncService extends BaseSyncService {
         if (dataValue is String) {
           try {
             productosData = jsonDecode(dataValue) as List;
-          } catch (e) {
-            return [];
-          }
+          } catch (e) { AppLogger.e("PRODUCTO_SYNC_SERVICE: Error", e); return []; }
         } else if (dataValue is List) {
           productosData = dataValue;
         }
@@ -229,8 +226,6 @@ class ProductoSyncService extends BaseSyncService {
       }
 
       return productosParaGuardar;
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("PRODUCTO_SYNC_SERVICE: Error", e); return []; }
   }
 }

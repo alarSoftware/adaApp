@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/logger.dart';
 
 import 'dart:async';
 import 'package:uuid/uuid.dart';
@@ -201,7 +202,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       } else if (cliente != null) {
         try {
           clienteId = int.tryParse(cliente.id.toString());
-        } catch (_) {}
+        } catch (_) { AppLogger.e("PREVIEW_SCREEN_VIEWMODEL: Error capturado", "Error ignorado con _"); }
       }
 
       var codBarras = datos['codigo_barras']?.toString() ?? '';
@@ -372,23 +373,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
     }
   }
 
-  // Wrapper de instancia para compatibilidad si fuera necesario
-  //TODO Ronaldo borrar despues
-  Future<String> _crearEquipoNuevo(
-    Map<String, dynamic> datos,
-    int? clienteId,
-    String processId,
-    String? userId,
-  ) async {
-    return _crearEquipoNuevoStatic(
-      datos,
-      clienteId,
-      processId,
-      userId,
-      _equipoRepository,
-    );
-  }
-
   static Future<bool> _verificarAsignacionLocalStatic(
     String equipoId,
     int clienteId,
@@ -470,9 +454,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final hora = fecha.hour.toString().padLeft(2, '0');
       final minuto = fecha.minute.toString().padLeft(2, '0');
       return '$dia/$mes/$ano - $hora:$minuto';
-    } catch (e) {
-      return 'Formato inválido';
-    }
+    } catch (e) { AppLogger.e("PREVIEW_SCREEN_VIEWMODEL: Error", e); return 'Formato inválido'; }
   }
 
   Future<Map<String, dynamic>> verificarSincronizacionPendiente(
@@ -639,7 +621,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
                 try {
                   errorDetalle +=
                       '\n\nOcurrió el: ${_formatTimestamp(DateTime.parse(timestamp))}';
-                } catch (_) {}
+                } catch (_) { AppLogger.e("PREVIEW_SCREEN_VIEWMODEL: Error capturado", "Error ignorado con _"); }
               }
             } else {
               errorDetalle = result.first['error_mensaje'] as String?;
@@ -736,9 +718,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
         usuarioId,
         employeeId,
       );
-    } catch (e) {
-      return {'success': false, 'error': 'Error al reintentar: $e'};
-    }
+    } catch (e) { AppLogger.e("PREVIEW_SCREEN_VIEWMODEL: Error", e); return {'success': false, 'error': 'Error al reintentar: $e'}; }
   }
 
   Future<List<String>> obtenerLogsGuardados() async {
@@ -772,8 +752,6 @@ class PreviewScreenViewModel extends ChangeNotifier {
       if (value is String) return int.tryParse(value);
       if (value is double) return value.toInt();
       return null;
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("PREVIEW_SCREEN_VIEWMODEL: Error", e); return null; }
   }
 }

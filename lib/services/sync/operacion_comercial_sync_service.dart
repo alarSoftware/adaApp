@@ -1,5 +1,5 @@
 // lib/services/sync/operacion_comercial_sync_service.dart
-import 'package:flutter/foundation.dart';
+import '../../utils/logger.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -199,6 +199,7 @@ class OperacionComercialSyncService extends BaseSyncService {
 
       return null;
     } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_SYNC_SERVICE: Error", e);
       return null;
     }
   }
@@ -249,6 +250,7 @@ class OperacionComercialSyncService extends BaseSyncService {
               final parsed = jsonDecode(dataValue) as List;
               return parsed;
             } catch (e) {
+              AppLogger.e("OPERACION_COMERCIAL_SYNC_SERVICE: Error", e);
               return [];
             }
           } else if (dataValue is List) {
@@ -343,7 +345,10 @@ class OperacionComercialSyncService extends BaseSyncService {
         operacionesParaGuardar.add(operacionParaGuardar);
       } catch (e) {
         operacionesInvalidas++;
-        debugPrint('Error procesando operación: $e');
+        AppLogger.e(
+          'OPERACION_COMERCIAL_SYNC_SERVICE: Error procesando operación',
+          e,
+        );
       }
     }
 
@@ -362,8 +367,8 @@ class OperacionComercialSyncService extends BaseSyncService {
     }
 
     if (operacionesInvalidas > 0) {
-      debugPrint(
-        'Se saltaron $operacionesInvalidas operaciones con datos incompletos',
+      AppLogger.w(
+        'OPERACION_COMERCIAL_SYNC_SERVICE: Se saltaron $operacionesInvalidas operaciones con datos incompletos',
       );
     }
 
@@ -515,6 +520,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       try {
         return int.parse(value);
       } catch (e) {
+        AppLogger.e("OPERACION_COMERCIAL_SYNC_SERVICE: Error", e);
         return null;
       }
     }
@@ -529,6 +535,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       try {
         return double.parse(value);
       } catch (e) {
+        AppLogger.e("OPERACION_COMERCIAL_SYNC_SERVICE: Error", e);
         return 0.0;
       }
     }
@@ -564,7 +571,10 @@ class OperacionComercialSyncService extends BaseSyncService {
           operacionesExitosas++;
         } catch (e) {
           totalFallidas++;
-          debugPrint('❌ [SYNC] Error en operación ${operacion.id}: $e');
+          AppLogger.e(
+            'OPERACION_COMERCIAL_SYNC_SERVICE: ❌ [SYNC] Error en operación ${operacion.id}',
+            e,
+          );
 
           // Marcar la operación como error en la BD
           if (operacion.id != null) {
@@ -665,8 +675,8 @@ class OperacionComercialSyncService extends BaseSyncService {
         final intentos = operacion.syncRetryCount;
 
         if (intentos >= maxIntentos) {
-          debugPrint(
-            '⛔ [FILTER] Operación ${operacion.id} excede max intentos',
+          AppLogger.w(
+            'OPERACION_COMERCIAL_SYNC_SERVICE: ⛔ [FILTER] Operación ${operacion.id} excede max intentos',
           );
           continue;
         }
@@ -684,13 +694,13 @@ class OperacionComercialSyncService extends BaseSyncService {
         final tiempoRestante = tiempoProximoIntento.difference(ahora);
 
         if (ahora.isAfter(tiempoProximoIntento)) {
-          debugPrint(
-            '✅ [FILTER] Operación ${operacion.id} lista para reintentar',
+          AppLogger.i(
+            'OPERACION_COMERCIAL_SYNC_SERVICE: ✅ [FILTER] Operación ${operacion.id} lista para reintentar',
           );
           operacionesListas.add(operacion);
         } else {
-          debugPrint(
-            '⏸️ [FILTER] Operación ${operacion.id} aún no es tiempo (faltan ${tiempoRestante.inSeconds}s)',
+          AppLogger.i(
+            'OPERACION_COMERCIAL_SYNC_SERVICE: ⏸️ [FILTER] Operación ${operacion.id} aún no es tiempo (faltan ${tiempoRestante.inSeconds}s)',
           );
         }
       } catch (e) {
@@ -698,8 +708,8 @@ class OperacionComercialSyncService extends BaseSyncService {
       }
     }
 
-    debugPrint(
-      '✅ [FILTER] Resultado: ${operacionesListas.length} operaciones listas',
+    AppLogger.i(
+      'OPERACION_COMERCIAL_SYNC_SERVICE: ✅ [FILTER] Resultado: ${operacionesListas.length} operaciones listas',
     );
 
     return operacionesListas;
@@ -762,30 +772,41 @@ class OperacionComercialSyncService extends BaseSyncService {
   static Future<void> _ejecutarSincronizacionAutomatica() async {
     if (_syncEnProgreso || !_syncActivo || _usuarioActual == null) {
       if (_syncEnProgreso)
-        debugPrint('⏸️ [TIMER] Sync ya en progreso, saltando...');
-      if (!_syncActivo) debugPrint('⏸️ [TIMER] Sync no está activo');
+        AppLogger.i(
+          'OPERACION_COMERCIAL_SYNC_SERVICE: ⏸️ [TIMER] Sync ya en progreso, saltando...',
+        );
+      if (!_syncActivo)
+        AppLogger.i(
+          'OPERACION_COMERCIAL_SYNC_SERVICE: ⏸️ [TIMER] Sync no está activo',
+        );
       if (_usuarioActual == null)
-        debugPrint('⏸️ [TIMER] Usuario no establecido');
+        AppLogger.i(
+          'OPERACION_COMERCIAL_SYNC_SERVICE: ⏸️ [TIMER] Usuario no establecido',
+        );
       return;
     }
-
 
     _syncEnProgreso = true;
 
     try {
       final conexion = await BaseSyncService.testConnection();
       if (!conexion.exito) {
-        debugPrint('❌ [TIMER] Sin conexión, saltando sincronización');
+        AppLogger.w(
+          'OPERACION_COMERCIAL_SYNC_SERVICE: ❌ [TIMER] Sin conexión, saltando sincronización',
+        );
         return;
       }
 
-      debugPrint('✅ [TIMER] Conexión OK, sincronizando operaciones...');
+      AppLogger.i(
+        'OPERACION_COMERCIAL_SYNC_SERVICE: ✅ [TIMER] Conexión OK, sincronizando operaciones...',
+      );
 
       final service = OperacionComercialSyncService();
       await service.sincronizarOperacionesPendientes(_usuarioActual!);
 
       // OdooName se sincroniza en su propio timer independiente
     } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_SYNC_SERVICE: Error", e);
     } finally {
       _syncEnProgreso = false;
     }
@@ -804,21 +825,21 @@ class OperacionComercialSyncService extends BaseSyncService {
         return;
       }
 
-      debugPrint(
-        '🔍 [OdooName Sync] Encontradas ${operaciones.length} operaciones sin Odoo Name. Iniciando sincronización...',
+      AppLogger.i(
+        'OPERACION_COMERCIAL_SYNC_SERVICE: 🔍 [OdooName Sync] Encontradas ${operaciones.length} operaciones sin Odoo Name. Iniciando sincronización...',
       );
 
       for (final operacion in operaciones) {
         if (operacion.adaSequence == null) {
-          debugPrint(
-            '⚠️ [OdooName Sync] Operación ${operacion.id} ignorada: adaSequence es nulo.',
+          AppLogger.w(
+            'OPERACION_COMERCIAL_SYNC_SERVICE: ⚠️ [OdooName Sync] Operación ${operacion.id} ignorada: adaSequence es nulo.',
           );
           continue;
         }
 
         try {
-          debugPrint(
-            '🔄 [OdooName Sync] Consultando para AdaSequence: ${operacion.adaSequence}',
+          AppLogger.i(
+            'OPERACION_COMERCIAL_SYNC_SERVICE: 🔄 [OdooName Sync] Consultando para AdaSequence: ${operacion.adaSequence}',
           );
           final odooName = await obtenerOdooName(operacion.adaSequence!);
 
@@ -827,17 +848,18 @@ class OperacionComercialSyncService extends BaseSyncService {
               operacion.id!,
               odooName,
             );
-            debugPrint(
-              '✅ [OdooName Sync] ACTUALIZADO EXITOSAMENTE: ${operacion.adaSequence} -> $odooName',
+            AppLogger.i(
+              'OPERACION_COMERCIAL_SYNC_SERVICE: ✅ [OdooName Sync] ACTUALIZADO EXITOSAMENTE: ${operacion.adaSequence} -> $odooName',
             );
           } else {
-            debugPrint(
-              '❌ [OdooName Sync] No se encontró Odoo Name para ${operacion.adaSequence} (Respuesta nula o vacía)',
+            AppLogger.w(
+              'OPERACION_COMERCIAL_SYNC_SERVICE: ❌ [OdooName Sync] No se encontró Odoo Name para ${operacion.adaSequence} (Respuesta nula o vacía)',
             );
           }
         } catch (e) {
-          debugPrint(
-            '🔥 [OdooName Sync] Excepción obteniendo Odoo Name para ${operacion.adaSequence}: $e',
+          AppLogger.e(
+            'OPERACION_COMERCIAL_SYNC_SERVICE: 🔥 [OdooName Sync] Excepción obteniendo Odoo Name para ${operacion.adaSequence}',
+            e,
           );
         }
 
@@ -845,7 +867,10 @@ class OperacionComercialSyncService extends BaseSyncService {
         await Future.delayed(const Duration(milliseconds: 200));
       }
     } catch (e) {
-      debugPrint('🔥 [OdooName Sync] Error general en el proceso: $e');
+      AppLogger.e(
+        'OPERACION_COMERCIAL_SYNC_SERVICE: 🔥 [OdooName Sync] Error general en el proceso',
+        e,
+      );
     }
   }
 }

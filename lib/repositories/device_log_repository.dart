@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart';
+import '../utils/logger.dart';
 import 'package:uuid/uuid.dart';
 import 'package:ada_app/models/device_log.dart';
 
@@ -64,9 +65,7 @@ class DeviceLogRepository {
 
       if (maps.isEmpty) return null;
       return DeviceLog.fromMap(maps.first);
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("DEVICE_LOG_REPOSITORY: Error", e); return null; }
   }
 
   /// 🆕 Verificar si existe un log muy reciente (prevenir duplicados)
@@ -117,9 +116,7 @@ class DeviceLogRepository {
       final logs = maps.map((map) => DeviceLog.fromMap(map)).toList();
 
       return logs;
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DEVICE_LOG_REPOSITORY: Error", e); return []; }
   }
 
   /// Marcar un log como sincronizado
@@ -154,9 +151,7 @@ class DeviceLogRepository {
       }
 
       return DeviceLog.fromMap(maps.first);
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("DEVICE_LOG_REPOSITORY: Error", e); return null; }
   }
 
   /// Obtener logs sincronizados
@@ -170,9 +165,7 @@ class DeviceLogRepository {
       );
 
       return maps.map((map) => DeviceLog.fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DEVICE_LOG_REPOSITORY: Error", e); return []; }
   }
 
   /// Obtener logs por vendedor
@@ -186,9 +179,7 @@ class DeviceLogRepository {
       );
 
       return maps.map((map) => DeviceLog.fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DEVICE_LOG_REPOSITORY: Error", e); return []; }
   }
 
   /// Obtener logs en un rango de fechas
@@ -205,9 +196,7 @@ class DeviceLogRepository {
       );
 
       return maps.map((map) => DeviceLog.fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DEVICE_LOG_REPOSITORY: Error", e); return []; }
   }
 
   /// Contar logs pendientes de sincronización
@@ -218,9 +207,7 @@ class DeviceLogRepository {
       );
 
       return (result.first['count'] as int?) ?? 0;
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("DEVICE_LOG_REPOSITORY: Error", e); return 0; }
   }
 
   /// Contar logs sincronizados
@@ -231,9 +218,7 @@ class DeviceLogRepository {
       );
 
       return (result.first['count'] as int?) ?? 0;
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("DEVICE_LOG_REPOSITORY: Error", e); return 0; }
   }
 
   /// Eliminar logs sincronizados antiguos
@@ -250,9 +235,7 @@ class DeviceLogRepository {
       );
 
       return count;
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("DEVICE_LOG_REPOSITORY: Error", e); return 0; }
   }
 
   /// Eliminar log específico
@@ -269,9 +252,7 @@ class DeviceLogRepository {
       } else {
         return false;
       }
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("DEVICE_LOG_REPOSITORY: Error", e); return false; }
   }
 
   /// Eliminar todos los logs (usar con precaución)
@@ -280,9 +261,7 @@ class DeviceLogRepository {
       final count = await db.delete('device_log');
 
       return count;
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("DEVICE_LOG_REPOSITORY: Error", e); return 0; }
   }
 
   /// Obtener estadísticas generales
@@ -328,9 +307,7 @@ class DeviceLogRepository {
       );
 
       return maps.map((map) => DeviceLog.fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DEVICE_LOG_REPOSITORY: Error", e); return []; }
   }
 
   /// Resetear estado de sincronización (útil para testing)
@@ -339,8 +316,6 @@ class DeviceLogRepository {
       final count = await db.update('device_log', {'sincronizado': 0});
 
       return count;
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("DEVICE_LOG_REPOSITORY: Error", e); return 0; }
   }
 }
