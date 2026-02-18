@@ -31,11 +31,37 @@ class DatabaseTables {
     }
 
     if (oldVersion < 4) {
-      // Migración a v4: Agregar columna estado_odoo a operacion_comercial
+      // Migración a v4: Agregar columnas de estado portal + tabla app_routes
+      await db.execute(
+        'ALTER TABLE operacion_comercial ADD COLUMN estado_portal TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE operacion_comercial ADD COLUMN estado_motivo_portal TEXT',
+      );
+      await db.execute(_sqlAppRoutes());
+      await _crearIndicesAppRoutes(db);
+      debugPrint(
+        'Migración v4: estado_portal, estado_motivo_portal y app_routes creados',
+      );
+    }
+
+    if (oldVersion < 5) {
+      // Migración a v5: Agregar columnas de Odoo (estado, motivo, orden transporte)
       await db.execute(
         'ALTER TABLE operacion_comercial ADD COLUMN estado_odoo TEXT',
       );
-      debugPrint('Migración v4: Columna estado_odoo agregada a operacion_comercial');
+      await db.execute(
+        'ALTER TABLE operacion_comercial ADD COLUMN motivo_odoo TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE operacion_comercial ADD COLUMN orden_transporte_odoo TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE operacion_comercial ADD COLUMN ada_estado TEXT',
+      );
+      debugPrint(
+        'Migración v5: estado_odoo, motivo_odoo, orden_transporte_odoo y ada_estado creados',
+      );
     }
   }
 
@@ -334,7 +360,12 @@ class DatabaseTables {
     sync_retry_count INTEGER DEFAULT 0,
     odoo_name TEXT,
     ada_sequence TEXT,
+    estado_portal TEXT,
+    estado_motivo_portal TEXT,
     estado_odoo TEXT,
+    motivo_odoo TEXT,
+    orden_transporte_odoo TEXT,
+    ada_estado TEXT,
     FOREIGN KEY (cliente_id) REFERENCES clientes (id),
     FOREIGN KEY (usuario_id) REFERENCES Users (id)
   )

@@ -92,7 +92,10 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         limit: 1,
       );
       return maps.isNotEmpty ? fromMap(maps.first) : null;
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return null; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return null;
+    }
   }
 
   /// Obtener último estado por equipo_id y cliente_id
@@ -109,7 +112,10 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         limit: 1,
       );
       return maps.isNotEmpty ? fromMap(maps.first) : null;
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return null; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return null;
+    }
   }
 
   // ========== MÉTODOS DE CONSULTA ==========
@@ -127,14 +133,20 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         orderBy: 'fecha_revision DESC',
       );
       return maps.map((map) => fromMap(map)).toList();
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return [];
+    }
   }
 
-  /// Obtener todos los censos con filtro de fecha opcional
-  Future<List<CensoActivo>> obtenerTodos({DateTime? fecha}) async {
+  /// Obtener todos los censos con filtros opcionales
+  Future<List<CensoActivo>> obtenerTodos({
+    DateTime? fecha,
+    String? employeeId,
+  }) async {
     try {
-      String? whereClause;
-      List<dynamic>? whereArgs;
+      final List<String> conditions = [];
+      final List<dynamic> whereArgs = [];
 
       if (fecha != null) {
         // Generar rango del día completo
@@ -143,19 +155,30 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
             .add(const Duration(days: 1))
             .subtract(const Duration(milliseconds: 1));
 
-        whereClause = 'fecha_creacion BETWEEN ? AND ?';
-        whereArgs = [startOfDay.toIso8601String(), endOfDay.toIso8601String()];
+        conditions.add('fecha_creacion BETWEEN ? AND ?');
+        whereArgs.add(startOfDay.toIso8601String());
+        whereArgs.add(endOfDay.toIso8601String());
       }
+
+      if (employeeId != null && employeeId.isNotEmpty) {
+        conditions.add('employee_id = ?');
+        whereArgs.add(employeeId);
+      }
+
+      final whereClause = conditions.isEmpty ? null : conditions.join(' AND ');
 
       final maps = await dbHelper.consultar(
         tableName,
         where: whereClause,
-        whereArgs: whereArgs,
+        whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
         orderBy: 'fecha_creacion DESC', // Ordenar por fecha descendente
       );
 
       return maps.map((map) => fromMap(map)).toList();
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return [];
+    }
   }
 
   /// Obtener fotos de un censo
@@ -168,7 +191,10 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         orderBy: 'orden ASC',
       );
       return maps;
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return [];
+    }
   }
 
   /// Obtener estados por usuario - NUEVO MÉTODO
@@ -181,7 +207,10 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         orderBy: getDefaultOrderBy(),
       );
       return maps.map((map) => fromMap(map)).toList();
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return [];
+    }
   }
 
   /// Obtener estados creados (pendientes)
@@ -194,7 +223,10 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         orderBy: getDefaultOrderBy(),
       );
       return maps.map((map) => fromMap(map)).toList();
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return [];
+    }
   }
 
   /// Obtener estados migrados
@@ -207,7 +239,10 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         orderBy: getDefaultOrderBy(),
       );
       return maps.map((map) => fromMap(map)).toList();
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return [];
+    }
   }
 
   Future<List<CensoActivo>> obtenerConError() async {
@@ -219,7 +254,10 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         orderBy: getDefaultOrderBy(),
       );
       return maps.map((map) => fromMap(map)).toList();
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return [];
+    }
   }
 
   /// Eliminar censo y sus fotos asociadas
@@ -256,7 +294,10 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
 
       return maps.map((map) => fromMap(map)).toList();
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return [];
+    }
   }
 
   // ========== MÉTODOS DE ACTUALIZACIÓN ==========
@@ -331,7 +372,10 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'error': conError.length,
         'total': creados.length + migrados.length + conError.length,
       };
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return {'creados': 0, 'migrados': 0, 'error': 0, 'total': 0}; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return {'creados': 0, 'migrados': 0, 'error': 0, 'total': 0};
+    }
   }
 
   /// Contar registros por usuario - NUEVO MÉTODO
@@ -354,7 +398,10 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'error': conError,
         'total': estados.length,
       };
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return {'creados': 0, 'migrados': 0, 'error': 0, 'total': 0}; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return {'creados': 0, 'migrados': 0, 'error': 0, 'total': 0};
+    }
   }
 
   /// Obtener estadísticas de migración
@@ -388,7 +435,10 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'porcentaje_pendiente': (creados / total * 100).toDouble(),
         'porcentaje_error': (errores / total * 100).toDouble(),
       };
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return {}; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return {};
+    }
   }
 
   /// Contar cambios por equipo_id y cliente_id
@@ -400,7 +450,10 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         whereArgs: [equipoId, clienteId],
       );
       return result.length;
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return 0; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return 0;
+    }
   }
 
   /// Obtener estadísticas de cambios
@@ -442,7 +495,10 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
     try {
       final noSincronizados = await obtenerNoSincronizados();
       return noSincronizados.map((estado) => estado.toJson()).toList();
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return []; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return [];
+    }
   }
 
   /// Limpiar historial antiguo
@@ -488,7 +544,10 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
     try {
       final estado = await obtenerUltimoEstado(equipoId, clienteId);
       return estado?.toMap();
-    } catch (e) { AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e); return null; }
+    } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
+      return null;
+    }
   }
 
   // ========== MÉTODOS PARA SYNC PANEL ==========

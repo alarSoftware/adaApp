@@ -9,7 +9,6 @@ import 'package:uuid/uuid.dart';
 import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/sync/user_sync_service.dart';
 
-
 /// 🔧 Helper para obtener información del dispositivo
 /// Centraliza toda la lógica de obtención de datos sin duplicación
 class DeviceInfoHelper {
@@ -98,11 +97,14 @@ class DeviceInfoHelper {
   static Future<String?> obtenerEmployeeId() async {
     try {
       return await UserSyncService.obtenerEmployeeIdUsuarioActual();
-    } catch (e) { AppLogger.e("DEVICE_INFO_HELPER: Error", e); return null; }
+    } catch (e) {
+      AppLogger.e("DEVICE_INFO_HELPER: Error", e);
+      return null;
+    }
   }
 
   /// Crear DeviceLog completo (método todo-en-uno)
-  static Future<DeviceLog?> crearDeviceLog() async {
+  static Future<DeviceLog?> crearDeviceLog({bool requerirGps = true}) async {
     try {
       // Obtener todos los datos necesarios en paralelo para mayor eficiencia
       final results = await Future.wait([
@@ -117,16 +119,18 @@ class DeviceInfoHelper {
       final modelo = results[2] as String;
       final employeeId = results[3] as String?;
 
-      // Validar que tenemos ubicación
-      if (position == null) {
+      // Validar ubicación si es estrictamente requerida
+      if (position == null && requerirGps) {
         return null;
       }
 
-      // Crear el log
+      // Crear el log (con coordenadas reales o marcador de ausencia)
       final log = DeviceLog(
         id: const Uuid().v4(),
         employeeId: employeeId,
-        latitudLongitud: '${position.latitude},${position.longitude}',
+        latitudLongitud: position != null
+            ? '${position.latitude},${position.longitude}'
+            : 'SIN_SEÑAL_GPS',
         bateria: bateria,
         modelo: modelo,
         fechaRegistro: DateTime.now().toIso8601String(),
@@ -235,7 +239,9 @@ class DeviceInfoHelper {
     debugPrint('═══════════════════════════════════════');
     disponibilidad.forEach((servicio, disponible) {
       final icono = disponible ? '✅' : '❌';
-      debugPrint('$icono $servicio: ${disponible ? "DISPONIBLE" : "NO DISPONIBLE"}');
+      debugPrint(
+        '$icono $servicio: ${disponible ? "DISPONIBLE" : "NO DISPONIBLE"}',
+      );
     });
     debugPrint('═══════════════════════════════════════');
   }

@@ -5,6 +5,7 @@ import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/utils/device_info_helper.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:stomp_dart_client/stomp_dart_client.dart';
+import 'package:ada_app/services/data/data_usage_service.dart';
 
 class SocketService {
   static final SocketService _instance = SocketService._internal();
@@ -104,15 +105,27 @@ class SocketService {
       // Recolectar datos del dispositivo con TIMEOUT para evitar bloqueos (GPS puede tardar 30s)
       dynamic deviceLog;
       try {
-        deviceLog = await DeviceInfoHelper.crearDeviceLog().timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            debugPrint('[WS] Device info timeout. Proceeding.');
-            return null;
-          },
-        );
+        deviceLog = await DeviceInfoHelper.crearDeviceLog(requerirGps: false)
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () {
+                debugPrint('[WS] Device info timeout (15s). Proceeding.');
+                return null;
+              },
+            );
       } catch (e) {
         debugPrint('[WS] Error gathering device info');
+      }
+
+      // Obtener estadísticas de uso de datos (Max y Avg)
+      Map<String, dynamic> dataUsageStats = {
+        'max_daily_usage': 0,
+        'avg_daily_usage': 0,
+      };
+      try {
+        dataUsageStats = await DataUsageService().getAggregatedStatistics();
+      } catch (e) {
+        debugPrint('[WS] Error gathering data usage stats');
       }
 
       _client = StompClient(
@@ -157,12 +170,18 @@ class SocketService {
               'model': deviceLog.modelo.toString(),
               'timestamp': deviceLog.fechaRegistro.toString(),
             },
+            'max-daily-usage': dataUsageStats['max_daily_usage'].toString(),
+            'avg-daily-usage': dataUsageStats['avg_daily_usage'].toString(),
           },
           webSocketConnectHeaders: {if (username != null) 'username': username},
           reconnectDelay: const Duration(seconds: 10),
           heartbeatOutgoing: const Duration(seconds: 10),
           heartbeatIncoming: const Duration(seconds: 10),
         ),
+      );
+
+      debugPrint(
+        '[WS] Connecting with headers: ${_client!.config.stompConnectHeaders}',
       );
 
       _client?.activate();

@@ -431,10 +431,10 @@ class _OperacionComercialFormViewState
           ),
         ],
 
-        // 3. ODOO NAME (Condicional o placeholder "Sin Odoo Name")
+        // 3. ODOO NAME
         if (hasOdooName || viewModel.isViewOnly) ...[
-          if (hasAdaSequence) _buildDivider(), // Divider solo si hubo AdaSeq
-          if (!hasAdaSequence) _buildDivider(), // Divider con Fecha
+          if (hasAdaSequence) _buildDivider(),
+          if (!hasAdaSequence) _buildDivider(),
 
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
@@ -513,6 +513,205 @@ class _OperacionComercialFormViewState
                     ),
                   ),
                 ],
+              ],
+            ),
+          ),
+        ],
+
+        // 4. ADA ESTADO
+        if (operacion?.adaEstado != null &&
+            operacion!.adaEstado!.isNotEmpty) ...[
+          _buildDivider(),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Row(
+              children: [
+                () {
+                  final estado = operacion.adaEstado!.toLowerCase();
+                  if (estado == 'done') {
+                    return _buildIconContainer(
+                      Icons.check_circle_rounded,
+                      Colors.green,
+                    );
+                  } else if (estado == 'cancel') {
+                    return _buildIconContainer(
+                      Icons.cancel_rounded,
+                      Colors.red,
+                    );
+                  }
+                  return _buildIconContainer(
+                    Icons.info_outline_rounded,
+                    Colors.blue,
+                  );
+                }(),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabelText('Ada Estado'),
+                      const SizedBox(height: 2),
+                      () {
+                        final estado = operacion.adaEstado!.toLowerCase();
+                        String label = operacion.adaEstado!;
+                        Color color = const Color(0xFF334155);
+                        FontWeight weight = FontWeight.w600;
+
+                        if (estado == 'done') {
+                          label = 'CONFIRMADO';
+                          color = Colors.green[700]!;
+                          weight = FontWeight.bold;
+                        } else if (estado == 'cancel') {
+                          label = 'CANCELADO';
+                          color = Colors.red[700]!;
+                          weight = FontWeight.bold;
+                        }
+
+                        return Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: weight,
+                            color: color,
+                          ),
+                        );
+                      }(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        // 5. ESTADO ODOO
+        if (operacion?.estadoOdoo != null &&
+            operacion!.estadoOdoo!.isNotEmpty) ...[
+          _buildDivider(),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Row(
+              children: [
+                () {
+                  final estado = operacion.estadoOdoo!.toLowerCase();
+                  if (estado == 'done') {
+                    return _buildIconContainer(
+                      Icons.check_circle_rounded,
+                      Colors.green,
+                    );
+                  } else if (estado == 'cancel') {
+                    return _buildIconContainer(
+                      Icons.cancel_rounded,
+                      Colors.red,
+                    );
+                  }
+                  return _buildIconContainer(
+                    Icons.sync_alt_rounded,
+                    Colors.teal,
+                  );
+                }(),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabelText('Estado Odoo'),
+                      const SizedBox(height: 2),
+                      () {
+                        final estado = operacion.estadoOdoo!.toLowerCase();
+                        String label = operacion.estadoOdoo!;
+                        Color color = const Color(0xFF334155);
+                        FontWeight weight = FontWeight.w600;
+
+                        if (estado == 'done') {
+                          label = 'CONFIRMADO';
+                          color = Colors.green[700]!;
+                          weight = FontWeight.bold;
+                        } else if (estado == 'cancel') {
+                          label = 'CANCELADO';
+                          color = Colors.red[700]!;
+                          weight = FontWeight.bold;
+                        }
+
+                        return Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: weight,
+                            color: color,
+                          ),
+                        );
+                      }(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        // 6. MOTIVO ODOO
+        if (operacion?.motivoOdoo != null &&
+            operacion!.motivoOdoo!.isNotEmpty) ...[
+          _buildDivider(),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Row(
+              children: [
+                _buildIconContainer(Icons.comment_bank_outlined, Colors.orange),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabelText('Motivo Odoo'),
+                      const SizedBox(height: 2),
+                      Text(
+                        operacion.motivoOdoo!,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF334155),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        // 7. ORDEN DE TRANSPORTE
+        if (operacion?.ordenTransporteOdoo != null &&
+            operacion!.ordenTransporteOdoo!.isNotEmpty) ...[
+          _buildDivider(),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Row(
+              children: [
+                _buildIconContainer(
+                  Icons.local_shipping_outlined,
+                  Colors.indigo,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabelText('Orden de Transporte'),
+                      const SizedBox(height: 2),
+                      Text(
+                        operacion.ordenTransporteOdoo!,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF334155),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

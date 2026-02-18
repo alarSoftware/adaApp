@@ -20,7 +20,12 @@ class OperacionComercial {
   final double? longitud;
   final String? odooName;
   final String? adaSequence;
+  final String? estadoPortal;
+  final String? estadoMotivoPortal;
   final String? estadoOdoo;
+  final String? motivoOdoo;
+  final String? ordenTransporteOdoo;
+  final String? adaEstado;
 
   final List<OperacionComercialDetalle> detalles;
 
@@ -43,7 +48,12 @@ class OperacionComercial {
     this.longitud,
     this.odooName,
     this.adaSequence,
+    this.estadoPortal,
+    this.estadoMotivoPortal,
     this.estadoOdoo,
+    this.motivoOdoo,
+    this.ordenTransporteOdoo,
+    this.adaEstado,
     this.detalles = const [],
   });
 
@@ -75,7 +85,12 @@ class OperacionComercial {
       longitud: map['longitud'] as double?,
       odooName: map['odoo_name'] as String?,
       adaSequence: map['ada_sequence'] as String?,
+      estadoPortal: map['estado_portal'] as String?,
+      estadoMotivoPortal: map['estado_motivo_portal'] as String?,
       estadoOdoo: map['estado_odoo'] as String?,
+      motivoOdoo: map['motivo_odoo'] as String?,
+      ordenTransporteOdoo: map['orden_transporte_odoo'] as String?,
+      adaEstado: map['ada_estado'] as String?,
     );
   }
 
@@ -99,7 +114,12 @@ class OperacionComercial {
       'longitud': longitud,
       'odoo_name': odooName,
       'ada_sequence': adaSequence,
+      'estado_portal': estadoPortal,
+      'estado_motivo_portal': estadoMotivoPortal,
       'estado_odoo': estadoOdoo,
+      'motivo_odoo': motivoOdoo,
+      'orden_transporte_odoo': ordenTransporteOdoo,
+      'ada_estado': adaEstado,
     };
   }
 
@@ -116,7 +136,12 @@ class OperacionComercial {
       'longitud': longitud,
       'odoo_name': odooName,
       'ada_sequence': adaSequence,
+      'estado_portal': estadoPortal,
+      'estado_motivo_portal': estadoMotivoPortal,
       'estado_odoo': estadoOdoo,
+      'motivo_odoo': motivoOdoo,
+      'orden_transporte_odoo': ordenTransporteOdoo,
+      'ada_estado': adaEstado,
       'detalles': detalles.map((d) => d.toJson()).toList(),
     };
   }
@@ -140,7 +165,12 @@ class OperacionComercial {
     double? longitud,
     String? odooName,
     String? adaSequence,
+    String? estadoPortal,
+    String? estadoMotivoPortal,
     String? estadoOdoo,
+    String? motivoOdoo,
+    String? ordenTransporteOdoo,
+    String? adaEstado,
     List<OperacionComercialDetalle>? detalles,
   }) {
     return OperacionComercial(
@@ -162,7 +192,12 @@ class OperacionComercial {
       longitud: longitud ?? this.longitud,
       odooName: odooName ?? this.odooName,
       adaSequence: adaSequence ?? this.adaSequence,
+      estadoPortal: estadoPortal ?? this.estadoPortal,
+      estadoMotivoPortal: estadoMotivoPortal ?? this.estadoMotivoPortal,
       estadoOdoo: estadoOdoo ?? this.estadoOdoo,
+      motivoOdoo: motivoOdoo ?? this.motivoOdoo,
+      ordenTransporteOdoo: ordenTransporteOdoo ?? this.ordenTransporteOdoo,
+      adaEstado: adaEstado ?? this.adaEstado,
       detalles: detalles ?? this.detalles,
     );
   }

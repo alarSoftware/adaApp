@@ -622,10 +622,47 @@ class _HistoryViewState extends State<_HistoryView>
                                 fontSize: 12,
                               ),
                             ),
+                          if (operacion.adaEstado != null &&
+                              operacion.adaEstado!.isNotEmpty)
+                            () {
+                              final estado = operacion.adaEstado!.toLowerCase();
+                              String label = operacion.adaEstado!;
+                              Color color = Colors.blue;
+
+                              if (estado == 'done') {
+                                label = 'CONFIRMADO';
+                                color = Colors.green;
+                              } else if (estado == 'cancel') {
+                                label = 'CANCELADO';
+                                color = Colors.red;
+                              }
+
+                              return Container(
+                                margin: const EdgeInsets.only(top: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  label,
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              );
+                            }(),
                           if ((operacion.odooName == null ||
                                   operacion.odooName!.isEmpty) &&
                               (operacion.adaSequence == null ||
-                                  operacion.adaSequence!.isEmpty))
+                                  operacion.adaSequence!.isEmpty) &&
+                              (operacion.adaEstado == null ||
+                                  operacion.adaEstado!.isEmpty))
                             Text(
                               'Sin Identificadores',
                               style: TextStyle(

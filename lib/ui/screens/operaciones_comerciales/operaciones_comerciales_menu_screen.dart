@@ -266,7 +266,7 @@ class _OperacionesComercialesMenuViewState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               if (_canCreateOperacion)
                 SizedBox(
                   height: 44,
@@ -292,12 +292,11 @@ class _OperacionesComercialesMenuViewState
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                     ),
                   ),
                 ),
-              if (_canCreateOperacion) const SizedBox(height: 24),
-              const SizedBox(height: 12),
+              if (_canCreateOperacion) const SizedBox(height: 16),
               Expanded(
                 child: _buildOperacionesList(viewModel, tipoOperacion, color),
               ),

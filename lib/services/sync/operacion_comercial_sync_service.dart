@@ -15,6 +15,7 @@ import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
 import '../post/operaciones_comerciales_post_service.dart';
+import 'package:ada_app/services/websocket/socket_service.dart';
 
 class OperacionComercialSyncService extends BaseSyncService {
   final OperacionComercialRepositoryImpl _operacionRepository;
@@ -173,7 +174,9 @@ class OperacionComercialSyncService extends BaseSyncService {
     return obtenerOperaciones(tipo: tipo);
   }
 
-  static Future<String?> obtenerOdooName(String adaSequence) async {
+  static Future<Map<String, String?>?> obtenerOdooName(
+    String adaSequence,
+  ) async {
     try {
       final queryParams = {'adaSequence': adaSequence};
 
@@ -185,16 +188,65 @@ class OperacionComercialSyncService extends BaseSyncService {
 
       final body = jsonDecode(response.body);
 
-      // Si recibimos un mapa, buscamos la key 'odooName' o 'name'
+      // Si recibimos un mapa, buscamos los campos extendidos
       if (body is Map) {
-        if (body.containsKey('odooName')) return body['odooName']?.toString();
-        if (body.containsKey('name')) return body['name']?.toString();
-        if (body.containsKey('data'))
-          return body['data']?.toString(); // A veces viene en data
+        final Map<String, dynamic> data = body['data'] is Map
+            ? Map<String, dynamic>.from(body['data'])
+            : {};
+
+        // Si no hay 'data' pero el body mismo es el mapa de resultados
+        final mapToUse = data.isNotEmpty
+            ? data
+            : (body as Map<String, dynamic>);
+
+        final String? odooName =
+            mapToUse['odooName']?.toString() ??
+            mapToUse['name']?.toString() ??
+            mapToUse['odoo_name']?.toString() ??
+            mapToUse['odooname']?.toString();
+
+        final String? adaEstado =
+            mapToUse['adaEstado']?.toString() ??
+            mapToUse['ada_estado']?.toString() ??
+            mapToUse['adaestado']?.toString() ??
+            mapToUse['estado_ada']?.toString() ??
+            mapToUse['estadoada']?.toString();
+
+        final String? estadoOdoo =
+            mapToUse['estadoOdoo']?.toString() ??
+            mapToUse['estado_odoo']?.toString() ??
+            mapToUse['estadoodoo']?.toString();
+
+        final String? motivoOdoo =
+            mapToUse['motivoOdoo']?.toString() ??
+            mapToUse['motivo_odoo']?.toString() ??
+            mapToUse['motivoodoo']?.toString();
+
+        final String? ordenDeTransporteOdoo =
+            (mapToUse['ordenDeTransporteOdoo'] ??
+                    mapToUse['orden_transporte_odoo'] ??
+                    mapToUse['ordendetransporteodoo'] ??
+                    mapToUse['ordentransporteodoo'])
+                ?.toString();
+
+        // Si al menos tenemos el nombre o algún estado, devolvemos el mapa
+        if (odooName != null ||
+            adaEstado != null ||
+            estadoOdoo != null ||
+            motivoOdoo != null ||
+            ordenDeTransporteOdoo != null) {
+          return {
+            'odooName': odooName,
+            'adaEstado': adaEstado,
+            'estadoOdoo': estadoOdoo,
+            'motivoOdoo': motivoOdoo,
+            'ordenDeTransporteOdoo': ordenDeTransporteOdoo,
+          };
+        }
       }
-      // Si es un string simple, asumimos que es el nombre
+      // Si es un string simple, asumimos que es el odooName por compatibilidad
       else if (body is String) {
-        return body;
+        return {'odooName': body};
       }
 
       return null;
@@ -409,11 +461,48 @@ class OperacionComercialSyncService extends BaseSyncService {
       'sync_error': apiOperacion['errorText']?.toString(),
       'synced_at': DateTime.now().toIso8601String(),
       'sync_retry_count': 0,
-      'odoo_name': apiOperacion['odooName']?.toString(),
-      'ada_sequence': apiOperacion['adaSequence']?.toString(),
-      'estado_odoo': apiOperacion['estadoOdoo']?.toString(),
-      'latitud': _parseDoubleSafely(apiOperacion['latitud']),
-      'longitud': _parseDoubleSafely(apiOperacion['longitud']),
+      'odoo_name':
+          apiOperacion['odooName']?.toString() ??
+          apiOperacion['odoo_name']?.toString() ??
+          apiOperacion['odooname']?.toString(),
+      'ada_sequence':
+          apiOperacion['adaSequence']?.toString() ??
+          apiOperacion['ada_sequence']?.toString() ??
+          apiOperacion['adasequence']?.toString(),
+      'estado_portal':
+          apiOperacion['estadoPortal']?.toString() ??
+          apiOperacion['estado_portal']?.toString() ??
+          apiOperacion['estadoportal']?.toString(),
+      'estado_motivo_portal':
+          apiOperacion['estadoMotivoPortal']?.toString() ??
+          apiOperacion['estado_motivo_portal']?.toString() ??
+          apiOperacion['estadomotivoportal']?.toString(),
+      'estado_odoo':
+          apiOperacion['estadoOdoo']?.toString() ??
+          apiOperacion['estado_odoo']?.toString() ??
+          apiOperacion['estadoodoo']?.toString(),
+      'motivo_odoo':
+          apiOperacion['motivoOdoo']?.toString() ??
+          apiOperacion['motivo_odoo']?.toString() ??
+          apiOperacion['motivoodoo']?.toString(),
+      'orden_transporte_odoo':
+          (apiOperacion['ordenDeTransporteOdoo'] ??
+                  apiOperacion['orden_transporte_odoo'] ??
+                  apiOperacion['ordendetransporteodoo'] ??
+                  apiOperacion['ordentransporteodoo'])
+              ?.toString(),
+      'ada_estado':
+          apiOperacion['adaEstado']?.toString() ??
+          apiOperacion['ada_estado']?.toString() ??
+          apiOperacion['adaestado']?.toString() ??
+          apiOperacion['estado_ada']?.toString() ??
+          apiOperacion['estadoada']?.toString(),
+      'latitud': _parseDoubleSafely(
+        apiOperacion['latitud'] ?? apiOperacion['latitude'],
+      ),
+      'longitud': _parseDoubleSafely(
+        apiOperacion['longitud'] ?? apiOperacion['longitude'],
+      ),
     };
 
     final todosLosDetalles =
@@ -640,26 +729,25 @@ class OperacionComercialSyncService extends BaseSyncService {
       final serverResponse =
           await OperacionesComercialesPostService.enviarOperacion(operacion);
 
-      // Parsear respuesta del servidor para obtener odooName y adaSequence
-      String? odooName;
-      String? adaSequence;
-
       if (serverResponse.resultJson != null) {
         final parsedData =
             OperacionesComercialesPostService.parsearRespuestaJson(
               serverResponse.resultJson,
             );
-        odooName = parsedData['odooName'];
-        adaSequence = parsedData['adaSequence'];
-      }
 
-      // Marcar como migrado en la BD
-      await _operacionRepository.marcarComoMigrado(
-        operacionId,
-        null,
-        odooName: odooName,
-        adaSequence: adaSequence,
-      );
+        await _operacionRepository.marcarComoMigrado(
+          operacionId,
+          null,
+          odooName: parsedData['odooName'],
+          adaSequence: parsedData['adaSequence'],
+          estadoOdoo: parsedData['estadoOdoo'],
+          motivoOdoo: parsedData['motivoOdoo'],
+          ordenTransporteOdoo: parsedData['ordenTransporteOdoo'],
+          adaEstado: parsedData['adaEstado'],
+        );
+      } else {
+        await _operacionRepository.marcarComoMigrado(operacionId, null);
+      }
     } catch (e) {
       rethrow;
     }
@@ -790,10 +878,9 @@ class OperacionComercialSyncService extends BaseSyncService {
     _syncEnProgreso = true;
 
     try {
-      final conexion = await BaseSyncService.testConnection();
-      if (!conexion.exito) {
+      if (!SocketService().isConnected) {
         AppLogger.w(
-          'OPERACION_COMERCIAL_SYNC_SERVICE: [TIMER] Sin conexión, saltando sincronización',
+          'OPERACION_COMERCIAL_SYNC_SERVICE: [TIMER] WebSocket desconectado, saltando sincronización',
         );
         return;
       }
@@ -842,15 +929,18 @@ class OperacionComercialSyncService extends BaseSyncService {
           AppLogger.i(
             'OPERACION_COMERCIAL_SYNC_SERVICE: 🔄 [OdooName Sync] Consultando para AdaSequence: ${operacion.adaSequence}',
           );
-          final odooName = await obtenerOdooName(operacion.adaSequence!);
+          AppLogger.i(
+            'OPERACION_COMERCIAL_SYNC_SERVICE: 🔄 [OdooName Sync] Consultando para AdaSequence: ${operacion.adaSequence}',
+          );
+          final odooStatus = await obtenerOdooName(operacion.adaSequence!);
 
-          if (odooName != null && odooName.isNotEmpty) {
-            await _operacionRepository.actualizarOdooName(
+          if (odooStatus != null && odooStatus.isNotEmpty) {
+            await _operacionRepository.actualizarOdooStatus(
               operacion.id!,
-              odooName,
+              odooStatus,
             );
             AppLogger.i(
-              'OPERACION_COMERCIAL_SYNC_SERVICE: ✅ [OdooName Sync] ACTUALIZADO EXITOSAMENTE: ${operacion.adaSequence} -> $odooName',
+              'OPERACION_COMERCIAL_SYNC_SERVICE: ✅ [OdooName Sync] ACTUALIZADO EXITOSAMENTE: ${operacion.adaSequence} -> ${odooStatus['odooName']}',
             );
           } else {
             AppLogger.w(

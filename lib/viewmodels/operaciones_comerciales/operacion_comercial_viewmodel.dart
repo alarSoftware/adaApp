@@ -253,7 +253,10 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         final error = tipoOperacion.validarUnidadMedida(p.unidadMedida);
         return error == null;
       }).toList();
-    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_VIEWMODEL: Error", e); return []; }
+    } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_VIEWMODEL: Error", e);
+      return [];
+    }
   }
 
   Future<List<Producto>> getProductosReemplazo(
@@ -267,7 +270,10 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         categoriaOriginal,
         excluirId: idProductoActual,
       );
-    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_VIEWMODEL: Error", e); return []; }
+    } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_VIEWMODEL: Error", e);
+      return [];
+    }
   }
 
   void seleccionarProductoReemplazo(int index, Producto productoReemplazo) {
@@ -463,15 +469,19 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       // 1. Si tiene adaSequence, intentar obtener odooName específicamente
       if (_operacionActual!.adaSequence != null &&
           _operacionActual!.adaSequence!.isNotEmpty) {
-        final odooName = await OperacionComercialSyncService.obtenerOdooName(
+        final odooStatus = await OperacionComercialSyncService.obtenerOdooName(
           _operacionActual!.adaSequence!,
         );
 
-        if (odooName != null && odooName.isNotEmpty) {
+        if (odooStatus != null && odooStatus.isNotEmpty) {
           await _operacionRepository.marcarComoMigrado(
             _operacionActual!.id!,
             _operacionActual!.serverId,
-            odooName: odooName,
+            odooName: odooStatus['odooName'],
+            estadoOdoo: odooStatus['estadoOdoo'],
+            motivoOdoo: odooStatus['motivoOdoo'],
+            ordenTransporteOdoo: odooStatus['ordenDeTransporteOdoo'],
+            adaEstado: odooStatus['adaEstado'],
           );
 
           final operacionActualizada = await _operacionRepository
@@ -511,6 +521,9 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
   Future<Producto?> obtenerProductoPorId(int productoId) async {
     try {
       return await _productoRepository.obtenerProductoPorId(productoId);
-    } catch (e) { AppLogger.e("OPERACION_COMERCIAL_VIEWMODEL: Error", e); return null; }
+    } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_VIEWMODEL: Error", e);
+      return null;
+    }
   }
 }

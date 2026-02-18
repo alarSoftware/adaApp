@@ -185,21 +185,57 @@ class OperacionesComercialesPostService {
   static Map<String, String?> parsearRespuestaJson(String? resultJson) {
     String? odooName;
     String? adaSequence;
+    String? estadoOdoo;
+    String? motivoOdoo;
+    String? ordenTransporteOdoo;
+    String? adaEstado;
 
     if (resultJson != null) {
       try {
-        final jsonMap = jsonDecode(resultJson);
+        final body = jsonDecode(resultJson);
+        final Map<String, dynamic> jsonMap =
+            (body is Map && body.containsKey('data') && body['data'] is Map)
+            ? Map<String, dynamic>.from(body['data'])
+            : (body is Map ? Map<String, dynamic>.from(body) : {});
+
         odooName = jsonMap['name'] as String? ?? jsonMap['odooName'] as String?;
 
         adaSequence =
             jsonMap['sequence'] as String? ??
             jsonMap['adaSequence'] as String? ??
             jsonMap['ada_sequence'] as String?;
+
+        estadoOdoo =
+            jsonMap['estadoOdoo'] as String? ??
+            jsonMap['estado_odoo'] as String? ??
+            jsonMap['estadoodoo'] as String?;
+        motivoOdoo =
+            jsonMap['motivoOdoo'] as String? ??
+            jsonMap['motivo_odoo'] as String? ??
+            jsonMap['motivoodoo'] as String?;
+        ordenTransporteOdoo =
+            jsonMap['ordenDeTransporteOdoo'] as String? ??
+            jsonMap['orden_transporte_odoo'] as String? ??
+            jsonMap['ordentransporteodoo'] as String? ??
+            jsonMap['ordendetransporteodoo'] as String?;
+        adaEstado =
+            jsonMap['adaEstado'] as String? ??
+            jsonMap['ada_estado'] as String? ??
+            jsonMap['adaestado'] as String? ??
+            jsonMap['estado_ada'] as String? ??
+            jsonMap['estadoada'] as String?;
       } catch (e) {
         debugPrint('Error al analizar el JSON: $e');
       }
     }
 
-    return {'odooName': odooName, 'adaSequence': adaSequence};
+    return {
+      'odooName': odooName,
+      'adaSequence': adaSequence,
+      'estadoOdoo': estadoOdoo,
+      'motivoOdoo': motivoOdoo,
+      'ordenTransporteOdoo': ordenTransporteOdoo,
+      'adaEstado': adaEstado,
+    };
   }
 }
