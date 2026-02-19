@@ -360,8 +360,6 @@ class DatabaseTables {
     sync_retry_count INTEGER DEFAULT 0,
     odoo_name TEXT,
     ada_sequence TEXT,
-    estado_portal TEXT,
-    estado_motivo_portal TEXT,
     estado_odoo TEXT,
     motivo_odoo TEXT,
     orden_transporte_odoo TEXT,

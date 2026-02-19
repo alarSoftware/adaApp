@@ -426,10 +426,56 @@ class _OperacionesComercialesMenuViewState
                             fontSize: 12,
                           ),
                         ),
+                      if (operacion.adaEstado != null &&
+                          operacion.adaEstado!.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'ADA: ${operacion.adaEstado!.toUpperCase()}',
+                            style: const TextStyle(
+                              color: Colors.blue,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      if (operacion.estadoOdoo != null &&
+                          operacion.estadoOdoo!.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'ODOO: ${operacion.estadoOdoo!.toUpperCase()}',
+                            style: const TextStyle(
+                              color: Colors.teal,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       if ((operacion.odooName == null ||
                               operacion.odooName!.isEmpty) &&
                           (operacion.adaSequence == null ||
-                              operacion.adaSequence!.isEmpty))
+                              operacion.adaSequence!.isEmpty) &&
+                          (operacion.adaEstado == null ||
+                              operacion.adaEstado!.isEmpty) &&
+                          (operacion.estadoOdoo == null ||
+                              operacion.estadoOdoo!.isEmpty))
                         Text(
                           'Sin Identificadores',
                           style: TextStyle(

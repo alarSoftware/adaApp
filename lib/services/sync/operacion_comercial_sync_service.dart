@@ -180,7 +180,10 @@ class OperacionComercialSyncService extends BaseSyncService {
     try {
       final queryParams = {'adaSequence': adaSequence};
 
-      final response = await _makeHttpRequest('/api/getOdooName', queryParams);
+      final response = await _makeHttpRequest(
+        '/api/getOdooNameV2',
+        queryParams,
+      );
 
       if (!_isSuccessStatusCode(response.statusCode)) {
         return null;
@@ -469,14 +472,6 @@ class OperacionComercialSyncService extends BaseSyncService {
           apiOperacion['adaSequence']?.toString() ??
           apiOperacion['ada_sequence']?.toString() ??
           apiOperacion['adasequence']?.toString(),
-      'estado_portal':
-          apiOperacion['estadoPortal']?.toString() ??
-          apiOperacion['estado_portal']?.toString() ??
-          apiOperacion['estadoportal']?.toString(),
-      'estado_motivo_portal':
-          apiOperacion['estadoMotivoPortal']?.toString() ??
-          apiOperacion['estado_motivo_portal']?.toString() ??
-          apiOperacion['estadomotivoportal']?.toString(),
       'estado_odoo':
           apiOperacion['estadoOdoo']?.toString() ??
           apiOperacion['estado_odoo']?.toString() ??

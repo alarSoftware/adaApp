@@ -551,31 +551,14 @@ class _OperacionComercialFormViewState
                     children: [
                       _buildLabelText('Ada Estado'),
                       const SizedBox(height: 2),
-                      () {
-                        final estado = operacion.adaEstado!.toLowerCase();
-                        String label = operacion.adaEstado!;
-                        Color color = const Color(0xFF334155);
-                        FontWeight weight = FontWeight.w600;
-
-                        if (estado == 'done') {
-                          label = 'CONFIRMADO';
-                          color = Colors.green[700]!;
-                          weight = FontWeight.bold;
-                        } else if (estado == 'cancel') {
-                          label = 'CANCELADO';
-                          color = Colors.red[700]!;
-                          weight = FontWeight.bold;
-                        }
-
-                        return Text(
-                          label,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: weight,
-                            color: color,
-                          ),
-                        );
-                      }(),
+                      Text(
+                        operacion.adaEstado!.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -617,31 +600,14 @@ class _OperacionComercialFormViewState
                     children: [
                       _buildLabelText('Estado Odoo'),
                       const SizedBox(height: 2),
-                      () {
-                        final estado = operacion.estadoOdoo!.toLowerCase();
-                        String label = operacion.estadoOdoo!;
-                        Color color = const Color(0xFF334155);
-                        FontWeight weight = FontWeight.w600;
-
-                        if (estado == 'done') {
-                          label = 'CONFIRMADO';
-                          color = Colors.green[700]!;
-                          weight = FontWeight.bold;
-                        } else if (estado == 'cancel') {
-                          label = 'CANCELADO';
-                          color = Colors.red[700]!;
-                          weight = FontWeight.bold;
-                        }
-
-                        return Text(
-                          label,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: weight,
-                            color: color,
-                          ),
-                        );
-                      }(),
+                      Text(
+                        operacion.estadoOdoo!.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.teal,
+                        ),
+                      ),
                     ],
                   ),
                 ),
