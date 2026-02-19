@@ -200,13 +200,13 @@ class OperacionComercial {
   String get displaySyncStatus {
     switch (syncStatus) {
       case 'creado':
-        return 'Pendiente';
+        return 'PENDIENTE';
       case 'migrado':
-        return 'Sincronizado';
+        return 'SINCRONIZADO';
       case 'error':
-        return 'Error';
+        return 'ERROR';
       default:
-        return syncStatus;
+        return 'DESCONOCIDO';
     }
   }
 

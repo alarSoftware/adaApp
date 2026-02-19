@@ -42,32 +42,30 @@ class OperacionComercialSyncService extends BaseSyncService {
       List.from(_ultimasOperaciones);
 
   static Future<SyncResult> obtenerOperaciones({
-    String? employeeId,
+    required String employeeId,
     int? partnerId,
     String? tipo,
   }) async {
     try {
       final queryParams = <String, String>{};
+      queryParams['employeeId'] = employeeId;
 
-      if (employeeId != null) {
-        // SEGURIDAD: Verificar si hay pendientes
-        final pendientes = await OperacionComercialRepositoryImpl()
-            .obtenerOperacionesPendientes();
+      // SEGURIDAD: Verificar si hay pendientes
+      final pendientes = await OperacionComercialRepositoryImpl()
+          .obtenerOperacionesPendientes();
 
-        if (pendientes.isNotEmpty) {
-          return SyncResult(
-            exito: false,
-            mensaje:
-                'Hay ${pendientes.length} operaciones pendientes. Por favor sincronízalas antes de actualizar.',
-            itemsSincronizados: 0,
-          );
-        }
-
-        // LIMPIEZA: Si no hay pendientes, limpiar todo para evitar duplicados/stale data
-        await OperacionComercialRepositoryImpl().eliminarTodasLasOperaciones();
-
-        queryParams['employeeId'] = employeeId;
+      if (pendientes.isNotEmpty) {
+        return SyncResult(
+          exito: false,
+          mensaje:
+              'Hay ${pendientes.length} operaciones pendientes. Por favor sincronízalas antes de actualizar.',
+          itemsSincronizados: 0,
+        );
       }
+
+      // LIMPIEZA: Si no hay pendientes, limpiar todo para evitar duplicados/stale data
+      await OperacionComercialRepositoryImpl().eliminarTodasLasOperaciones();
+
       if (partnerId != null) {
         // VALIDACIÓN DE SEGURIDAD:
         // Antes de descargar y reemplazar, verificamos si hay pendientes locales.
@@ -166,12 +164,18 @@ class OperacionComercialSyncService extends BaseSyncService {
     return obtenerOperaciones(employeeId: employeeId);
   }
 
-  static Future<SyncResult> obtenerOperacionesPorCliente(int partnerId) {
-    return obtenerOperaciones(partnerId: partnerId);
+  static Future<SyncResult> obtenerOperacionesPorCliente(
+    String employeeId,
+    int partnerId,
+  ) {
+    return obtenerOperaciones(employeeId: employeeId, partnerId: partnerId);
   }
 
-  static Future<SyncResult> obtenerOperacionesPorTipo(String tipo) {
-    return obtenerOperaciones(tipo: tipo);
+  static Future<SyncResult> obtenerOperacionesPorTipo(
+    String employeeId,
+    String tipo,
+  ) {
+    return obtenerOperaciones(employeeId: employeeId, tipo: tipo);
   }
 
   static Future<Map<String, String?>?> obtenerOdooName(
@@ -461,6 +465,8 @@ class OperacionComercialSyncService extends BaseSyncService {
       'server_id': operacionServerId,
       'sync_status': 'migrado',
       'employee_id': apiOperacion['employeeId']?.toString(),
+      'snc':
+          apiOperacion['nroSnc']?.toString() ?? apiOperacion['snc']?.toString(),
       'sync_error': apiOperacion['errorText']?.toString(),
       'synced_at': DateTime.now().toIso8601String(),
       'sync_retry_count': 0,
@@ -488,6 +494,7 @@ class OperacionComercialSyncService extends BaseSyncService {
               ?.toString(),
       'ada_estado':
           apiOperacion['adaEstado']?.toString() ??
+          apiOperacion['estado']?.toString() ??
           apiOperacion['ada_estado']?.toString() ??
           apiOperacion['adaestado']?.toString() ??
           apiOperacion['estado_ada']?.toString() ??
@@ -909,23 +916,23 @@ class OperacionComercialSyncService extends BaseSyncService {
       }
 
       AppLogger.i(
-        'OPERACION_COMERCIAL_SYNC_SERVICE: 🔍 [OdooName Sync] Encontradas ${operaciones.length} operaciones sin Odoo Name. Iniciando sincronización...',
+        'OPERACION_COMERCIAL_SYNC_SERVICE: [OdooName Sync] Encontradas ${operaciones.length} operaciones sin Odoo Name. Iniciando sincronización...',
       );
 
       for (final operacion in operaciones) {
         if (operacion.adaSequence == null) {
           AppLogger.w(
-            'OPERACION_COMERCIAL_SYNC_SERVICE: ⚠️ [OdooName Sync] Operación ${operacion.id} ignorada: adaSequence es nulo.',
+            'OPERACION_COMERCIAL_SYNC_SERVICE: [OdooName Sync] Operación ${operacion.id} ignorada: adaSequence es nulo.',
           );
           continue;
         }
 
         try {
           AppLogger.i(
-            'OPERACION_COMERCIAL_SYNC_SERVICE: 🔄 [OdooName Sync] Consultando para AdaSequence: ${operacion.adaSequence}',
+            'OPERACION_COMERCIAL_SYNC_SERVICE: [OdooName Sync] Consultando para AdaSequence: ${operacion.adaSequence}',
           );
           AppLogger.i(
-            'OPERACION_COMERCIAL_SYNC_SERVICE: 🔄 [OdooName Sync] Consultando para AdaSequence: ${operacion.adaSequence}',
+            'OPERACION_COMERCIAL_SYNC_SERVICE: [OdooName Sync] Consultando para AdaSequence: ${operacion.adaSequence}',
           );
           final odooStatus = await obtenerOdooName(operacion.adaSequence!);
 

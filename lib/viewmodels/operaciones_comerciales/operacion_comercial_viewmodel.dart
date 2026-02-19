@@ -497,9 +497,15 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       }
 
       // 2. Fallback: Sincronización general por cliente
-      await OperacionComercialSyncService.obtenerOperacionesPorCliente(
-        cliente.id!,
-      );
+      final currentUser = await AuthService().getCurrentUser();
+      final employeeId = currentUser?.employeeId;
+
+      if (employeeId != null) {
+        await OperacionComercialSyncService.obtenerOperacionesPorCliente(
+          employeeId,
+          cliente.id!,
+        );
+      }
 
       final operacionActualizada = await _operacionRepository
           .obtenerOperacionPorId(_operacionActual!.id!);

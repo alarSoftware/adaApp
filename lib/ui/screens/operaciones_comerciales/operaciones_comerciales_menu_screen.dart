@@ -388,8 +388,8 @@ class _OperacionesComercialesMenuViewState
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                          horizontal: 6,
+                          vertical: 3,
                         ),
                         decoration: BoxDecoration(
                           color: _getSyncStatusColor(
@@ -400,82 +400,54 @@ class _OperacionesComercialesMenuViewState
                         child: Text(
                           operacion.displaySyncStatus,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 9.5,
                             fontWeight: FontWeight.w700,
                             color: _getSyncStatusColor(operacion.syncStatus),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      if (operacion.odooName != null &&
-                          operacion.odooName!.isNotEmpty)
-                        Text(
-                          'Odoo: ${operacion.odooName}',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      if (operacion.adaSequence != null &&
-                          operacion.adaSequence!.isNotEmpty)
-                        Text(
-                          'Seq: ${operacion.adaSequence}',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      if (operacion.adaEstado != null &&
-                          operacion.adaEstado!.isNotEmpty)
-                        Container(
-                          margin: const EdgeInsets.only(top: 4),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'ADA: ${operacion.adaEstado!.toUpperCase()}',
-                            style: const TextStyle(
-                              color: Colors.blue,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (operacion.adaSequence != null &&
+                              operacion.adaSequence!.isNotEmpty)
+                            Text(
+                              operacion.adaSequence!,
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        ),
-                      if (operacion.estadoOdoo != null &&
-                          operacion.estadoOdoo!.isNotEmpty)
-                        Container(
-                          margin: const EdgeInsets.only(top: 4),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.teal.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'ODOO: ${operacion.estadoOdoo!.toUpperCase()}',
-                            style: const TextStyle(
-                              color: Colors.teal,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                          if (operacion.odooName != null &&
+                              operacion.odooName!.isNotEmpty)
+                            Text(
+                              operacion.odooName!,
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11.5,
+                              ),
                             ),
-                          ),
-                        ),
+                          if (operacion.ordenTransporteOdoo != null &&
+                              operacion.ordenTransporteOdoo!.isNotEmpty)
+                            Text(
+                              operacion.ordenTransporteOdoo!,
+                              style: TextStyle(
+                                color: Colors.orange.shade800,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11.5,
+                              ),
+                            ),
+                        ],
+                      ),
                       if ((operacion.odooName == null ||
                               operacion.odooName!.isEmpty) &&
                           (operacion.adaSequence == null ||
-                              operacion.adaSequence!.isEmpty) &&
-                          (operacion.adaEstado == null ||
-                              operacion.adaEstado!.isEmpty) &&
-                          (operacion.estadoOdoo == null ||
-                              operacion.estadoOdoo!.isEmpty))
+                              operacion.adaSequence!.isEmpty))
                         Text(
                           'Sin Identificadores',
                           style: TextStyle(

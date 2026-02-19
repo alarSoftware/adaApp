@@ -7,7 +7,6 @@ import 'package:ada_app/repositories/operacion_comercial_repository.dart';
 import 'package:ada_app/repositories/cliente_repository.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/services/events/operacion_event_service.dart';
-import 'package:ada_app/services/api/auth_service.dart';
 
 class OperacionesComercialesHistoryViewModel extends ChangeNotifier {
   final OperacionComercialRepository _operacionRepository;
@@ -117,21 +116,14 @@ class OperacionesComercialesHistoryViewModel extends ChangeNotifier {
         '📥 [HISTORY] Cargando datos de DB... (Refresco auto: $esRefrescoAutomatico)',
       );
 
-      // Obtener el employeeId del usuario actual para filtrar
-      final currentUser = await AuthService().getCurrentUser();
-      final employeeId = currentUser?.employeeId;
-
-      // Cargar operaciones filtradas por employeeId
+      // Cargar todas las operaciones locales (opcionalmente filtradas por fecha)
+      // El filtrado por employeeId ahora se delega totalmente a la API durante la descarga.
       _operaciones = await _operacionRepository.obtenerTodasLasOperaciones(
         fecha: _selectedDate,
-        employeeId: employeeId,
       );
 
-      // Cargar censos filtrados por employeeId
-      _censos = await _censoRepository.obtenerTodos(
-        fecha: _selectedDate,
-        employeeId: employeeId,
-      );
+      // Cargar todos los censos locales (opcionalmente filtrados por fecha)
+      _censos = await _censoRepository.obtenerTodos(fecha: _selectedDate);
 
       // Solo notificar si hay cambios o es carga inicial
       if (!esRefrescoAutomatico) {
