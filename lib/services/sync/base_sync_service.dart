@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../utils/logger.dart';
 import 'dart:io';
 import 'dart:async';
 import 'package:http/http.dart' as http;
@@ -6,7 +7,7 @@ import 'package:ada_app/services/api/api_config_service.dart';
 import 'package:ada_app/services/network/monitored_http_client.dart';
 
 abstract class BaseSyncService {
-  static const Duration timeout = Duration(minutes: 1);
+  static const Duration timeout = Duration(minutes: 2);
 
   static Future<String> getBaseUrl() async {
     return await ApiConfigService.getBaseUrl();
@@ -65,9 +66,7 @@ abstract class BaseSyncService {
       }
 
       return [];
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("BASE_SYNC_SERVICE: Error", e); return []; }
   }
 
   static String extractErrorMessage(http.Response response) {
@@ -81,9 +80,7 @@ abstract class BaseSyncService {
           errorData['error'] ??
           errorData['mensaje'] ??
           'Error del servidor (${response.statusCode})';
-    } catch (e) {
-      return 'Error del servidor (${response.statusCode}): ${response.body.length > 100 ? '${response.body.substring(0, 100)}...' : response.body}';
-    }
+    } catch (e) { AppLogger.e("BASE_SYNC_SERVICE: Error", e); return 'Error del servidor (${response.statusCode}): ${response.body.length > 100 ? '${response.body.substring(0, 100)}...' : response.body}'; }
   }
 
   static String getErrorMessage(dynamic error) {
@@ -120,7 +117,7 @@ abstract class BaseSyncService {
               'hasData': responseData['data'] != null,
             };
           }
-        } catch (e) {}
+        } catch (e) { AppLogger.e("BASE_SYNC_SERVICE: Error", e); }
 
         return ApiResponse(
           exito: true,
@@ -134,9 +131,7 @@ abstract class BaseSyncService {
           codigoEstado: response.statusCode,
         );
       }
-    } catch (e) {
-      return ApiResponse(exito: false, mensaje: getErrorMessage(e));
-    }
+    } catch (e) { AppLogger.e("BASE_SYNC_SERVICE: Error", e); return ApiResponse(exito: false, mensaje: getErrorMessage(e)); }
   }
 }
 

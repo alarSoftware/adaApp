@@ -1,32 +1,67 @@
-import 'package:sqflite/sqflite.dart';
+﻿import 'package:sqflite/sqflite.dart';
+import 'package:flutter/foundation.dart';
 
 class DatabaseTables {
   Future<void> onCreate(Database db, int version) async {
-    print('Creando tablas de base de datos v$version');
+    debugPrint('Creando tablas de base de datos v$version');
 
     await _crearTablasMaestras(db);
     await _crearTablasPrincipales(db);
     await _crearTablasMonitoreo(db);
     await _crearIndices(db);
 
-    print('Todas las tablas e índices creados exitosamente');
+    debugPrint('Todas las tablas e índices creados exitosamente');
   }
 
   Future<void> onUpgrade(Database db, int oldVersion, int newVersion) async {
-    print('Actualizando base de datos de v$oldVersion a v$newVersion');
+    debugPrint('Actualizando base de datos de v$oldVersion a v$newVersion');
 
     if (oldVersion < 2) {
       // Migración a v2: Agregar columna sucursal a Users y clientes
       await db.execute('ALTER TABLE Users ADD COLUMN sucursal TEXT');
       await db.execute('ALTER TABLE clientes ADD COLUMN sucursal TEXT');
-      print('Migración v2: Columna sucursal agregada a Users y clientes');
+      debugPrint('Migración v2: Columna sucursal agregada a Users y clientes');
     }
 
     if (oldVersion < 3) {
       // Migración a v3: Agregar tabla data_usage
       await db.execute(_sqlDataUsage());
       await _crearIndicesDataUsage(db);
-      print('Migración v3: Tabla data_usage creada');
+      debugPrint('Migración v3: Tabla data_usage creada');
+    }
+
+    if (oldVersion < 4) {
+      // Migración a v4: Agregar columnas de estado portal + tabla app_routes
+      await db.execute(
+        'ALTER TABLE operacion_comercial ADD COLUMN estado_portal TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE operacion_comercial ADD COLUMN estado_motivo_portal TEXT',
+      );
+      await db.execute(_sqlAppRoutes());
+      await _crearIndicesAppRoutes(db);
+      debugPrint(
+        'Migración v4: estado_portal, estado_motivo_portal y app_routes creados',
+      );
+    }
+
+    if (oldVersion < 5) {
+      // Migración a v5: Agregar columnas de Odoo (estado, motivo, orden transporte)
+      await db.execute(
+        'ALTER TABLE operacion_comercial ADD COLUMN estado_odoo TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE operacion_comercial ADD COLUMN motivo_odoo TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE operacion_comercial ADD COLUMN orden_transporte_odoo TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE operacion_comercial ADD COLUMN ada_estado TEXT',
+      );
+      debugPrint(
+        'Migración v5: estado_odoo, motivo_odoo, orden_transporte_odoo y ada_estado creados',
+      );
     }
   }
 
@@ -325,6 +360,10 @@ class DatabaseTables {
     sync_retry_count INTEGER DEFAULT 0,
     odoo_name TEXT,
     ada_sequence TEXT,
+    estado_odoo TEXT,
+    motivo_odoo TEXT,
+    orden_transporte_odoo TEXT,
+    ada_estado TEXT,
     FOREIGN KEY (cliente_id) REFERENCES clientes (id),
     FOREIGN KEY (usuario_id) REFERENCES Users (id)
   )

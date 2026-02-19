@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart';
+import '../utils/logger.dart';
 import 'package:ada_app/models/equipos.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import '../repositories/base_repository.dart';
@@ -217,9 +218,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
       }
 
       return false;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("EQUIPO_REPOSITORY: Error", e); return false; }
   }
 
   /// Verifica si un equipo está asignado usando la misma lógica estricta que obtenerEquiposAsignados
@@ -245,9 +244,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
       final result = await db.rawQuery(query, [equipoId, clienteId]);
 
       return result.isNotEmpty;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("EQUIPO_REPOSITORY: Error", e); return false; }
   }
 
   Future<List<Map<String, dynamic>>> obtenerEquiposDisponibles() async {
@@ -523,9 +520,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
 
       final results = await dbHelper.consultarPersonalizada(sql, [equipoId]);
       return results.isNotEmpty ? results.first : null;
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("EQUIPO_REPOSITORY: Error", e); return null; }
   }
 
   Future<List<Map<String, dynamic>>> obtenerMarcas() async =>
@@ -542,9 +537,7 @@ class EquipoRepository extends BaseRepository<Equipo> {
         'SELECT COUNT(*) as count FROM $tableName',
       );
       return Sqflite.firstIntValue(result) ?? 0;
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("EQUIPO_REPOSITORY: Error", e); return 0; }
   }
 
   Future<Map<String, dynamic>> obtenerEstadisticas() async {

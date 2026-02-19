@@ -1,4 +1,5 @@
 import 'package:ada_app/viewmodels/preview_screen_viewmodel.dart';
+import '../utils/logger.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import '../repositories/censo_activo_repository.dart';
@@ -538,9 +539,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       final fecha = DateTime.parse(fechaString);
       final diferencia = DateTime.now().difference(fecha);
       return '${diferencia.inDays} días';
-    } catch (e) {
-      return '0 días';
-    }
+    } catch (e) { AppLogger.e("EQUIPOS_CLIENTES_DETAIL_SCREEN_VIEWMODEL: Error", e); return '0 días'; }
   }
 
   String getFechaRetiroText() {

@@ -35,7 +35,7 @@ class OperacionEventService {
         operacionId: operacionId,
       ),
     );
-    debugPrint('📢 [EVENT] Evento emitido: created ID: $operacionId');
+    debugPrint('[EVENT] Evento emitido: created ID: $operacionId');
   }
 
   /// Notificar que una operación fue actualizada
@@ -46,7 +46,7 @@ class OperacionEventService {
         operacionId: operacionId,
       ),
     );
-    debugPrint('📢 [EVENT] Evento emitido: updated ID: $operacionId');
+    debugPrint('[EVENT] Evento emitido: updated ID: $operacionId');
   }
 
   /// Notificar que el estado de sincronización cambió
@@ -59,7 +59,7 @@ class OperacionEventService {
       ),
     );
     debugPrint(
-      '📢 [EVENT] Evento emitido: syncStatusChanged ID: $operacionId Status: $nuevoEstado',
+      '[EVENT] Evento emitido: syncStatusChanged ID: $operacionId Status: $nuevoEstado',
     );
   }
 

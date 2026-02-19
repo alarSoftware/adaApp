@@ -1,4 +1,5 @@
-import 'package:flutter/services.dart';
+﻿import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
@@ -11,10 +12,10 @@ class BatteryOptimizationService {
       final bool result = await _channel.invokeMethod(
         'isIgnoringBatteryOptimizations',
       );
-      print('¿App ignora optimización de batería?: $result');
+      debugPrint('¿App ignora optimización de batería?: $result');
       return result;
     } catch (e) {
-      print('Error verificando optimización de batería: $e');
+      debugPrint('Error verificando optimización de batería: $e');
       return false;
     }
   }
@@ -25,25 +26,25 @@ class BatteryOptimizationService {
       // Primero verificar si ya está deshabilitada
       final bool isAlreadyIgnoring = await isIgnoringBatteryOptimizations();
       if (isAlreadyIgnoring) {
-        print('La app ya ignora la optimización de batería');
+        debugPrint('La app ya ignora la optimización de batería');
         return true;
       }
 
       // Solicitar al usuario que la deshabilite
-      print('Solicitando deshabilitar optimización de batería...');
+      debugPrint('Solicitando deshabilitar optimización de batería...');
       final bool result = await _channel.invokeMethod(
         'requestIgnoreBatteryOptimizations',
       );
 
       if (result) {
-        print('Usuario aceptó deshabilitar optimización de batería');
+        debugPrint('Usuario aceptó deshabilitar optimización de batería');
       } else {
-        print(' Usuario rechazó deshabilitar optimización de batería');
+        debugPrint(' Usuario rechazó deshabilitar optimización de batería');
       }
 
       return result;
     } catch (e) {
-      print('Error solicitando deshabilitar optimización de batería: $e');
+      debugPrint('Error solicitando deshabilitar optimización de batería: $e');
       return false;
     }
   }
@@ -51,13 +52,13 @@ class BatteryOptimizationService {
   /// Abre directamente la configuración de optimización de batería
   static Future<bool> openBatteryOptimizationSettings() async {
     try {
-      print('Abriendo configuración de optimización de batería...');
+      debugPrint('Abriendo configuración de optimización de batería...');
       final bool result = await _channel.invokeMethod(
         'openBatteryOptimizationSettings',
       );
       return result;
     } catch (e) {
-      print('Error abriendo configuración de optimización: $e');
+      debugPrint('Error abriendo configuración de optimización: $e');
       return false;
     }
   }
@@ -65,7 +66,7 @@ class BatteryOptimizationService {
   /// Verifica y solicita permisos relacionados con background
   static Future<bool> checkAndRequestBackgroundPermissions() async {
     try {
-      print('Verificando permisos de background...');
+      debugPrint('Verificando permisos de background...');
 
       // Lista de permisos a verificar
       Map<Permission, PermissionStatus> permissions = await [
@@ -76,7 +77,7 @@ class BatteryOptimizationService {
 
       bool allGranted = true;
       permissions.forEach((permission, status) {
-        print('Permiso $permission: $status');
+        debugPrint('Permiso $permission: $status');
         if (status != PermissionStatus.granted) {
           allGranted = false;
         }
@@ -84,7 +85,7 @@ class BatteryOptimizationService {
 
       return allGranted;
     } catch (e) {
-      print('Error verificando permisos de background: $e');
+      debugPrint('Error verificando permisos de background: $e');
       return false;
     }
   }
@@ -96,7 +97,7 @@ class BatteryOptimizationService {
       final androidInfo = await deviceInfo.androidInfo;
       return androidInfo.manufacturer.toUpperCase();
     } catch (e) {
-      print('Error obteniendo fabricante: $e');
+      debugPrint('Error obteniendo fabricante: $e');
       return 'UNKNOWN';
     }
   }

@@ -266,7 +266,7 @@ class _OperacionesComercialesMenuViewState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               if (_canCreateOperacion)
                 SizedBox(
                   height: 44,
@@ -292,12 +292,11 @@ class _OperacionesComercialesMenuViewState
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                     ),
                   ),
                 ),
-              if (_canCreateOperacion) const SizedBox(height: 24),
-              const SizedBox(height: 12),
+              if (_canCreateOperacion) const SizedBox(height: 16),
               Expanded(
                 child: _buildOperacionesList(viewModel, tipoOperacion, color),
               ),
@@ -389,8 +388,8 @@ class _OperacionesComercialesMenuViewState
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                          horizontal: 6,
+                          vertical: 3,
                         ),
                         decoration: BoxDecoration(
                           color: _getSyncStatusColor(
@@ -401,32 +400,50 @@ class _OperacionesComercialesMenuViewState
                         child: Text(
                           operacion.displaySyncStatus,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 9.5,
                             fontWeight: FontWeight.w700,
                             color: _getSyncStatusColor(operacion.syncStatus),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      if (operacion.odooName != null &&
-                          operacion.odooName!.isNotEmpty)
-                        Text(
-                          'Odoo: ${operacion.odooName}',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      if (operacion.adaSequence != null &&
-                          operacion.adaSequence!.isNotEmpty)
-                        Text(
-                          'Seq: ${operacion.adaSequence}',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (operacion.adaSequence != null &&
+                              operacion.adaSequence!.isNotEmpty)
+                            Text(
+                              operacion.adaSequence!,
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          if (operacion.odooName != null &&
+                              operacion.odooName!.isNotEmpty)
+                            Text(
+                              operacion.odooName!,
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          if (operacion.ordenTransporteOdoo != null &&
+                              operacion.ordenTransporteOdoo!.isNotEmpty)
+                            Text(
+                              operacion.ordenTransporteOdoo!,
+                              style: TextStyle(
+                                color: Colors.orange.shade800,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11.5,
+                              ),
+                            ),
+                        ],
+                      ),
                       if ((operacion.odooName == null ||
                               operacion.odooName!.isEmpty) &&
                           (operacion.adaSequence == null ||

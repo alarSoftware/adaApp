@@ -230,7 +230,7 @@ class EquipmentSyncService extends BaseSyncService {
       final response = await MonitoredHttpClient.get(
         url: Uri.parse(endpoint),
         headers: BaseSyncService.headers,
-        timeout: const Duration(minutes: 5),
+        timeout: BaseSyncService.timeout,
       );
 
       stopwatchDownload.stop();

@@ -1,6 +1,5 @@
 // widgets/gps_navigation_widget.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 

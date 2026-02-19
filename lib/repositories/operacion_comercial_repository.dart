@@ -1,5 +1,6 @@
 // lib/repositories/operacion_comercial_repository.dart
 import 'package:flutter/foundation.dart';
+import '../utils/logger.dart';
 
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial_detalle.dart';
@@ -37,6 +38,10 @@ abstract class OperacionComercialRepository {
     dynamic serverId, {
     String? odooName,
     String? adaSequence,
+    String? estadoOdoo,
+    String? motivoOdoo,
+    String? ordenTransporteOdoo,
+    String? adaEstado,
   });
 
   Future<List<OperacionComercial>> obtenerOperacionesPendientesPorCliente(
@@ -48,10 +53,12 @@ abstract class OperacionComercialRepository {
 
   Future<List<OperacionComercial>> obtenerTodasLasOperaciones({
     DateTime? fecha,
+    String? employeeId,
   });
 
   Future<List<OperacionComercial>> obtenerOperacionesSinOdooName();
   Future<void> actualizarOdooName(String id, String odooName);
+  Future<void> actualizarOdooStatus(String id, Map<String, String?> odooStatus);
 
   Future<Map<String, String>> obtenerNombresOdooMap(List<String> ids);
 }
@@ -122,6 +129,7 @@ class OperacionComercialRepositoryImpl
           .map((map) => OperacionComercialDetalle.fromMap(map))
           .toList();
     } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -166,9 +174,6 @@ class OperacionComercialRepositoryImpl
               operacionConId,
             );
 
-        String? odooName;
-        String? adaSequence;
-
         if (serverResponse.resultJson != null) {
           debugPrint(
             'DEBUG: ResultJson received: ${serverResponse.resultJson}',
@@ -177,20 +182,20 @@ class OperacionComercialRepositoryImpl
               OperacionesComercialesPostService.parsearRespuestaJson(
                 serverResponse.resultJson,
               );
-          odooName = parsedData['odooName'];
-          adaSequence = parsedData['adaSequence'];
 
-          debugPrint(
-            'DEBUG: Parsed odooName: $odooName, adaSequence: $adaSequence',
+          await marcarComoMigrado(
+            operacionId,
+            null,
+            odooName: parsedData['odooName'],
+            adaSequence: parsedData['adaSequence'],
+            estadoOdoo: parsedData['estadoOdoo'],
+            motivoOdoo: parsedData['motivoOdoo'],
+            ordenTransporteOdoo: parsedData['ordenTransporteOdoo'],
+            adaEstado: parsedData['adaEstado'],
           );
+        } else {
+          await marcarComoMigrado(operacionId, null);
         }
-
-        await marcarComoMigrado(
-          operacionId,
-          null,
-          odooName: odooName,
-          adaSequence: adaSequence,
-        );
       } catch (syncError) {
         await marcarComoError(
           operacionId,
@@ -221,6 +226,7 @@ class OperacionComercialRepositoryImpl
       final operacion = fromMap(operacionMaps.first);
       return operacion.copyWith(detalles: detalles);
     } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e);
       return null;
     }
   }
@@ -250,6 +256,7 @@ class OperacionComercialRepositoryImpl
 
       return operaciones;
     } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -268,6 +275,7 @@ class OperacionComercialRepositoryImpl
 
       return operacionesMaps.map((map) => fromMap(map)).toList();
     } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -302,6 +310,7 @@ class OperacionComercialRepositoryImpl
 
       return operaciones;
     } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -353,6 +362,7 @@ class OperacionComercialRepositoryImpl
 
       return operacionesMaps.map((map) => fromMap(map)).toList();
     } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -368,6 +378,7 @@ class OperacionComercialRepositoryImpl
 
       return operacionesMaps.map((map) => fromMap(map)).toList();
     } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -378,6 +389,10 @@ class OperacionComercialRepositoryImpl
     dynamic serverId, {
     String? odooName,
     String? adaSequence,
+    String? estadoOdoo,
+    String? motivoOdoo,
+    String? ordenTransporteOdoo,
+    String? adaEstado,
   }) async {
     try {
       final now = DateTime.now();
@@ -394,6 +409,18 @@ class OperacionComercialRepositoryImpl
       }
       if (adaSequence != null) {
         data['ada_sequence'] = adaSequence;
+      }
+      if (estadoOdoo != null) {
+        data['estado_odoo'] = estadoOdoo;
+      }
+      if (motivoOdoo != null) {
+        data['motivo_odoo'] = motivoOdoo;
+      }
+      if (ordenTransporteOdoo != null) {
+        data['orden_transporte_odoo'] = ordenTransporteOdoo;
+      }
+      if (adaEstado != null) {
+        data['ada_estado'] = adaEstado;
       }
 
       await dbHelper.actualizar(
@@ -554,6 +581,7 @@ class OperacionComercialRepositoryImpl
 
       return operacionesMaps.map((map) => fromMap(map)).toList();
     } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -640,19 +668,27 @@ class OperacionComercialRepositoryImpl
   @override
   Future<List<OperacionComercial>> obtenerTodasLasOperaciones({
     DateTime? fecha,
+    String? employeeId,
   }) async {
     try {
-      String? whereClause;
-      List<dynamic> whereArgs = [];
+      final List<String> conditions = [];
+      final List<dynamic> whereArgs = [];
 
       if (fecha != null) {
-        // Filter by date (ignoring time)
         final startOfDay = DateTime(fecha.year, fecha.month, fecha.day);
         final endOfDay = startOfDay.add(const Duration(days: 1));
 
-        whereClause = 'fecha_creacion >= ? AND fecha_creacion < ?';
-        whereArgs = [startOfDay.toIso8601String(), endOfDay.toIso8601String()];
+        conditions.add('fecha_creacion >= ? AND fecha_creacion < ?');
+        whereArgs.add(startOfDay.toIso8601String());
+        whereArgs.add(endOfDay.toIso8601String());
       }
+
+      if (employeeId != null && employeeId.isNotEmpty) {
+        conditions.add('employee_id = ?');
+        whereArgs.add(employeeId);
+      }
+
+      final whereClause = conditions.isEmpty ? null : conditions.join(' AND ');
 
       final operacionesMaps = await dbHelper.consultar(
         tableName,
@@ -672,6 +708,7 @@ class OperacionComercialRepositoryImpl
 
       return operaciones;
     } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -692,6 +729,7 @@ class OperacionComercialRepositoryImpl
       }
       return operaciones;
     } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -727,6 +765,44 @@ class OperacionComercialRepositoryImpl
       await dbHelper.actualizar(
         tableName,
         {'odoo_name': odooName},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+      OperacionEventService().notificarActualizacion(id);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> actualizarOdooStatus(
+    String id,
+    Map<String, String?> odooStatus,
+  ) async {
+    try {
+      final data = <String, dynamic>{};
+      if (odooStatus['odooName'] != null) {
+        data['odoo_name'] = odooStatus['odooName'];
+      }
+      if (odooStatus['estadoOdoo'] != null) {
+        data['estado_odoo'] = odooStatus['estadoOdoo'];
+      }
+      if (odooStatus['motivoOdoo'] != null) {
+        data['motivo_odoo'] = odooStatus['motivoOdoo'];
+      }
+      if (odooStatus['ordenDeTransporteOdoo'] != null) {
+        data['orden_transporte_odoo'] = odooStatus['ordenDeTransporteOdoo'];
+      }
+      if (odooStatus['adaEstado'] != null) {
+        data['ada_estado'] = odooStatus['adaEstado'];
+      }
+
+      if (data.isEmpty) return;
+
+      await dbHelper.actualizar(
+        tableName,
+        data,
         where: 'id = ?',
         whereArgs: [id],
       );

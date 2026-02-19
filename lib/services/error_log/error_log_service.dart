@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:uuid/uuid.dart';
 import 'package:synchronized/synchronized.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ErrorLogService {
   static const _uuid = Uuid();
@@ -342,7 +343,7 @@ class ErrorLogService {
         whereArgs: [error['id']],
       );
 
-      print(
+      debugPrint(
         'Error log ${error['id']} programado para reintento #$retryCount en ${delay.inMinutes} minutos',
       );
     } catch (e) {
@@ -356,6 +357,9 @@ class ErrorLogService {
     try {
       final baseUrl = await BaseSyncService.getBaseUrl();
       final endpoint = '$baseUrl/appErrorLog/insertAppErrorLog';
+
+      // Obtener datos del empleado para identificación
+      final prefs = await SharedPreferences.getInstance();
 
       final jsonData = {
         'id': errorLog['id'],
@@ -371,6 +375,9 @@ class ErrorLogService {
         'endpoint': errorLog['endpoint'],
         'retryCount': errorLog['retry_count'],
         'lastRetryAt': errorLog['last_retry_at'],
+        'employeeId': prefs.getString('last_synced_vendedor'),
+        'employeeName': prefs.getString('last_synced_vendedor_name'),
+        'username': prefs.getString('current_user'),
       };
 
       final payload = {'jsonData': jsonEncode(jsonData)};
@@ -444,7 +451,7 @@ class ErrorLogService {
       );
 
       if (updated > 0) {
-        print(
+        debugPrint(
           '$updated error(es) marcado(s) como resuelto(s) para $tableName:$registroFailId',
         );
       }
@@ -660,7 +667,7 @@ class ErrorLogService {
       );
 
       if (deleted > 0) {
-        print(
+        debugPrint(
           'Eliminados $deleted error logs antiguos resueltos y sincronizados',
         );
       }

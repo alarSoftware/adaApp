@@ -1,6 +1,7 @@
 import '../models/dynamic_form/dynamic_form_template.dart';
 import '../services/sync/dynamic_form_sync_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
+import 'package:ada_app/utils/logger.dart';
 
 class DynamicFormTemplateRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper();
@@ -28,9 +29,7 @@ class DynamicFormTemplateRepository {
       }
 
       return templates;
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_TEMPLATE_REPOSITORY: Error", e); return []; }
   }
 
   /// Obtener template por ID
@@ -46,9 +45,7 @@ class DynamicFormTemplateRepository {
       if (maps.isEmpty) return null;
 
       return await _mapToTemplateWithDetails(maps.first);
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_TEMPLATE_REPOSITORY: Error", e); return null; }
   }
 
   /// Obtener templates por estado
@@ -71,9 +68,7 @@ class DynamicFormTemplateRepository {
       }
 
       return templates;
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_TEMPLATE_REPOSITORY: Error", e); return []; }
   }
 
   /// Descargar templates desde el servidor (limpia antes de descargar)
@@ -93,9 +88,7 @@ class DynamicFormTemplateRepository {
       }
 
       return true;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_TEMPLATE_REPOSITORY: Error", e); return false; }
   }
 
   /// Guardar templates desde el servidor
@@ -128,13 +121,11 @@ class DynamicFormTemplateRepository {
 
           await _dbHelper.insertar(_tableName, _mapTemplateForDB(template));
           saved++;
-        } catch (e) {}
+        } catch (e) { AppLogger.e("DYNAMIC_FORM_TEMPLATE_REPOSITORY: Error", e); }
       }
 
       return saved;
-    } catch (e) {
-      return saved;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_TEMPLATE_REPOSITORY: Error", e); return saved; }
   }
 
   /// Guardar detalles de templates desde el servidor
@@ -181,13 +172,11 @@ class DynamicFormTemplateRepository {
           }
 
           saved++;
-        } catch (e) {}
+        } catch (e) { AppLogger.e("DYNAMIC_FORM_TEMPLATE_REPOSITORY: Error", e); }
       }
 
       return saved;
-    } catch (e) {
-      return saved;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_TEMPLATE_REPOSITORY: Error", e); return saved; }
   }
 
   /// Eliminar template y sus detalles
@@ -202,9 +191,7 @@ class DynamicFormTemplateRepository {
       await _dbHelper.eliminar(_tableName, where: 'id = ?', whereArgs: [id]);
 
       return true;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_TEMPLATE_REPOSITORY: Error", e); return false; }
   }
 
   /// Contar templates
@@ -212,9 +199,7 @@ class DynamicFormTemplateRepository {
     try {
       final maps = await _dbHelper.consultar(_tableName);
       return maps.length;
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_TEMPLATE_REPOSITORY: Error", e); return 0; }
   }
 
   // ==================== MÉTODOS PRIVADOS DE MAPEO ====================
@@ -294,9 +279,7 @@ class DynamicFormTemplateRepository {
       }
 
       return DynamicFormTemplate.fromApiJson(formJson, detailsJson);
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_TEMPLATE_REPOSITORY: Error", e); return null; }
   }
 
   /// Mapear template para BD

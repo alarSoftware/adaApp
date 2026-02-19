@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:ada_app/viewmodels/pending_data_viewmodel.dart';
@@ -726,8 +727,6 @@ class _PendingDataScreenState extends State<PendingDataScreen> {
     try {
       final dateTime = DateTime.parse(timeString);
       return DateFormat('dd/MM HH:mm').format(dateTime);
-    } catch (e) {
-      return timeString;
-    }
+    } catch (e) { AppLogger.e("PENDING_DATA_SCREEN: Error", e); return timeString; }
   }
 }

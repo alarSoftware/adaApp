@@ -7,6 +7,7 @@ import '../models/dynamic_form/dynamic_form_response_detail.dart';
 import '../models/dynamic_form/dynamic_form_response_image.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:ada_app/services/data/database_helper.dart';
+import 'package:ada_app/utils/logger.dart';
 
 class DynamicFormResponseRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper();
@@ -48,6 +49,7 @@ class DynamicFormResponseRepository {
 
       return true;
     } catch (e) {
+      AppLogger.e('DYNAMIC_FORM_RESPONSE_REPO: Error salvando respuesta', e);
       return false;
     }
   }
@@ -60,9 +62,7 @@ class DynamicFormResponseRepository {
       );
 
       return await _mapListToResponses(maps);
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); return []; }
   }
 
   Future<DynamicFormResponse?> getById(String id) async {
@@ -77,6 +77,10 @@ class DynamicFormResponseRepository {
       if (maps.isEmpty) return null;
       return await _mapToResponseWithDetails(maps.first);
     } catch (e) {
+      AppLogger.e(
+        'DYNAMIC_FORM_RESPONSE_REPO: Error obteniendo respuesta por ID: $id',
+        e,
+      );
       return null;
     }
   }
@@ -91,9 +95,7 @@ class DynamicFormResponseRepository {
       );
 
       return await _mapListToResponses(maps);
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); return []; }
   }
 
   Future<List<DynamicFormResponse>> getPendingSync() async {
@@ -106,9 +108,7 @@ class DynamicFormResponseRepository {
       );
 
       return await _mapListToResponses(maps);
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); return []; }
   }
 
   Future<bool> delete(String responseId) async {
@@ -156,7 +156,10 @@ class DynamicFormResponseRepository {
 
       return true;
     } catch (e) {
-      print('ERROR AL ELIMINAR FORMULARIO: $e'); // LOG SOLICITADO
+      AppLogger.e(
+        'DYNAMIC_FORM_RESPONSE_REPO: ERROR AL ELIMINAR FORMULARIO: $responseId',
+        e,
+      );
       return false;
     }
   }
@@ -199,6 +202,10 @@ class DynamicFormResponseRepository {
 
       return imageId;
     } catch (e) {
+      AppLogger.e(
+        'DYNAMIC_FORM_RESPONSE_REPO: Error guardando imagen inmediatamente',
+        e,
+      );
       return null;
     }
   }
@@ -253,8 +260,17 @@ class DynamicFormResponseRepository {
         whereArgs: [detailId],
       );
 
-      if (images.isNotEmpty) {}
-    } catch (e) {}
+      if (images.isNotEmpty) {
+        AppLogger.i(
+          'DYNAMIC_FORM_RESPONSE_REPO: Se eliminaron ${images.length} imágenes físicas para el detalle $detailId',
+        );
+      }
+    } catch (e) {
+      AppLogger.e(
+        'DYNAMIC_FORM_RESPONSE_REPO: Error eliminando imágenes del detalle: $detailId',
+        e,
+      );
+    }
   }
 
   // ==================== MÉTODOS PÚBLICOS - CONTADORES ====================
@@ -270,9 +286,7 @@ class DynamicFormResponseRepository {
 
       final count = result.first['count'] as int?;
       return count ?? 0;
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); return 0; }
   }
 
   Future<int> countSynced() async {
@@ -299,9 +313,7 @@ class DynamicFormResponseRepository {
         'mensaje_error_sync': map['mensaje_error_sync'],
         'fecha_sincronizado': map['fecha_sincronizado'],
       };
-    } catch (e) {
-      return _getDefaultSyncMetadata();
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); return _getDefaultSyncMetadata(); }
   }
 
   // ==================== MÉTODOS PÚBLICOS - DETALLES ====================
@@ -315,9 +327,7 @@ class DynamicFormResponseRepository {
       );
 
       return maps.map((map) => DynamicFormResponseDetail.fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); return []; }
   }
 
   // ==================== MÉTODOS PÚBLICOS - IMÁGENES ====================
@@ -334,9 +344,7 @@ class DynamicFormResponseRepository {
       );
 
       return maps.map((map) => DynamicFormResponseImage.fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); return []; }
   }
 
   Future<List<DynamicFormResponseImage>> getImagesForResponse(
@@ -357,9 +365,7 @@ class DynamicFormResponseRepository {
       );
 
       return maps.map((map) => DynamicFormResponseImage.fromMap(map)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); return []; }
   }
 
   Future<void> deleteImageFile(DynamicFormResponseImage image) async {
@@ -370,7 +376,7 @@ class DynamicFormResponseRepository {
       if (await file.exists()) {
         await file.delete();
       }
-    } catch (e) {}
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); }
   }
 
   // ==================== MÉTODOS PÚBLICOS - SINCRONIZACIÓN CON SERVIDOR ====================
@@ -391,7 +397,7 @@ class DynamicFormResponseRepository {
         }
 
         count++;
-      } catch (e) {}
+      } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); }
     }
 
     return count;
@@ -417,7 +423,7 @@ class DynamicFormResponseRepository {
 
         await _dbHelper.insertar(_detailTable, detailForDB);
         count++;
-      } catch (e) {}
+      } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); }
     }
 
     return count;
@@ -470,7 +476,7 @@ class DynamicFormResponseRepository {
 
         await _upsertImage(imageForDB['id']!.toString(), imageForDB);
         count++;
-      } catch (e) {}
+      } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); }
     }
 
     return count;
@@ -641,9 +647,7 @@ class DynamicFormResponseRepository {
 
       final images = await getImagesForDetail(details.first['id']);
       return images.isNotEmpty;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); return false; }
   }
 
   Future<void> _saveServerDetails(
@@ -710,9 +714,7 @@ class DynamicFormResponseRepository {
         where: where,
         whereArgs: whereArgs,
       );
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); return 0; }
   }
 
   Future<List<DynamicFormResponse>> _mapListToResponses(
@@ -755,9 +757,7 @@ class DynamicFormResponseRepository {
         employeeId: map['employee_id']?.toString(),
         errorMessage: map['mensaje_error_sync']?.toString(),
       );
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); return null; }
   }
 
   Future<Map<String, dynamic>> _loadAnswers(String responseId) async {
@@ -794,9 +794,7 @@ class DynamicFormResponseRepository {
     if (value == null) return null;
     try {
       return DateTime.parse(value.toString());
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); return null; }
   }
 
   bool _isImagePath(dynamic value) {
@@ -829,9 +827,7 @@ class DynamicFormResponseRepository {
 
       final bytes = await file.readAsBytes();
       return {'base64': base64Encode(bytes), 'tamano': bytes.length};
-    } catch (e) {
-      return {'base64': null, 'tamano': null};
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_RESPONSE_REPOSITORY: Error", e); return {'base64': null, 'tamano': null}; }
   }
 
   Map<String, dynamic> _getDefaultSyncMetadata() {

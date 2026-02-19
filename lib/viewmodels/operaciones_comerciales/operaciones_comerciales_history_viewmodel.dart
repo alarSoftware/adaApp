@@ -116,12 +116,13 @@ class OperacionesComercialesHistoryViewModel extends ChangeNotifier {
         '📥 [HISTORY] Cargando datos de DB... (Refresco auto: $esRefrescoAutomatico)',
       );
 
-      // Cargar operaciones
+      // Cargar todas las operaciones locales (opcionalmente filtradas por fecha)
+      // El filtrado por employeeId ahora se delega totalmente a la API durante la descarga.
       _operaciones = await _operacionRepository.obtenerTodasLasOperaciones(
         fecha: _selectedDate,
       );
 
-      // Cargar censos
+      // Cargar todos los censos locales (opcionalmente filtrados por fecha)
       _censos = await _censoRepository.obtenerTodos(fecha: _selectedDate);
 
       // Solo notificar si hay cambios o es carga inicial

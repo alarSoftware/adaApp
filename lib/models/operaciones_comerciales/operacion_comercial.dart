@@ -20,6 +20,10 @@ class OperacionComercial {
   final double? longitud;
   final String? odooName;
   final String? adaSequence;
+  final String? estadoOdoo;
+  final String? motivoOdoo;
+  final String? ordenTransporteOdoo;
+  final String? adaEstado;
 
   final List<OperacionComercialDetalle> detalles;
 
@@ -42,6 +46,10 @@ class OperacionComercial {
     this.longitud,
     this.odooName,
     this.adaSequence,
+    this.estadoOdoo,
+    this.motivoOdoo,
+    this.ordenTransporteOdoo,
+    this.adaEstado,
     this.detalles = const [],
   });
 
@@ -73,6 +81,10 @@ class OperacionComercial {
       longitud: map['longitud'] as double?,
       odooName: map['odoo_name'] as String?,
       adaSequence: map['ada_sequence'] as String?,
+      estadoOdoo: map['estado_odoo'] as String?,
+      motivoOdoo: map['motivo_odoo'] as String?,
+      ordenTransporteOdoo: map['orden_transporte_odoo'] as String?,
+      adaEstado: map['ada_estado'] as String?,
     );
   }
 
@@ -96,6 +108,10 @@ class OperacionComercial {
       'longitud': longitud,
       'odoo_name': odooName,
       'ada_sequence': adaSequence,
+      'estado_odoo': estadoOdoo,
+      'motivo_odoo': motivoOdoo,
+      'orden_transporte_odoo': ordenTransporteOdoo,
+      'ada_estado': adaEstado,
     };
   }
 
@@ -112,6 +128,10 @@ class OperacionComercial {
       'longitud': longitud,
       'odoo_name': odooName,
       'ada_sequence': adaSequence,
+      'estado_odoo': estadoOdoo,
+      'motivo_odoo': motivoOdoo,
+      'orden_transporte_odoo': ordenTransporteOdoo,
+      'ada_estado': adaEstado,
       'detalles': detalles.map((d) => d.toJson()).toList(),
     };
   }
@@ -135,6 +155,10 @@ class OperacionComercial {
     double? longitud,
     String? odooName,
     String? adaSequence,
+    String? estadoOdoo,
+    String? motivoOdoo,
+    String? ordenTransporteOdoo,
+    String? adaEstado,
     List<OperacionComercialDetalle>? detalles,
   }) {
     return OperacionComercial(
@@ -156,6 +180,10 @@ class OperacionComercial {
       longitud: longitud ?? this.longitud,
       odooName: odooName ?? this.odooName,
       adaSequence: adaSequence ?? this.adaSequence,
+      estadoOdoo: estadoOdoo ?? this.estadoOdoo,
+      motivoOdoo: motivoOdoo ?? this.motivoOdoo,
+      ordenTransporteOdoo: ordenTransporteOdoo ?? this.ordenTransporteOdoo,
+      adaEstado: adaEstado ?? this.adaEstado,
       detalles: detalles ?? this.detalles,
     );
   }
@@ -172,13 +200,13 @@ class OperacionComercial {
   String get displaySyncStatus {
     switch (syncStatus) {
       case 'creado':
-        return 'Pendiente';
+        return 'PENDIENTE';
       case 'migrado':
-        return 'Sincronizado';
+        return 'SINCRONIZADO';
       case 'error':
-        return 'Error';
+        return 'ERROR';
       default:
-        return syncStatus;
+        return 'DESCONOCIDO';
     }
   }
 

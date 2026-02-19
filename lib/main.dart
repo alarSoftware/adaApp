@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:ada_app/services/app_services.dart';
 import 'package:ada_app/services/api/auth_service.dart';
-import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
+// import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
 import 'ui/screens/login/login_screen.dart';
 import 'ui/screens/clientes/clients_screen.dart';
 import 'ui/screens/menu_principal/select_screen.dart';
@@ -16,6 +16,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:ada_app/ui/widgets/debug_ribbon_wrapper.dart';
 import 'package:ada_app/services/background/workmanager_service.dart';
+import 'package:ada_app/utils/logger.dart';
 //IMPORTS PARA EL RESET TEMPORAL - COMENTADOS PARA PRODUCCIÓN
 // import 'package:ada_app/services/database_helper.dart';
 
@@ -109,40 +110,15 @@ class _InitializationScreenState extends State<InitializationScreen> {
         _loadingMessage = 'Inicializando servicios...';
       });
 
-      // 🔴 NUEVO: Solicitar permisos ANTES de cualquier cosa
+      // 1. Verificar permisos (bloqueante si faltan)
       await _checkAndRequestPermissions();
 
-      await AppServices().inicializar();
+      // 2. Iniciar servicios en SEGUNDO PLANO
+      _iniciarServiciosBackground();
 
-      // Inicializar WorkManager para logs garantizados en background
-      await WorkmanagerService.initialize();
-
-      setState(() {
-        _loadingMessage = 'Verificando autenticación...';
-      });
-
+      // 3. Verificar estado de autenticación
       final authService = AuthService();
       final estaAutenticado = await authService.hasUserLoggedInBefore();
-
-      if (estaAutenticado) {
-        setState(() {
-          _loadingMessage = 'Preparando acceso...';
-        });
-      }
-
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      if (mounted && estaAutenticado) {
-        try {
-          setState(() {
-            _loadingMessage = 'Verificando optimización de batería...';
-          });
-
-          await BatteryOptimizationDialog.checkAndRequestBatteryOptimization(
-            context,
-          );
-        } catch (e) {}
-      } else {}
 
       if (mounted) {
         Navigator.pushReplacementNamed(
@@ -151,6 +127,7 @@ class _InitializationScreenState extends State<InitializationScreen> {
         );
       }
     } catch (e) {
+      AppLogger.e('Error al inicializar la aplicación', e);
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -217,12 +194,10 @@ class _InitializationScreenState extends State<InitializationScreen> {
         });
       }
 
-      // 1. Verificar/Solicitar Ubicación (Foreground)
-      // Esta es la que muestra la "ventanita nativa"
+      // 1. Verificar/Solicitar Ubicación
       var locStatus = await Permission.location.status;
 
       if (!locStatus.isGranted) {
-        // Intentamos mostrar la nativa
         locStatus = await Permission.location.request();
       }
 
@@ -299,6 +274,19 @@ class _InitializationScreenState extends State<InitializationScreen> {
           return;
         }
       }
+    }
+  }
+
+  /// Inicia los servicios pesados en segundo plano sin bloquear la UI
+  void _iniciarServiciosBackground() async {
+    try {
+      // Inicializar servicios principales
+      await AppServices().inicializar();
+
+      // Inicializar WorkManager
+      await WorkmanagerService.initialize();
+    } catch (e) {
+      AppLogger.e('Error en _iniciarServiciosBackground', e);
     }
   }
 

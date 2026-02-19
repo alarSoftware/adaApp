@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../utils/logger.dart';
 import 'package:uuid/uuid.dart';
 import '../models/dynamic_form/dynamic_form_template.dart';
 import '../models/dynamic_form/dynamic_form_response.dart';
@@ -61,9 +62,7 @@ class DynamicFormViewModel extends ChangeNotifier {
   DynamicFormTemplate? getTemplateById(String templateId) {
     try {
       return _templates.firstWhere((t) => t.id == templateId);
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_VIEWMODEL: Error", e); return null; }
   }
 
   void startNewForm(
@@ -240,9 +239,7 @@ class DynamicFormViewModel extends ChangeNotifier {
 
       updateFieldValue(fieldId, null);
       return true;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_VIEWMODEL: Error", e); return false; }
   }
 
   bool _validateAllFields() {
@@ -439,9 +436,7 @@ class DynamicFormViewModel extends ChangeNotifier {
       final synced = await _responseRepo.countSynced();
 
       return {'pending': pending, 'synced': synced, 'total': pending + synced};
-    } catch (e) {
-      return {'pending': 0, 'synced': 0, 'total': 0};
-    }
+    } catch (e) { AppLogger.e("DYNAMIC_FORM_VIEWMODEL: Error", e); return {'pending': 0, 'synced': 0, 'total': 0}; }
   }
 
   Future<void> loadSavedResponsesWithSync({String? clienteId}) async {

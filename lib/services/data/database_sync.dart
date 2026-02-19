@@ -1,4 +1,5 @@
-import 'package:sqflite/sqflite.dart';
+﻿import 'package:sqflite/sqflite.dart';
+import 'package:flutter/foundation.dart';
 
 class DatabaseSync {
   // ================================================================
@@ -26,7 +27,7 @@ class DatabaseSync {
   ) async {
     // PRIMERO: Limpiar TODA la tabla de rutas antes de sincronizar usuarios
     await db.delete('app_routes');
-    print('Tabla app_routes limpiada completamente');
+    debugPrint('Tabla app_routes limpiada completamente');
 
     // SEGUNDO: Sincronizar usuarios
     await _sincronizarEntidades<Map<String, dynamic>>(
@@ -109,23 +110,24 @@ class DatabaseSync {
     bool limpiarTabla = false,
     bool usarReplace = false,
   }) async {
-    print('=== SINCRONIZANDO $nombreEntidad ===');
-    print('$nombreEntidad recibidos: ${datos.length}');
+    debugPrint('=== SINCRONIZANDO $nombreEntidad ===');
+    debugPrint('$nombreEntidad recibidos: ${datos.length}');
 
     await db.transaction((txn) async {
       if (limpiarTabla) {
         await txn.delete(tabla);
-        print('$nombreEntidad existentes eliminados');
+        debugPrint('$nombreEntidad existentes eliminados');
       }
 
       int sincronizados = 0;
       int omitidos = 0;
+      final batch = txn.batch();
 
       for (int i = 0; i < datos.length; i++) {
         final entidad = datos[i];
 
         if (!validarEntidad(entidad)) {
-          print('$nombreEntidad ${i + 1} omitido por validación');
+          debugPrint('$nombreEntidad ${i + 1} omitido por validación');
           omitidos++;
           continue;
         }
@@ -133,32 +135,33 @@ class DatabaseSync {
         try {
           final mapa = mapearEntidad(entidad);
           if (mapa == null) {
-            print('$nombreEntidad ${i + 1} omitido - mapeo falló');
+            debugPrint('$nombreEntidad ${i + 1} omitido - mapeo falló');
             omitidos++;
             continue;
           }
 
           if (usarReplace) {
-            await txn.insert(
+            batch.insert(
               tabla,
               mapa,
               conflictAlgorithm: ConflictAlgorithm.replace,
             );
           } else {
-            await txn.insert(tabla, mapa);
+            batch.insert(tabla, mapa);
           }
 
           sincronizados++;
         } catch (e) {
-          print('Error insertando ${nombreEntidad.toLowerCase()} ${i + 1}: $e');
+          debugPrint('Error procesando ${nombreEntidad.toLowerCase()} ${i + 1}: $e');
           omitidos++;
         }
       }
 
-      print('$nombreEntidad: $sincronizados sincronizados, $omitidos omitidos');
+      await batch.commit(noResult: true);
+      debugPrint('$nombreEntidad: $sincronizados sincronizados, $omitidos omitidos');
     });
 
-    print('=== SINCRONIZACIÓN DE $nombreEntidad COMPLETADA ===');
+    debugPrint('=== SINCRONIZACIÓN DE $nombreEntidad COMPLETADA ===');
   }
 
   // ================================================================
@@ -186,7 +189,7 @@ class DatabaseSync {
     final camposCriticos = ['code', 'username', 'password', 'fullname'];
     for (final campo in camposCriticos) {
       if (usuarioMapa[campo] == null) {
-        print('Campo requerido null: $campo');
+        debugPrint('Campo requerido null: $campo');
         return null;
       }
     }

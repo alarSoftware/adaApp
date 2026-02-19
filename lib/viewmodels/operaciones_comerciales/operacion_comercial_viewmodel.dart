@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../utils/logger.dart';
 import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/models/producto.dart';
 import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart';
@@ -253,6 +254,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         return error == null;
       }).toList();
     } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_VIEWMODEL: Error", e);
       return [];
     }
   }
@@ -269,6 +271,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         excluirId: idProductoActual,
       );
     } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_VIEWMODEL: Error", e);
       return [];
     }
   }
@@ -466,15 +469,19 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       // 1. Si tiene adaSequence, intentar obtener odooName específicamente
       if (_operacionActual!.adaSequence != null &&
           _operacionActual!.adaSequence!.isNotEmpty) {
-        final odooName = await OperacionComercialSyncService.obtenerOdooName(
+        final odooStatus = await OperacionComercialSyncService.obtenerOdooName(
           _operacionActual!.adaSequence!,
         );
 
-        if (odooName != null && odooName.isNotEmpty) {
+        if (odooStatus != null && odooStatus.isNotEmpty) {
           await _operacionRepository.marcarComoMigrado(
             _operacionActual!.id!,
             _operacionActual!.serverId,
-            odooName: odooName,
+            odooName: odooStatus['odooName'],
+            estadoOdoo: odooStatus['estadoOdoo'],
+            motivoOdoo: odooStatus['motivoOdoo'],
+            ordenTransporteOdoo: odooStatus['ordenDeTransporteOdoo'],
+            adaEstado: odooStatus['adaEstado'],
           );
 
           final operacionActualizada = await _operacionRepository
@@ -490,9 +497,15 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       }
 
       // 2. Fallback: Sincronización general por cliente
-      await OperacionComercialSyncService.obtenerOperacionesPorCliente(
-        cliente.id!,
-      );
+      final currentUser = await AuthService().getCurrentUser();
+      final employeeId = currentUser?.employeeId;
+
+      if (employeeId != null) {
+        await OperacionComercialSyncService.obtenerOperacionesPorCliente(
+          employeeId,
+          cliente.id!,
+        );
+      }
 
       final operacionActualizada = await _operacionRepository
           .obtenerOperacionPorId(_operacionActual!.id!);
@@ -515,6 +528,7 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     try {
       return await _productoRepository.obtenerProductoPorId(productoId);
     } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_VIEWMODEL: Error", e);
       return null;
     }
   }

@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart';
+import '../../utils/logger.dart';
 
 class PendingSyncInfo {
   final String tableName;
@@ -180,7 +181,7 @@ class DatabaseValidationService {
           ),
         );
       }
-    } catch (e) {}
+    } catch (e) { AppLogger.e("DATABASE_VALIDATION_SERVICE: Error", e); }
   }
 
   /// Obtiene un resumen detallado de todos los registros pendientes

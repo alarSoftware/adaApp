@@ -1,4 +1,6 @@
-import 'package:geolocator/geolocator.dart';
+﻿import 'package:geolocator/geolocator.dart';
+import 'package:flutter/foundation.dart';
+import '../../utils/logger.dart';
 
 import 'dart:async';
 
@@ -42,10 +44,10 @@ class LocationService {
   Future<bool> isLocationServiceEnabled() async {
     try {
       final isEnabled = await Geolocator.isLocationServiceEnabled();
-      print('Servicios de ubicación habilitados: $isEnabled');
+      debugPrint('Servicios de ubicación habilitados: $isEnabled');
       return isEnabled;
     } catch (e) {
-      print('Error verificando servicios de ubicación: $e');
+      debugPrint('Error verificando servicios de ubicación: $e');
       return false;
     }
   }
@@ -54,10 +56,10 @@ class LocationService {
   Future<LocationPermission> checkPermission() async {
     try {
       final permission = await Geolocator.checkPermission();
-      print('Permisos actuales: $permission');
+      debugPrint('Permisos actuales: $permission');
       return permission;
     } catch (e) {
-      print('Error verificando permisos: $e');
+      debugPrint('Error verificando permisos: $e');
       return LocationPermission.denied;
     }
   }
@@ -66,10 +68,10 @@ class LocationService {
   Future<LocationPermission> requestPermission() async {
     try {
       final permission = await Geolocator.requestPermission();
-      print('Permisos solicitados - resultado: $permission');
+      debugPrint('Permisos solicitados - resultado: $permission');
       return permission;
     } catch (e) {
-      print('Error solicitando permisos: $e');
+      debugPrint('Error solicitando permisos: $e');
       return LocationPermission.denied;
     }
   }
@@ -88,7 +90,7 @@ class LocationService {
       // Intentar "despertar" el diálogo de resolución de Android pidiendo ubicación
       try {
         await Geolocator.getCurrentPosition();
-      } catch (_) {}
+      } catch (_) { AppLogger.e("LOCATION_SERVICE: Error capturado", "Error ignorado con _"); }
 
       // Verificar de nuevo
       if (!await isLocationServiceEnabled()) {
@@ -131,11 +133,11 @@ class LocationService {
     Duration timeout = const Duration(seconds: 30),
   }) async {
     try {
-      print('Obteniendo ubicación GPS...');
+      debugPrint('Obteniendo ubicación GPS...');
 
       // Verificar permisos primero
       if (!await hasValidPermissions()) {
-        print('No hay permisos válidos para ubicación');
+        debugPrint('No hay permisos válidos para ubicación');
         return null;
       }
 
@@ -145,12 +147,12 @@ class LocationService {
         timeLimit: timeout,
       );
 
-      print(
+      debugPrint(
         'Ubicación obtenida: ${position.latitude}, ${position.longitude} (precisión: ${position.accuracy}m)',
       );
       return position;
     } catch (e) {
-      print('No se pudo obtener ubicación: $e');
+      debugPrint('No se pudo obtener ubicación: $e');
       return null;
     }
   }
@@ -162,7 +164,7 @@ class LocationService {
     bool autoRequestPermissions = true,
   }) async {
     try {
-      print('Obteniendo ubicación GPS (obligatorio)...');
+      debugPrint('Obteniendo ubicación GPS (obligatorio)...');
 
       // Asegurar permisos si está habilitado
       if (autoRequestPermissions) {
@@ -192,7 +194,7 @@ class LocationService {
         forceAndroidLocationManager: true,
       );
 
-      print(
+      debugPrint(
         'Ubicación obtenida exitosamente: ${position.latitude}, ${position.longitude}',
       );
       return position;
@@ -212,7 +214,7 @@ class LocationService {
         LocationErrorType.permissionDenied,
       );
     } catch (e) {
-      print('Error obteniendo ubicación obligatoria: $e');
+      debugPrint('Error obteniendo ubicación obligatoria: $e');
       throw LocationException(
         'Error inesperado obteniendo ubicación: $e',
         LocationErrorType.unknown,
@@ -228,7 +230,7 @@ class LocationService {
     Duration timeout = const Duration(seconds: 30),
   }) async {
     try {
-      print('Obteniendo ubicación promediada ($samples muestras)...');
+      debugPrint('Obteniendo ubicación promediada ($samples muestras)...');
 
       if (!await hasValidPermissions()) {
         return null;
@@ -244,7 +246,7 @@ class LocationService {
           );
           positions.add(position);
 
-          print(
+          debugPrint(
             'Muestra ${i + 1}/$samples: ${position.latitude}, ${position.longitude}',
           );
 
@@ -252,12 +254,12 @@ class LocationService {
             await Future.delayed(delayBetweenSamples);
           }
         } catch (e) {
-          print('Error en muestra ${i + 1}: $e');
+          debugPrint('Error en muestra ${i + 1}: $e');
         }
       }
 
       if (positions.isEmpty) {
-        print('No se pudieron obtener muestras de ubicación');
+        debugPrint('No se pudieron obtener muestras de ubicación');
         return null;
       }
 
@@ -272,7 +274,7 @@ class LocationService {
           positions.map((p) => p.accuracy).reduce((a, b) => a + b) /
           positions.length;
 
-      print(
+      debugPrint(
         'Ubicación promediada: $avgLat, $avgLng (precisión promedio: ${avgAccuracy.toStringAsFixed(1)}m)',
       );
 
@@ -290,7 +292,7 @@ class LocationService {
         headingAccuracy: positions.first.headingAccuracy,
       );
     } catch (e) {
-      print('Error obteniendo ubicación promediada: $e');
+      debugPrint('Error obteniendo ubicación promediada: $e');
       return null;
     }
   }
@@ -299,10 +301,10 @@ class LocationService {
   Future<bool> openLocationSettings() async {
     try {
       final result = await Geolocator.openLocationSettings();
-      print('Configuraciones de ubicación abiertas: $result');
+      debugPrint('Configuraciones de ubicación abiertas: $result');
       return result;
     } catch (e) {
-      print('Error abriendo configuraciones: $e');
+      debugPrint('Error abriendo configuraciones: $e');
       return false;
     }
   }
@@ -311,10 +313,10 @@ class LocationService {
   Future<bool> openAppSettings() async {
     try {
       final result = await Geolocator.openAppSettings();
-      print('Configuraciones de app abiertas: $result');
+      debugPrint('Configuraciones de app abiertas: $result');
       return result;
     } catch (e) {
-      print('Error abriendo configuraciones de app: $e');
+      debugPrint('Error abriendo configuraciones de app: $e');
       return false;
     }
   }
@@ -361,13 +363,13 @@ class LocationService {
       position ??= await Geolocator.getCurrentPosition();
 
       if (position.isMocked) {
-        print('ALERTA: Ubicación simulada detectada (Fake GPS)');
+        debugPrint('ALERTA: Ubicación simulada detectada (Fake GPS)');
         return true;
       }
 
       return false;
     } catch (e) {
-      print('Error verificando ubicación simulada: $e');
+      debugPrint('Error verificando ubicación simulada: $e');
       return false;
     }
   }

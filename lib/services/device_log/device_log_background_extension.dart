@@ -1,4 +1,5 @@
-import 'dart:async';
+﻿import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -55,14 +56,14 @@ class DeviceLogBackgroundExtension {
       final tieneSession = await authService.hasUserLoggedInBefore();
 
       if (!tieneSession) {
-        print('No active session - stopping auto logging');
+        debugPrint('No active session - stopping auto logging');
         await detener();
         return false;
       }
 
       return true;
     } catch (e) {
-      print('Error checking session: $e');
+      debugPrint('Error checking session: $e');
       return false;
     }
   }
@@ -82,7 +83,7 @@ class DeviceLogBackgroundExtension {
 
       _isInitialized = true;
 
-      print('DeviceLog Extension Initialized');
+      debugPrint('DeviceLog Extension Initialized');
 
       // Cargar configuración de horario
       await cargarConfiguracionHorario();
@@ -90,14 +91,14 @@ class DeviceLogBackgroundExtension {
       // ELIMINADO: Timer interno. Ahora usamos WorkManager.
       // _backgroundTimer = Timer.periodic(...)
 
-      print(
+      debugPrint(
         'DeviceLog Extension: Configuración cargada. Scheduling delegado a WorkManager.',
       );
 
       // Verificar disponibilidad de servicios
       await DeviceInfoHelper.mostrarEstadoDisponibilidad();
     } catch (e) {
-      print('Error inicializando extensión: $e');
+      debugPrint('Error inicializando extensión: $e');
     }
   }
 
@@ -139,10 +140,10 @@ class DeviceLogBackgroundExtension {
       // FORZAR INTERVALO FIJO - 15 minutos (Hardcoded)
       if (BackgroundLogConfig.intervalo.inMinutes != 15) {
         BackgroundLogConfig.intervalo = const Duration(minutes: 15);
-        print("Intervalo restablecido a 15 min (Hardcoded Fixed)");
+        debugPrint("Intervalo restablecido a 15 min (Hardcoded Fixed)");
       }
     } catch (e) {
-      print('Error cargando configuración: $e');
+      debugPrint('Error cargando configuración: $e');
     }
   }
 
@@ -161,20 +162,24 @@ class DeviceLogBackgroundExtension {
       BackgroundLogConfig.horaInicio = inicio;
       BackgroundLogConfig.horaFin = fin;
 
-      print('Nueva configuración guardada - Horario: $inicio:00 - $fin:00');
+      debugPrint(
+        'Nueva configuración guardada - Horario: $inicio:00 - $fin:00',
+      );
 
       // Enviar señal al servicio background para que recargue inmediatamente
       final service = FlutterBackgroundService();
       if (await service.isRunning()) {
         service.invoke('updateConfig');
-        print('Señal updateConfig enviada al servicio');
+        debugPrint('Señal updateConfig enviada al servicio');
       } else {
         // Fallback porsi el servicio no corre
         // No llamamos inicializar() aqui para no duplicar timers en UI
-        print('Servicio no corriendo - configuración guardada solo en disco');
+        debugPrint(
+          'Servicio no corriendo - configuración guardada solo en disco',
+        );
       }
     } catch (e) {
-      print('Error guardando configuración: $e');
+      debugPrint('Error guardando configuración: $e');
       rethrow;
     }
   }
@@ -191,7 +196,7 @@ class DeviceLogBackgroundExtension {
 
       // Verificar horario (si no se fuerza)
       if (!forzar && !estaEnHorarioTrabajo()) {
-        print(
+        debugPrint(
           'Fuera del horario de trabajo (${BackgroundLogConfig.horaInicio}:00 - ${BackgroundLogConfig.horaFin}:00)',
         );
         return;
@@ -216,9 +221,6 @@ class DeviceLogBackgroundExtension {
           // Si hace menos de (Intervalo - 0.5 min) que se hizo un log, saltamos.
           if (diferencia.inSeconds <
               (BackgroundLogConfig.intervalo.inSeconds - 30)) {
-            print(
-              'LOGGING SKIPPED: Intervalo no cumplido. Último: ${diferencia.inMinutes} min (Config: ${BackgroundLogConfig.intervalo.inMinutes})',
-            );
             return;
           }
         }
@@ -226,7 +228,7 @@ class DeviceLogBackgroundExtension {
 
       await _ejecutarLogging(forzar: forzar);
     } catch (e) {
-      print('Error en logging con horario: $e');
+      debugPrint('Error en logging con horario: $e');
     }
   }
 
@@ -234,7 +236,7 @@ class DeviceLogBackgroundExtension {
   static Future<void> _ejecutarLogging({bool forzar = false}) async {
     // LOCK DE CONCURRENCIA
     if (_isExecuting) {
-      print('Ya hay un proceso de logging en ejecución - saltando...');
+      debugPrint('Ya hay un proceso de logging en ejecución - saltando...');
       return;
     }
 
@@ -246,13 +248,13 @@ class DeviceLogBackgroundExtension {
 
       // Re-verificar sesión
       if (!await _verificarSesionActiva()) {
-        print('LOGGING SKIPPED: No hay sesión activa');
+        debugPrint('LOGGING SKIPPED: No hay sesión activa');
         return;
       }
 
       final isGpsEnabled = await Geolocator.isLocationServiceEnabled();
       if (!isGpsEnabled) {
-        print('LOGGING SKIPPED: GPS Desactivado - Enviando alerta');
+        debugPrint('LOGGING SKIPPED: GPS Desactivado - Enviando alerta');
 
         // Llamada directa al callback si existe (Sin usar invoke)
         if (_onGpsAlertListener != null) {
@@ -265,16 +267,16 @@ class DeviceLogBackgroundExtension {
       final hasAlways = await Permission.locationAlways.isGranted;
 
       if (!hasPermission && !hasAlways) {
-        print('LOGGING SKIPPED: Sin permisos de ubicación');
+        debugPrint('LOGGING SKIPPED: Sin permisos de ubicación');
         return;
       }
 
       // Crear log
-      print('Creando device log...');
+      debugPrint('Creando device log...');
       final log = await DeviceInfoHelper.crearDeviceLog();
 
       if (log == null) {
-        print('No se pudo crear el device log');
+        debugPrint('No se pudo crear el device log');
         return;
       }
 
@@ -289,15 +291,15 @@ class DeviceLogBackgroundExtension {
 
       // NUEVO: Intentar reenvío de Error Logs pendientes
       try {
-        print('Intentando reenviar error logs pendientes...');
+        debugPrint('Intentando reenviar error logs pendientes...');
         await ErrorLogService.enviarErrorLogsAlServidor();
       } catch (e) {
-        print('Error en reenvío automático de error logs: $e');
+        debugPrint('Error en reenvío automático de error logs: $e');
       }
 
-      print('Proceso de logging completado para: ${log.id}');
+      debugPrint('Proceso de logging completado para: ${log.id}');
     } catch (e) {
-      print('Error en proceso de logging: $e');
+      debugPrint('Error en proceso de logging: $e');
     } finally {
       // ⚡ RELEASE WAKELOCK: Eliminado
       _isExecuting = false;
@@ -336,9 +338,9 @@ class DeviceLogBackgroundExtension {
         modelo: log.modelo,
       );
 
-      print('Log guardado en BD local (sincronizado: 0)');
+      debugPrint('Log guardado en BD local (sincronizado: 0)');
     } catch (e) {
-      print('Error guardando en BD: $e');
+      debugPrint('Error guardando en BD: $e');
       rethrow;
     }
   }
@@ -351,7 +353,9 @@ class DeviceLogBackgroundExtension {
       intento++;
 
       try {
-        print('Intento $intento de ${BackgroundLogConfig.maxReintentos}...');
+        debugPrint(
+          'Intento $intento de ${BackgroundLogConfig.maxReintentos}...',
+        );
 
         // FETCH CORRECT USER ID
         final authService = AuthService();
@@ -371,15 +375,15 @@ class DeviceLogBackgroundExtension {
         );
 
         if (resultado['exito'] == true) {
-          print('Enviado exitosamente en intento $intento');
+          debugPrint('Enviado exitosamente en intento $intento');
           await _marcarComoSincronizado(log.id);
           // await _mostrarNotificacionExito(log.id); // Notificar éxito
           return;
         } else {
-          print('Fallo en intento $intento: ${resultado['mensaje']}');
+          debugPrint('Fallo en intento $intento: ${resultado['mensaje']}');
         }
       } catch (e) {
-        print('Error en intento $intento: $e');
+        debugPrint('Error en intento $intento: $e');
       }
 
       if (intento < BackgroundLogConfig.maxReintentos) {
@@ -388,7 +392,7 @@ class DeviceLogBackgroundExtension {
       }
     }
   }
-//Ronaldo Notificacion local
+  //Ronaldo Notificacion local
   // /// Mostrar notificación local de éxito
   // static Future<void> _mostrarNotificacionExito(String logId) async {
   //   try {
@@ -431,24 +435,24 @@ class DeviceLogBackgroundExtension {
         where: 'id = ?',
         whereArgs: [logId],
       );
-      print('Log marcado como sincronizado en BD');
+      debugPrint('Log marcado como sincronizado en BD');
     } catch (e) {
-      print('Error marcando como sincronizado: $e');
+      debugPrint('Error marcando como sincronizado: $e');
     }
   }
 
   /// Detener servicio de logging
   static Future<void> detener() async {
     try {
-      print('Deteniendo extensión de logging...');
+      debugPrint('Deteniendo extensión de logging...');
 
       // _backgroundTimer?.cancel(); // Removed
       _isInitialized = false;
       _isExecuting = false;
 
-      print('Extensión de logging detenida');
+      debugPrint('Extensión de logging detenida');
     } catch (e) {
-      print('Error deteniendo extensión: $e');
+      debugPrint('Error deteniendo extensión: $e');
     }
   }
 
@@ -462,7 +466,7 @@ class DeviceLogBackgroundExtension {
         await service.startService();
       }
     } catch (e) {
-      print('Error inicializando logging post-login: $e');
+      debugPrint('Error inicializando logging post-login: $e');
     }
   }
 
@@ -500,7 +504,7 @@ class DeviceLogBackgroundExtension {
         timerPareceActivo = diferencia < umbral;
       }
     } catch (e) {
-      print('Error consultando último log: $e');
+      debugPrint('Error consultando último log: $e');
     }
 
     return {
@@ -521,7 +525,7 @@ class DeviceLogBackgroundExtension {
 
   static Future<void> mostrarConfiguracion() async {
     final estado = await obtenerEstado();
-    print(
+    debugPrint(
       'Background Logging Config: Active=${estado['activo']}, Interval=${estado['intervalo_minutos']}',
     );
   }

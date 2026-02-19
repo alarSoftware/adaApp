@@ -3,10 +3,7 @@ import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/models/usuario.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 
-// Since package_info_plus is not in pubspec, I will create a simple version.
-// If the user wants dynamic versioning, they can request the package addition.
-// For now I will hardcode or use a helper.
-
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:ada_app/config/app_config.dart';
 
 class AboutScreen extends StatefulWidget {
@@ -18,7 +15,7 @@ class AboutScreen extends StatefulWidget {
 
 class _AboutScreenState extends State<AboutScreen> {
   String _version = AppConfig.currentAppVersion;
-  String _buildNumber = '1';
+  String _buildNumber = '';
   Usuario? _currentUser;
   bool _isLoading = true;
 
@@ -33,15 +30,13 @@ class _AboutScreenState extends State<AboutScreen> {
       final authService = AuthService();
       final user = await authService.getCurrentUser();
 
-      // Simulate version loading since we don't have package_info_plus yet
-      // In a real scenario with the package:
-      // final packageInfo = await PackageInfo.fromPlatform();
-      // _version = packageInfo.version;
-      // _buildNumber = packageInfo.buildNumber;
+      final packageInfo = await PackageInfo.fromPlatform();
 
       if (mounted) {
         setState(() {
           _currentUser = user;
+          _version = packageInfo.version;
+          _buildNumber = packageInfo.buildNumber;
           _isLoading = false;
         });
       }

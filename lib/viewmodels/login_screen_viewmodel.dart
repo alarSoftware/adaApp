@@ -28,12 +28,6 @@ class ShowSuccessEvent extends LoginUIEvent {
 
 class NavigateToHomeEvent extends LoginUIEvent {}
 
-class ShowSyncRequiredDialogEvent extends LoginUIEvent {
-  final SyncValidationResult validation;
-  final Usuario currentUser;
-  ShowSyncRequiredDialogEvent(this.validation, this.currentUser);
-}
-
 class ShowPendingRecordsDialogEvent extends LoginUIEvent {
   final DatabaseValidationResult validationResult;
   ShowPendingRecordsDialogEvent(this.validationResult);
@@ -252,15 +246,7 @@ class LoginScreenViewModel extends ChangeNotifier {
       final validationResult = await _validateUserAssignment();
       if (!validationResult) return;
 
-      final syncValidation = await _validateSyncRequirement();
-
-      if (syncValidation.requiereSincronizacion) {
-        _syncValidationResult = syncValidation;
-        _eventController.add(
-          ShowSyncRequiredDialogEvent(syncValidation, _currentUser!),
-        );
-        return;
-      }
+      // La validacion de sincronizacion ahora se maneja en SelectScreen
 
       await _checkBiometricAvailability();
 
@@ -327,15 +313,7 @@ class LoginScreenViewModel extends ChangeNotifier {
       final validationResult = await _validateUserAssignment();
       if (!validationResult) return;
 
-      final syncValidation = await _validateSyncRequirement();
-
-      if (syncValidation.requiereSincronizacion) {
-        _syncValidationResult = syncValidation;
-        _eventController.add(
-          ShowSyncRequiredDialogEvent(syncValidation, _currentUser!),
-        );
-        return;
-      }
+      // La validacion de sincronizacion ahora se maneja en SelectScreen
 
       // Solicitud de permisos proactiva y BLOQUEANTE
       final permissionsGranted = await checkAndRequestPermissions();
@@ -379,32 +357,6 @@ class LoginScreenViewModel extends ChangeNotifier {
       _errorMessage = errorMsg;
       _eventController.add(ShowErrorEvent(errorMsg));
       return false;
-    }
-  }
-
-  // ✅ MÉTODO CORREGIDO - Construye el display name completo antes de validar
-  Future<SyncValidationResult> _validateSyncRequirement() async {
-    try {
-      // ✅ CORRECCIÓN CLAVE: Construir el nombre completo "username - Nombre Vendedor"
-      final displayName = _buildVendorDisplayName(_currentUser!);
-
-      // ✅ Pasar el nombre completo construido a validateSyncRequirement
-      return await _authService.validateSyncRequirement(
-        _currentUser!.employeeId!,
-        displayName, // ← Ahora incluye "username - Nombre Vendedor"
-      );
-    } catch (e) {
-      // ✅ En caso de error, también construir el nombre completo
-      final displayName = _buildVendorDisplayName(_currentUser!);
-
-      return SyncValidationResult(
-        requiereSincronizacion: true,
-        razon: 'Error en validación - sincronización por seguridad',
-        vendedorAnteriorId: null,
-        vendedorActualId: _currentUser!.employeeId ?? '',
-        vendedorAnteriorNombre: null,
-        vendedorActualNombre: displayName, // ← Nombre completo
-      );
     }
   }
 
@@ -680,15 +632,7 @@ class LoginScreenViewModel extends ChangeNotifier {
       final validationResult = await _validateUserAssignment();
       if (!validationResult) return;
 
-      final syncValidation = await _validateSyncRequirement();
-
-      if (syncValidation.requiereSincronizacion) {
-        _syncValidationResult = syncValidation;
-        _eventController.add(
-          ShowSyncRequiredDialogEvent(syncValidation, _currentUser!),
-        );
-        return;
-      }
+      // La validacion de sincronizacion ahora se maneja en SelectScreen
 
       await _checkBiometricAvailability();
       await checkAndRequestPermissions();

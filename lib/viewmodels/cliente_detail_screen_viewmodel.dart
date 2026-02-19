@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../utils/logger.dart';
 import 'dart:async';
 import '../models/cliente.dart';
 import '../repositories/equipo_repository.dart';
@@ -241,7 +242,7 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
       try {
         final fecha = DateTime.parse(fechaStr).toLocal();
         return 'Censado: ${formatearFecha(fecha)}';
-      } catch (e) {}
+      } catch (e) { AppLogger.e("CLIENTE_DETAIL_SCREEN_VIEWMODEL: Error", e); }
     }
     return 'Fecha no disponible';
   }
@@ -320,9 +321,7 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
       }
 
       return resultado;
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("CLIENTE_DETAIL_SCREEN_VIEWMODEL: Error", e); return null; }
   }
 
   bool shouldShowCliente() => _cliente?.nombre.isNotEmpty == true;

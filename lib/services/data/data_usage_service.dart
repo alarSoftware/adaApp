@@ -197,4 +197,45 @@ class DataUsageService {
       return {'today': 0, 'week': 0, 'month': 0, 'categories': <String, int>{}};
     }
   }
+
+  /// Obtener estadísticas agregadas (max diario y promedio diario)
+  Future<Map<String, dynamic>> getAggregatedStatistics() async {
+    try {
+      final db = await _dbHelper.database;
+
+      // Agrupar consumo por día (ignorando la hora)
+      final result = await db.rawQuery('''
+        SELECT DATE(timestamp) as day, SUM(total_bytes) as daily_total
+        FROM $_tableName
+        GROUP BY DATE(timestamp)
+      ''');
+
+      if (result.isEmpty) {
+        return {'max_daily_usage': 0, 'avg_daily_usage': 0};
+      }
+
+      // Extraer totales diarios
+      List<int> dailyTotals = [];
+      for (var row in result) {
+        if (row['daily_total'] != null) {
+          dailyTotals.add(row['daily_total'] as int);
+        }
+      }
+
+      if (dailyTotals.isEmpty) {
+        return {'max_daily_usage': 0, 'avg_daily_usage': 0};
+      }
+
+      // Calcular Máximo
+      int max = dailyTotals.reduce((curr, next) => curr > next ? curr : next);
+
+      // Calcular Promedio
+      double avg = dailyTotals.reduce((a, b) => a + b) / dailyTotals.length;
+
+      return {'max_daily_usage': max, 'avg_daily_usage': avg.toInt()};
+    } catch (e) {
+      debugPrint('Error calculando estadísticas agregadas: $e');
+      return {'max_daily_usage': 0, 'avg_daily_usage': 0};
+    }
+  }
 }

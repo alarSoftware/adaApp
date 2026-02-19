@@ -1,4 +1,5 @@
 import 'package:ada_app/models/equipos_pendientes.dart';
+import '../utils/logger.dart';
 import 'base_repository.dart';
 import 'package:uuid/uuid.dart';
 
@@ -91,9 +92,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
       }
 
       return null;
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("EQUIPO_PENDIENTE_REPOSITORY: Error", e); return null; }
   }
 
   /// Procesar escaneo de censo - crear registro pendiente
@@ -160,9 +159,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
       } else {}
 
       return actualizados;
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("EQUIPO_PENDIENTE_REPOSITORY: Error", e); return 0; }
   }
 
   /// Crear nuevo registro de equipo pendiente
@@ -200,9 +197,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
       final authService = AuthService();
       final usuario = await authService.getCurrentUser();
       return usuario?.id ?? 1;
-    } catch (e) {
-      return 1;
-    }
+    } catch (e) { AppLogger.e("EQUIPO_PENDIENTE_REPOSITORY: Error", e); return 1; }
   }
 
   // ================================
@@ -228,9 +223,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
       ''';
 
       return await dbHelper.consultarPersonalizada(sql);
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("EQUIPO_PENDIENTE_REPOSITORY: Error", e); return []; }
   }
 
   /// Obtener estadísticas de pendientes
@@ -248,9 +241,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
 
       final result = await dbHelper.consultarPersonalizada(sql);
       return result.isNotEmpty ? result.first : {};
-    } catch (e) {
-      return {};
-    }
+    } catch (e) { AppLogger.e("EQUIPO_PENDIENTE_REPOSITORY: Error", e); return {}; }
   }
 
   // ================================
@@ -299,13 +290,11 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
 
           await dbHelper.insertar(tableName, datos);
           creados++;
-        } catch (e) {}
+        } catch (e) { AppLogger.e("EQUIPO_PENDIENTE_REPOSITORY: Error", e); }
       }
 
       return creados;
-    } catch (e) {
-      return 0;
-    }
+    } catch (e) { AppLogger.e("EQUIPO_PENDIENTE_REPOSITORY: Error", e); return 0; }
   }
 
   Future<int> guardarEquiposPendientesDesdeServidor(
@@ -347,7 +336,7 @@ class EquipoPendienteRepository extends BaseRepository<EquiposPendientes> {
           );
 
           guardados++;
-        } catch (e) {}
+        } catch (e) { AppLogger.e("EQUIPO_PENDIENTE_REPOSITORY: Error", e); }
       }
     });
 

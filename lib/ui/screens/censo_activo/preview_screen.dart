@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import '../../../utils/logger.dart';
 import 'package:provider/provider.dart';
 import '../../../models/cliente.dart';
 import 'package:ada_app/ui/theme/colors.dart';
@@ -88,9 +90,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
             return;
           }
-        } catch (e) {}
+        } catch (e) { AppLogger.e("PREVIEW_SCREEN: Error", e); }
       }
-    } catch (e) {}
+    } catch (e) { AppLogger.e("PREVIEW_SCREEN: Error", e); }
   }
 
   Future<void> _cargarImagen2() async {
@@ -123,9 +125,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
             return;
           }
-        } catch (e) {}
+        } catch (e) { AppLogger.e("PREVIEW_SCREEN: Error", e); }
       }
-    } catch (e) {}
+    } catch (e) { AppLogger.e("PREVIEW_SCREEN: Error", e); }
   }
 
   @override
@@ -386,7 +388,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
         );
       }
     } catch (e) {
-      print('Error al volver desde historial: $e');
+      debugPrint('Error al volver desde historial: $e');
       if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
@@ -536,6 +538,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     return PreviewBottomBar(
       esHistorial: esHistorial,
       isSaving: vm.isSaving,
+      isConfirming: _yaConfirmado,
       statusMessage: vm.statusMessage,
       cantidadImagenes: cantidadImagenes,
       onVolver: () => Navigator.of(context).pop(),

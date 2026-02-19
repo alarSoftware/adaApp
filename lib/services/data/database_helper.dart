@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../utils/logger.dart';
 import 'package:ada_app/config/app_config.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -150,12 +151,14 @@ class DatabaseHelper {
     return await db.transaction<int>((txn) async {
       await txn.delete(tableName);
 
+      final batch = txn.batch();
       for (final record in nuevosRegistros) {
         _validateValues(record);
         _addTimestamps(tableName, record);
-        await txn.insert(tableName, record);
+        batch.insert(tableName, record);
       }
 
+      await batch.commit(noResult: true);
       return nuevosRegistros.length;
     });
   }
@@ -526,9 +529,7 @@ class DatabaseHelper {
         'estadisticas': stats,
         'tablas': tables,
       };
-    } catch (e) {
-      return {'error': e.toString()};
-    }
+    } catch (e) { AppLogger.e("DATABASE_HELPER: Error", e); return {'error': e.toString()}; }
   }
 
   void _validateValues(Map<String, dynamic> values) {

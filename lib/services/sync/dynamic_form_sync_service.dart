@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../utils/logger.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:io';
@@ -865,9 +866,7 @@ class DynamicFormSyncService extends BaseSyncService {
         }
 
         return null;
-      } catch (e) {
-        return null;
-      }
+      } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_SERVICE: Error", e); return null; }
     });
   }
 

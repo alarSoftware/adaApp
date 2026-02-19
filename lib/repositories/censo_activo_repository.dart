@@ -1,4 +1,5 @@
 import '../models/censo_activo.dart';
+import '../utils/logger.dart';
 import 'base_repository.dart';
 
 import 'package:uuid/uuid.dart';
@@ -92,6 +93,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return maps.isNotEmpty ? fromMap(maps.first) : null;
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return null;
     }
   }
@@ -111,6 +113,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return maps.isNotEmpty ? fromMap(maps.first) : null;
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return null;
     }
   }
@@ -131,15 +134,19 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return [];
     }
   }
 
-  /// Obtener todos los censos con filtro de fecha opcional
-  Future<List<CensoActivo>> obtenerTodos({DateTime? fecha}) async {
+  /// Obtener todos los censos con filtros opcionales
+  Future<List<CensoActivo>> obtenerTodos({
+    DateTime? fecha,
+    String? employeeId,
+  }) async {
     try {
-      String? whereClause;
-      List<dynamic>? whereArgs;
+      final List<String> conditions = [];
+      final List<dynamic> whereArgs = [];
 
       if (fecha != null) {
         // Generar rango del día completo
@@ -148,19 +155,28 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
             .add(const Duration(days: 1))
             .subtract(const Duration(milliseconds: 1));
 
-        whereClause = 'fecha_creacion BETWEEN ? AND ?';
-        whereArgs = [startOfDay.toIso8601String(), endOfDay.toIso8601String()];
+        conditions.add('fecha_creacion BETWEEN ? AND ?');
+        whereArgs.add(startOfDay.toIso8601String());
+        whereArgs.add(endOfDay.toIso8601String());
       }
+
+      if (employeeId != null && employeeId.isNotEmpty) {
+        conditions.add('employee_id = ?');
+        whereArgs.add(employeeId);
+      }
+
+      final whereClause = conditions.isEmpty ? null : conditions.join(' AND ');
 
       final maps = await dbHelper.consultar(
         tableName,
         where: whereClause,
-        whereArgs: whereArgs,
+        whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
         orderBy: 'fecha_creacion DESC', // Ordenar por fecha descendente
       );
 
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -176,6 +192,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return maps;
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -191,6 +208,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -206,6 +224,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -221,6 +240,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -235,6 +255,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -274,6 +295,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
 
       return maps.map((map) => fromMap(map)).toList();
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -351,6 +373,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'total': creados.length + migrados.length + conError.length,
       };
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return {'creados': 0, 'migrados': 0, 'error': 0, 'total': 0};
     }
   }
@@ -376,6 +399,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'total': estados.length,
       };
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return {'creados': 0, 'migrados': 0, 'error': 0, 'total': 0};
     }
   }
@@ -412,6 +436,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
         'porcentaje_error': (errores / total * 100).toDouble(),
       };
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return {};
     }
   }
@@ -426,6 +451,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       );
       return result.length;
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return 0;
     }
   }
@@ -470,6 +496,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       final noSincronizados = await obtenerNoSincronizados();
       return noSincronizados.map((estado) => estado.toJson()).toList();
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return [];
     }
   }
@@ -518,6 +545,7 @@ class CensoActivoRepository extends BaseRepository<CensoActivo> {
       final estado = await obtenerUltimoEstado(equipoId, clienteId);
       return estado?.toMap();
     } catch (e) {
+      AppLogger.e("CENSO_ACTIVO_REPOSITORY: Error", e);
       return null;
     }
   }

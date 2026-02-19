@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../utils/logger.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -305,9 +306,7 @@ class CensusImageSyncService extends BaseSyncService {
     if (value is String) {
       try {
         return int.parse(value);
-      } catch (e) {
-        return null;
-      }
+      } catch (e) { AppLogger.e("CENSO_IMAGE_SYNC_SERVICE: Error", e); return null; }
     }
     return null;
   }

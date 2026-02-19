@@ -4,6 +4,7 @@ import 'package:ada_app/ui/theme/colors.dart';
 class PreviewBottomBar extends StatelessWidget {
   final bool esHistorial;
   final bool isSaving;
+  final bool isConfirming; // NEW: Track when confirmation is in progress
   final String? statusMessage;
   final int cantidadImagenes;
   final VoidCallback? onVolver;
@@ -14,6 +15,7 @@ class PreviewBottomBar extends StatelessWidget {
     super.key,
     required this.esHistorial,
     required this.isSaving,
+    this.isConfirming = false, // NEW: Default to false
     this.statusMessage,
     required this.cantidadImagenes,
     this.onVolver,
@@ -102,12 +104,7 @@ class PreviewBottomBar extends StatelessWidget {
   }
 
   Widget _buildNormalButtons(BuildContext context) {
-    String textoBoton = 'Confirmar Registro';
-    if (cantidadImagenes == 1) {
-      textoBoton = 'Confirmar con 1 Imagen';
-    } else if (cantidadImagenes == 2) {
-      textoBoton = 'Confirmar con 2 Imágenes';
-    }
+    String textoBoton = 'Confirmar';
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -142,7 +139,7 @@ class PreviewBottomBar extends StatelessWidget {
           children: [
             Expanded(
               child: OutlinedButton(
-                onPressed: isSaving ? null : onVolver,
+                onPressed: (isSaving || isConfirming) ? null : onVolver,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   side: BorderSide(color: AppColors.border),
@@ -162,7 +159,6 @@ class PreviewBottomBar extends StatelessWidget {
             ),
             const SizedBox(width: 16),
             Expanded(
-              flex: 2,
               child: ElevatedButton(
                 onPressed: isSaving ? null : onConfirmar,
                 style: ElevatedButton.styleFrom(
@@ -176,42 +172,42 @@ class PreviewBottomBar extends StatelessWidget {
                 ),
                 child: isSaving
                     ? Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        color: AppColors.onPrimary,
-                        strokeWidth: 2,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Flexible(
-                      child: Text(
-                        'Registrando...',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                )
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: AppColors.onPrimary,
+                              strokeWidth: 2,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Flexible(
+                            child: Text(
+                              'Registrando...',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      )
                     : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.check_circle, size: 20),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        textoBoton,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.check_circle, size: 20),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              textoBoton,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ],

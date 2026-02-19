@@ -8,7 +8,7 @@ import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_responses_screen.da
 
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
-import 'package:ada_app/services/api/auth_service.dart';
+import 'package:ada_app/services/api/auth_service.dart' as auth;
 import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
 // import 'package:ada_app/ui/widgets/debug_permissions_dialog.dart';
 import 'package:ada_app/ui/widgets/app_connection_indicator.dart';
@@ -18,9 +18,11 @@ import 'package:ada_app/ui/screens/menu_principal/logo_screen.dart';
 import 'package:ada_app/ui/screens/menu_principal/marca_screen.dart';
 import 'package:ada_app/viewmodels/select_screen_viewmodel.dart';
 import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
+import 'package:ada_app/ui/widgets/mandatory_sync_dialog.dart';
 import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/ui/screens/menu_principal/productos_screen.dart';
+import 'package:ada_app/ui/widgets/websocket_status_dot.dart';
 import 'package:ada_app/ui/screens/menu_principal/about_screen.dart';
 import 'package:ada_app/config/app_config.dart';
 import 'package:ada_app/ui/screens/error_log_screen.dart';
@@ -365,7 +367,7 @@ class _SelectScreenState extends State<SelectScreen>
       );
 
       // AuthService.logout() ahora incluye el reporte a la API
-      await AuthService().logout();
+      await auth.AuthService().logout();
 
       if (mounted) Navigator.of(context).pop();
 
@@ -1257,6 +1259,7 @@ class _SelectScreenState extends State<SelectScreen>
                         ),
                         SizedBox(width: 12),
                         _buildConnectionStatus(),
+                        const WebSocketStatusDot(),
                       ],
                     ),
                   ],
@@ -1733,71 +1736,32 @@ class _SelectScreenState extends State<SelectScreen>
   }
 
   Future<void> _handleRequiredSync(RequiredSyncEvent event) async {
-    await _mostrarDialogoSincronizacionObligatoria(event);
+    // Convertir el SyncValidationResult del ViewModel al de AuthService
+    final authValidation = auth.SyncValidationResult(
+      requiereSincronizacion: event.validationResult.requiereSincronizacion,
+      razon: event.validationResult.razon,
+      vendedorAnteriorId: event.validationResult.vendedorAnterior,
+      vendedorActualId: event.currentUser.employeeId ?? '',
+      vendedorAnteriorNombre: event.validationResult.vendedorAnterior,
+      vendedorActualNombre: event.validationResult.vendedorActual,
+    );
+
+    await MandatorySyncDialog.show(
+      context: context,
+      validation: authValidation,
+      onCancel: () {
+        // El logout ya se hizo en el dialogo con skipDeviceLog: true
+        // Solo necesitamos navegar al login
+        _redirectToLogin();
+      },
+      onSuccess: () {
+        // Actualizar estado del viewmodel
+        _viewModel.revalidateSync();
+      },
+    );
   }
 
   void _redirectToLogin() {
     Navigator.pushReplacementNamed(context, '/login');
-  }
-
-  Future<void> _mostrarDialogoSincronizacionObligatoria(
-    RequiredSyncEvent event,
-  ) async {
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppColors.surface,
-          title: Row(
-            children: [
-              Icon(Icons.sync_problem, color: AppColors.warning),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Sincronización Requerida',
-                  style: TextStyle(color: AppColors.textPrimary),
-                ),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  event.validationResult.razon,
-                  style: TextStyle(color: AppColors.textPrimary),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _viewModel.cancelAndLogout();
-              },
-              child: Text(
-                'Login',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _viewModel.executeMandatorySync();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.warning,
-                foregroundColor: AppColors.onPrimary,
-              ),
-              child: Text('Sincronizar'),
-            ),
-          ],
-        );
-      },
-    );
   }
 }

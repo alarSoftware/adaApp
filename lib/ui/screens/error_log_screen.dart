@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/logger.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:intl/intl.dart';
@@ -47,9 +48,7 @@ class _ErrorLogScreenState extends State<ErrorLogScreen> {
     try {
       final date = DateTime.parse(dateStr);
       return DateFormat('dd/MM/yyyy HH:mm:ss').format(date);
-    } catch (e) {
-      return dateStr;
-    }
+    } catch (e) { AppLogger.e("ERROR_LOG_SCREEN: Error", e); return dateStr; }
   }
 
   Color _getErrorColor(String? type) {

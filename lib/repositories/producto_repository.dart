@@ -1,4 +1,5 @@
 import 'package:ada_app/models/producto.dart';
+import '../utils/logger.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 
@@ -273,9 +274,7 @@ class ProductoRepositoryImpl implements ProductoRepository {
     try {
       final producto = await obtenerProductoPorCodigo(codigo);
       return producto != null;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { AppLogger.e("PRODUCTO_REPOSITORY: Error", e); return false; }
   }
 
   Future<Producto?> obtenerProductoPorCodigoBarras(String codigoBarras) async {
@@ -327,9 +326,7 @@ class ProductoRepositoryImpl implements ProductoRepository {
       final productos = maps.map((map) => Producto.fromMap(map)).toList();
 
       return productos;
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("PRODUCTO_REPOSITORY: Error", e); return []; }
   }
 
   Future<List<String>> obtenerCategorias() async {
@@ -346,8 +343,6 @@ class ProductoRepositoryImpl implements ProductoRepository {
           .toList();
 
       return categorias;
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { AppLogger.e("PRODUCTO_REPOSITORY: Error", e); return []; }
   }
 }

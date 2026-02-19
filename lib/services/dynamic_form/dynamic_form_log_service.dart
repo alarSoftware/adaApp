@@ -1,6 +1,8 @@
-// lib/services/dynamic_form/dynamic_form_log_service.dart
+﻿// lib/services/dynamic_form/dynamic_form_log_service.dart
 
 import 'dart:io';
+import 'package:flutter/foundation.dart';
+import '../../utils/logger.dart';
 import 'dart:convert';
 
 import 'package:path_provider/path_provider.dart';
@@ -29,9 +31,9 @@ class DynamicFormLogService {
 
       await file.writeAsString(contenido);
 
-      print('📁 Log guardado: ${file.uri.pathSegments.last}');
+      debugPrint('📁 Log guardado: ${file.uri.pathSegments.last}');
     } catch (e) {
-      print('Error guardando log: $e');
+      debugPrint('Error guardando log: $e');
     }
   }
 
@@ -56,15 +58,13 @@ class DynamicFormLogService {
           final statA = File(a).statSync();
           final statB = File(b).statSync();
           return statB.modified.compareTo(statA.modified);
-        } catch (e) {
-          return b.compareTo(a);
-        }
+        } catch (e) { AppLogger.e("DYNAMIC_FORM_LOG_SERVICE: Error", e); return b.compareTo(a); }
       });
 
-      print('📁 ${files.length} logs encontrados');
+      debugPrint('📁 ${files.length} logs encontrados');
       return files;
     } catch (e) {
-      print('Error listando logs: $e');
+      debugPrint('Error listando logs: $e');
       return [];
     }
   }
@@ -105,7 +105,7 @@ class DynamicFormLogService {
       }
       return null;
     } catch (e) {
-      print('Error obteniendo directorio: $e');
+      debugPrint('Error obteniendo directorio: $e');
       return null;
     }
   }

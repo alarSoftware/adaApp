@@ -1,4 +1,6 @@
-import 'package:shared_preferences/shared_preferences.dart';
+﻿import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
+import '../../utils/logger.dart';
 import 'package:bcrypt/bcrypt.dart';
 
 import 'package:ada_app/services/data/database_helper.dart';
@@ -12,7 +14,6 @@ import 'package:ada_app/services/device_log/device_log_background_extension.dart
 import 'package:ada_app/services/background/app_background_service.dart';
 import 'package:ada_app/models/usuario.dart';
 import 'package:ada_app/utils/device_info_helper.dart';
-import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/post/device_log_post_service.dart';
 import 'package:ada_app/repositories/device_log_repository.dart';
 
@@ -125,8 +126,8 @@ class AuthService {
 
       try {
         await AppServices().inicializarDeviceLoggingDespuesDeSincronizacion();
-      } catch (e) {}
-    } catch (e) {}
+      } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
+    } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
   }
 
   Future<void> clearSyncData() async {
@@ -137,7 +138,7 @@ class AuthService {
       await prefs.remove('last_sync_date');
 
       await _dbHelper.eliminar('clientes');
-    } catch (e) {}
+    } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
   }
 
   static Future<SyncResult> sincronizarSoloUsuarios() async {
@@ -290,8 +291,8 @@ class AuthService {
       await _saveLoginSuccess(usuarioAuth);
 
       try {
-        await AppServices().inicializarEnLogin();
-      } catch (e) {}
+        await AppServices().inicializarEnLogin(password: password);
+      } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
 
       return AuthResult(
         exitoso: true,
@@ -330,7 +331,7 @@ class AuthService {
         if (!syncValidation.requiereSincronizacion) {
           try {
             await AppBackgroundService.initialize();
-          } catch (e) {}
+          } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
         }
       }
 
@@ -353,8 +354,8 @@ class AuthService {
       await _saveLoginSuccess(usuarioAuth);
 
       try {
-        await AppServices().inicializarEnLogin();
-      } catch (e) {}
+        await AppServices().inicializarEnLogin(password: usuario.password);
+      } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
 
       return AuthResult(
         exitoso: true,
@@ -369,31 +370,42 @@ class AuthService {
     }
   }
 
-  Future<void> logout() async {
+  Future<void> logout({bool skipDeviceLog = false}) async {
     try {
-      // 1. Reportar logout a la API (Intento de "best effort")
-      await _reportLogout();
+      // 1. PRIMERO: Obtener usuario ANTES de limpiar (necesario para el device log)
+      final currentUser = await getCurrentUser();
 
-      // 2. Detener servicios background
+      // 2. Detener sincronizaciones y servicios para que no bloqueen
       try {
-        await AppBackgroundService.stopService();
-      } catch (e) {}
+        await AppServices().detenerEnLogout();
+      } catch (e) {
+        debugPrint('Error deteniendo servicios: $e');
+      }
 
+      // 3. Crear y GUARDAR el device log (solo si no se omite)
+      if (currentUser != null && !skipDeviceLog) {
+        await _guardarLogoutLog(currentUser);
+      }
+
+      // 4. Limpiar sesión
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_keyHasLoggedIn);
       await prefs.remove(_keyCurrentUser);
       await prefs.remove(_keyCurrentUserRole);
-    } catch (e) {}
+
+      debugPrint('Logout completado');
+    } catch (e) {
+      debugPrint('Error en logout: $e');
+    }
   }
 
-  /// Envía un DeviceLog final indicando el cierre de sesión
-  Future<void> _reportLogout() async {
+  /// Guarda el DeviceLog de logout en BD local y envía al servidor en segundo plano
+  Future<void> _guardarLogoutLog(Usuario currentUser) async {
     try {
-      print('Reporting logout to API...');
-      final currentUser = await getCurrentUser();
-      if (currentUser == null) return;
+      debugPrint('Guardando device log de logout...');
 
-      final log = await DeviceInfoHelper.crearDeviceLog();
+      // Usar método rápido para no bloquear (usa última ubicación conocida)
+      final log = await DeviceInfoHelper.crearDeviceLogRapido();
 
       if (log != null) {
         final parts = log.latitudLongitud.split(',');
@@ -418,27 +430,36 @@ class AuthService {
           modelo: '${log.modelo} [LOGOUT]',
         );
 
+        debugPrint('✅ Device log de logout guardado en BD local (ID: $logId)');
+
         // Recuperar el objeto completo desde la BD
         final logParaEnviar = await repository.obtenerPorId(logId);
 
         if (logParaEnviar != null) {
-          final resultado = await DeviceLogPostService.enviarDeviceLog(
-            logParaEnviar,
-            userId: currentUser.id.toString(),
-          );
-
-          if (resultado['exito'] == true) {
-            await repository.marcarComoSincronizado(logId);
-            print('Logout report sent and synced successfully');
-          } else {
-            print(
-              'Logout report saved locally but failed to send: ${resultado['mensaje']}',
-            );
-          }
+          // Enviar al servidor en segundo plano (fire and forget)
+          DeviceLogPostService.enviarDeviceLog(
+                logParaEnviar,
+                userId: currentUser.id.toString(),
+              )
+              .then((resultado) async {
+                if (resultado['exito'] == true) {
+                  await repository.marcarComoSincronizado(logId);
+                  debugPrint('✅ Logout log enviado y sincronizado');
+                } else {
+                  debugPrint(
+                    '⚠️ Logout log guardado, se sincronizará después: ${resultado['mensaje']}',
+                  );
+                }
+              })
+              .catchError((e) {
+                debugPrint('⚠️ Logout log guardado, se sincronizará después: $e');
+              });
         }
+      } else {
+        debugPrint('⚠️ No se pudo crear device log de logout');
       }
     } catch (e) {
-      print('Error reporting logout: $e');
+      debugPrint('Error guardando logout log: $e');
     }
   }
 
@@ -454,7 +475,7 @@ class AuthService {
       await prefs.remove(_keyLastSyncedVendedor);
       await prefs.remove(_keyLastSyncedVendedorName);
       await prefs.remove('last_sync_date');
-    } catch (e) {}
+    } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
   }
 
   Future<bool> hasUserLoggedInBefore() async {
@@ -480,9 +501,7 @@ class AuthService {
       return usuarios
           .where((u) => u.username.toLowerCase() == username.toLowerCase())
           .firstOrNull;
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); return null; }
   }
 
   Future<UsuarioAuth?> getCurrentUserAuth() async {
@@ -518,9 +537,7 @@ class AuthService {
         'deviceLogActivo': deviceLogState['activo'],
         'deviceLogInicializado': deviceLogState['inicializado'],
       };
-    } catch (e) {
-      return {};
-    }
+    } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); return {}; }
   }
 }
 

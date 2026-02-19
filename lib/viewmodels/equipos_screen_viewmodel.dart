@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/logger.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 
 import 'package:ada_app/services/sync/equipment_sync_service.dart';
@@ -177,7 +178,7 @@ class EquipoListScreenViewModel extends ChangeNotifier {
 
       // Probar búsqueda vacía
       final vacia = await _equipoRepository.buscarConDetalles('');
-    } catch (e) {}
+    } catch (e) { AppLogger.e("EQUIPOS_SCREEN_VIEWMODEL: Error", e); }
   }
 
   // ===============================

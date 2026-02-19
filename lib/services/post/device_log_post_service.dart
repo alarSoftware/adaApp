@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../utils/logger.dart';
 import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/post/base_post_service.dart';
 import 'package:ada_app/services/api/api_config_service.dart';
@@ -33,16 +34,12 @@ class DeviceLogPostService {
       // FIX: Formatear fecha para eliminar la 'T' ISO8601
       if (log.fechaRegistro.isNotEmpty) {
         try {
-          debugPrint('DEBUG DATE: Original: ${log.fechaRegistro}');
           final fechaDt = DateTime.parse(log.fechaRegistro);
           body['fechaRegistro'] = _formatTimestampForBackend(fechaDt);
-          debugPrint('DEBUG DATE: Formatted: ${body['fechaRegistro']}');
         } catch (e) {
           debugPrint('Error formateando fecha log: $e');
         }
       }
-
-      debugPrint('Enviando DeviceLog Body: $body');
 
       final resultado = await BasePostService.post(
         endpoint: _endpoint,
@@ -52,6 +49,7 @@ class DeviceLogPostService {
       );
       return resultado;
     } catch (e) {
+      AppLogger.e("DEVICE_LOG_POST_SERVICE: Error", e);
       return {'exito': false, 'success': false, 'mensaje': 'Error: $e'};
     }
   }

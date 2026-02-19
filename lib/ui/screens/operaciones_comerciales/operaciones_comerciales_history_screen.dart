@@ -408,7 +408,26 @@ class _HistoryViewState extends State<_HistoryView>
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    _buildSyncBadge(syncStatus),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getSyncStatusColor(
+                          syncStatus,
+                        ).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        syncStatus.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _getSyncStatusColor(syncStatus),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const Divider(height: 12),
@@ -492,16 +511,13 @@ class _HistoryViewState extends State<_HistoryView>
     OperacionComercial operacion,
     String clienteNombre,
   ) {
-    // Corporate style: Always black/dark icons
-    final iconColor = const Color(0xFF333333);
-
     final fechaCreacionStr = DateFormat(
       'dd/MM/yyyy HH:mm',
     ).format(operacion.fechaCreacion);
 
     final isReposicion =
         operacion.tipoOperacion == TipoOperacion.notaReposicion;
-    final fechaRetiroLabel = isReposicion ? 'F. Entrega' : 'F. Retiro';
+    final fechaRetiroLabel = isReposicion ? 'F. Reposición' : 'F. Retiro';
 
     return Container(
       decoration: BoxDecoration(
@@ -569,22 +585,20 @@ class _HistoryViewState extends State<_HistoryView>
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    _buildSyncBadge(operacion.syncStatus),
                   ],
                 ),
-                const Divider(height: 12),
                 Row(
                   children: [
                     Container(
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: iconColor.withValues(alpha: 0.1),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.description_outlined,
-                        color: iconColor,
+                        color: AppColors.primary,
                         size: 20,
                       ),
                     ),
@@ -593,35 +607,66 @@ class _HistoryViewState extends State<_HistoryView>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Operation Type
-                          Text(
-                            operacion.tipoOperacion.displayName,
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getSyncStatusColor(
+                                operacion.syncStatus,
+                              ).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              operacion.displaySyncStatus,
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: _getSyncStatusColor(
+                                  operacion.syncStatus,
+                                ),
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          // Identifiers
-                          if (operacion.odooName != null &&
-                              operacion.odooName!.isNotEmpty)
-                            Text(
-                              'Odoo: ${operacion.odooName}',
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 12,
-                              ),
-                            ),
-                          if (operacion.adaSequence != null &&
-                              operacion.adaSequence!.isNotEmpty)
-                            Text(
-                              'Seq: ${operacion.adaSequence}',
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 12,
-                              ),
-                            ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              if (operacion.adaSequence != null &&
+                                  operacion.adaSequence!.isNotEmpty)
+                                Text(
+                                  operacion.adaSequence!,
+                                  style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              if (operacion.odooName != null &&
+                                  operacion.odooName!.isNotEmpty)
+                                Text(
+                                  operacion.odooName!,
+                                  style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              if (operacion.ordenTransporteOdoo != null &&
+                                  operacion.ordenTransporteOdoo!.isNotEmpty)
+                                Text(
+                                  operacion.ordenTransporteOdoo!,
+                                  style: TextStyle(
+                                    color: Colors.orange.shade800,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                            ],
+                          ),
                           if ((operacion.odooName == null ||
                                   operacion.odooName!.isEmpty) &&
                               (operacion.adaSequence == null ||
@@ -641,7 +686,7 @@ class _HistoryViewState extends State<_HistoryView>
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          'Creado:',
+                          'F. Creacion:',
                           style: TextStyle(
                             fontSize: 10,
                             color: AppColors.textSecondary,
@@ -699,46 +744,17 @@ class _HistoryViewState extends State<_HistoryView>
     );
   }
 
-  Widget _buildSyncBadge(String status) {
-    Color color;
-    IconData icon;
-
-    switch (status) {
+  Color _getSyncStatusColor(String syncStatus) {
+    switch (syncStatus) {
+      case 'creado':
+        return AppColors.warning;
       case 'migrado':
-        color = AppColors.success;
-        icon = Icons.check_circle_rounded;
-        break;
+        return AppColors.success;
       case 'error':
-        color = AppColors.error;
-        icon = Icons.error_rounded;
-        break;
+        return AppColors.error;
       default:
-        color = AppColors.warning;
-        icon = Icons.sync;
+        return Colors.grey;
     }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            status.toUpperCase(),
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _pickDate(

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/logger.dart';
 import 'package:ada_app/utils/parsing_helpers.dart';
 
 // ============================================================================
@@ -262,9 +263,7 @@ List<Equipo> parseEquiposFromApiResponse(String jsonResponse) {
         .whereType<Map<String, dynamic>>()
         .map((item) => Equipo.fromJson(item))
         .toList();
-  } catch (e) {
-    return [];
-  }
+  } catch (e) { AppLogger.e("EQUIPOS: Error", e); return []; }
 }
 
 /// Parsear desde Map ya decodificado
@@ -284,9 +283,7 @@ List<Equipo> parseEquiposFromMap(Map<String, dynamic> responseMap) {
         .whereType<Map<String, dynamic>>()
         .map((item) => Equipo.fromJson(item))
         .toList();
-  } catch (e) {
-    return [];
-  }
+  } catch (e) { AppLogger.e("EQUIPOS: Error", e); return []; }
 }
 
 /// Parsear desde array directo (sin wrapper "data")
@@ -296,9 +293,7 @@ List<Equipo> parseEquiposFromDirectArray(List<dynamic> equiposJson) {
         .whereType<Map<String, dynamic>>()
         .map((item) => Equipo.fromJson(item))
         .toList();
-  } catch (e) {
-    return [];
-  }
+  } catch (e) { AppLogger.e("EQUIPOS: Error", e); return []; }
 }
 
 // ============================================================================

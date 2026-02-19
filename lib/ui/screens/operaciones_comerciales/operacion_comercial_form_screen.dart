@@ -341,17 +341,25 @@ class _OperacionComercialFormViewState
   ) {
     final isError = !viewModel.isViewOnly && viewModel.fechaRetiro == null;
     final operacion = viewModel.operacionExistente;
+
     final adaSequence = operacion?.adaSequence;
     final odooName = operacion?.odooName;
     final hasAdaSequence = adaSequence != null && adaSequence.isNotEmpty;
     final hasOdooName = odooName != null && odooName.isNotEmpty;
 
-    // Retornamos directamente la columna, sin decoración propia,
-    // para que se integre en el ClientInfoCard (fondo blanco).
-    // Usamos Material transparente para el InkWell.
+    final adaEstado = operacion?.adaEstado;
+    final estadoOdoo = operacion?.estadoOdoo;
+    final hasAdaEstado = adaEstado != null && adaEstado.isNotEmpty;
+    final hasEstadoOdoo = estadoOdoo != null && estadoOdoo.isNotEmpty;
+
+    final motivoOdoo = operacion?.motivoOdoo;
+    final hasMotivo = motivoOdoo != null && motivoOdoo.isNotEmpty;
+    final ordenTransporte = operacion?.ordenTransporteOdoo;
+    final hasOrden = ordenTransporte != null && ordenTransporte.isNotEmpty;
+
     return Column(
       children: [
-        // 1. FECHA DE ENTREGA / RETIRO (Clickable)
+        // 1. FECHA (Siempre es importante que sea claro)
         Material(
           color: Colors.transparent,
           child: InkWell(
@@ -400,124 +408,246 @@ class _OperacionComercialFormViewState
           ),
         ),
 
-        // 2. ADA SEQUENCE
-        if (hasAdaSequence) ...[
+        // 2. IDENTIFICADORES (Grupo Horizontal)
+        if (hasAdaSequence || hasOdooName || viewModel.isViewOnly) ...[
+          _buildDivider(),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildIconContainer(Icons.tag_rounded, Colors.grey[600]!),
+                const SizedBox(width: 12),
+                if (hasAdaSequence)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildLabelText('Ada Sequence'),
+                        Text(
+                          adaSequence,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF334155),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (viewModel.isViewOnly)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildLabelText('Odoo Name'),
+                        Text(
+                          hasOdooName ? odooName : 'Sin asignar',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: hasOdooName
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                            color: hasOdooName
+                                ? AppColors.primary
+                                : Colors.grey[400],
+                            fontStyle: hasOdooName
+                                ? FontStyle.normal
+                                : FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+
+        // 3. ESTADOS (Badges Horizontales)
+        if (hasAdaEstado || hasEstadoOdoo) ...[
           _buildDivider(),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
             child: Row(
               children: [
-                _buildIconContainer(Icons.tag_rounded, Colors.grey[600]!),
+                _buildIconContainer(Icons.sync, Colors.grey[600]!),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLabelText('Ada Sequence'),
-                      const SizedBox(height: 2),
-                      Text(
-                        adaSequence!,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF334155),
-                        ),
-                      ),
-                    ],
+                if (hasAdaEstado) ...[
+                  _buildCompactStatusBadge(
+                    'ADA',
+                    adaEstado,
+                    Colors.blue,
+                    Icons.info_outline,
                   ),
-                ),
+                  const SizedBox(width: 8),
+                ],
+                if (hasEstadoOdoo)
+                  _buildCompactStatusBadge(
+                    'ODOO',
+                    estadoOdoo,
+                    Colors.teal,
+                    Icons.sync_alt_rounded,
+                  ),
               ],
             ),
           ),
         ],
 
-        // 3. ODOO NAME (Condicional o placeholder "Sin Odoo Name")
-        if (hasOdooName || viewModel.isViewOnly) ...[
-          if (hasAdaSequence) _buildDivider(), // Divider solo si hubo AdaSeq
-          if (!hasAdaSequence) _buildDivider(), // Divider con Fecha
-
+        // 4. LOGÍSTICA (OT y MOTIVO en grupo compacto)
+        if (hasOrden || hasMotivo) ...[
+          _buildDivider(),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildIconContainer(
-                  Icons.receipt_long_rounded,
-                  hasOdooName ? AppColors.primary : Colors.grey[400]!,
+                  Icons.local_shipping_outlined,
+                  Colors.grey[600]!,
                 ),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLabelText('Odoo Name'),
-                      const SizedBox(height: 2),
-                      Text(
-                        hasOdooName ? odooName! : 'Sin Odoo Name',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: hasOdooName
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                          fontStyle: hasOdooName
-                              ? FontStyle.normal
-                              : FontStyle.italic,
-                          color: hasOdooName
-                              ? AppColors.primary
-                              : Colors.grey[400],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (!hasOdooName || viewModel.isLoading) ...[
-                  Text(
-                    'Descargar OdooName',
-                    style: TextStyle(
-                      color: AppColors.warning,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      iconSize: 18,
-                      icon: viewModel.isLoading
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(
-                              Icons.download_rounded,
-                              color: AppColors.primary,
-                            ),
-                      onPressed: viewModel.isLoading
-                          ? null
-                          : () async {
-                              await viewModel.sincronizarOperacionActual();
-                            },
-                      tooltip: 'Obtener Odoo Name',
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(
-                            color: AppColors.primary.withValues(alpha: 0.1),
+                if (hasOrden)
+                  Expanded(
+                    flex: 4,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildLabelText('Orden Transporte'),
+                        Text(
+                          ordenTransporte,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF334155),
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
-                ],
+                if (hasMotivo)
+                  Expanded(
+                    flex: 6,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildLabelText('Motivo Odoo'),
+                        Text(
+                          motivoOdoo,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
         ],
+        // 5. BOTÓN DE ACTUALIZACIÓN CON TEXTO (Debajo de los datos técnicos)
+        if (viewModel.isViewOnly) ...[
+          _buildDivider(),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: viewModel.isLoading
+                  ? null
+                  : () => viewModel.sincronizarOperacionActual(),
+              icon: viewModel.isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFFFFC107),
+                      ),
+                    )
+                  : const Icon(
+                      Icons.refresh_rounded,
+                      color: Color(0xFF1E293B),
+                      size: 18,
+                    ),
+              label: Text(
+                viewModel.isLoading
+                    ? 'ACTUALIZANDO...'
+                    : 'ACTUALIZAR INFORMACIÓN',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                  letterSpacing: 0.5,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                side: BorderSide(
+                  color: const Color(0xFFFFC107).withValues(alpha: 0.5),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                backgroundColor: const Color(
+                  0xFFFFC107,
+                ).withValues(alpha: 0.95),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
       ],
+    );
+  }
+
+  Widget _buildCompactStatusBadge(
+    String prefix,
+    String status,
+    Color color,
+    IconData icon,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            prefix,
+            style: TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.w900,
+              color: color,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 1),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 10, color: color),
+              const SizedBox(width: 4),
+              Text(
+                status.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
