@@ -134,6 +134,64 @@ class OperacionComercialRepositoryImpl
     }
   }
 
+  Future<Map<String, List<OperacionComercialDetalle>>>
+  _obtenerDetallesPorOperacionIds(List<String> operacionIds) async {
+    final mapa = <String, List<OperacionComercialDetalle>>{};
+    for (final id in operacionIds) {
+      mapa[id] = [];
+    }
+
+    if (operacionIds.isEmpty) return mapa;
+
+    try {
+      final db = await dbHelper.database;
+
+      // SQLite limit variables in IN clause to 999. Use chunks of 900.
+      final chunks = <List<String>>[];
+      for (var i = 0; i < operacionIds.length; i += 900) {
+        chunks.add(
+          operacionIds.sublist(
+            i,
+            i + 900 > operacionIds.length ? operacionIds.length : i + 900,
+          ),
+        );
+      }
+
+      for (final chunk in chunks) {
+        final placeholders = List.filled(chunk.length, '?').join(',');
+        final resultado = await db.rawQuery('''
+          SELECT 
+            ocd.id,
+            ocd.operacion_comercial_id,
+            ocd.producto_id,
+            ocd.cantidad,
+            ocd.ticket,
+            ocd.precio_unitario,
+            ocd.subtotal,
+            ocd.orden,
+            ocd.fecha_creacion,
+            ocd.producto_reemplazo_id,
+            p.codigo_barras AS producto_codigo_barras,
+            pr.codigo_barras AS producto_reemplazo_codigo_barras
+          FROM operacion_comercial_detalle ocd
+          LEFT JOIN productos p ON ocd.producto_id = p.id
+          LEFT JOIN productos pr ON ocd.producto_reemplazo_id = pr.id
+          WHERE ocd.operacion_comercial_id IN ($placeholders)
+          ORDER BY ocd.orden ASC
+        ''', chunk);
+
+        for (final row in resultado) {
+          final opId = row['operacion_comercial_id'] as String;
+          mapa[opId]?.add(OperacionComercialDetalle.fromMap(row));
+        }
+      }
+      return mapa;
+    } catch (e) {
+      AppLogger.e("OPERACION_COMERCIAL_REPOSITORY: Error batch detalles", e);
+      return mapa;
+    }
+  }
+
   @override
   Future<String> crearOperacion(OperacionComercial operacion) async {
     String? operacionId;
@@ -243,13 +301,17 @@ class OperacionComercialRepositoryImpl
         orderBy: getDefaultOrderBy(),
       );
 
+      if (operacionesMaps.isEmpty) return [];
+
       final operaciones = <OperacionComercial>[];
+      final operacionIds = operacionesMaps
+          .map((m) => m['id'] as String)
+          .toList();
+      final mapaDetalles = await _obtenerDetallesPorOperacionIds(operacionIds);
 
       for (final operacionMap in operacionesMaps) {
-        final operacionId = operacionMap['id'];
-
-        final detalles = await _obtenerDetallesConCodigoBarras(operacionId);
-
+        final operacionId = operacionMap['id'] as String;
+        final detalles = mapaDetalles[operacionId] ?? [];
         final operacion = fromMap(operacionMap).copyWith(detalles: detalles);
         operaciones.add(operacion);
       }
@@ -298,12 +360,14 @@ class OperacionComercialRepositoryImpl
       }
 
       final operaciones = <OperacionComercial>[];
+      final operacionIds = operacionesMaps
+          .map((m) => m['id'] as String)
+          .toList();
+      final mapaDetalles = await _obtenerDetallesPorOperacionIds(operacionIds);
 
       for (final operacionMap in operacionesMaps) {
-        final operacionId = operacionMap['id'];
-
-        final detalles = await _obtenerDetallesConCodigoBarras(operacionId);
-
+        final operacionId = operacionMap['id'] as String;
+        final detalles = mapaDetalles[operacionId] ?? [];
         final operacion = fromMap(operacionMap).copyWith(detalles: detalles);
         operaciones.add(operacion);
       }
@@ -697,11 +761,20 @@ class OperacionComercialRepositoryImpl
         orderBy: 'fecha_creacion DESC',
       );
 
+      if (operacionesMaps.isEmpty) return [];
+
       final operaciones = <OperacionComercial>[];
+      final operacionIds = operacionesMaps
+          .map((m) => m['id'] as String)
+          .toList();
+
+      // OPTIMIZACIÓN KERNEL: Cargar los detalles de todas las operaciones agrupadas
+      // evita hacer consultas SQLite N+1 (lo que ponía lenta a la app)
+      final mapaDetalles = await _obtenerDetallesPorOperacionIds(operacionIds);
 
       for (final operacionMap in operacionesMaps) {
-        final operacionId = operacionMap['id'];
-        final detalles = await _obtenerDetallesConCodigoBarras(operacionId);
+        final operacionId = operacionMap['id'] as String;
+        final detalles = mapaDetalles[operacionId] ?? [];
         final operacion = fromMap(operacionMap).copyWith(detalles: detalles);
         operaciones.add(operacion);
       }

@@ -28,7 +28,7 @@ class OperacionesComercialesHistoryViewModel extends ChangeNotifier {
   DateTime? get selectedDate => _selectedDate;
 
   StreamSubscription<OperacionEvent>? _eventSubscription;
-  Timer? _fallbackTimer;
+  bool _disposed = false;
 
   OperacionesComercialesHistoryViewModel()
     : _operacionRepository = OperacionComercialRepositoryImpl(),
@@ -40,15 +40,20 @@ class OperacionesComercialesHistoryViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       await _cargarClientes();
+      if (_disposed) return;
+
       await cargarDatos();
+      if (_disposed) return;
+
       _iniciarEscuchaEventos();
-      _iniciarRefrescoRespaldo();
       debugPrint('✅ [HISTORY] ViewModel inicializado correctamente');
     } catch (e) {
       debugPrint('Error loading history: $e');
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!_disposed) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -58,39 +63,29 @@ class OperacionesComercialesHistoryViewModel extends ChangeNotifier {
 
     // Escuchar eventos en tiempo real
     _eventSubscription = OperacionEventService().eventos.listen((event) async {
+      if (_disposed) return;
       debugPrint(
         '⚡ [HISTORY] Evento recibido: ${event.type} ID: ${event.operacionId}',
       );
-
-      // Si estamos mostrando una fecha específica y el evento es de creación (fecha actual),
-      // tal vez no necesitamos actualizar si la fecha seleccionada es antigua.
-      // Pero por simplicidad, actualizamos siempre para garantizar consistencia.
       await cargarDatos();
     });
 
     debugPrint('✅ [HISTORY] Escuchando eventos de operaciones en tiempo real');
   }
 
-  void _iniciarRefrescoRespaldo() {
-    _fallbackTimer?.cancel();
-    // Timer de respaldo cada 1 segundo para máxima responsividad
-    _fallbackTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
-      await cargarDatos();
-    });
-    debugPrint('✅ [HISTORY] Timer de respaldo iniciado (cada 1s)');
-  }
-
   @override
   void dispose() {
+    _disposed = true;
     _eventSubscription?.cancel();
-    _fallbackTimer?.cancel();
-    debugPrint('🛑 [HISTORY] Comprobación de cambios cancelada');
+    debugPrint('🛑 [HISTORY] Comprobación de cambios cancelada (disposed)');
     super.dispose();
   }
 
   Future<void> _cargarClientes() async {
     try {
       final clientes = await _clienteRepository.obtenerTodos();
+      if (_disposed) return;
+
       _clientesCache.clear();
       for (var c in clientes) {
         if (c.id != null) {
@@ -103,40 +98,34 @@ class OperacionesComercialesHistoryViewModel extends ChangeNotifier {
   }
 
   Future<void> cargarDatos() async {
-    // No mostrar loading en refrescos automáticos
-    final esRefrescoAutomatico = !_isLoading;
+    if (_disposed) return;
 
-    if (!esRefrescoAutomatico) {
+    // Solo mostrar el indicador de carga si no están cargados ya para evitar parpadeos
+    if (_operaciones.isEmpty && _censos.isEmpty) {
       _isLoading = true;
       notifyListeners();
     }
 
     try {
-      debugPrint(
-        '📥 [HISTORY] Cargando datos de DB... (Refresco auto: $esRefrescoAutomatico)',
-      );
+      debugPrint('📥 [HISTORY] Cargando datos de DB...');
 
-      // Cargar todas las operaciones locales (opcionalmente filtradas por fecha)
-      // El filtrado por employeeId ahora se delega totalmente a la API durante la descarga.
-      _operaciones = await _operacionRepository.obtenerTodasLasOperaciones(
+      final operacionesNuevas = await _operacionRepository
+          .obtenerTodasLasOperaciones(fecha: _selectedDate);
+
+      final censosNuevos = await _censoRepository.obtenerTodos(
         fecha: _selectedDate,
       );
 
-      // Cargar todos los censos locales (opcionalmente filtrados por fecha)
-      _censos = await _censoRepository.obtenerTodos(fecha: _selectedDate);
+      if (_disposed) return;
 
-      // Solo notificar si hay cambios o es carga inicial
-      if (!esRefrescoAutomatico) {
-        notifyListeners();
-      } else {
-        // En refresco automático, siempre notificar para actualizar UI
-        notifyListeners();
-        debugPrint('🔔 [HISTORY] UI Notificada');
-      }
+      _operaciones = operacionesNuevas;
+      _censos = censosNuevos;
+
+      notifyListeners();
     } catch (e) {
       debugPrint('Error loading data: $e');
     } finally {
-      if (!esRefrescoAutomatico) {
+      if (!_disposed) {
         _isLoading = false;
         notifyListeners();
       }

@@ -101,7 +101,16 @@ class OperacionComercialSyncService extends BaseSyncService {
         return _handleErrorResponse(operacionesResponse);
       }
 
-      final operacionesData = await _parseResponse(operacionesResponse);
+      final rawOperacionesData = await _parseResponse(operacionesResponse);
+
+      // Filtrado estricto local para garantizar que solo traiga del employeeId solicitado
+      final operacionesData = rawOperacionesData.where((op) {
+        if (op is Map) {
+          final opEmployeeId = op['employeeId']?.toString();
+          return opEmployeeId == employeeId;
+        }
+        return false;
+      }).toList();
 
       if (operacionesData.isEmpty) {
         return SyncResult(

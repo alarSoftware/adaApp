@@ -31,36 +31,41 @@ class DatabaseTables {
     }
 
     if (oldVersion < 4) {
-      // Migración a v4: Agregar columnas de estado portal + tabla app_routes
-      await db.execute(
-        'ALTER TABLE operacion_comercial ADD COLUMN estado_portal TEXT',
-      );
-      await db.execute(
-        'ALTER TABLE operacion_comercial ADD COLUMN estado_motivo_portal TEXT',
-      );
-      await db.execute(_sqlAppRoutes());
-      await _crearIndicesAppRoutes(db);
-      debugPrint(
-        'Migración v4: estado_portal, estado_motivo_portal y app_routes creados',
-      );
+      // Migración a v4: tabla app_routes (estado_portal y estado_motivo_portal fueron removidos)
+      try {
+        await db.execute(_sqlAppRoutes());
+      } catch (e) {
+        debugPrint('Migración v4 tabla app_routes omitida (ya existe): $e');
+      }
+
+      try {
+        await _crearIndicesAppRoutes(db);
+      } catch (e) {
+        debugPrint('Migración v4 indices app_routes omitida (ya existen): $e');
+      }
+
+      debugPrint('Migración v4: app_routes resueltos');
     }
 
     if (oldVersion < 5) {
       // Migración a v5: Agregar columnas de Odoo (estado, motivo, orden transporte)
-      await db.execute(
-        'ALTER TABLE operacion_comercial ADD COLUMN estado_odoo TEXT',
-      );
-      await db.execute(
-        'ALTER TABLE operacion_comercial ADD COLUMN motivo_odoo TEXT',
-      );
-      await db.execute(
-        'ALTER TABLE operacion_comercial ADD COLUMN orden_transporte_odoo TEXT',
-      );
-      await db.execute(
-        'ALTER TABLE operacion_comercial ADD COLUMN ada_estado TEXT',
-      );
+      final columns = [
+        'estado_odoo',
+        'motivo_odoo',
+        'orden_transporte_odoo',
+        'ada_estado',
+      ];
+      for (final col in columns) {
+        try {
+          await db.execute(
+            'ALTER TABLE operacion_comercial ADD COLUMN $col TEXT',
+          );
+        } catch (e) {
+          debugPrint('Migración v5 columna $col omitida (ya existe): $e');
+        }
+      }
       debugPrint(
-        'Migración v5: estado_odoo, motivo_odoo, orden_transporte_odoo y ada_estado creados',
+        'Migración v5: estado_odoo, motivo_odoo, orden_transporte_odoo y ada_estado resueltos',
       );
     }
   }
