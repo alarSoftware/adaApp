@@ -62,7 +62,10 @@ class DynamicFormViewModel extends ChangeNotifier {
   DynamicFormTemplate? getTemplateById(String templateId) {
     try {
       return _templates.firstWhere((t) => t.id == templateId);
-    } catch (e) { AppLogger.e("DYNAMIC_FORM_VIEWMODEL: Error", e); return null; }
+    } catch (e) {
+      AppLogger.e("DYNAMIC_FORM_VIEWMODEL: Error", e);
+      return null;
+    }
   }
 
   void startNewForm(
@@ -239,7 +242,10 @@ class DynamicFormViewModel extends ChangeNotifier {
 
       updateFieldValue(fieldId, null);
       return true;
-    } catch (e) { AppLogger.e("DYNAMIC_FORM_VIEWMODEL: Error", e); return false; }
+    } catch (e) {
+      AppLogger.e("DYNAMIC_FORM_VIEWMODEL: Error", e);
+      return false;
+    }
   }
 
   bool _validateAllFields() {
@@ -248,16 +254,117 @@ class DynamicFormViewModel extends ChangeNotifier {
     _fieldErrors.clear();
     bool isValid = true;
 
+    // Construir mapa de parent_id → parent para poder verificar visibilidad
+    final parentMap = _buildParentMap(_currentTemplate!.fields);
+
     final answerableFields = _currentTemplate!.answerableFields;
 
     for (final field in answerableFields) {
-      if (field.required && _isFieldEmpty(_fieldValues[field.id])) {
+      // Si el campo está dentro de una opción no seleccionada, ignorarlo
+      if (!_isFieldActive(field, parentMap)) continue;
+
+      final value = _fieldValues[field.id];
+
+      // Validación: campo obligatorio vacío
+      if (field.required && _isFieldEmpty(value)) {
         _fieldErrors[field.id] = '${field.label} es obligatorio';
         isValid = false;
+        continue;
+      }
+
+      // Validación: campo numérico activo (visible) → obligatorio + rango
+      if (field.type == 'numerico') {
+        if (_isFieldEmpty(value)) {
+          // Numérico visible sin valor = obligatorio aunque required sea false
+          _fieldErrors[field.id] = '${field.label} es obligatorio';
+          isValid = false;
+        } else {
+          final parsed = double.tryParse(value.toString());
+          if (parsed == null) {
+            _fieldErrors[field.id] = '${field.label} debe ser un número válido';
+            isValid = false;
+          } else if (field.minValue != null && parsed < field.minValue!) {
+            _fieldErrors[field.id] =
+                'El valor mínimo para ${field.label} es ${_formatFieldNumber(field.minValue!)}';
+            isValid = false;
+          } else if (field.maxValue != null && parsed > field.maxValue!) {
+            _fieldErrors[field.id] =
+                'El valor máximo para ${field.label} es ${_formatFieldNumber(field.maxValue!)}';
+            isValid = false;
+          }
+        }
       }
     }
 
     return isValid;
+  }
+
+  /// Verifica si un campo está activo (visible) según las selecciones actuales.
+  /// Un campo dentro de un `opt` solo es activo si ese `opt` está seleccionado.
+  bool _isFieldActive(
+    DynamicFormField field,
+    Map<String, DynamicFormField> parentMap,
+  ) {
+    String? currentId = field.parentId;
+
+    while (currentId != null) {
+      final parent = parentMap[currentId];
+      if (parent == null) break;
+
+      if (parent.type == 'opt') {
+        // Encontrar el radio_button/checkbox que contiene este opt
+        final grandParent = parent.parentId != null
+            ? parentMap[parent.parentId!]
+            : null;
+
+        if (grandParent == null) break;
+
+        final selectedValue = _fieldValues[grandParent.id];
+
+        if (grandParent.type == 'radio_button') {
+          // Activo solo si este opt es el seleccionado
+          if (selectedValue?.toString() != parent.id) return false;
+        } else if (grandParent.type == 'checkbox') {
+          // Activo solo si este opt está en la lista seleccionada
+          final selected = selectedValue is List
+              ? selectedValue.map((e) => e.toString()).toList()
+              : (selectedValue != null
+                    ? [selectedValue.toString()]
+                    : <String>[]);
+          if (!selected.contains(parent.id)) return false;
+        }
+      }
+
+      currentId = parent.parentId;
+    }
+
+    return true;
+  }
+
+  /// Construye un mapa field.id → DynamicFormField para toda la jerarquía.
+  Map<String, DynamicFormField> _buildParentMap(List<DynamicFormField> fields) {
+    final map = <String, DynamicFormField>{};
+
+    void traverse(DynamicFormField field) {
+      map[field.id] = field;
+      for (final child in field.children) {
+        traverse(child);
+      }
+    }
+
+    for (final field in fields) {
+      traverse(field);
+    }
+
+    return map;
+  }
+
+  String _formatFieldNumber(double v) {
+    if (v == v.truncateToDouble()) return v.toInt().toString();
+    return v
+        .toStringAsFixed(2)
+        .replaceAll(RegExp(r'0+$'), '')
+        .replaceAll(RegExp(r'\.$'), '');
   }
 
   bool isFormComplete() {
@@ -374,6 +481,29 @@ class DynamicFormViewModel extends ChangeNotifier {
     _fieldErrors.clear();
   }
 
+  /// Descarta el formulario actual sin guardar nada.
+  /// Si hay un borrador en la BD (status=draft), lo elimina.
+  Future<void> discardForm() async {
+    final responseToDelete = _currentResponse;
+    _clearCurrentForm();
+    _errorMessage = null;
+    notifyListeners();
+
+    // Limpiar DB solo si era un borrador que nunca fue completado/sincronizado
+    if (responseToDelete != null && responseToDelete.status == 'draft') {
+      try {
+        // Verificar que existe en DB antes de intentar borrarlo
+        final exists = await _responseRepo.getById(responseToDelete.id);
+        if (exists != null) {
+          await _responseRepo.delete(responseToDelete.id);
+        }
+      } catch (_) {
+        // Si falla el borrado de DB, no es crítico — el borrador queda huérfano
+        // pero el estado en memoria ya fue limpiado
+      }
+    }
+  }
+
   Future<void> _syncResponse(String responseId) async {
     _isSyncing = true;
     notifyListeners();
@@ -436,7 +566,10 @@ class DynamicFormViewModel extends ChangeNotifier {
       final synced = await _responseRepo.countSynced();
 
       return {'pending': pending, 'synced': synced, 'total': pending + synced};
-    } catch (e) { AppLogger.e("DYNAMIC_FORM_VIEWMODEL: Error", e); return {'pending': 0, 'synced': 0, 'total': 0}; }
+    } catch (e) {
+      AppLogger.e("DYNAMIC_FORM_VIEWMODEL: Error", e);
+      return {'pending': 0, 'synced': 0, 'total': 0};
+    }
   }
 
   Future<void> loadSavedResponsesWithSync({String? clienteId}) async {
@@ -469,9 +602,7 @@ class DynamicFormViewModel extends ChangeNotifier {
   Future<bool> downloadResponsesFromServer(String employeeId) async {
     return await _executeWithLoading(() async {
       final resultado =
-          await DynamicFormSyncService.obtenerRespuestasPorVendedor(
-            employeeId,
-          );
+          await DynamicFormSyncService.obtenerRespuestasPorVendedor(employeeId);
 
       if (resultado.exito) {
         await loadSavedResponsesWithSync();

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/models/dynamic_form/dynamic_form_field.dart';
 import 'package:image_picker/image_picker.dart';
@@ -51,6 +52,7 @@ class DynamicFormFieldWidget extends StatelessWidget {
       'checkbox' => _buildSelectionGroup(context, isMultiple: true),
       'resp_abierta' => _buildTextField(maxLines: 3),
       'resp_abierta_larga' => _buildTextField(maxLines: 6),
+      'numerico' => _buildNumericField(),
       'image' => _buildImagePicker(context),
       _ => _buildTextField(),
     };
@@ -313,6 +315,7 @@ class DynamicFormFieldWidget extends StatelessWidget {
       ),
       'resp_abierta' => _buildNestedTextField(field, maxLines: 2),
       'resp_abierta_larga' => _buildNestedTextField(field, maxLines: 4),
+      'numerico' => _buildNestedNumericField(field),
       _ => _buildNestedTextField(field),
     };
   }
@@ -440,6 +443,103 @@ class DynamicFormFieldWidget extends StatelessWidget {
     );
   }
 
+  Widget _buildNestedNumericField(DynamicFormField field) {
+    final hasRange = field.minValue != null || field.maxValue != null;
+    final currentValue = allValues[field.id];
+    String? rangeError;
+
+    if (currentValue != null && currentValue.toString().isNotEmpty) {
+      final parsed = double.tryParse(currentValue.toString());
+      if (parsed != null) {
+        if (field.minValue != null && parsed < field.minValue!) {
+          rangeError = 'Mínimo: ${_formatNumber(field.minValue!)}';
+        } else if (field.maxValue != null && parsed > field.maxValue!) {
+          rangeError = 'Máximo: ${_formatNumber(field.maxValue!)}';
+        }
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                field.label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            if (hasRange) ...[
+              SizedBox(width: 6),
+              _buildNestedRangeBadge(field),
+            ],
+          ],
+        ),
+        SizedBox(height: 6),
+        TextFormField(
+          initialValue: currentValue?.toString(),
+          enabled: !isReadOnly,
+          keyboardType: const TextInputType.numberWithOptions(
+            decimal: true,
+            signed: false,
+          ),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+          ],
+          decoration: InputDecoration(
+            hintText: isReadOnly ? '' : 'Número...',
+            errorText: rangeError,
+            hintStyle: TextStyle(fontSize: 11),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            isDense: true,
+            filled: true,
+            fillColor: isReadOnly ? AppColors.neutral200 : AppColors.background,
+            suffixIcon: isReadOnly ? Icon(Icons.lock_outline, size: 16) : null,
+          ),
+          style: TextStyle(fontSize: 12),
+          onChanged: isReadOnly
+              ? null
+              : (v) => onNestedFieldChanged?.call(field.id, v),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNestedRangeBadge(DynamicFormField field) {
+    final min = field.minValue;
+    final max = field.maxValue;
+    String label;
+    if (min != null && max != null) {
+      label = '${_formatNumber(min)}–${_formatNumber(max)}';
+    } else if (min != null) {
+      label = '≥ ${_formatNumber(min)}';
+    } else {
+      label = '≤ ${_formatNumber(max!)}';
+    }
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.info.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.info.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 9,
+          color: AppColors.info,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   Widget _buildNestedTextField(DynamicFormField field, {int maxLines = 2}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -551,6 +651,137 @@ class DynamicFormFieldWidget extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  Widget _buildNumericField() {
+    final hasRange = field.minValue != null || field.maxValue != null;
+    String? rangeError;
+
+    if (value != null && value.toString().isNotEmpty) {
+      final parsed = double.tryParse(value.toString());
+      if (parsed != null) {
+        if (field.minValue != null && parsed < field.minValue!) {
+          rangeError = 'El valor mínimo es ${_formatNumber(field.minValue!)}';
+        } else if (field.maxValue != null && parsed > field.maxValue!) {
+          rangeError = 'El valor máximo es ${_formatNumber(field.maxValue!)}';
+        }
+      }
+    }
+
+    final effectiveError = errorText ?? rangeError;
+
+    return _buildCardContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildFieldHeader(),
+          if (hasRange) ...[SizedBox(height: 4), _buildRangeBadge()],
+          SizedBox(height: 8),
+          TextFormField(
+            initialValue: value?.toString(),
+            enabled: !isReadOnly,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+              signed: false,
+            ),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+            ],
+            decoration: InputDecoration(
+              hintText: isReadOnly
+                  ? ''
+                  : (hasRange ? 'Ingresa un valor...' : 'Ingresa un número...'),
+              errorText: effectiveError,
+              prefixIcon: Icon(
+                Icons.tag,
+                color: effectiveError != null
+                    ? AppColors.error
+                    : AppColors.textSecondary,
+                size: 18,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: AppColors.primary, width: 2),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: AppColors.error, width: 2),
+              ),
+              disabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              filled: true,
+              fillColor: isReadOnly
+                  ? AppColors.neutral200
+                  : AppColors.background,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+              suffixIcon: isReadOnly
+                  ? Icon(Icons.lock_outline, size: 20)
+                  : null,
+            ),
+            onChanged: isReadOnly ? null : onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRangeBadge() {
+    final min = field.minValue;
+    final max = field.maxValue;
+    String label;
+    if (min != null && max != null) {
+      label = 'Rango: ${_formatNumber(min)} – ${_formatNumber(max)}';
+    } else if (min != null) {
+      label = 'Mínimo: ${_formatNumber(min)}';
+    } else {
+      label = 'Máximo: ${_formatNumber(max!)}';
+    }
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.info.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.info.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.straighten, size: 12, color: AppColors.info),
+          SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.info,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Formatea un número: muestra sin decimales si es entero, con hasta 2 si tiene fracción.
+  String _formatNumber(double v) {
+    if (v == v.truncateToDouble()) return v.toInt().toString();
+    // Elimina ceros trailing (ej: 1.50 → "1.5")
+    final s = v.toStringAsFixed(2);
+    return s.contains('.')
+        ? s.replaceAll(RegExp(r'0+$'), '').replaceAll(RegExp(r'\.$'), '')
+        : s;
   }
 
   Widget _buildTextField({int maxLines = 3}) {

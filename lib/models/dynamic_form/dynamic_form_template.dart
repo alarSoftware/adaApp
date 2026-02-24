@@ -126,6 +126,7 @@ class DynamicFormTemplate {
               child.type == 'checkbox' ||
               child.type == 'resp_abierta' ||
               child.type == 'resp_abierta_larga' ||
+              child.type == 'numerico' ||
               child.type == 'image') {
             topLevelFields.add(child);
           }
@@ -134,6 +135,7 @@ class DynamicFormTemplate {
         topLevelFields.add(root);
       } else if (root.type == 'resp_abierta' ||
           root.type == 'resp_abierta_larga' ||
+          root.type == 'numerico' ||
           root.type == 'image') {
         topLevelFields.add(root);
       }

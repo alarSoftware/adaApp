@@ -10,6 +10,8 @@ class DynamicFormField {
   final double? percentage;
   final bool isParent;
   final bool isRequired;
+  final double? minValue;
+  final double? maxValue;
   final List<DynamicFormField> children;
   final Map<String, dynamic>? metadata;
 
@@ -25,6 +27,8 @@ class DynamicFormField {
     this.percentage,
     this.isParent = false,
     this.isRequired = false,
+    this.minValue,
+    this.maxValue,
     this.children = const [],
     this.metadata,
   });
@@ -49,6 +53,12 @@ class DynamicFormField {
           json['required'] == true ||
           json['is_required'] == 1 ||
           json['is_required'] == true,
+      minValue: json['minValue'] != null
+          ? (json['minValue'] as num).toDouble()
+          : null,
+      maxValue: json['maxValue'] != null
+          ? (json['maxValue'] as num).toDouble()
+          : null,
     );
   }
 
@@ -100,6 +110,8 @@ class DynamicFormField {
       percentage: percentage,
       isParent: isParent,
       isRequired: isRequired,
+      minValue: minValue,
+      maxValue: maxValue,
       children: children,
       metadata: metadata,
     );
@@ -117,6 +129,8 @@ class DynamicFormField {
     double? percentage,
     bool? isParent,
     bool? isRequired,
+    double? minValue,
+    double? maxValue,
     List<DynamicFormField>? children,
     Map<String, dynamic>? metadata,
   }) {
@@ -133,6 +147,8 @@ class DynamicFormField {
       percentage: percentage ?? this.percentage,
       isParent: isParent ?? this.isParent,
       isRequired: isRequired ?? this.isRequired,
+      minValue: minValue ?? this.minValue,
+      maxValue: maxValue ?? this.maxValue,
       children: children ?? this.children,
       metadata: metadata ?? this.metadata,
     );
@@ -155,6 +171,8 @@ class DynamicFormField {
       if (percentage != null) 'percentage': percentage,
       'isParent': isParent,
       'isRequired': isRequired,
+      if (minValue != null) 'minValue': minValue,
+      if (maxValue != null) 'maxValue': maxValue,
       if (children.isNotEmpty)
         'children': children.map((c) => c.toJson()).toList(),
       if (metadata != null) 'metadata': metadata,

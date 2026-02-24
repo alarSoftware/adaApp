@@ -68,6 +68,20 @@ class DatabaseTables {
         'Migración v5: estado_odoo, motivo_odoo, orden_transporte_odoo y ada_estado resueltos',
       );
     }
+
+    if (oldVersion < 6) {
+      // Migración a v6: Agregar min_value y max_value a dynamic_form_detail
+      for (final col in ['min_value REAL', 'max_value REAL']) {
+        try {
+          await db.execute('ALTER TABLE dynamic_form_detail ADD COLUMN $col');
+        } catch (e) {
+          debugPrint('Migración v6 columna $col omitida (ya existe): $e');
+        }
+      }
+      debugPrint(
+        'Migración v6: min_value y max_value agregados a dynamic_form_detail',
+      );
+    }
   }
 
   Future<void> _crearTablasMaestras(Database db) async {
@@ -290,6 +304,8 @@ class DatabaseTables {
       parent_id TEXT,
       percentage REAL,
       is_required INTEGER DEFAULT 0,
+      min_value REAL,
+      max_value REAL,
       FOREIGN KEY (dynamic_form_id) REFERENCES dynamic_form (id)
     )
   ''';

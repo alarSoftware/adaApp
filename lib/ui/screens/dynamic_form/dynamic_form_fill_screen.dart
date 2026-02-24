@@ -37,12 +37,15 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
     return PopScope(
       canPop: widget.isReadOnly && !_isSaving,
       onPopInvokedWithResult: (didPop, result) async {
+        // En modo lectura el sistema ya hizo el pop (canPop = true), nada que hacer
         if (didPop) return;
         if (_isSaving) return;
 
+        // Modo edición: preguntar si guardar
         final shouldExit = await _showExitConfirmation();
         if (shouldExit && context.mounted) {
-          Navigator.of(context).pop();
+          await widget.viewModel.discardForm();
+          if (context.mounted) Navigator.of(context).pop();
         }
       },
       child: Stack(
