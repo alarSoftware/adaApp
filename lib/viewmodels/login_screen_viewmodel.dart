@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:local_auth/local_auth.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/services/data/database_validation_service.dart';
-import 'package:ada_app/services/sync/full_sync_service.dart';
 import 'package:ada_app/models/usuario.dart';
 import 'dart:async';
 import 'package:sqflite/sqflite.dart';
-import 'package:ada_app/services/censo/censo_upload_service.dart';
-import 'package:ada_app/services/dynamic_form/dynamic_form_upload_service.dart';
-import 'package:ada_app/services/device_log/device_log_upload_service.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:ada_app/services/device/device_permissions_service.dart';
+import 'package:ada_app/services/sync/sync_orchestrator_service.dart';
 
 abstract class LoginUIEvent {}
 
@@ -55,7 +51,6 @@ class SyncCompletedEvent extends LoginUIEvent {
 
 class LoginScreenViewModel extends ChangeNotifier {
   final _authService = AuthService();
-  final _localAuth = LocalAuthentication();
   final _dbHelper = DatabaseHelper();
 
   final usernameController = TextEditingController();
@@ -65,7 +60,6 @@ class LoginScreenViewModel extends ChangeNotifier {
 
   bool _isLoading = false;
   bool _obscurePassword = true;
-  bool _biometricAvailable = false;
   bool _usernameValid = false;
   bool _passwordValid = false;
   bool _isSyncing = false;
@@ -84,7 +78,6 @@ class LoginScreenViewModel extends ChangeNotifier {
 
   bool get isLoading => _isLoading;
   bool get obscurePassword => _obscurePassword;
-  bool get biometricAvailable => _biometricAvailable;
   bool get usernameValid => _usernameValid;
   bool get passwordValid => _passwordValid;
   bool get isSyncing => _isSyncing;
@@ -97,7 +90,6 @@ class LoginScreenViewModel extends ChangeNotifier {
 
   LoginScreenViewModel() {
     _setupValidationListeners();
-    _checkBiometricAvailability();
     _checkUsersTableEmpty();
   }
 
@@ -142,19 +134,7 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> _checkBiometricAvailability() async {
-    try {
-      final bool isAvailable = await _localAuth.canCheckBiometrics;
-      final bool isDeviceSupported = await _localAuth.isDeviceSupported();
-      final bool hasLoggedInBefore = await _authService.hasUserLoggedInBefore();
-
-      _biometricAvailable =
-          isAvailable && isDeviceSupported && hasLoggedInBefore;
-      notifyListeners();
-    } catch (e) {
-      // Silently fail
-    }
-  }
+  // Ya no se usa biometría
 
   Future<void> _checkUsersTableEmpty() async {
     try {
@@ -246,12 +226,11 @@ class LoginScreenViewModel extends ChangeNotifier {
       final validationResult = await _validateUserAssignment();
       if (!validationResult) return;
 
-      // La validacion de sincronizacion ahora se maneja en SelectScreen
+      // Ya no se usa biometría
 
-      await _checkBiometricAvailability();
-
-      // Solicitud de permisos proactiva y BLOQUEANTE
-      final permissionsGranted = await checkAndRequestPermissions();
+      // Solicitud de permisos proactiva y BLOQUEANTE usando servicio externo
+      final permissionsGranted =
+          await DevicePermissionsService.checkAndRequestCriticalPermissions();
       if (!permissionsGranted) {
         _eventController.add(ShowPermissionDeniedDialogEvent());
         return;
@@ -274,69 +253,7 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> authenticateWithBiometric() async {
-    try {
-      HapticFeedback.lightImpact();
-
-      final bool didAuthenticate = await _localAuth.authenticate(
-        localizedReason: 'Autentica tu identidad para acceder a la aplicación',
-        options: const AuthenticationOptions(
-          biometricOnly: true,
-          stickyAuth: true,
-          sensitiveTransaction: true,
-        ),
-      );
-
-      if (!didAuthenticate) {
-        _eventController.add(ShowErrorEvent('Autenticación cancelada'));
-        return;
-      }
-
-      HapticFeedback.lightImpact();
-
-      final result = await _authService.authenticateWithBiometric();
-
-      if (!result.exitoso) {
-        _eventController.add(ShowErrorEvent(result.mensaje));
-        return;
-      }
-
-      _currentUser = await _authService.getCurrentUser();
-
-      if (_currentUser == null) {
-        _eventController.add(
-          ShowErrorEvent('Error obteniendo información del usuario'),
-        );
-        return;
-      }
-
-      final validationResult = await _validateUserAssignment();
-      if (!validationResult) return;
-
-      // La validacion de sincronizacion ahora se maneja en SelectScreen
-
-      // Solicitud de permisos proactiva y BLOQUEANTE
-      final permissionsGranted = await checkAndRequestPermissions();
-      if (!permissionsGranted) {
-        _eventController.add(ShowPermissionDeniedDialogEvent());
-        return;
-      }
-
-      _eventController.add(
-        ShowSuccessEvent(
-          'Bienvenido ${_currentUser!.fullname}',
-          Icons.fingerprint,
-        ),
-      );
-      _eventController.add(NavigateToHomeEvent());
-    } on PlatformException catch (e) {
-      _eventController.add(
-        ShowErrorEvent('Error: ${e.message ?? 'Error desconocido'}'),
-      );
-    } catch (e) {
-      _eventController.add(ShowErrorEvent('Error de autenticación'));
-    }
-  }
+  // Ya no existe autenticación biométrica
 
   Future<bool> _validateUserAssignment() async {
     try {
@@ -379,101 +296,25 @@ class LoginScreenViewModel extends ChangeNotifier {
     }
   }
 
-  /// 🛡️ Validar y solicitar permisos críticos antes de entrar a la app
-  /// Retorna TRUE si se tienen los permisos necesarios (o si no se pueden verificar/pedir)
-  /// Retorna FALSE si el usuario rechazó explícitamente el permiso de NOTIFICACIONES
-  Future<bool> checkAndRequestPermissions() async {
-    try {
-      // 1. Notificaciones (Android 13+) - CRÍTICO PARA BACKGROUND
-      // Requerido para ver la notificación persistente
-      var notifStatus = await Permission.notification.status;
-      debugPrint(
-        '🔍 DEBUG PERMISOS: Status inicial Notificaciones: $notifStatus',
-      );
-
-      if (notifStatus.isDenied) {
-        debugPrint('🔍 DEBUG PERMISOS: Solicitando permiso...');
-        notifStatus = await Permission.notification.request();
-        debugPrint('🔍 DEBUG PERMISOS: Status post-request: $notifStatus');
-      }
-
-      // Si después de pedirlo sigue denegado o está permanentemente denegado: BLOQUEAR
-      if (notifStatus.isDenied || notifStatus.isPermanentlyDenied) {
-        debugPrint('⛔ DEBUG PERMISOS: Acceso DENEGADO (Bloqueando login)');
-        return false;
-      }
-
-      debugPrint('✅ DEBUG PERMISOS: Notificaciones OK');
-
-      // 2. Ubicación
-      // Primero 'location' (precisa/coarse en uso)
-      var locStatus = await Permission.location.status;
-      if (!locStatus.isGranted) {
-        locStatus = await Permission.location.request();
-      }
-
-      // Si se concedió ubicación básica, intentar 'locationAlways' para background
-      if (locStatus.isGranted) {
-        if (await Permission.locationAlways.isDenied) {
-          // No bloqueamos el login si esto falla, pero lo intentamos
-          await Permission.locationAlways.request();
-        }
-      }
-
-      // 3. Optimización de batería
-      // Importante para que el servicio no muera
-      if (await Permission.ignoreBatteryOptimizations.isDenied) {
-        await Permission.ignoreBatteryOptimizations.request();
-      }
-
-      return true;
-    } catch (e) {
-      debugPrint('Error solicitando permisos: $e');
-      // En caso de error de plataforma, dejamos pasar por seguridad (o bloqueamos? mejor pasar para no brickear)
-      return true;
-    }
-  }
+  // Ya no existe lógica interna de permisos, delegada a DevicePermissionsService
 
   Future<void> uploadPendingData() async {
+    if (_currentUser == null) return;
     _isLoading = true;
     notifyListeners();
 
     try {
-      // 1. Intentar subir censos
-      try {
-        final censoService = CensoUploadService();
-        final userId = _currentUser?.id ?? 0;
-        await censoService.sincronizarCensosNoMigrados(userId);
-      } catch (e) {
-        debugPrint('Error subiendo censos: $e');
-      }
-
-      // 2. Intentar subir formularios
-      try {
-        final formService = DynamicFormUploadService();
-        final userIdStr = _currentUser?.id?.toString() ?? '0';
-        await formService.sincronizarRespuestasPendientes(userIdStr);
-      } catch (e) {
-        debugPrint('Error subiendo formularios: $e');
-      }
-
-      // 3. Intentar subir logs
-      try {
-        await DeviceLogUploadService.sincronizarDeviceLogsPendientes();
-      } catch (e) {
-        debugPrint('Error subiendo logs: $e');
-      }
-
-      // 4. Re-verificar estado
       final db = await _dbHelper.database;
-      final validationService = DatabaseValidationService(db);
-      final validationResult = await validationService.canDeleteDatabase();
+      final validationResult =
+          await SyncOrchestratorService.uploadAllPendingData(
+            userId: _currentUser!.id!,
+            database: db,
+          );
 
       _isLoading = false;
       notifyListeners();
 
       if (!validationResult.canDelete) {
-        // Aún hay pendientes
         _eventController.add(ShowPendingRecordsDialogEvent(validationResult));
         _eventController.add(
           ShowErrorEvent(
@@ -481,13 +322,13 @@ class LoginScreenViewModel extends ChangeNotifier {
           ),
         );
       } else {
-        // Ya no hay pendientes, ¡Éxito!
         _eventController.add(
           ShowSuccessEvent(
             'Datos pendientes enviados correctamente',
             Icons.cloud_upload,
           ),
         );
+        await executeSync();
       }
     } catch (e) {
       _isLoading = false;
@@ -509,13 +350,11 @@ class LoginScreenViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // ✅ Usar el método helper para construir el nombre consistentemente
       final displayName = _buildVendorDisplayName(_currentUser!);
 
-      final result = await FullSyncService.syncAllDataWithProgress(
+      final result = await SyncOrchestratorService.executeFullSync(
         employeeId: _currentUser!.employeeId!,
-        edfVendedorNombre:
-            displayName, // ← Nombre completo "username - Nombre Vendedor"
+        displayName: displayName,
         previousVendedorId: _syncValidationResult?.vendedorAnteriorId,
         onProgress:
             ({
@@ -541,9 +380,6 @@ class LoginScreenViewModel extends ChangeNotifier {
       if (!result.exito) {
         throw Exception(result.mensaje);
       }
-
-      // FullSyncService ya marca la sincronización como completada internamente
-      // por lo que no necesitamos llamar a markSyncCompleted aquí
 
       _eventController.add(
         SyncCompletedEvent(result.mensaje, result.itemsSincronizados),
@@ -634,8 +470,7 @@ class LoginScreenViewModel extends ChangeNotifier {
 
       // La validacion de sincronizacion ahora se maneja en SelectScreen
 
-      await _checkBiometricAvailability();
-      await checkAndRequestPermissions();
+      await DevicePermissionsService.checkAndRequestCriticalPermissions();
 
       _eventController.add(
         ShowSuccessEvent(

@@ -11,7 +11,6 @@ import 'package:ada_app/services/sync/user_sync_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
 import 'package:ada_app/services/app_services.dart';
 import 'package:ada_app/services/device_log/device_log_background_extension.dart';
-import 'package:ada_app/services/background/app_background_service.dart';
 import 'package:ada_app/models/usuario.dart';
 import 'package:ada_app/utils/device_info_helper.dart';
 import 'package:ada_app/services/post/device_log_post_service.dart';
@@ -52,15 +51,6 @@ class AuthService {
   factory AuthService() => _instance ??= AuthService._internal();
 
   static final _dbHelper = DatabaseHelper();
-
-  // Helper para construir el nombre del vendedor
-  String _buildVendorDisplayName(Usuario usuario) {
-    if (usuario.employeeName != null &&
-        usuario.employeeName!.trim().isNotEmpty) {
-      return '${usuario.username} - ${usuario.employeeName}';
-    }
-    return usuario.username;
-  }
 
   Future<SyncValidationResult> validateSyncRequirement(
     String currentEmployeeId,
@@ -126,8 +116,12 @@ class AuthService {
 
       try {
         await AppServices().inicializarDeviceLoggingDespuesDeSincronizacion();
-      } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
-    } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
+      } catch (e) {
+        AppLogger.e("AUTH_SERVICE: Error", e);
+      }
+    } catch (e) {
+      AppLogger.e("AUTH_SERVICE: Error", e);
+    }
   }
 
   Future<void> clearSyncData() async {
@@ -138,7 +132,9 @@ class AuthService {
       await prefs.remove('last_sync_date');
 
       await _dbHelper.eliminar('clientes');
-    } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
+    } catch (e) {
+      AppLogger.e("AUTH_SERVICE: Error", e);
+    }
   }
 
   static Future<SyncResult> sincronizarSoloUsuarios() async {
@@ -292,7 +288,9 @@ class AuthService {
 
       try {
         await AppServices().inicializarEnLogin(password: password);
-      } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
+      } catch (e) {
+        AppLogger.e("AUTH_SERVICE: Error", e);
+      }
 
       return AuthResult(
         exitoso: true,
@@ -307,47 +305,6 @@ class AuthService {
     }
   }
 
-  Future<AuthResult> authenticateWithBiometric() async {
-    try {
-      final currentUser = await getCurrentUser();
-      if (currentUser == null) {
-        return AuthResult(
-          exitoso: false,
-          mensaje: 'Debes iniciar sesión con credenciales primero',
-        );
-      }
-
-      final usuarioAuth = UsuarioAuth.fromUsuario(currentUser);
-
-      if (currentUser.employeeId != null) {
-        // Usar el método helper para construir el nombre
-        final nombreVendedor = _buildVendorDisplayName(currentUser);
-
-        final syncValidation = await validateSyncRequirement(
-          currentUser.employeeId!,
-          nombreVendedor,
-        );
-
-        if (!syncValidation.requiereSincronizacion) {
-          try {
-            await AppBackgroundService.initialize();
-          } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
-        }
-      }
-
-      return AuthResult(
-        exitoso: true,
-        mensaje: 'Bienvenido de nuevo, ${currentUser.fullname}',
-        usuario: usuarioAuth,
-      );
-    } catch (e) {
-      return AuthResult(
-        exitoso: false,
-        mensaje: 'Error en autenticación biométrica',
-      );
-    }
-  }
-
   Future<AuthResult> forceLogin(Usuario usuario) async {
     try {
       final usuarioAuth = UsuarioAuth.fromUsuario(usuario);
@@ -355,7 +312,9 @@ class AuthService {
 
       try {
         await AppServices().inicializarEnLogin(password: usuario.password);
-      } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
+      } catch (e) {
+        AppLogger.e("AUTH_SERVICE: Error", e);
+      }
 
       return AuthResult(
         exitoso: true,
@@ -452,7 +411,9 @@ class AuthService {
                 }
               })
               .catchError((e) {
-                debugPrint('⚠️ Logout log guardado, se sincronizará después: $e');
+                debugPrint(
+                  '⚠️ Logout log guardado, se sincronizará después: $e',
+                );
               });
         }
       } else {
@@ -475,7 +436,9 @@ class AuthService {
       await prefs.remove(_keyLastSyncedVendedor);
       await prefs.remove(_keyLastSyncedVendedorName);
       await prefs.remove('last_sync_date');
-    } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); }
+    } catch (e) {
+      AppLogger.e("AUTH_SERVICE: Error", e);
+    }
   }
 
   Future<bool> hasUserLoggedInBefore() async {
@@ -501,7 +464,10 @@ class AuthService {
       return usuarios
           .where((u) => u.username.toLowerCase() == username.toLowerCase())
           .firstOrNull;
-    } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); return null; }
+    } catch (e) {
+      AppLogger.e("AUTH_SERVICE: Error", e);
+      return null;
+    }
   }
 
   Future<UsuarioAuth?> getCurrentUserAuth() async {
@@ -537,7 +503,10 @@ class AuthService {
         'deviceLogActivo': deviceLogState['activo'],
         'deviceLogInicializado': deviceLogState['inicializado'],
       };
-    } catch (e) { AppLogger.e("AUTH_SERVICE: Error", e); return {}; }
+    } catch (e) {
+      AppLogger.e("AUTH_SERVICE: Error", e);
+      return {};
+    }
   }
 }
 
