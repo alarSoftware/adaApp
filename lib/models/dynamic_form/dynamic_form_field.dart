@@ -52,7 +52,8 @@ class DynamicFormField {
       isRequired:
           json['required'] == true ||
           json['is_required'] == 1 ||
-          json['is_required'] == true,
+          json['is_required'] == true ||
+          json['obligatorio'] == true,
       minValue: json['minValue'] != null
           ? (json['minValue'] as num).toDouble()
           : null,

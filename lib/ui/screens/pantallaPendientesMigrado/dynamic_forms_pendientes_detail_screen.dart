@@ -131,14 +131,14 @@ class _DynamicFormsPendientesDetailScreenState
         );
       }
 
-      // Usamos el servicio de upload que mapea correctamente los datos (snake_case -> camelCase)
-      final result = await uploadService.enviarRespuestaAlServidor(
+      // reintentarEnvioRespuesta persiste el estado en la BD (synced/error)
+      // y detecta automáticamente errores de ID duplicado
+      final result = await uploadService.reintentarEnvioRespuesta(
         responseId,
-        guardarLog: true,
         userId: form['usuario_id']?.toString(),
       );
 
-      if (result['exito'] == true || result['success'] == true) {
+      if (result['success'] == true) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -147,20 +147,18 @@ class _DynamicFormsPendientesDetailScreenState
             ),
           );
         }
-        await _loadFormsFallidos(); // Recargar lista
+        await _loadFormsFallidos(); // Recargar lista — el form ya no aparecerá
       } else {
         if (mounted) {
           final errorMessage =
-              result['mensaje'] ??
-              result['message'] ??
-              result['error'] ??
-              'Error desconocido';
+              result['error'] ?? result['mensaje'] ?? 'Error desconocido';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error al enviar: $errorMessage'),
               backgroundColor: AppColors.error,
             ),
           );
+          await _loadFormsFallidos(); // Recargar igual para ver mensaje de error actualizado
         }
       }
     } catch (e) {

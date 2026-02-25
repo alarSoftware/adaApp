@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../utils/logger.dart';
 import 'package:uuid/uuid.dart';
@@ -274,11 +275,7 @@ class DynamicFormViewModel extends ChangeNotifier {
 
       // Validación: campo numérico activo (visible) → obligatorio + rango
       if (field.type == 'numerico') {
-        if (_isFieldEmpty(value)) {
-          // Numérico visible sin valor = obligatorio aunque required sea false
-          _fieldErrors[field.id] = '${field.label} es obligatorio';
-          isValid = false;
-        } else {
+        if (!_isFieldEmpty(value)) {
           final parsed = double.tryParse(value.toString());
           if (parsed == null) {
             _fieldErrors[field.id] = '${field.label} debe ser un número válido';
@@ -433,7 +430,7 @@ class DynamicFormViewModel extends ChangeNotifier {
         return false;
       }
 
-      await _syncResponse(completedResponse.id);
+      unawaited(_syncResponse(completedResponse.id));
 
       _clearCurrentForm();
       notifyListeners();
@@ -479,6 +476,7 @@ class DynamicFormViewModel extends ChangeNotifier {
     _currentResponse = null;
     _fieldValues.clear();
     _fieldErrors.clear();
+    _errorMessage = null;
   }
 
   /// Descarta el formulario actual sin guardar nada.
@@ -486,7 +484,6 @@ class DynamicFormViewModel extends ChangeNotifier {
   Future<void> discardForm() async {
     final responseToDelete = _currentResponse;
     _clearCurrentForm();
-    _errorMessage = null;
     notifyListeners();
 
     // Limpiar DB solo si era un borrador que nunca fue completado/sincronizado

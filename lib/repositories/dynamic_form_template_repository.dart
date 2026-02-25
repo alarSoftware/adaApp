@@ -359,7 +359,9 @@ class DynamicFormTemplateRepository {
       'parent_id': parentId,
       'percentage': apiData['percentage'],
       'is_required':
-          (apiData['required'] == true || apiData['is_required'] == true)
+          (apiData['required'] == true ||
+              apiData['is_required'] == true ||
+              apiData['obligatorio'] == true)
           ? 1
           : 0,
       'min_value': apiData['minValue'],

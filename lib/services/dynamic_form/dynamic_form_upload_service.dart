@@ -123,22 +123,18 @@ class DynamicFormUploadService {
           await _syncRepository.markAllImagesAsSynced(responseId);
 
           AppLogger.i('Sincronización de formulario exitosa');
+        } else if (_esErrorDeDuplicado(resultado)) {
+          AppLogger.i(
+            'Formulario ya existe en el servidor (serverAction=${resultado['serverAction']}) — marcando como sincronizado',
+          );
+          await _syncRepository.markResponseAsSynced(responseId);
+          await _syncRepository.markAllDetailsAsSynced(responseId);
+          await _syncRepository.markAllImagesAsSynced(responseId);
         } else {
           await _syncRepository.markResponseAsError(
             responseId,
             'Error (intento #1): ${resultado['mensaje']}',
           );
-
-          // LOG: Error en primer intento
-          // await ErrorLogService.logError(
-          //   tableName: 'dynamic_form_response',
-          //   operation: 'sync_background',
-          //   errorMessage: 'Error en primer intento: ${resultado['mensaje']}',
-          //   errorType: 'sync',
-          //   registroFailId: responseId,
-          //   syncAttempt: 1,
-          //   userId: userId,
-          // );
 
           AppLogger.w('Error en envío - reintento programado');
         }
@@ -273,22 +269,24 @@ class DynamicFormUploadService {
         await _syncRepository.markAllImagesAsSynced(responseId);
 
         return {'success': true, 'message': 'Respuesta sincronizada'};
+      } else if (_esErrorDeDuplicado(resultado)) {
+        // El servidor ya tiene el registro — marcar como sincronizado
+        AppLogger.i(
+          'Formulario ya existe en el servidor (serverAction=${resultado['serverAction']}) — marcando como sincronizado',
+        );
+        await _syncRepository.markResponseAsSynced(responseId);
+        await _syncRepository.markAllDetailsAsSynced(responseId);
+        await _syncRepository.markAllImagesAsSynced(responseId);
+
+        return {
+          'success': true,
+          'message': 'Registro ya existía en el servidor',
+        };
       } else {
         await _syncRepository.markResponseAsError(
           responseId,
           'Error: ${resultado['mensaje']}',
         );
-
-        // LOG: Reintento fallido
-        // await ErrorLogService.logError(
-        //   tableName: 'dynamic_form_response',
-        //   operation: 'RETRY_POST',
-        //   errorMessage: 'Reintento #$numeroIntento falló: ${resultado['mensaje']}',
-        //   errorType: 'retry_failed',
-        //   registroFailId: responseId,
-        //   syncAttempt: numeroIntento,
-        //   userId: userId,
-        // );
 
         return {'success': false, 'error': resultado['mensaje']};
       }
@@ -449,22 +447,18 @@ class DynamicFormUploadService {
       await _syncRepository.markAllImagesAsSynced(responseId);
 
       AppLogger.i('Formulario sincronizado después de $numeroIntento intentos');
+    } else if (_esErrorDeDuplicado(resultado)) {
+      AppLogger.i(
+        'Formulario ya existe en el servidor (serverAction=${resultado['serverAction']}) — marcando como sincronizado',
+      );
+      await _syncRepository.markResponseAsSynced(responseId);
+      await _syncRepository.markAllDetailsAsSynced(responseId);
+      await _syncRepository.markAllImagesAsSynced(responseId);
     } else {
       await _syncRepository.markResponseAsError(
         responseId,
         'Error (intento #$numeroIntento): ${resultado['mensaje']}',
       );
-
-      // LOG: Intento fallido con backoff
-      // await ErrorLogService.logError(
-      //   tableName: 'dynamic_form_response',
-      //   operation: 'sync_individual',
-      //   errorMessage: 'Error en intento #$numeroIntento: ${resultado['mensaje']}',
-      //   errorType: 'sync_retry',
-      //   registroFailId: responseId,
-      //   syncAttempt: numeroIntento,
-      //   userId: userId,
-      // );
 
       final proximoIntento = _calcularProximoIntento(numeroIntento);
       AppLogger.w(
@@ -550,5 +544,25 @@ class DynamicFormUploadService {
       AppLogger.e('Error obteniendo último intento de sync', e);
     }
     return null;
+  }
+
+  /// Detecta si la respuesta del servidor indica que el registro ya existe.
+  /// serverAction -501 es el código que usa el backend Grails para "duplicado".
+  /// También cubre el flag 'idempotente' que puede venir de BasePostService.
+  bool _esErrorDeDuplicado(Map<String, dynamic> resultado) {
+    if (resultado['idempotente'] == true) return true;
+
+    final serverAction = resultado['serverAction'];
+    if (serverAction == -501) return true;
+
+    // Fallback: revisar mensaje de error
+    final msg = (resultado['mensaje'] ?? resultado['resultError'] ?? '')
+        .toString()
+        .toLowerCase();
+    return msg.contains('duplicate') ||
+        msg.contains('already exists') ||
+        msg.contains('unique constraint') ||
+        msg.contains('dataintegrityviolationexception') ||
+        msg.contains('ya existe');
   }
 }

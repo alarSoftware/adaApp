@@ -25,6 +25,7 @@ class DynamicFormFillScreen extends StatefulWidget {
 class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
   final _scrollController = ScrollController();
   bool _isSaving = false;
+  bool _isFinished = false;
 
   @override
   void dispose() {
@@ -35,7 +36,7 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: widget.isReadOnly && !_isSaving,
+      canPop: (widget.isReadOnly || _isFinished) && !_isSaving,
       onPopInvokedWithResult: (didPop, result) async {
         // En modo lectura el sistema ya hizo el pop (canPop = true), nada que hacer
         if (didPop) return;
@@ -140,7 +141,7 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
   Widget _buildBody() {
     final template = widget.viewModel.currentTemplate;
 
-    if (template == null) {
+    if (template == null && !_isFinished) {
       return Center(
         child: Text(
           'No se pudo cargar el formulario',
@@ -408,6 +409,10 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
           message: 'Formulario completado exitosamente',
           backgroundColor: AppColors.success,
         );
+        setState(() {
+          _isFinished = true;
+          _isSaving = false;
+        });
         Navigator.pop(context);
       } else {
         final errorMessage =

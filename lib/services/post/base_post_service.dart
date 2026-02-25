@@ -161,10 +161,32 @@ class BasePostService {
     String? url,
   ) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      // 🛑 Aquí validamos el cuerpo JSON, incluso si el status es 200
       return _processSuccessResponse(response);
     } else {
       debugPrint('Error del servidor: ${response.statusCode}');
+
+      // Verificar si el cuerpo del error indica duplicado (ej: HTTP 409 Conflict)
+      final bodyLower = response.body.toLowerCase();
+      final esDuplicado =
+          bodyLower.contains('duplicate') ||
+          bodyLower.contains('already exists') ||
+          bodyLower.contains('unique constraint') ||
+          bodyLower.contains('dataintegrityviolationexception') ||
+          bodyLower.contains('duplicatekey') ||
+          bodyLower.contains('ya existe');
+
+      if (esDuplicado) {
+        debugPrint(
+          'ID duplicado detectado en error HTTP ${response.statusCode} - tratando como éxito idempotente',
+        );
+        return {
+          'exito': true,
+          'success': true,
+          'mensaje': 'Registro ya existe en el servidor (idempotente)',
+          'status_code': response.statusCode,
+          'idempotente': true,
+        };
+      }
 
       return {
         'exito': false,
@@ -202,6 +224,40 @@ class BasePostService {
         } else {
           // Error Lógico (-501, 205, etc.), aun con HTTP 200
           debugPrint('Falso Negativo detectado. Action: $serverAction');
+          debugPrint(
+            'Server resultError: ${responseBody['resultError']} | resultMessage: ${responseBody['resultMessage']}',
+          );
+
+          final errorMsg =
+              (responseBody['resultError'] ??
+                      responseBody['resultMessage'] ??
+                      '')
+                  .toString()
+                  .toLowerCase();
+
+          // Si el error es por ID duplicado, el dato YA está en el servidor.
+          // Tratarlo como éxito idempotente para evitar reintentos infinitos.
+          final esDuplicado =
+              errorMsg.contains('duplicate') ||
+              errorMsg.contains('already exists') ||
+              errorMsg.contains('unique constraint') ||
+              errorMsg.contains('dataintegrityviolationexception') ||
+              errorMsg.contains('duplicatekey') ||
+              errorMsg.contains('ya existe');
+
+          if (esDuplicado) {
+            debugPrint(
+              'ID duplicado detectado - tratando como éxito idempotente',
+            );
+            return {
+              'exito': true,
+              'success': true,
+              'mensaje': 'Registro ya existe en el servidor (idempotente)',
+              'serverAction': serverAction,
+              'idempotente': true,
+            };
+          }
+
           return {
             'exito': false,
             'success': false,
