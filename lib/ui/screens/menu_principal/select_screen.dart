@@ -816,95 +816,110 @@ class _SelectScreenState extends State<SelectScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Esta acción descargará todos los datos del servidor:',
+                    'Esta acción descargará los datos habilitados:',
                     style: TextStyle(color: AppColors.textPrimary),
                   ),
                   SizedBox(height: 12),
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceVariant,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '• Clientes',
-                          style: TextStyle(color: AppColors.textSecondary),
-                        ),
-                        Text(
-                          '• Formularios',
-                          style: TextStyle(color: AppColors.textSecondary),
-                        ),
-                        // Opcional: mostrar visualmente si equipos se descargarán o no
-                        if (descargarEquipos)
-                          Text(
-                            '• Equipos (Se descargarán)',
-                            style: TextStyle(
-                              color: AppColors.success,
-                              fontWeight: FontWeight.bold,
+                  FutureBuilder<Set<String>?>(
+                    future: PermissionsService.getAllowedModules(),
+                    builder: (context, snapshot) {
+                      final modules = snapshot.data;
+                      // Mapeo de rutas a nombres legibles
+                      const moduleNames = {
+                        '/clientes': 'Clientes',
+                        '/censos': 'Censos',
+                        '/formularios': 'Formularios Dinámicos',
+                        '/operaciones': 'Operaciones Comerciales',
+                        '/equipos': 'Equipos',
+                      };
+                      // null = sin restricciones = todos los módulos
+                      final visibleModules = modules == null
+                          ? moduleNames.keys.toList()
+                          : moduleNames.keys
+                              .where((k) => modules.contains(k))
+                              .toList();
+
+                      final hasEquipos = visibleModules.contains('/equipos');
+                      final otherModules = visibleModules
+                          .where((k) => k != '/equipos')
+                          .toList();
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (otherModules.isNotEmpty)
+                            Container(
+                              padding: EdgeInsets.all(12),
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceVariant,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: otherModules.map((k) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Text(
+                                    '• ${moduleNames[k]}',
+                                    style: TextStyle(color: AppColors.textSecondary),
+                                  ),
+                                )).toList(),
+                              ),
                             ),
-                          )
-                        else
-                          Text(
-                            '• NO SE DESCARGARÁN EQUIPOS',
-                            style: TextStyle(
-                              color: AppColors.error,
-                              fontWeight: FontWeight.bold,
+                          if (hasEquipos) ...[
+                            SizedBox(height: 16),
+                            Row(
+                              children: [
+                                SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: Checkbox(
+                                    value: descargarEquipos,
+                                    activeColor: AppColors.success,
+                                    side: WidgetStateBorderSide.resolveWith(
+                                      (states) => BorderSide(
+                                        width: 2.0,
+                                        color: descargarEquipos
+                                            ? AppColors.success
+                                            : AppColors.error,
+                                      ),
+                                    ),
+                                    onChanged: (bool? value) {
+                                      setState(() {
+                                        descargarEquipos = value ?? false;
+                                      });
+                                    },
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        descargarEquipos = !descargarEquipos;
+                                      });
+                                    },
+                                    child: Text(
+                                      'Descargar equipos',
+                                      style: TextStyle(
+                                        color: descargarEquipos
+                                            ? AppColors.textPrimary
+                                            : AppColors.error,
+                                        fontSize: 14,
+                                        fontWeight: descargarEquipos
+                                            ? FontWeight.normal
+                                            : FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Row(
-                    children: [
-                      SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: Checkbox(
-                          value: descargarEquipos,
-                          activeColor: AppColors.success,
-                          side: WidgetStateBorderSide.resolveWith(
-                            (states) => BorderSide(
-                              width: 2.0,
-                              color: descargarEquipos
-                                  ? AppColors.success
-                                  : AppColors.error,
-                            ),
-                          ),
-                          onChanged: (bool? value) {
-                            setState(() {
-                              descargarEquipos = value ?? true;
-                            });
-                          },
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              descargarEquipos = !descargarEquipos;
-                            });
-                          },
-                          child: Text(
-                            'Descargar equipos',
-                            style: TextStyle(
-                              color: descargarEquipos
-                                  ? AppColors.textPrimary
-                                  : AppColors.error,
-                              fontSize: 14,
-                              fontWeight: descargarEquipos
-                                  ? FontWeight.normal
-                                  : FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                          ],
+                        ],
+                      );
+                    },
                   ),
                   SizedBox(height: 12),
                   Text(
@@ -1271,80 +1286,72 @@ class _SelectScreenState extends State<SelectScreen>
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                _buildDrawerItem(
-                  icon: Icons.kitchen,
-                  label: 'Equipos',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const EquipoListScreen(),
-                      ),
+                FutureBuilder<Set<String>?>(
+                  future: PermissionsService.getAllowedModules(),
+                  builder: (context, snapshot) {
+                    // null = sin restricciones = mostrar todo
+                    final modules = snapshot.data;
+                    final hasEquipos = modules == null || modules.contains('/equipos');
+                    final hasOperaciones = modules == null || modules.contains('/operaciones');
+
+                    return Column(
+                      children: [
+                        if (hasEquipos) ...[
+                          _buildDrawerItem(
+                            icon: Icons.kitchen,
+                            label: 'Equipos',
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const EquipoListScreen()));
+                            },
+                          ),
+                          _buildDrawerItem(
+                            icon: Icons.widgets,
+                            label: 'Modelos',
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const ModelosScreen()));
+                            },
+                          ),
+                          _buildDrawerItem(
+                            icon: Icons.local_offer,
+                            label: 'Logos',
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const LogosScreen()));
+                            },
+                          ),
+                          _buildDrawerItem(
+                            icon: Icons.domain,
+                            label: 'Marcas',
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const MarcaScreen()));
+                            },
+                          ),
+                        ],
+                        if (hasOperaciones) ...[
+                          _buildDrawerItem(
+                            icon: Icons.inventory_2,
+                            label: 'Productos',
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductosScreen()));
+                            },
+                          ),
+                          _buildDrawerItem(
+                            icon: Icons.history_edu,
+                            label: 'Historial Operaciones',
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const OperacionesComercialesHistoryScreen()));
+                            },
+                          ),
+                        ],
+                      ],
                     );
                   },
                 ),
-                _buildDrawerItem(
-                  icon: Icons.widgets,
-                  label: 'Modelos',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ModelosScreen()),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.local_offer,
-                  label: 'Logos',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const LogosScreen()),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.domain,
-                  label: 'Marcas',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const MarcaScreen()),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.inventory_2,
-                  label: 'Productos',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ProductosScreen(),
-                      ),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.history_edu,
-                  label: 'Historial Operaciones',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            const OperacionesComercialesHistoryScreen(),
-                      ),
-                    );
-                  },
-                ),
-                Divider(),
                 Padding(
                   padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
                   child: Text(

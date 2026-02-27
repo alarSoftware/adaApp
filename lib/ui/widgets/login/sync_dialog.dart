@@ -281,7 +281,7 @@ class _SyncDialogContentState extends State<_SyncDialogContent> {
               if (mounted) {
                 setState(() {
                   _progress = progress;
-                  _currentStep = currentStep;
+                  if (currentStep.isNotEmpty) _currentStep = currentStep;
                   _completedSteps = List.from(completedSteps);
                 });
               }

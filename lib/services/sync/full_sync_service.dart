@@ -3,6 +3,7 @@ import 'package:ada_app/services/api/auth_service.dart';
 import 'package:ada_app/services/sync/sync_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
+import 'package:ada_app/services/permissions_service.dart';
 
 /// Callback para reportar progreso de sincronización
 typedef SyncProgressCallback =
@@ -78,7 +79,17 @@ class FullSyncService {
       }
 
       // =================================================================
-      // 3. Sincronizar todos los datos (usa SyncResultUnificado dinámicamente)
+      // 3. Obtener módulos habilitados de la empresa (desde app_routes)
+      // =================================================================
+      final allowedModules = await PermissionsService.getAllowedModules();
+      if (allowedModules != null) {
+        debugPrint('Sync selectiva: solo módulos $allowedModules');
+      } else {
+        debugPrint('Sync completa (empresa sin módulos configurados)');
+      }
+
+      // =================================================================
+      // 4. Sincronizar todos los datos (usa SyncResultUnificado dinámicamente)
       // =================================================================
       try {
         onProgress(
@@ -89,6 +100,7 @@ class FullSyncService {
 
         final syncResult = await SyncService.sincronizarTodosLosDatos(
           syncEquipments: syncEquipments,
+          allowedModules: allowedModules,
           onProgress: (progress, message) {
             // Mapeamos el progreso interno (0.0 - 1.0) al rango global (0.2 - 0.8)
             // Range = 0.6

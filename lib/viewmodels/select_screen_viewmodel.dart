@@ -449,7 +449,7 @@ class SelectScreenViewModel extends ChangeNotifier {
             }) {
               // Actualizar estado interno
               _syncProgress = progress;
-              _syncCurrentStep = currentStep;
+              if (currentStep.isNotEmpty) _syncCurrentStep = currentStep;
               _syncCompletedSteps = List.from(completedSteps);
 
               // Emitir evento para la UI

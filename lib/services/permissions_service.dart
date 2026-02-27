@@ -42,4 +42,49 @@ class PermissionsService {
     }
     return results;
   }
+
+  /// Obtiene todos los módulos habilitados en una sola query desde app_routes.
+  /// app_routes se llena desde ConfigEmpre.adaAppJsonPermission (global por empresa).
+  /// El campo route_path puede tener múltiples rutas separadas por coma
+  /// (ej: "/clientes,/formularios")
+  ///
+  /// Retorna:
+  ///   - null  → app_routes vacío → empresa sin módulos configurados → sync completa
+  ///   - Set   → solo sincronizar estos módulos
+  static Future<Set<String>?> getAllowedModules() async {
+    try {
+      final user = await _authService.getCurrentUser();
+      if (user == null) {
+        debugPrint('getAllowedModules: Sin usuario → sync completa');
+        return null;
+      }
+
+      final db = await _dbHelper.database;
+      final result = await db.query(
+        'app_routes',
+        columns: ['route_path'],
+        where: 'user_id = ?',
+        whereArgs: [user.id],
+      );
+
+      if (result.isEmpty) {
+        debugPrint('getAllowedModules: Sin módulos en app_routes → sync completa');
+        return null;
+      }
+
+      // route_path puede ser "/clientes,/formularios" → splitear y aplanar
+      final modules = result
+          .expand((row) {
+            final path = row['route_path'] as String? ?? '';
+            return path.split(',').map((r) => r.trim()).where((r) => r.isNotEmpty);
+          })
+          .toSet();
+
+      debugPrint('getAllowedModules: Rutas habilitadas → $modules');
+      return modules;
+    } catch (e) {
+      debugPrint('Error leyendo módulos, sync completa como fallback: $e');
+      return null;
+    }
+  }
 }

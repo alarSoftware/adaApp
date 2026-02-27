@@ -81,7 +81,11 @@ class SyncService {
   static Future<SyncResultUnificado> sincronizarTodosLosDatos({
     Function(double progress, String message)? onProgress,
     bool syncEquipments = true,
+    Set<String>? allowedModules,
   }) async {
+    // null = sin restricciones (sync completa). Set = solo esos módulos.
+    bool moduloPermitido(String m) =>
+        allowedModules == null || allowedModules.contains(m);
     final resultado = SyncResultUnificado();
 
     try {
@@ -153,7 +157,7 @@ class SyncService {
         );
       }
 
-      if (syncEquipments) {
+      if (syncEquipments && moduloPermitido('/equipos')) {
         onProgress?.call(0.1, 'Sincronizando marcas...');
         await EquipmentSyncService.sincronizarMarcas();
         onProgress?.call(0.15, 'Sincronizando modelos...');
@@ -161,221 +165,183 @@ class SyncService {
         onProgress?.call(0.2, 'Sincronizando logos...');
         await EquipmentSyncService.sincronizarLogos();
       } else {
-        onProgress?.call(0.1, 'Saltando sincronización de equipos...');
+        onProgress?.call(0.2, '');
       }
 
-      try {
-        onProgress?.call(0.25, 'Sincronizando clientes...');
-        final resultadoClientes =
-            await ClientSyncService.sincronizarClientesDelUsuario();
-        resultado.clientesSincronizados = resultadoClientes.itemsSincronizados;
-        resultado.clientesExito = resultadoClientes.exito;
-
-        if (!resultadoClientes.exito) {
-          resultado.erroresClientes = resultadoClientes.mensaje;
+      if (moduloPermitido('/clientes')) {
+        try {
+          onProgress?.call(0.25, 'Sincronizando clientes...');
+          final resultadoClientes =
+              await ClientSyncService.sincronizarClientesDelUsuario();
+          resultado.clientesSincronizados = resultadoClientes.itemsSincronizados;
+          resultado.clientesExito = resultadoClientes.exito;
+          if (!resultadoClientes.exito) {
+            resultado.erroresClientes = resultadoClientes.mensaje;
+          }
+        } catch (e, stackTrace) {
+          resultado.clientesExito = false;
+          resultado.erroresClientes = 'Error al sincronizar clientes: $e';
+          resultado.clientesSincronizados = 0;
+          debugPrint("ERROR CONTROLADO: $stackTrace");
+          await ErrorLogService.manejarExcepcion(
+            e, null, 'getCliente', currentUser?.id, 'clientes',
+          );
         }
-      } catch (e, stackTrace) {
-        resultado.clientesExito = false;
-        resultado.erroresClientes = 'Error al sincronizar clientes: $e';
-        resultado.clientesSincronizados = 0;
-        debugPrint("ERROR CONTROLADO: $stackTrace");
-
-        await ErrorLogService.manejarExcepcion(
-          e,
-          null,
-          'getCliente',
-          currentUser?.id,
-          'clientes',
-        );
+      } else {
+        onProgress?.call(0.25, '');
+        resultado.clientesExito = true;
       }
 
-      if (syncEquipments) {
+      if (syncEquipments && moduloPermitido('/equipos')) {
         try {
           onProgress?.call(0.35, 'Sincronizando equipos...');
-          final resultadoEquipos =
-              await EquipmentSyncService.sincronizarEquipos();
+          final resultadoEquipos = await EquipmentSyncService.sincronizarEquipos();
           resultado.equiposSincronizados = resultadoEquipos.itemsSincronizados;
           resultado.equiposExito = resultadoEquipos.exito;
-
-          if (!resultadoEquipos.exito) {
-            resultado.erroresEquipos = resultadoEquipos.mensaje;
-          }
+          if (!resultadoEquipos.exito) resultado.erroresEquipos = resultadoEquipos.mensaje;
         } catch (e) {
           resultado.equiposExito = false;
           resultado.erroresEquipos = 'Error al sincronizar equipos: $e';
           resultado.equiposSincronizados = 0;
         }
       } else {
-        resultado.equiposExito = true; // Consider success if skipped
+        resultado.equiposExito = true;
         resultado.equiposSincronizados = 0;
       }
 
-      try {
-        onProgress?.call(0.45, 'Sincronizando productos...');
-        final resultadoProductos = await ProductoSyncService.obtenerProductos();
-        resultado.productosSincronizados =
-            resultadoProductos.itemsSincronizados;
-        resultado.productosExito = resultadoProductos.exito;
-
-        if (!resultadoProductos.exito) {
-          resultado.erroresProductos = resultadoProductos.mensaje;
-        }
-      } catch (e) {
-        resultado.productosExito = false;
-        resultado.erroresProductos = 'Error al sincronizar productos: $e';
-        resultado.productosSincronizados = 0;
-      }
-
-      try {
-        onProgress?.call(0.55, 'Sincronizando censos...');
-        final resultadoCensos = await CensusSyncService.obtenerCensosActivos(
-          employeeId: employeeId,
-        );
-        resultado.censosSincronizados = resultadoCensos.itemsSincronizados;
-        resultado.censosExito = resultadoCensos.exito;
-
-        if (!resultadoCensos.exito) {
-          resultado.erroresCensos = resultadoCensos.mensaje;
-        }
-      } catch (e) {
-        resultado.censosExito = false;
-        resultado.erroresCensos = 'Error al sincronizar censos: $e';
-        resultado.censosSincronizados = 0;
-      }
-
-      if (resultado.censosExito) {
+      if (moduloPermitido('/operaciones')) {
         try {
-          onProgress?.call(0.60, 'Descargando imágenes de censos...');
-          final resultadoImagenes =
-              await CensusImageSyncService.obtenerFotosCensos(
-                employeeId: employeeId,
-              );
-          resultado.imagenesCensosSincronizadas =
-              resultadoImagenes.itemsSincronizados;
-          resultado.imagenesCensosExito = resultadoImagenes.exito;
-
-          if (!resultadoImagenes.exito) {
-            resultado.erroresImagenesCensos = resultadoImagenes.mensaje;
-          }
+          onProgress?.call(0.45, 'Sincronizando productos...');
+          final r = await ProductoSyncService.obtenerProductos();
+          resultado.productosSincronizados = r.itemsSincronizados;
+          resultado.productosExito = r.exito;
+          if (!r.exito) resultado.erroresProductos = r.mensaje;
         } catch (e) {
-          resultado.imagenesCensosExito = false;
-          resultado.erroresImagenesCensos =
-              'Error al sincronizar imágenes de censos: $e';
+          resultado.productosExito = false;
+          resultado.erroresProductos = 'Error al sincronizar productos: $e';
+          resultado.productosSincronizados = 0;
+        }
+      } else {
+        onProgress?.call(0.45, '');
+        resultado.productosExito = true;
+      }
+
+      if (moduloPermitido('/censos')) {
+        try {
+          onProgress?.call(0.55, 'Sincronizando censos...');
+          final r = await CensusSyncService.obtenerCensosActivos(employeeId: employeeId);
+          resultado.censosSincronizados = r.itemsSincronizados;
+          resultado.censosExito = r.exito;
+          if (!r.exito) resultado.erroresCensos = r.mensaje;
+        } catch (e) {
+          resultado.censosExito = false;
+          resultado.erroresCensos = 'Error al sincronizar censos: $e';
+          resultado.censosSincronizados = 0;
+        }
+        if (resultado.censosExito) {
+          try {
+            onProgress?.call(0.60, 'Descargando imágenes de censos...');
+            final ri = await CensusImageSyncService.obtenerFotosCensos(employeeId: employeeId);
+            resultado.imagenesCensosSincronizadas = ri.itemsSincronizados;
+            resultado.imagenesCensosExito = ri.exito;
+            if (!ri.exito) resultado.erroresImagenesCensos = ri.mensaje;
+          } catch (e) {
+            resultado.imagenesCensosExito = false;
+            resultado.erroresImagenesCensos = 'Error imágenes censos: $e';
+            resultado.imagenesCensosSincronizadas = 0;
+          }
+        } else {
+          resultado.imagenesCensosExito = true;
           resultado.imagenesCensosSincronizadas = 0;
+          resultado.erroresImagenesCensos = null;
         }
       } else {
+        onProgress?.call(0.60, '');
+        resultado.censosExito = true;
         resultado.imagenesCensosExito = true;
-        resultado.imagenesCensosSincronizadas = 0;
-        resultado.erroresImagenesCensos = null;
       }
 
-      try {
-        onProgress?.call(0.65, 'Sincronizando equipos pendientes...');
-        final resultadoPendientes =
-            await EquiposPendientesSyncService.obtenerEquiposPendientes(
-              employeeId: employeeId,
-            );
-        resultado.equiposPendientesSincronizados =
-            resultadoPendientes.itemsSincronizados;
-        resultado.equiposPendientesExito = resultadoPendientes.exito;
-
-        if (!resultadoPendientes.exito) {
-          resultado.erroresEquiposPendientes = resultadoPendientes.mensaje;
-        }
-      } catch (e) {
-        resultado.equiposPendientesExito = false;
-        resultado.erroresEquiposPendientes =
-            'Error al sincronizar equipos pendientes: $e';
-        resultado.equiposPendientesSincronizados = 0;
-      }
-
-      try {
-        onProgress?.call(0.70, 'Sincronizando formularios...');
-        final resultadoFormularios =
-            await DynamicFormSyncService.obtenerFormulariosDinamicos();
-        resultado.formulariosSincronizados =
-            resultadoFormularios.itemsSincronizados;
-        resultado.formulariosExito = resultadoFormularios.exito;
-
-        if (!resultadoFormularios.exito) {
-          resultado.erroresFormularios = resultadoFormularios.mensaje;
-        }
-      } catch (e) {
-        resultado.formulariosExito = false;
-        resultado.erroresFormularios = 'Error al sincronizar formularios: $e';
-        resultado.formulariosSincronizados = 0;
-      }
-
-      resultado.detallesFormulariosSincronizados = 0;
-      resultado.detallesFormulariosExito = true;
-
-      try {
-        onProgress?.call(0.75, 'Sincronizando respuestas...');
-        final resultadoRespuestas =
-            await DynamicFormSyncService.obtenerRespuestasPorVendedor(
-              employeeId,
-            );
-        resultado.respuestasFormulariosSincronizadas =
-            resultadoRespuestas.itemsSincronizados;
-        resultado.respuestasFormulariosExito = resultadoRespuestas.exito;
-
-        if (!resultadoRespuestas.exito) {
-          resultado.erroresRespuestasFormularios = resultadoRespuestas.mensaje;
-        }
-      } catch (e) {
-        resultado.respuestasFormulariosExito = false;
-        resultado.erroresRespuestasFormularios =
-            'Error al sincronizar respuestas: $e';
-        resultado.respuestasFormulariosSincronizadas = 0;
-      }
-
-      if (resultado.respuestasFormulariosExito) {
+      if (moduloPermitido('/equipos')) {
         try {
-          onProgress?.call(0.80, 'Descargando imágenes de formularios...');
-          final resultadoImagenesFormularios =
-              await DynamicFormSyncService.obtenerImagenesFormularios(
-                employeeId: employeeId,
-              );
-          resultado.imagenesFormulariosSincronizadas =
-              resultadoImagenesFormularios.itemsSincronizados;
-          resultado.imagenesFormulariosExito =
-              resultadoImagenesFormularios.exito;
-
-          if (!resultadoImagenesFormularios.exito) {
-            resultado.erroresImagenesFormularios =
-                resultadoImagenesFormularios.mensaje;
-          }
+          onProgress?.call(0.65, 'Sincronizando equipos pendientes...');
+          final r = await EquiposPendientesSyncService.obtenerEquiposPendientes(employeeId: employeeId);
+          resultado.equiposPendientesSincronizados = r.itemsSincronizados;
+          resultado.equiposPendientesExito = r.exito;
+          if (!r.exito) resultado.erroresEquiposPendientes = r.mensaje;
         } catch (e) {
-          resultado.imagenesFormulariosExito = false;
-          resultado.erroresImagenesFormularios =
-              'Error al sincronizar imágenes de formularios: $e';
-          resultado.imagenesFormulariosSincronizadas = 0;
+          resultado.equiposPendientesExito = false;
+          resultado.erroresEquiposPendientes = 'Error equipos pendientes: $e';
+          resultado.equiposPendientesSincronizados = 0;
         }
       } else {
-        resultado.imagenesFormulariosExito = true;
-        resultado.imagenesFormulariosSincronizadas = 0;
-        resultado.erroresImagenesFormularios = null;
+        resultado.equiposPendientesExito = true;
       }
 
-      try {
-        onProgress?.call(0.85, 'Sincronizando operaciones comerciales...');
-        final resultadoOperaciones =
-            await OperacionComercialSyncService.obtenerOperacionesPorVendedor(
-              employeeId,
-            );
-        resultado.operacionesComercialesSincronizadas =
-            resultadoOperaciones.itemsSincronizados;
-        resultado.operacionesComercialesExito = resultadoOperaciones.exito;
-
-        if (!resultadoOperaciones.exito) {
-          resultado.erroresOperacionesComerciales =
-              resultadoOperaciones.mensaje;
+      if (moduloPermitido('/formularios')) {
+        try {
+          onProgress?.call(0.70, 'Sincronizando formularios...');
+          final rf = await DynamicFormSyncService.obtenerFormulariosDinamicos();
+          resultado.formulariosSincronizados = rf.itemsSincronizados;
+          resultado.formulariosExito = rf.exito;
+          if (!rf.exito) resultado.erroresFormularios = rf.mensaje;
+        } catch (e) {
+          resultado.formulariosExito = false;
+          resultado.erroresFormularios = 'Error formularios: $e';
+          resultado.formulariosSincronizados = 0;
         }
-      } catch (e) {
-        resultado.operacionesComercialesExito = false;
-        resultado.erroresOperacionesComerciales =
-            'Error al sincronizar operaciones comerciales: $e';
-        resultado.operacionesComercialesSincronizadas = 0;
+        resultado.detallesFormulariosSincronizados = 0;
+        resultado.detallesFormulariosExito = true;
+        try {
+          onProgress?.call(0.75, 'Sincronizando respuestas...');
+          final rr = await DynamicFormSyncService.obtenerRespuestasPorVendedor(employeeId);
+          resultado.respuestasFormulariosSincronizadas = rr.itemsSincronizados;
+          resultado.respuestasFormulariosExito = rr.exito;
+          if (!rr.exito) resultado.erroresRespuestasFormularios = rr.mensaje;
+        } catch (e) {
+          resultado.respuestasFormulariosExito = false;
+          resultado.erroresRespuestasFormularios = 'Error respuestas: $e';
+          resultado.respuestasFormulariosSincronizadas = 0;
+        }
+        if (resultado.respuestasFormulariosExito) {
+          try {
+            onProgress?.call(0.80, 'Descargando imágenes de formularios...');
+            final ri = await DynamicFormSyncService.obtenerImagenesFormularios(employeeId: employeeId);
+            resultado.imagenesFormulariosSincronizadas = ri.itemsSincronizados;
+            resultado.imagenesFormulariosExito = ri.exito;
+            if (!ri.exito) resultado.erroresImagenesFormularios = ri.mensaje;
+          } catch (e) {
+            resultado.imagenesFormulariosExito = false;
+            resultado.erroresImagenesFormularios = 'Error imágenes formularios: $e';
+            resultado.imagenesFormulariosSincronizadas = 0;
+          }
+        } else {
+          resultado.imagenesFormulariosExito = true;
+          resultado.imagenesFormulariosSincronizadas = 0;
+          resultado.erroresImagenesFormularios = null;
+        }
+      } else {
+        onProgress?.call(0.80, '');
+        resultado.formulariosExito = true;
+        resultado.detallesFormulariosExito = true;
+        resultado.respuestasFormulariosExito = true;
+        resultado.imagenesFormulariosExito = true;
+      }
+
+      if (moduloPermitido('/operaciones')) {
+        try {
+          onProgress?.call(0.85, 'Sincronizando operaciones comerciales...');
+          final r = await OperacionComercialSyncService.obtenerOperacionesPorVendedor(employeeId);
+          resultado.operacionesComercialesSincronizadas = r.itemsSincronizados;
+          resultado.operacionesComercialesExito = r.exito;
+          if (!r.exito) resultado.erroresOperacionesComerciales = r.mensaje;
+        } catch (e) {
+          resultado.operacionesComercialesExito = false;
+          resultado.erroresOperacionesComerciales = 'Error operaciones: $e';
+          resultado.operacionesComercialesSincronizadas = 0;
+        }
+      } else {
+        onProgress?.call(0.85, '');
+        resultado.operacionesComercialesExito = true;
       }
 
       // ==================== DEVICE LOGS (Upload & Clean) ====================
@@ -692,10 +658,11 @@ class SyncResultUnificado {
           '$imagenesFormulariosSincronizadas imágenes de formularios',
           'Imágenes de formularios descargadas',
         ),
-      SyncStep(
-        '$asignacionesSincronizadas asignaciones',
-        'Asignaciones descargadas',
-      ),
+      if (asignacionesSincronizadas > 0)
+        SyncStep(
+          '$asignacionesSincronizadas asignaciones',
+          'Asignaciones descargadas',
+        ),
       if (operacionesComercialesSincronizadas > 0)
         SyncStep(
           '$operacionesComercialesSincronizadas operaciones comerciales',
