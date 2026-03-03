@@ -75,7 +75,7 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/logo_bdp.png"
+  image_path: "assets/logo_rodes.png"
 
 flutter:
   uses-material-design: true

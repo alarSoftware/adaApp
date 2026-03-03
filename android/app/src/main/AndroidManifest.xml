@@ -44,7 +44,7 @@
         android:required="false" />
 
     <application
-        android:label="AdaApp"
+        android:label="Aprende Mas"
         android:name=".Application"
         android:icon="@mipmap/ic_launcher">
         <activity

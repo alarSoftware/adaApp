@@ -30,7 +30,7 @@ void onStart(ServiceInstance service) async {
 
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
     'ada_background_service', // id (must match internal config)
-    'AdaApp Service', // title
+    'Aprende Mas Service', // title
     description: 'Servicio de monitoreo en segundo plano',
     importance:
         Importance.high, // Cambiado de low a high para mayor persistencia
@@ -126,7 +126,7 @@ void onStart(ServiceInstance service) async {
           // UPDATE NOTIFICATION VIA LOCAL NOTIFICATIONS (Custom & Persistent)
           flutterLocalNotificationsPlugin.show(
             888, // Notification ID (Matches SDK config)
-            'AdaApp Activa',
+            'Aprende Mas Activa',
             'La app esta funcionando correctamente',
             NotificationDetails(
               android: AndroidNotificationDetails(
@@ -150,7 +150,9 @@ void onStart(ServiceInstance service) async {
       bool extensionActiva = DeviceLogBackgroundExtension.estaActivo;
 
       if (!extensionActiva) {
-        debugPrint('Watchdog: Extensión inactiva detectada. Reinicializando...');
+        debugPrint(
+          'Watchdog: Extensión inactiva detectada. Reinicializando...',
+        );
         await DeviceLogBackgroundExtension.inicializar(
           verificarSesion: true,
           serviceInstance: service,
@@ -186,7 +188,7 @@ class AppBackgroundService {
         autoStart: true,
         isForegroundMode: true,
         notificationChannelId: 'ada_background_service',
-        initialNotificationTitle: 'AdaApp',
+        initialNotificationTitle: 'Aprende Mas',
         initialNotificationContent: 'Servicio en segundo plano activo',
         foregroundServiceNotificationId: 888,
         // Match types declared in AndroidManifest.xml

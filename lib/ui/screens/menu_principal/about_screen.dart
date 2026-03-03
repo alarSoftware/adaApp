@@ -104,12 +104,12 @@ class _AboutScreenState extends State<AboutScreen> {
           ),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Image.asset('assets/logo_bdp.png', fit: BoxFit.contain),
+            child: Image.asset('assets/logo_rodes.png', fit: BoxFit.contain),
           ),
         ),
         SizedBox(height: 16),
         Text(
-          'AdaApp',
+          'Aprende Mas',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,

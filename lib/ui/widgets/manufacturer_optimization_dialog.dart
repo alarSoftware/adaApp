@@ -37,7 +37,7 @@ class ManufacturerOptimizationDialog extends StatelessWidget {
             _buildManufacturerWarning(),
             const SizedBox(height: 20),
             Text(
-              'Sigue estos pasos para asegurar que AdaApp funcione correctamente:',
+              'Sigue estos pasos para asegurar que Aprende Mas funcione correctamente:',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -141,7 +141,7 @@ class ManufacturerOptimizationDialog extends StatelessWidget {
         _buildStep(2, 'Ve a Aplicaciones -> Inicio de aplicaciones.'),
         _buildStep(
           3,
-          'Busca "AdaApp" y desactiva "Gestionar automáticamente".',
+          'Busca "Aprende Mas" y desactiva "Gestionar automáticamente".',
         ),
         _buildStep(
           4,
@@ -153,8 +153,8 @@ class ManufacturerOptimizationDialog extends StatelessWidget {
         m.contains('POCO')) {
       return [
         _buildStep(1, 'Abre Ajustes -> Aplicaciones -> Permisos.'),
-        _buildStep(2, 'Selecciona "Inicio automático" y activa AdaApp.'),
-        _buildStep(3, 'Vuelve a Ajustes de batería -> AdaApp.'),
+        _buildStep(2, 'Selecciona "Inicio automático" y activa Aprende Mas.'),
+        _buildStep(3, 'Vuelve a Ajustes de batería -> Aprende Mas.'),
         _buildStep(
           4,
           'Selecciona "Sin restricciones" en el modo de ahorro de batería.',
@@ -163,13 +163,13 @@ class ManufacturerOptimizationDialog extends StatelessWidget {
     } else if (m.contains('SAMSUNG')) {
       return [
         _buildStep(1, 'Abre Ajustes -> Aplicaciones.'),
-        _buildStep(2, 'Busca AdaApp -> Batería.'),
+        _buildStep(2, 'Busca Aprende Mas -> Batería.'),
         _buildStep(3, 'Selecciona la opción "No restringida".'),
       ];
     } else {
       return [
         _buildStep(1, 'Abre Ajustes de batería.'),
-        _buildStep(2, 'Busca AdaApp.'),
+        _buildStep(2, 'Busca Aprende Mas.'),
         _buildStep(
           3,
           'Desactiva cualquier optimización de batería o restricción de segundo plano.',

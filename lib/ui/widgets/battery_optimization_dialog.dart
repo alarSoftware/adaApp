@@ -209,7 +209,7 @@ class BatteryOptimizationDialog {
             ],
           ),
           content: Text(
-            'AdaApp ahora puede funcionar correctamente en segundo plano.',
+            'Aprende Mas ahora puede funcionar correctamente en segundo plano.',
             style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
           ),
           actions: [

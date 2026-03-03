@@ -46,7 +46,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AdaApp',
+      title: 'Aprende Mas',
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -93,7 +93,7 @@ class InitializationScreen extends StatefulWidget {
 
 class _InitializationScreenState extends State<InitializationScreen> {
   bool _isLoading = true;
-  String _loadingMessage = 'Iniciando AdaApp...';
+  String _loadingMessage = 'Iniciando Aprende Mas...';
 
   @override
   void initState() {
@@ -314,7 +314,7 @@ class _InitializationScreenState extends State<InitializationScreen> {
             const SizedBox(height: 40),
 
             const Text(
-              'AdaApp',
+              'Aprende Mas',
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
