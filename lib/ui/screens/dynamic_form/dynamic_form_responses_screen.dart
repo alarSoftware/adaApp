@@ -92,65 +92,8 @@ class _DynamicFormResponsesScreenState
           onPressed: _navigateToFormList,
           tooltip: 'Nuevo Formulario',
         ),
-        if (widget.cliente == null)
-          IconButton(
-            icon: Icon(Icons.logout, color: AppColors.onPrimary),
-            onPressed: _handleLogout,
-            tooltip: 'Cerrar Sesión',
-          ),
       ],
     );
-  }
-
-  Future<void> _handleLogout() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Cerrar Sesión'),
-        content: Text('¿Seguro que deseas salir?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: Text('Salir'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    try {
-      if (mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => Center(child: CircularProgressIndicator()),
-        );
-      }
-
-      await AuthService().logout();
-
-      if (mounted) {
-        Navigator.of(context).pop(); // Close dialog
-        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-      }
-    } catch (e) {
-      if (mounted) Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al cerrar sesión: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    }
   }
 
   // ==================== CLIENT INFO ====================
@@ -698,27 +641,61 @@ class _DynamicFormResponsesScreenState
       builder: (context) => PopScope(
         canPop: false,
         child: Center(
-          child: Container(
-            padding: EdgeInsets.all(24),
+          child: Card(
+            elevation: 4,
+            color: AppColors.surface,
+            shadowColor: AppColors.shadowLight,
             margin: EdgeInsets.symmetric(horizontal: 40),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: AppColors.border, width: 0.5),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: AppColors.primary),
-                SizedBox(height: 16),
-                Text(
-                  'Descargando formularios...',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.info.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.cloud_download,
+                      color: AppColors.info,
+                      size: 24,
+                    ),
                   ),
-                ),
-              ],
+                  SizedBox(height: 16),
+                  Text(
+                    'Descargando formularios',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Por favor espere...',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      color: AppColors.primary,
+                      strokeWidth: 3,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

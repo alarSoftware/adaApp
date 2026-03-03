@@ -6,6 +6,7 @@ import 'dart:convert';
 
 import 'package:ada_app/services/api/api_config_service.dart';
 import 'package:ada_app/services/network/monitored_http_client.dart';
+import '../../utils/logger.dart';
 
 import 'package:ada_app/config/constants/server_constants.dart';
 
@@ -46,6 +47,18 @@ class BasePostService {
       );
 
       debugPrint('Response: ${response.statusCode}');
+
+      // LOG: Imprimir snippet del body para depuración
+      AppLogger.i(
+        'BASE_POST_SERVICE: POST $endpoint -> status: ${response.statusCode}',
+      );
+      if (response.body.length > 200) {
+        AppLogger.i(
+          'BASE_POST_SERVICE: body snippet: ${response.body.substring(0, 200)}',
+        );
+      } else {
+        AppLogger.i('BASE_POST_SERVICE: body: ${response.body}');
+      }
 
       final result = _processResponse(response, fullUrl);
 

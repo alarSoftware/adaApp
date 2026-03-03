@@ -725,6 +725,18 @@ class DynamicFormSyncService extends BaseSyncService {
         timeout: BaseSyncService.timeout,
       );
 
+      AppLogger.i(
+        'DYNAMIC_FORM_SYNC: GET getDynamicForm status: ${response.statusCode}',
+      );
+      AppLogger.i('DYNAMIC_FORM_SYNC: endpoint: $currentEndpoint');
+      if (response.body.length > 200) {
+        AppLogger.i(
+          'DYNAMIC_FORM_SYNC: body snippet: ${response.body.substring(0, 200)}',
+        );
+      } else {
+        AppLogger.i('DYNAMIC_FORM_SYNC: body: ${response.body}');
+      }
+
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return await _parseListResponse(response.body);
       } else {
@@ -866,7 +878,10 @@ class DynamicFormSyncService extends BaseSyncService {
         }
 
         return null;
-      } catch (e) { AppLogger.e("DYNAMIC_FORM_SYNC_SERVICE: Error", e); return null; }
+      } catch (e) {
+        AppLogger.e("DYNAMIC_FORM_SYNC_SERVICE: Error", e);
+        return null;
+      }
     });
   }
 

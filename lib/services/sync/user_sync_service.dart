@@ -25,17 +25,35 @@ class UserSyncService {
         timeout: BaseSyncService.timeout,
       );
 
+      AppLogger.i(
+        "USER_SYNC_SERVICE: GET getUsers status: ${response.statusCode}",
+      );
+
       if (response.statusCode >= 200 && response.statusCode < 300) {
+        AppLogger.i("USER_SYNC_SERVICE: body length: ${response.body.length}");
+        if (response.body.length > 100) {
+          AppLogger.i(
+            "USER_SYNC_SERVICE: body snippet: ${response.body.substring(0, 100)}",
+          );
+        } else {
+          AppLogger.i("USER_SYNC_SERVICE: body snippet: ${response.body}");
+        }
+
         final responseData = jsonDecode(response.body);
 
         final String dataString = responseData['data'];
+        AppLogger.i(
+          "USER_SYNC_SERVICE: dataString length: ${dataString.length}",
+        );
         final List<dynamic> usuariosAPI = jsonDecode(dataString);
 
         if (usuariosAPI.isEmpty) {
           // Si no hay usuarios en el servidor, limpiar la tabla local
           try {
             await _dbHelper.sincronizarUsuarios([]);
-          } catch (dbError) { AppLogger.e("USER_SYNC_SERVICE: Error", dbError); }
+          } catch (dbError) {
+            AppLogger.e("USER_SYNC_SERVICE: Error", dbError);
+          }
 
           return SyncResult(
             exito: true,
@@ -172,11 +190,16 @@ class UserSyncService {
         mensaje: 'Sin conexión de red',
         itemsSincronizados: 0,
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppLogger.e(
+        "USER_SYNC_SERVICE: Error general en sincronizarUsuarios",
+        e,
+        stackTrace,
+      );
       await ErrorLogService.logError(
         tableName: 'Users',
         operation: 'sync_from_server',
-        errorMessage: 'Error general: $e',
+        errorMessage: 'Error general: $e\n$stackTrace',
         errorType: 'unknown',
         errorCode: 'GENERAL_ERROR',
         endpoint: currentEndpoint,
@@ -213,7 +236,10 @@ class UserSyncService {
         return result.first['employee_name'] as String?;
       }
       return null;
-    } catch (e) { AppLogger.e("USER_SYNC_SERVICE: Error", e); return null; }
+    } catch (e) {
+      AppLogger.e("USER_SYNC_SERVICE: Error", e);
+      return null;
+    }
   }
 
   static Future<String?> obtenerEmployeeIdUsuarioActual() async {
