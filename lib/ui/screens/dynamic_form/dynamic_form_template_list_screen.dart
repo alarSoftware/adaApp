@@ -364,8 +364,10 @@ class _DynamicFormTemplateListScreenState
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) =>
-              DynamicFormFillScreen(viewModel: widget.viewModel),
+          builder: (context) => DynamicFormFillScreen(
+            viewModel: widget.viewModel,
+            isNewForm: true,
+          ),
         ),
       );
     } else {

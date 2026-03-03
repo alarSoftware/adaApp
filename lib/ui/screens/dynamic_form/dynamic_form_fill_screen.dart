@@ -7,6 +7,7 @@ import 'package:ada_app/ui/widgets/exit_confimation_dialog.dart';
 class DynamicFormFillScreen extends StatefulWidget {
   final DynamicFormViewModel viewModel;
   final bool isReadOnly;
+  final bool isNewForm;
   final VoidCallback? onRetry;
   final VoidCallback? onDelete;
 
@@ -14,6 +15,7 @@ class DynamicFormFillScreen extends StatefulWidget {
     super.key,
     required this.viewModel,
     this.isReadOnly = false,
+    this.isNewForm = false,
     this.onRetry,
     this.onDelete,
   });
@@ -414,6 +416,9 @@ class _DynamicFormFillScreenState extends State<DynamicFormFillScreen> {
           _isSaving = false;
         });
         Navigator.pop(context);
+        if (widget.isNewForm) {
+          Navigator.pop(context);
+        }
       } else {
         final errorMessage =
             widget.viewModel.errorMessage ?? 'Error al completar formulario';
