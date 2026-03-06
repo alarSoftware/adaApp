@@ -164,9 +164,22 @@ class LoginScreenViewModel extends ChangeNotifier {
 
       if (count == 0) {
         _errorMessage =
-            'No hay usuarios registrados.\nPor favor sincronice los usuarios.';
-        // No enviamos evento ShowErrorEvent aquí para no mostrar un snackbar/dialog intrusivo al inicio,
-        // pero sí mostramos el mensaje en el formulario (que usa _errorMessage).
+            'No hay usuarios registrados.\nSincronizando automáticamente...';
+        notifyListeners();
+
+        await syncUsers();
+
+        final resultAfterSync = await db.rawQuery(
+          'SELECT count(*) as count FROM Users',
+        );
+        final countAfterSync = Sqflite.firstIntValue(resultAfterSync) ?? 0;
+
+        if (countAfterSync == 0) {
+          _errorMessage =
+              'No se pudieron sincronizar los usuarios.\nVerifique su conexión e intente manualmente.';
+        } else {
+          _errorMessage = null;
+        }
         notifyListeners();
       }
     } catch (e) {
@@ -221,10 +234,30 @@ class LoginScreenViewModel extends ChangeNotifier {
     HapticFeedback.lightImpact();
 
     try {
-      final result = await _authService.login(
+      var result = await _authService.login(
         usernameController.text.trim(),
         passwordController.text,
       );
+
+      if (!result.exitoso && result.mensaje == 'Usuario no encontrado') {
+        _errorMessage =
+            'Usuario no encontrado localmente.\nBuscando en el servidor...';
+        notifyListeners();
+
+        final syncResult = await AuthService.sincronizarSoloUsuarios();
+
+        if (syncResult.exito && syncResult.itemsSincronizados > 0) {
+          result = await _authService.login(
+            usernameController.text.trim(),
+            passwordController.text,
+          );
+        }
+
+        if (!result.exitoso) {
+          _errorMessage = null;
+          notifyListeners();
+        }
+      }
 
       if (!result.exitoso) {
         HapticFeedback.heavyImpact();
@@ -246,11 +279,8 @@ class LoginScreenViewModel extends ChangeNotifier {
       final validationResult = await _validateUserAssignment();
       if (!validationResult) return;
 
-      // La validacion de sincronizacion ahora se maneja en SelectScreen
-
       await _checkBiometricAvailability();
 
-      // Solicitud de permisos proactiva y BLOQUEANTE
       final permissionsGranted = await checkAndRequestPermissions();
       if (!permissionsGranted) {
         _eventController.add(ShowPermissionDeniedDialogEvent());
