@@ -50,42 +50,43 @@ class OperacionComercialSyncService extends BaseSyncService {
       final queryParams = <String, String>{};
       queryParams['employeeId'] = employeeId;
 
-      // SEGURIDAD: Verificar si hay pendientes
-      final pendientes = await OperacionComercialRepositoryImpl()
-          .obtenerOperacionesPendientes();
+      final repo = OperacionComercialRepositoryImpl();
+      final creadas = await repo.obtenerOperacionesPendientes();
+      final conError = await repo.obtenerOperacionesConError();
+      final todasPendientes = [...creadas, ...conError];
 
-      if (pendientes.isNotEmpty) {
+      if (todasPendientes.isNotEmpty) {
         return SyncResult(
           exito: false,
           mensaje:
-              'Hay ${pendientes.length} operaciones pendientes. Por favor sincronízalas antes de actualizar.',
+              'Hay ${todasPendientes.length} operaciones pendientes o con error de envío. Por favor sincronízalas antes de actualizar.',
           itemsSincronizados: 0,
         );
       }
 
-      // LIMPIEZA: Si no hay pendientes, limpiar todo para evitar duplicados/stale data
-      await OperacionComercialRepositoryImpl().eliminarTodasLasOperaciones();
+      // LIMPIEZA GLOBAL: Si no hay pendientes, limpiar todo para evitar duplicados
+      await repo.eliminarTodasLasOperaciones();
 
       if (partnerId != null) {
-        // VALIDACIÓN DE SEGURIDAD:
-        // Antes de descargar y reemplazar, verificamos si hay pendientes locales.
-        final pendientes = await OperacionComercialRepositoryImpl()
+        // VALIDACIÓN DE SEGURIDAD POR CLIENTE:
+        final creadasCliente = await repo
             .obtenerOperacionesPendientesPorCliente(partnerId);
+        final conErrorCliente = conError
+            .where((o) => o.clienteId == partnerId)
+            .toList();
+        final pendientesCliente = [...creadasCliente, ...conErrorCliente];
 
-        if (pendientes.isNotEmpty) {
+        if (pendientesCliente.isNotEmpty) {
           return SyncResult(
             exito: false,
             mensaje:
-                'Hay ${pendientes.length} operaciones pendientes de envío para este cliente. Por favor, incia la sincronización antes de descargar nuevas.',
+                'Hay ${pendientesCliente.length} operaciones pendientes o con error de envío para este cliente. Por favor, inicia la sincronización antes de descargar nuevas.',
             itemsSincronizados: 0,
           );
         }
 
-        // Si no hay pendientes, es seguro limpiar para evitar duplicados.
-        await OperacionComercialRepositoryImpl().eliminarOperacionesPorCliente(
-          partnerId,
-        );
-
+        // Si no hay pendientes, es seguro limpiar para este cliente
+        await repo.eliminarOperacionesPorCliente(partnerId);
         queryParams['partnerId'] = partnerId.toString();
       }
       if (tipo != null) {

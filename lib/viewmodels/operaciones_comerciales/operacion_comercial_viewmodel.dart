@@ -248,10 +248,17 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
         excluirId: productoOriginal.id,
       );
 
+      // Obtener IDs de productos que ya están siendo usados como reemplazo
+      final idsYaUsados = _productosSeleccionados
+          .where((d) => d.productoReemplazoId != null)
+          .map((d) => d.productoReemplazoId!)
+          .toSet();
+
       // Filtrar por unidad de medida según el tipo de operación
+      // e integrar la restricción para no duplicar reemplazos
       return productos.where((p) {
         final error = tipoOperacion.validarUnidadMedida(p.unidadMedida);
-        return error == null;
+        return error == null && !idsYaUsados.contains(p.id);
       }).toList();
     } catch (e) {
       AppLogger.e("OPERACION_COMERCIAL_VIEWMODEL: Error", e);
@@ -266,10 +273,17 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
     if (categoriaOriginal == null) return [];
 
     try {
-      return await _productoRepository.obtenerProductosPorCategoria(
+      final productos = await _productoRepository.obtenerProductosPorCategoria(
         categoriaOriginal,
         excluirId: idProductoActual,
       );
+
+      final idsYaUsados = _productosSeleccionados
+          .where((d) => d.productoReemplazoId != null)
+          .map((d) => d.productoReemplazoId!)
+          .toSet();
+
+      return productos.where((p) => !idsYaUsados.contains(p.id)).toList();
     } catch (e) {
       AppLogger.e("OPERACION_COMERCIAL_VIEWMODEL: Error", e);
       return [];
@@ -321,6 +335,18 @@ class OperacionComercialFormViewModel extends ChangeNotifier {
       if (sinReemplazo.isNotEmpty) {
         return ValidationResult.error(
           'Debes seleccionar un reemplazo para todos los productos',
+        );
+      }
+
+      // Validar que no haya duplicados en los productos de reemplazo
+      final idsReemplazo = _productosSeleccionados
+          .where((d) => d.productoReemplazoId != null)
+          .map((d) => d.productoReemplazoId!)
+          .toList();
+
+      if (idsReemplazo.length != idsReemplazo.toSet().length) {
+        return ValidationResult.error(
+          'No se puede duplicar el producto de reemplazo',
         );
       }
     }
