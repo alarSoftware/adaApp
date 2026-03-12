@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/viewmodels/login_screen_viewmodel.dart';
 import 'package:ada_app/ui/theme/colors.dart';
-import 'package:showcaseview/showcaseview.dart';
 
 class LoginForm extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final LoginScreenViewModel viewModel;
   final VoidCallback onSubmit;
-  final GlobalKey loginButtonKey;
 
   const LoginForm({
     super.key,
     required this.formKey,
     required this.viewModel,
     required this.onSubmit,
-    required this.loginButtonKey,
   });
 
   @override
@@ -175,46 +172,40 @@ class LoginForm extends StatelessWidget {
   Widget _buildLoginButton() {
     return SizedBox(
       height: 54,
-      child: Showcase(
-        key: loginButtonKey,
-        title: 'Iniciar Sesión',
-        description:
-            'Una vez que los usuarios estén sincronizados, ingresa tus credenciales aquí para entrar.',
-        child: Semantics(
-          button: true,
-          enabled: !viewModel.isLoading,
-          child: ElevatedButton(
-            onPressed: viewModel.isLoading ? null : onSubmit,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.buttonPrimary,
-              foregroundColor: AppColors.buttonTextPrimary,
-              disabledBackgroundColor: AppColors.buttonDisabled,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 2,
-              shadowColor: AppColors.shadowLight,
+      child: Semantics(
+        button: true,
+        enabled: !viewModel.isLoading,
+        child: ElevatedButton(
+          onPressed: viewModel.isLoading ? null : onSubmit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.buttonPrimary,
+            foregroundColor: AppColors.buttonTextPrimary,
+            disabledBackgroundColor: AppColors.buttonDisabled,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: viewModel.isLoading
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        AppColors.buttonTextPrimary,
-                      ),
-                    ),
-                  )
-                : const Text(
-                    'Iniciar Sesión',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
+            elevation: 2,
+            shadowColor: AppColors.shadowLight,
+          ),
+          child: viewModel.isLoading
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.buttonTextPrimary,
                     ),
                   ),
-          ),
+                )
+              : const Text(
+                  'Iniciar Sesión',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
         ),
       ),
     );

@@ -4,6 +4,7 @@ import 'package:ada_app/viewmodels/dynamic_form_viewmodel.dart';
 import 'package:ada_app/models/dynamic_form/dynamic_form_template.dart';
 import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_fill_screen.dart';
 import 'package:ada_app/models/cliente.dart';
+import 'package:ada_app/ui/widgets/dynamic_form/dynamic_form_loading_dialog.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 
 /// Pantalla que muestra la lista de formularios dinámicos disponibles (templates)
@@ -43,7 +44,7 @@ class _DynamicFormTemplateListScreenState
               if (!mounted) return;
               scaffoldMessenger.showSnackBar(
                 SnackBar(
-                  content: Text('✅ Formularios actualizados'),
+                  content: const Text('Formularios actualizados'),
                   backgroundColor: AppColors.success,
                 ),
               );
@@ -243,42 +244,74 @@ class _DynamicFormTemplateListScreenState
 
   Widget _buildEmptyView() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.inbox_outlined,
-              size: 80,
-              color: AppColors.textSecondary,
+      child: Container(
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.shadow.withValues(alpha: 0.05),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
             ),
-            SizedBox(height: 16),
-            Text(
-              'No hay formularios disponibles',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.05),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.cloud_download_outlined,
+                size: 64,
+                color: AppColors.primary,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 24),
             Text(
-              'Descarga formularios desde el servidor',
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              'No hay formularios',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Es necesario descargar los formularios del servidor para comenzar.',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
               textAlign: TextAlign.center,
             ),
-            SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () async {
-                await widget.viewModel.downloadTemplatesFromServer();
-              },
-              icon: Icon(Icons.cloud_download),
-              label: Text('Descargar Formularios'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.onPrimary,
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  await widget.viewModel.downloadTemplatesFromServer();
+                },
+                icon: const Icon(Icons.sync),
+                label: const Text('Descargar Ahora'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 0,
+                ),
               ),
             ),
           ],
@@ -333,10 +366,8 @@ class _DynamicFormTemplateListScreenState
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-        ),
+      builder: (context) => const ModernLoadingDialog(
+        title: 'Iniciando formulario...',
       ),
     );
 
@@ -372,7 +403,7 @@ class _DynamicFormTemplateListScreenState
       // Mostrar error
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ Error al crear el formulario'),
+          content: const Text('Error al crear el formulario'),
           backgroundColor: AppColors.error,
         ),
       );

@@ -44,7 +44,7 @@ Una aplicación móvil desarrollada con Flutter para la gestión integral de ope
 
 ## Historial de Versiones
 
-- **v2.0.1**: Mejora en login con sincronización automática.
+- **v2.0.1**: Mejora en login con sincronización automática y rediseño premium de formularios dinámicos.
 - **v2.0.0**: Versión estable inicial.
 
 ---

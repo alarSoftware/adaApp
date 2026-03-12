@@ -6,6 +6,7 @@ import 'package:ada_app/models/cliente.dart';
 import 'package:ada_app/ui/widgets/client_info_card.dart';
 import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_template_list_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:ada_app/ui/widgets/dynamic_form/dynamic_form_loading_dialog.dart';
 import 'package:ada_app/ui/screens/dynamic_form/dynamic_form_fill_screen.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 
@@ -472,41 +473,72 @@ class _DynamicFormResponsesScreenState
 
   Widget _buildEmptyView() {
     return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32.0),
+      child: Container(
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.shadow.withValues(alpha: 0.05),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.assignment_outlined,
-              size: 80,
-              color: AppColors.textSecondary,
-            ),
-            SizedBox(height: 16),
-            Text(
-              'No hay respuestas guardadas',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.05),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.assignment_outlined,
+                size: 64,
+                color: AppColors.primary,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 24),
+            Text(
+              'Sin resultados',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 12),
             Text(
               _getEmptyMessage(),
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
               textAlign: TextAlign.center,
             ),
-            SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _navigateToFormList,
-              icon: Icon(Icons.add),
-              label: Text('Crear Nuevo Formulario'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.onPrimary,
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _navigateToFormList,
+                icon: const Icon(Icons.add),
+                label: const Text('Crear Nuevo Formulario'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 0,
+                ),
               ),
             ),
           ],
@@ -633,14 +665,17 @@ class _DynamicFormResponsesScreenState
     final usuario = await AuthService().getCurrentUser();
     final employeeId = usuario?.employeeId ?? '';
 
-    _showLoadingDialog();
+    final subtitleNotifier = ValueNotifier<String?>('Iniciando...');
+    _showLoadingDialog(subtitleNotifier);
 
     // PASO 1: Descargar templates
-    debugPrint('📥 [1/2] Descargando templates...');
+    subtitleNotifier.value = '[1/2] Descargando plantillas...';
+    debugPrint('📥 [1/2] Descargando plantillas...');
     final templatesSuccess = await _viewModel.downloadTemplatesFromServer();
     debugPrint('📋 Templates: $templatesSuccess');
 
     // PASO 2: Descargar respuestas
+    subtitleNotifier.value = '[2/2] Descargando respuestas...';
     debugPrint('📥 [2/2] Descargando respuestas...');
     bool responsesSuccess = false;
 
@@ -651,8 +686,13 @@ class _DynamicFormResponsesScreenState
       debugPrint('📝 Responses: $responsesSuccess');
     } else {}
 
-    if (!mounted) return;
+    subtitleNotifier.value = 'Finalizando...';
+    if (!mounted) {
+      subtitleNotifier.dispose();
+      return;
+    }
     Navigator.pop(context);
+    subtitleNotifier.dispose();
 
     // Mostrar resultado
     final templatesCount = _viewModel.templates.length;
@@ -663,21 +703,21 @@ class _DynamicFormResponsesScreenState
 
     if (employeeId.isEmpty) {
       message = templatesSuccess
-          ? '✅ Formularios: $templatesCount\n⚠️ Respuestas no descargadas (sin vendedor)'
-          : '❌ Error descargando formularios';
+          ? 'Formularios: $templatesCount\nRespuestas no descargadas (sin vendedor)'
+          : 'Error descargando formularios';
       backgroundColor = templatesSuccess ? AppColors.warning : AppColors.error;
     } else if (templatesSuccess && responsesSuccess) {
       message =
-          '✅ Descarga completa:\n📋 $templatesCount formularios\n📝 $responsesCount respuestas';
+          'Descarga completa:\n$templatesCount formularios\n$responsesCount respuestas';
       backgroundColor = AppColors.success;
     } else if (templatesSuccess && !responsesSuccess) {
-      message = '⚠️ Formularios: OK ($templatesCount)\n❌ Respuestas: Error';
+      message = 'Formularios: OK ($templatesCount)\nRespuestas: Error';
       backgroundColor = AppColors.warning;
     } else if (!templatesSuccess && responsesSuccess) {
-      message = '❌ Formularios: Error\n⚠️ Respuestas: OK ($responsesCount)';
+      message = 'Formularios: Error\nRespuestas: OK ($responsesCount)';
       backgroundColor = AppColors.warning;
     } else {
-      message = '❌ Error en la descarga';
+      message = 'Error en la descarga';
       backgroundColor = AppColors.error;
     }
 
@@ -691,37 +731,13 @@ class _DynamicFormResponsesScreenState
     debugPrint('🔴 DESCARGA FINALIZADA');
   }
 
-  void _showLoadingDialog() {
+  void _showLoadingDialog(ValueNotifier<String?>? subtitleNotifier) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => PopScope(
-        canPop: false,
-        child: Center(
-          child: Container(
-            padding: EdgeInsets.all(24),
-            margin: EdgeInsets.symmetric(horizontal: 40),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: AppColors.primary),
-                SizedBox(height: 16),
-                Text(
-                  'Descargando formularios...',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+      builder: (context) => ModernLoadingDialog(
+        title: 'Descargando formularios',
+        subtitleNotifier: subtitleNotifier,
       ),
     );
   }
@@ -747,7 +763,7 @@ class _DynamicFormResponsesScreenState
       if (!mounted) return;
 
       _showSnackBar(
-        success ? '✅ Respuesta eliminada' : '❌ Error al eliminar',
+        success ? 'Respuesta eliminada' : 'Error al eliminar',
         success ? AppColors.success : AppColors.error,
       );
 
