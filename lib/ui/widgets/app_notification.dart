@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ada_app/ui/theme/colors.dart';
+import 'package:ada_app/utils/logger.dart';
 
 class AppNotification {
   static void show(
@@ -9,10 +10,15 @@ class AppNotification {
     Duration duration = const Duration(seconds: 3),
     String? action,
     VoidCallback? onAction,
+    OverlayState? overlay,
   }) {
-    final overlay = Overlay.of(context);
-    late OverlayEntry overlayEntry;
+    final targetOverlay = overlay ?? context.findAncestorStateOfType<OverlayState>();
+    if (targetOverlay == null) {
+      AppLogger.w('APP_NOTIFICATION: No se encontró Overlay para mostrar la notificación');
+      return;
+    }
 
+    late OverlayEntry overlayEntry;
     overlayEntry = OverlayEntry(
       builder: (context) => _MinimalNotificationWidget(
         message: message,
@@ -24,7 +30,7 @@ class AppNotification {
       ),
     );
 
-    overlay.insert(overlayEntry);
+    targetOverlay.insert(overlayEntry);
   }
 }
 

@@ -568,6 +568,7 @@ class DatabaseHelper {
       'operacion_comercial',
       'operacion_comercial_detalle',
       'productos',
+      'notifications',
     };
     return !tablesWithoutTimestamps.contains(tableName);
   }

@@ -161,60 +161,9 @@ class _OperacionesComercialesMenuViewState
       foregroundColor: AppColors.appBarForeground,
       elevation: 0,
       centerTitle: true,
-      actions: [
-        Consumer<OperacionesComercialesMenuViewModel>(
-          builder: (context, viewModel, _) {
-            return IconButton(
-              icon: viewModel.isSyncing
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.appBarForeground,
-                      ),
-                    )
-                  : const Icon(Icons.refresh_rounded),
-              onPressed: viewModel.isLoading || viewModel.isSyncing
-                  ? null
-                  : () => _sincronizarYCargar(viewModel),
-              tooltip: 'Sincronizar con servidor',
-            );
-          },
-        ),
-      ],
     );
   }
 
-  Future<void> _sincronizarYCargar(
-    OperacionesComercialesMenuViewModel viewModel,
-  ) async {
-    final resultado = await viewModel.sincronizarOperacionesDesdeServidor();
-
-    if (!mounted) return;
-
-    if (resultado != null) {
-      final itemsSincronizados = resultado['total'] ?? 0;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            itemsSincronizados > 0
-                ? '✓ $itemsSincronizados operaciones sincronizadas'
-                : 'Sin nuevas operaciones',
-          ),
-          backgroundColor: itemsSincronizados > 0
-              ? AppColors.success
-              : Colors.grey.shade700,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-    }
-  }
 
   Widget _buildTabBar() {
     return Container(

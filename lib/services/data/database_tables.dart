@@ -1,4 +1,4 @@
-﻿import 'package:sqflite/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:flutter/foundation.dart';
 
 class DatabaseTables {
@@ -82,6 +82,12 @@ class DatabaseTables {
         'Migración v6: min_value y max_value agregados a dynamic_form_detail',
       );
     }
+
+    if (oldVersion < 7) {
+      // Migración a v7: Agregar tabla notifications
+      await db.execute(_sqlNotifications());
+      debugPrint('Migración v7: Tabla notifications creada');
+    }
   }
 
   Future<void> _crearTablasMaestras(Database db) async {
@@ -109,6 +115,7 @@ class DatabaseTables {
     await db.execute(_sqlOperacionComercial());
     await db.execute(_sqlOperacionComercialDetalle());
     await db.execute(_sqlAppRoutes());
+    await db.execute(_sqlNotifications());
   }
 
   Future<void> _crearTablasMonitoreo(Database db) async {
@@ -429,6 +436,17 @@ class DatabaseTables {
     FOREIGN KEY (user_id) REFERENCES Users (id) ON DELETE CASCADE
   )
 ''';
+
+  String _sqlNotifications() => '''
+    CREATE TABLE notifications (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      type TEXT NOT NULL,
+      timestamp INTEGER NOT NULL,
+      isRead INTEGER DEFAULT 0
+    )
+  ''';
 
   String _sqlDataUsage() => '''
   CREATE TABLE data_usage (

@@ -23,6 +23,8 @@ import 'package:ada_app/services/data/database_validation_service.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/ui/screens/menu_principal/productos_screen.dart';
 import 'package:ada_app/ui/widgets/websocket_status_dot.dart';
+import 'package:ada_app/ui/screens/menu_principal/notifications_screen.dart';
+import 'package:ada_app/services/notification/notification_manager.dart';
 import 'package:ada_app/ui/screens/menu_principal/about_screen.dart';
 import 'package:ada_app/config/app_config.dart';
 import 'package:ada_app/ui/screens/error_log_screen.dart';
@@ -381,49 +383,53 @@ class _SelectScreenState extends State<SelectScreen>
     }
   }
 
-  Widget _buildPendingDataButton() {
-    return Stack(
-      children: [
-        IconButton(
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => PendingDataScreen()),
-            );
-          },
-          icon: Icon(Icons.notifications, color: AppColors.onPrimary),
-          tooltip: 'Datos pendientes de envío',
-        ),
-        if (_pendingDataCount > 0)
-          Positioned(
-            right: 6,
-            top: 6,
-            child: Container(
-              padding: EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: AppColors.error,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 2,
-                    offset: Offset(0, 1),
+  Widget _buildNotificationButton() {
+    return ValueListenableBuilder<int>(
+      valueListenable: NotificationManager().unreadCount,
+      builder: (context, count, child) {
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.notifications, color: AppColors.onPrimary),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const NotificationsScreen(),
                   ),
-                ],
-              ),
-              constraints: BoxConstraints(minWidth: 16, minHeight: 16),
-              child: Text(
-                _pendingDataCount > 99 ? '99+' : _pendingDataCount.toString(),
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
+                );
+              },
+              tooltip: 'Notificaciones',
             ),
-          ),
-      ],
+            if (count > 0)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Text(
+                    count > 99 ? '99+' : '$count',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 
@@ -1481,17 +1487,21 @@ class _SelectScreenState extends State<SelectScreen>
             },
           ),
 
-          _buildPendingDataButton(),
+          _buildNotificationButton(),
           ListenableBuilder(
             listenable: _viewModel,
             builder: (context, child) {
               return PopupMenuButton<String>(
                 onSelected: (String value) {
                   switch (value) {
-                    case 'probar_conexion':
-                      _viewModel.testConnection();
+                    case 'datos_pendientes':
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PendingDataScreen(),
+                        ),
+                      );
                       break;
-
                     case 'acerca_de':
                       Navigator.push(
                         context,
@@ -1502,35 +1512,39 @@ class _SelectScreenState extends State<SelectScreen>
                 },
                 itemBuilder: (BuildContext context) => [
                   PopupMenuItem<String>(
-                    value: 'probar_conexion',
-                    enabled:
-                        !_viewModel.isTestingConnection &&
-                        !_viewModel.isSyncing,
+                    value: 'datos_pendientes',
                     child: Row(
                       children: [
-                        _viewModel.isTestingConnection
-                            ? SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    AppColors.success,
-                                  ),
-                                ),
-                              )
-                            : Icon(Icons.wifi_find, color: AppColors.success),
-                        SizedBox(width: 8),
-                        Text(
-                          _viewModel.isTestingConnection
-                              ? 'Probando...'
-                              : 'Probar Conexión',
-                          style: TextStyle(color: AppColors.textPrimary),
+                        Icon(
+                          Icons.sync_problem,
+                          color: _pendingDataCount > 0
+                              ? AppColors.error
+                              : AppColors.textSecondary,
                         ),
+                        const SizedBox(width: 8),
+                        Expanded(child: const Text('Datos Pendientes')),
+                        if (_pendingDataCount > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.error,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$_pendingDataCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
-
                   PopupMenuItem<String>(
                     value: 'acerca_de',
                     child: Row(

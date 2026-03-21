@@ -809,9 +809,9 @@ class OperacionComercialSyncService extends BaseSyncService {
       }
     }
 
-    AppLogger.i(
+    /* AppLogger.i(
       'OPERACION_COMERCIAL_SYNC_SERVICE: ✅ [FILTER] Resultado: ${operacionesListas.length} operaciones listas',
-    );
+    ); */
 
     return operacionesListas;
   }
@@ -872,7 +872,7 @@ class OperacionComercialSyncService extends BaseSyncService {
 
   static Future<void> _ejecutarSincronizacionAutomatica() async {
     if (_syncEnProgreso || !_syncActivo || _usuarioActual == null) {
-      if (_syncEnProgreso)
+      /* if (_syncEnProgreso)
         AppLogger.i(
           'OPERACION_COMERCIAL_SYNC_SERVICE: ⏸️ [TIMER] Sync ya en progreso, saltando...',
         );
@@ -883,7 +883,7 @@ class OperacionComercialSyncService extends BaseSyncService {
       if (_usuarioActual == null)
         AppLogger.i(
           'OPERACION_COMERCIAL_SYNC_SERVICE: ⏸️ [TIMER] Usuario no establecido',
-        );
+        ); */
       return;
     }
 
@@ -897,9 +897,9 @@ class OperacionComercialSyncService extends BaseSyncService {
         return;
       }
 
-      AppLogger.i(
+      /* AppLogger.i(
         'OPERACION_COMERCIAL_SYNC_SERVICE: ✅ [TIMER] Conexión OK, sincronizando operaciones...',
-      );
+      ); */
 
       final service = OperacionComercialSyncService();
       await service.sincronizarOperacionesPendientes(_usuarioActual!);

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-
 import 'package:ada_app/services/app_services.dart';
 import 'package:ada_app/services/api/auth_service.dart';
-// import 'package:ada_app/ui/widgets/battery_optimization_dialog.dart';
 import 'ui/screens/login/login_screen.dart';
 import 'ui/screens/clientes/clients_screen.dart';
 import 'ui/screens/menu_principal/select_screen.dart';
@@ -14,9 +12,10 @@ import 'models/cliente.dart';
 import 'package:ada_app/config/app_config.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:ada_app/ui/widgets/debug_ribbon_wrapper.dart';
-import 'package:ada_app/services/background/workmanager_service.dart';
+import 'ui/widgets/debug_ribbon_wrapper.dart';
 import 'package:ada_app/utils/logger.dart';
+import 'package:ada_app/services/notification/notification_manager.dart';
+import 'package:ada_app/services/background/workmanager_service.dart';
 //IMPORTS PARA EL RESET TEMPORAL - COMENTADOS PARA PRODUCCIÓN
 // import 'package:ada_app/services/database_helper.dart';
 
@@ -24,8 +23,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es', null);
 
-  // RESET TEMPORAL - COMENTADO PARA PRODUCCIÓN
-  // await _resetCompleteApp();
+  // Inicializar el gestor de notificaciones
+  NotificationManager().initialize();
 
   runApp(const MyApp());
 }
@@ -62,6 +61,7 @@ class MyApp extends StatelessWidget {
       builder: (context, child) {
         return DebugRibbonWrapper(child: child!);
       },
+      navigatorKey: NotificationManager().navigatorKey,
       home: const InitializationScreen(),
       navigatorObservers: [routeObserver],
       routes: {

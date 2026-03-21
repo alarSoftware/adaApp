@@ -43,8 +43,10 @@ Una aplicación móvil desarrollada con Flutter para la gestión integral de ope
 4. Ejecuta la aplicación: `flutter run`.
 
 ## Historial de Versiones
+## Unrealesed
+- **v2.0.1**: Mejora en login con sincronización automática y rediseño de card de descarga de formularios dinámicos.
 
-- **v2.0.1**: Mejora en login con sincronización automática y rediseño premium de formularios dinámicos.
+## Released
 - **v2.0.0**: Versión estable inicial.
 
 ---
