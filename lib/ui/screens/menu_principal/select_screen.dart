@@ -20,7 +20,6 @@ import 'package:ada_app/viewmodels/select_screen_viewmodel.dart';
 import 'package:ada_app/ui/widgets/login/sync_progress_widget.dart';
 import 'package:ada_app/ui/widgets/mandatory_sync_dialog.dart';
 import 'package:ada_app/services/data/database_validation_service.dart';
-import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/ui/screens/menu_principal/productos_screen.dart';
 import 'package:ada_app/ui/widgets/websocket_status_dot.dart';
 import 'package:ada_app/ui/screens/menu_principal/notifications_screen.dart';
@@ -51,10 +50,6 @@ class _SelectScreenState extends State<SelectScreen>
   late SelectScreenViewModel _viewModel;
   late StreamSubscription<UIEvent> _eventSubscription;
 
-  int _pendingDataCount = 0;
-
-  Timer? _pendingDataTimer;
-
   bool _batteryOptimizationChecked = false;
 
   @override
@@ -62,7 +57,6 @@ class _SelectScreenState extends State<SelectScreen>
     super.initState();
     _viewModel = SelectScreenViewModel();
     _setupEventListener();
-    _startPendingDataMonitoring();
     WidgetsBinding.instance.addObserver(this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -97,64 +91,8 @@ class _SelectScreenState extends State<SelectScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _eventSubscription.cancel();
-    _pendingDataTimer?.cancel();
     _viewModel.dispose();
     super.dispose();
-  }
-
-  void _startPendingDataMonitoring() {
-    _checkPendingData();
-
-    _pendingDataTimer?.cancel();
-    // 🔄 Actualización casi en tiempo real (cada 5 segundos)
-    _pendingDataTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      _checkPendingData();
-    });
-  }
-
-  Future<void> _checkPendingData() async {
-    try {
-      final dbHelper = DatabaseHelper();
-      final db = await dbHelper.database;
-
-      final censosPendientes = await db.query(
-        'censo_activo',
-        where: 'estado_censo IN (?, ?)',
-        whereArgs: ['creado', 'error'],
-      );
-
-      final cantidadCensos = censosPendientes.length;
-
-      final validationService = DatabaseValidationService(db);
-      final summary = await validationService.getPendingSyncSummary();
-      final pendingByTable =
-          summary['pending_by_table'] as List<dynamic>? ?? [];
-
-      final tablasExcluidas = {
-        'censo_activo',
-        'equipos_pendientes',
-        'censo_activo_foto',
-      };
-
-      int otrosDatos = 0;
-      for (var item in pendingByTable) {
-        final tableName = item['table'] as String;
-        final count = item['count'] as int;
-        if (!tablasExcluidas.contains(tableName)) {
-          otrosDatos += count;
-        }
-      }
-
-      final totalPendientes = cantidadCensos + otrosDatos;
-
-      if (mounted && _pendingDataCount != totalPendientes) {
-        setState(() {
-          _pendingDataCount = totalPendientes;
-        });
-      }
-    } catch (e) {
-      // Silent fail
-    }
   }
 
   Future<void> _checkBatteryOptimizationOnFirstLoad() async {
@@ -190,6 +128,7 @@ class _SelectScreenState extends State<SelectScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkLocationPermissions();
+      _viewModel.refresh(); // 🔥 Refrescar contadores al volver a la app
     }
   }
 
@@ -1492,6 +1431,28 @@ class _SelectScreenState extends State<SelectScreen>
             listenable: _viewModel,
             builder: (context, child) {
               return PopupMenuButton<String>(
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.more_vert, color: AppColors.onPrimary),
+                    if (_viewModel.pendingDataCount > 0)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: AppColors.error,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            maxHeight: 12,
+                            maxWidth: 12,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
                 onSelected: (String value) {
                   switch (value) {
                     case 'datos_pendientes':
@@ -1517,13 +1478,13 @@ class _SelectScreenState extends State<SelectScreen>
                       children: [
                         Icon(
                           Icons.sync_problem,
-                          color: _pendingDataCount > 0
+                          color: _viewModel.pendingDataCount > 0
                               ? AppColors.error
                               : AppColors.textSecondary,
                         ),
                         const SizedBox(width: 8),
-                        Expanded(child: const Text('Datos Pendientes')),
-                        if (_pendingDataCount > 0)
+                        const Expanded(child: Text('Datos Pendientes')),
+                        if (_viewModel.pendingDataCount > 0)
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 6,
@@ -1534,7 +1495,7 @@ class _SelectScreenState extends State<SelectScreen>
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
-                              '$_pendingDataCount',
+                              '${_viewModel.pendingDataCount}',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 10,
@@ -1550,8 +1511,8 @@ class _SelectScreenState extends State<SelectScreen>
                     child: Row(
                       children: [
                         Icon(Icons.info_outline, color: AppColors.primary),
-                        SizedBox(width: 8),
-                        Text(
+                        const SizedBox(width: 8),
+                        const Text(
                           'Acerca de',
                           style: TextStyle(color: AppColors.textPrimary),
                         ),

@@ -24,7 +24,7 @@ void main() async {
   await initializeDateFormatting('es', null);
 
   // Inicializar el gestor de notificaciones
-  NotificationManager().initialize();
+  await NotificationManager().initialize();
 
   runApp(const MyApp());
 }
@@ -115,6 +115,9 @@ class _InitializationScreenState extends State<InitializationScreen> {
 
       // 2. Iniciar servicios en SEGUNDO PLANO
       _iniciarServiciosBackground();
+
+      // 2.5 Verificar bloqueo persistente
+      await NotificationManager().checkPersistentBlock();
 
       // 3. Verificar estado de autenticación
       final authService = AuthService();

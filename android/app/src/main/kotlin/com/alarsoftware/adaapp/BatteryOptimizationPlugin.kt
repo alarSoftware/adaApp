@@ -1,4 +1,4 @@
-package com.example.cliente_app
+package com.alarsoftware.adaapp
 
 import android.content.Context
 import android.content.Intent

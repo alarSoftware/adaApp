@@ -97,10 +97,10 @@ class DatabaseValidationService {
       final displayName = entry.value;
 
       try {
-        // Solo contar ERRORES, no pendientes
+        // Contar pendientes y errores
         final result = await db.rawQuery(
-          'SELECT COUNT(*) as count FROM $tableName WHERE sync_status = ?',
-          ['error'],
+          'SELECT COUNT(*) as count FROM $tableName WHERE sync_status IN (?, ?, ?)',
+          ['pending', 'error', 'draft'],
         );
 
         final count = Sqflite.firstIntValue(result) ?? 0;
@@ -166,8 +166,8 @@ class DatabaseValidationService {
     // Verificar censo_activo - SOLO con ERROR
     try {
       final result = await db.rawQuery(
-        'SELECT COUNT(*) as count FROM censo_activo WHERE estado_censo = ?',
-        ['error'],
+        'SELECT COUNT(*) as count FROM censo_activo WHERE estado_censo IN (?, ?)',
+        ['creado', 'error'],
       );
 
       final count = Sqflite.firstIntValue(result) ?? 0;

@@ -88,6 +88,16 @@ class DatabaseTables {
       await db.execute(_sqlNotifications());
       debugPrint('Migración v7: Tabla notifications creada');
     }
+
+    if (oldVersion < 8) {
+      // Migración a v8: Agregar columna imei a device_log
+      try {
+        await db.execute('ALTER TABLE device_log ADD COLUMN imei TEXT');
+        debugPrint('Migración v8: Columna imei agregada a device_log');
+      } catch (e) {
+        debugPrint('Migración v8 columna imei omitida (ya existe): $e');
+      }
+    }
   }
 
   Future<void> _crearTablasMaestras(Database db) async {
@@ -256,6 +266,7 @@ class DatabaseTables {
     modelo TEXT,
     fecha_registro TEXT NOT NULL,
     sincronizado INTEGER DEFAULT 0,
+    imei TEXT,
     FOREIGN KEY (employee_id) REFERENCES Users (employee_id)
   )
 ''';

@@ -1,4 +1,4 @@
-package com.example.cliente_app
+package com.alarsoftware.adaapp
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine

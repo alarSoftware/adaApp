@@ -1,6 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.example.cliente_app">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Permisos existentes -->
     <uses-permission android:name="android.permission.INTERNET"/>
@@ -23,6 +22,9 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission 
+        android:name="android.permission.REQUEST_INSTALL_PACKAGES" 
+        tools:node="replace" />
 
     <!-- Features existentes -->
     <uses-feature
@@ -45,10 +47,11 @@
 
     <application
         android:label="AdaApp"
-        android:name=".Application"
-        android:icon="@mipmap/ic_launcher">
+        android:name="com.alarsoftware.adaapp.Application"
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
-            android:name=".MainActivity"
+            android:name="com.alarsoftware.adaapp.MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
@@ -92,12 +95,41 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+
+        <!-- OTA Update FileProvider -->
+        <provider
+            android:name="sk.fourq.otaupdate.OtaUpdateFileProvider"
+            android:authorities="com.alarsoftware.adaapp.ota_update_provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/filepaths" />
+        </provider>
+
+        <!-- OTA Update Install Result Receiver -->
+        <receiver
+            android:name="sk.fourq.otaupdate.InstallResultReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.alarsoftware.adaapp.ACTION_INSTALL_COMPLETE"/>
+            </intent-filter>
+        </receiver>
     </application>
 
     <queries>
+        <package android:name="com.alarsoftware.adaapp" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/vnd.android.package-archive" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.INSTALL_PACKAGE" />
+            <data android:scheme="package" />
         </intent>
     </queries>
 </manifest>

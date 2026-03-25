@@ -140,6 +140,10 @@ class _NotificationTile extends StatelessWidget {
         iconColor = AppColors.info;
         iconData = Icons.info_outline;
         break;
+      case NotificationLevel.unblocking:
+        iconColor = AppColors.success;
+        iconData = Icons.lock_open_rounded;
+        break;
     }
 
     final date = DateTime.fromMillisecondsSinceEpoch(notification.timestamp);

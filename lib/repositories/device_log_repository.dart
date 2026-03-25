@@ -18,6 +18,7 @@ class DeviceLogRepository {
     required double longitud,
     required int bateria,
     required String modelo,
+    String? imei,
   }) async {
     final log = DeviceLog(
       id: id ?? _uuid.v4(), // <--- Usar ID si se provee
@@ -27,6 +28,7 @@ class DeviceLogRepository {
       modelo: modelo,
       fechaRegistro: DateTime.now().toIso8601String(),
       sincronizado: 0, // ✅ Por defecto no sincronizado
+      imei: imei,
     );
 
     await db.insert('device_log', log.toMapLocal());

@@ -10,6 +10,7 @@ import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart
 import 'package:ada_app/models/operaciones_comerciales/operacion_comercial.dart';
 import 'package:ada_app/ui/screens/operaciones_comerciales/operacion_comercial_form_screen.dart';
 import 'package:ada_app/viewmodels/operaciones_comerciales/operaciones_comerciales_menu_viewmodel.dart';
+import 'package:ada_app/services/permissions_service.dart';
 import 'package:ada_app/main.dart';
 
 class OperacionesComercialesMenuScreen extends StatelessWidget {
@@ -41,16 +42,25 @@ class _OperacionesComercialesMenuViewState
     extends State<_OperacionesComercialesMenuView>
     with TickerProviderStateMixin, RouteAware {
   late TabController _tabController;
-  late List<_TabConfig> _availableTabs;
-
-  bool _canCreateOperacion = true;
+  late List<_TabConfig> _availableTabs = [];
+  bool _isLoadingTabs = true;
+  final bool _canCreateOperacion = true;
 
   @override
   void initState() {
     super.initState();
-    // _checkPermission(); -> SIMPLIFICADO: Si entra al módulo, puede crear.
-    _availableTabs = _getAvailableTabs();
-    _tabController = TabController(length: _availableTabs.length, vsync: this);
+    _loadAvailableTabs();
+  }
+
+  Future<void> _loadAvailableTabs() async {
+    final tabs = await _getAvailableTabs();
+    if (mounted) {
+      setState(() {
+        _availableTabs = tabs;
+        _tabController = TabController(length: _availableTabs.length, vsync: this);
+        _isLoadingTabs = false;
+      });
+    }
   }
 
   @override
@@ -65,7 +75,9 @@ class _OperacionesComercialesMenuViewState
   @override
   void dispose() {
     MyApp.routeObserver.unsubscribe(this);
-    _tabController.dispose();
+    if (!_isLoadingTabs) {
+      _tabController.dispose();
+    }
     super.dispose();
   }
 
@@ -87,19 +99,42 @@ class _OperacionesComercialesMenuViewState
     });
   }
 
-  List<_TabConfig> _getAvailableTabs() {
+  Future<List<_TabConfig>> _getAvailableTabs() async {
     final List<_TabConfig> tabs = [];
 
-    tabs.add(
-      _TabConfig(
-        tipo: TipoOperacion.notaReposicion,
-        label: 'Reposición',
-        icon: Icons.add_shopping_cart,
-        color: AppColors.success,
-        title: 'Nota de Reposición',
-        description: 'Solicita productos para reponer en el cliente',
-      ),
-    );
+    // Verificación de permisos para Reposición
+    bool reposicionHabilitada = true;
+    try {
+      final allowedModules = await PermissionsService.getAllowedModules();
+      if (allowedModules != null) {
+        if (widget.cliente.esCredito) {
+          // Si existe "reposicion_credito=no", se deshabilita. 
+          // Si no existe o dice "=si", se mantiene habilitado (default behavior).
+          if (allowedModules.contains('reposicion_credito=no')) {
+            reposicionHabilitada = false;
+          }
+        } else if (widget.cliente.esContado) {
+          if (allowedModules.contains('reposicion_contado=no')) {
+            reposicionHabilitada = false;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error verificando permisos de reposición: $e');
+    }
+
+    if (reposicionHabilitada) {
+      tabs.add(
+        _TabConfig(
+          tipo: TipoOperacion.notaReposicion,
+          label: 'Reposición',
+          icon: Icons.add_shopping_cart,
+          color: AppColors.success,
+          title: 'Nota de Reposición',
+          description: 'Solicita productos para reponer en el cliente',
+        ),
+      );
+    }
 
     if (widget.cliente.esCredito) {
       tabs.add(
@@ -136,20 +171,26 @@ class _OperacionesComercialesMenuViewState
       backgroundColor: const Color(0xFFF8F9FC),
       appBar: _buildAppBar(),
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: ClientInfoCard(cliente: widget.cliente),
-            ),
-            if (_availableTabs.length > 1) _buildTabBar(),
-            Expanded(
-              child: _availableTabs.length > 1
-                  ? _buildTabBarView()
-                  : _buildSingleTab(_availableTabs.first),
-            ),
-          ],
-        ),
+        child: _isLoadingTabs
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: ClientInfoCard(cliente: widget.cliente),
+                  ),
+                  _buildTabBar(),
+                  Expanded(
+                    child: _availableTabs.isNotEmpty
+                        ? (_availableTabs.length > 1
+                            ? _buildTabBarView()
+                            : _buildSingleTab(_availableTabs.first))
+                        : const Center(
+                            child: Text('No hay operaciones disponibles'),
+                          ),
+                  ),
+                ],
+              ),
       ),
     );
   }
@@ -193,20 +234,31 @@ class _OperacionesComercialesMenuViewState
       controller: _tabController,
       children: _availableTabs
           .map(
-            (tab) =>
-                _buildOperacionTab(tipoOperacion: tab.tipo, color: tab.color),
+            (tab) => _buildOperacionTab(
+              tipoOperacion: tab.tipo,
+              color: tab.color,
+              title: tab.title,
+              description: tab.description,
+            ),
           )
           .toList(),
     );
   }
 
   Widget _buildSingleTab(_TabConfig tab) {
-    return _buildOperacionTab(tipoOperacion: tab.tipo, color: tab.color);
+    return _buildOperacionTab(
+      tipoOperacion: tab.tipo,
+      color: tab.color,
+      title: tab.title,
+      description: tab.description,
+    );
   }
 
   Widget _buildOperacionTab({
     required TipoOperacion tipoOperacion,
     required Color color,
+    required String title,
+    required String description,
   }) {
     return Consumer<OperacionesComercialesMenuViewModel>(
       builder: (context, viewModel, _) {
@@ -215,7 +267,7 @@ class _OperacionesComercialesMenuViewState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               if (_canCreateOperacion)
                 SizedBox(
                   height: 44,
@@ -226,9 +278,9 @@ class _OperacionesComercialesMenuViewState
                       Icons.add_circle_outline_rounded,
                       size: 20,
                     ),
-                    label: const Text(
-                      'Nueva Solicitud',
-                      style: TextStyle(
+                    label: Text(
+                      'Nueva ${tipoOperacion.esNotaReposicion ? "Reposición" : "Nota de Retiro"}',
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),

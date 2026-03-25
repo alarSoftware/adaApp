@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:ada_app/models/notification_model.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:sqflite/sqflite.dart';
@@ -18,13 +19,31 @@ class NotificationRepository {
         isRead INTEGER DEFAULT 0
       )
     ''');
+
+    // Intentar agregar nuevas columnas si no existen (Migración manual)
+    try {
+      await db.execute('ALTER TABLE $_tableName ADD COLUMN target TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE $_tableName ADD COLUMN targetConfig TEXT');
+    } catch (_) {}
   }
 
   Future<int> insert(NotificationModel notification) async {
     await _ensureTableExists();
+
+    // Serializar campos complejos para SQLite
+    final Map<String, dynamic> data = notification.toJson();
+    if (data['target'] != null && data['target'] is! String) {
+      data['target'] = jsonEncode(data['target']);
+    }
+    if (data['targetConfig'] != null) {
+      data['targetConfig'] = jsonEncode(data['targetConfig']);
+    }
+
     return await _dbHelper.insertar(
       _tableName,
-      notification.toJson(),
+      data,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }

@@ -8,6 +8,7 @@ class DeviceLog {
   final String modelo;
   final String fechaRegistro;
   final int sincronizado;
+  final String? imei;
 
   DeviceLog({
     required this.id,
@@ -17,6 +18,7 @@ class DeviceLog {
     required this.modelo,
     required this.fechaRegistro,
     this.sincronizado = 1,
+    this.imei,
   });
 
   /// Metodo coincidente con backend Grails
@@ -28,6 +30,7 @@ class DeviceLog {
       'bateria': bateria,
       'modelo': modelo,
       'fechaRegistro': fechaRegistro,
+      'imei': imei,
     };
   }
 
@@ -41,6 +44,7 @@ class DeviceLog {
       'modelo': modelo,
       'fecha_registro': fechaRegistro,
       'sincronizado': sincronizado,
+      'imei': imei,
     };
   }
 
@@ -53,6 +57,7 @@ class DeviceLog {
       modelo: map['modelo'],
       fechaRegistro: map['fecha_registro'],
       sincronizado: map['sincronizado'] ?? 1,
+      imei: map['imei'],
     );
   }
 }

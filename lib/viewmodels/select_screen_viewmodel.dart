@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../utils/logger.dart';
+import 'package:ada_app/services/sync/sync_tables_config.dart';
 import 'package:ada_app/repositories/cliente_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import '../services/sync/sync_service.dart';
@@ -164,6 +165,10 @@ class SelectScreenViewModel extends ChangeNotifier {
   SyncValidationState _syncValidationState = SyncValidationState.checking;
   SyncValidationResult? _syncValidationResult;
 
+  // ESTADO DE DATOS PENDIENTES
+  int _pendingDataCount = 0;
+  Timer? _pendingDataTimer;
+
   // ========== STREAMS PARA COMUNICACIÓN ==========
   final StreamController<UIEvent> _eventController =
       StreamController<UIEvent>.broadcast();
@@ -198,16 +203,21 @@ class SelectScreenViewModel extends ChangeNotifier {
   bool get canAccessNormalFeatures =>
       _syncValidationState == SyncValidationState.optional;
 
+  // GETTER DE DATOS PENDIENTES
+  int get pendingDataCount => _pendingDataCount;
+
   // ========== CONSTRUCTOR ==========
   SelectScreenViewModel() {
     _initializeMonitoring();
     _loadCurrentUserAndValidateSync();
+    _startPendingDataMonitoring();
   }
 
   @override
   void dispose() {
     _connectivitySubscription?.cancel();
     _apiMonitorTimer?.cancel();
+    _pendingDataTimer?.cancel();
     _eventController.close();
     super.dispose();
   }
@@ -693,9 +703,10 @@ class SelectScreenViewModel extends ChangeNotifier {
     return {};
   }
 
-  /// Refresca manualmente el estado de conexión
+  /// Refresca manualmente el estado de conexión y contadores
   Future<void> refresh() async {
     await _checkInitialConnection();
+    await _checkPendingData();
   }
 
   /// Refresca la información del usuario
@@ -749,5 +760,38 @@ class SelectScreenViewModel extends ChangeNotifier {
       );
       return resultado.isNotEmpty ? (resultado.first['total'] as int? ?? 0) : 0;
     } catch (e) { AppLogger.e("SELECT_SCREEN_VIEWMODEL: Error", e); return 0; }
+  }
+
+  // ========== MONITOREO DE DATOS PENDIENTES ==========
+  void _startPendingDataMonitoring() {
+    _checkPendingData();
+    _pendingDataTimer?.cancel();
+    _pendingDataTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      _checkPendingData();
+    });
+  }
+
+  Future<void> _checkPendingData() async {
+    try {
+      // Usar SyncTablesConfig como única fuente de verdad para el indicador visual
+      // Esto asegura que el badge rojo coincida con lo que el usuario ve en la pantalla de "Datos Pendientes"
+      final counts = await SyncTablesConfig.getPendingCounts();
+
+      int totalPendientes = 0;
+      counts.forEach((tableName, count) {
+        // Excluimos 'device_log' del conteo del badge, ya que son logs de sistema
+        // que no requieren acción directa del usuario y suelen generarse continuamente.
+        if (tableName != 'device_log') {
+          totalPendientes += count;
+        }
+      });
+
+      if (_pendingDataCount != totalPendientes) {
+        _pendingDataCount = totalPendientes;
+        notifyListeners();
+      }
+    } catch (e) {
+      AppLogger.e("SELECT_SCREEN_VIEWMODEL: Error al verificar pendientes", e);
+    }
   }
 }

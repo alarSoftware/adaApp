@@ -156,7 +156,15 @@ class SocketService {
             _isConnecting = false;
           },
           onDebugMessage: (String message) {
-            // Log ALL STOMP traffic for troubleshooting per plan
+            final msg = message.trim();
+            // Filtrar PING/PONG, indicadores de latido y mensajes vacíos
+            if (msg.isEmpty || 
+                msg == '<<<' || 
+                msg == '>>>' || 
+                msg.contains('PING') || 
+                msg.contains('PONG')) {
+              return;
+            }
             AppLogger.i('SOCKET_SERVICE [STOMP]: $message');
           },
           stompConnectHeaders: {
@@ -177,6 +185,7 @@ class SocketService {
               'coords': deviceLog.latitudLongitud.toString(),
               'model': deviceLog.modelo.toString(),
               'timestamp': deviceLog.fechaRegistro.toString(),
+              if (deviceLog.imei != null) 'device-imei': deviceLog.imei.toString(),
             },
             'max-daily-usage': dataUsageStats['max_daily_usage'].toString(),
             'avg-daily-usage': dataUsageStats['avg_daily_usage'].toString(),

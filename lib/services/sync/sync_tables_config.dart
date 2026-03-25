@@ -56,8 +56,8 @@ class SyncTablesConfig {
         tableName: 'censo_activo',
         displayName: 'Censos Activos',
         description: 'Censos pendientes de sincronización',
-        whereClause: 'estado_censo = ?',
-        whereArgs: ['error'],
+        whereClause: 'estado_censo IN (?, ?)',
+        whereArgs: ['creado', 'error'],
         syncFunction: _syncCensos,
       ),
 
@@ -65,9 +65,9 @@ class SyncTablesConfig {
       SyncTableConfig(
         tableName: 'operacion_comercial',
         displayName: 'Operaciones Comerciales',
-        description: 'Operaciones comerciales con error de sincronización',
-        whereClause: 'sync_status = ?',
-        whereArgs: ['error'],
+        description: 'Operaciones comerciales pendientes o con error',
+        whereClause: 'sync_status IN (?, ?)',
+        whereArgs: ['pending', 'error'],
         syncFunction: _syncOperacionesComerciales,
       ),
 

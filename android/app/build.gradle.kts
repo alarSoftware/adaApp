@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.cliente_app"
+    namespace = "com.alarsoftware.adaapp"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 

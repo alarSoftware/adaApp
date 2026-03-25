@@ -1,6 +1,7 @@
 import 'package:ada_app/repositories/device_log_repository.dart';
 import 'package:ada_app/services/data/database_helper.dart';
 import 'package:ada_app/ui/screens/device_log_screen.dart';
+import 'package:ada_app/ui/screens/settings/technical_info_screen.dart';
 import 'package:ada_app/ui/screens/settings/work_hours_settings_screen.dart';
 import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/services/api/auth_service.dart';
@@ -37,6 +38,18 @@ class SystemOptionsScreen extends StatelessWidget {
                   ),
                 );
               }
+            },
+          ),
+          _buildOptionTile(
+            context,
+            icon: Icons.info_outline,
+            label: 'Información Técnica',
+            subtitle: 'ID de dispositivo, versión y detalles del hardware',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TechnicalInfoScreen()),
+              );
             },
           ),
           const Divider(),

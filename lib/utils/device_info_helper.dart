@@ -1,4 +1,4 @@
-﻿// lib/utils/device_info_helper.dart
+// lib/utils/device_info_helper.dart
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../utils/logger.dart';
@@ -8,6 +8,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:uuid/uuid.dart';
 import 'package:ada_app/models/device_log.dart';
 import 'package:ada_app/services/sync/user_sync_service.dart';
+import 'package:android_id/android_id.dart';
 
 /// 🔧 Helper para obtener información del dispositivo
 /// Centraliza toda la lógica de obtención de datos sin duplicación
@@ -93,6 +94,24 @@ class DeviceInfoHelper {
     }
   }
 
+  /// 🆔 Obtener ID único del dispositivo (Android ID o identifierForVendor)
+  static Future<String?> obtenerIdUnicoDispositivo() async {
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      if (Platform.isAndroid) {
+        const androidIdPlugin = AndroidId();
+        return await androidIdPlugin.getId();
+      } else if (Platform.isIOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        return iosInfo.identifierForVendor;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error al obtener ID único: $e');
+      return null;
+    }
+  }
+
   /// 👤 Obtener ID del vendedor actual
   static Future<String?> obtenerEmployeeId() async {
     try {
@@ -112,12 +131,14 @@ class DeviceInfoHelper {
         obtenerNivelBateria(),
         obtenerModeloDispositivo(),
         obtenerEmployeeId(),
+        obtenerIdUnicoDispositivo(),
       ]);
 
       final position = results[0] as Position?;
       final bateria = results[1] as int;
       final modelo = results[2] as String;
       final employeeId = results[3] as String?;
+      final imei = results[4] as String?;
 
       // Validar ubicación si es estrictamente requerida
       if (position == null && requerirGps) {
@@ -135,6 +156,7 @@ class DeviceInfoHelper {
         modelo: modelo,
         fechaRegistro: DateTime.now().toIso8601String(),
         sincronizado: 0,
+        imei: imei,
       );
       return log;
     } catch (e) {
@@ -154,12 +176,14 @@ class DeviceInfoHelper {
         obtenerNivelBateria(),
         obtenerModeloDispositivo(),
         obtenerEmployeeId(),
+        obtenerIdUnicoDispositivo(),
       ]);
 
       final position = results[0] as Position?;
       final bateria = results[1] as int;
       final modelo = results[2] as String;
       final employeeId = results[3] as String?;
+      final imei = results[4] as String?;
 
       // Si no hay ubicación, usar 0,0 para no bloquear el logout
       final latLong = position != null
@@ -175,6 +199,7 @@ class DeviceInfoHelper {
         modelo: modelo,
         fechaRegistro: DateTime.now().toIso8601String(),
         sincronizado: 0,
+        imei: imei,
       );
 
       debugPrint(' Device log rápido creado');

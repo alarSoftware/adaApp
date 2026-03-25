@@ -1,4 +1,4 @@
-package com.example.cliente_app
+package com.alarsoftware.adaapp
 
 import io.flutter.app.FlutterApplication
 import androidx.work.Configuration

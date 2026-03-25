@@ -1,0 +1,362 @@
+import 'dart:ui';
+import 'package:flutter/material.dart';
+import 'package:ada_app/models/notification_model.dart';
+import 'package:ada_app/services/api/api_config_service.dart';
+import 'package:ada_app/utils/logger.dart';
+import 'package:ota_update/ota_update.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:http/http.dart' as http;
+
+class BlockingNotificationDialog extends StatefulWidget {
+  final NotificationModel notification;
+
+  const BlockingNotificationDialog({super.key, required this.notification});
+
+  @override
+  State<BlockingNotificationDialog> createState() =>
+      _BlockingNotificationDialogState();
+}
+
+class _BlockingNotificationDialogState
+    extends State<BlockingNotificationDialog> with SingleTickerProviderStateMixin {
+  bool _isDownloading = false;
+  double _downloadProgress = 0.0;
+  String _statusMessage = '';
+  bool _downloadComplete = false;
+  bool _downloadError = false;
+  String _currentVersion = '...';
+
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+    _pulseAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _currentVersion = packageInfo.version;
+        });
+      }
+    } catch (e) {
+      AppLogger.e('Error cargando versión', e);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startDownload() async {
+    try {
+      final status = await Permission.requestInstallPackages.status;
+      if (!status.isGranted) {
+        setState(() {
+          _isDownloading = true;
+          _statusMessage = 'Permiso necesario para instalar actualizaciones';
+        });
+
+        // Intentar solicitarlo
+        final result = await Permission.requestInstallPackages.request();
+        
+        if (!result.isGranted) {
+          // Si sigue sin estar concedido, abrir los ajustes directamente
+          setState(() {
+            _statusMessage = 'Por favor, activa "Instalar aplicaciones desconocidas" para AdaApp';
+          });
+          
+          await openAppSettings();
+          
+          // No continuamos, el usuario volverá después de cambiar el ajuste
+          setState(() => _isDownloading = false);
+          return;
+        }
+      }
+    } catch (e) {
+      AppLogger.e('Error solicitando permiso de instalación', e);
+    }
+
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = 0.0;
+      _statusMessage = 'Iniciando descarga...';
+      _downloadError = false;
+    });
+
+    try {
+      final apkUrl = await ApiConfigService.getFullUrl('/api/download');
+
+      // ✅ Validación PRE-Descarga: Verificamos que sea un APK real y no un HTML
+      try {
+        AppLogger.i('DEBUG_OTA: Verificando URL: $apkUrl');
+        final response = await http.get(Uri.parse(apkUrl)).timeout(const Duration(seconds: 10));
+        
+        AppLogger.i('DEBUG_OTA: Status Code: ${response.statusCode}');
+        final contentType = response.headers['content-type']?.toLowerCase() ?? '';
+        AppLogger.i('DEBUG_OTA: Content-Type: $contentType');
+        
+        if (response.statusCode != 200) {
+          throw 'Servidor devolvió error ${response.statusCode}';
+        }
+        
+        if (contentType.contains('text/html')) {
+          throw 'El servidor envió una página web en lugar del instalador. Contacta a soporte.';
+        }
+      } catch (e) {
+        AppLogger.e('DEBUG_OTA: Error en validación previa: $e');
+        if (mounted) {
+          setState(() {
+            _isDownloading = false;
+            _downloadError = true;
+            _statusMessage = e.toString();
+          });
+        }
+        return; // Detenemos el proceso
+      }
+
+      AppLogger.i('BLOCKING_DIALOG: Iniciando descarga de APK desde: $apkUrl');
+
+      OtaUpdate()
+          .execute(apkUrl) // Sin destinationFilename para mayor compatibilidad
+          .listen(
+        (OtaEvent event) {
+          if (!mounted) return;
+          setState(() {
+            switch (event.status) {
+              case OtaStatus.DOWNLOADING:
+                final progress = double.tryParse(event.value ?? '0') ?? 0;
+                _downloadProgress = progress / 100.0;
+                _statusMessage = 'Descargando... ${progress.toStringAsFixed(0)}%';
+                break;
+              case OtaStatus.INSTALLING:
+                _downloadComplete = true;
+                _statusMessage = 'Instalando actualización...';
+                break;
+              case OtaStatus.ALREADY_RUNNING_ERROR:
+                _statusMessage = 'Ya hay una descarga en curso';
+                break;
+              case OtaStatus.PERMISSION_NOT_GRANTED_ERROR:
+                _downloadError = true;
+                _statusMessage = 'Permiso denegado: Activa "Instalar apps desconocidas"';
+                break;
+              case OtaStatus.INTERNAL_ERROR:
+              case OtaStatus.DOWNLOAD_ERROR:
+              case OtaStatus.CHECKSUM_ERROR:
+              case OtaStatus.INSTALLATION_ERROR:
+                _downloadError = true;
+                _statusMessage = 'Error: ${event.value ?? "Intenta de nuevo"}';
+                break;
+              case OtaStatus.INSTALLATION_DONE:
+                _downloadComplete = true;
+                _statusMessage = 'Instalación terminada';
+                break;
+              case OtaStatus.CANCELED:
+                _isDownloading = false;
+                _statusMessage = 'Cancelado';
+                break;
+            }
+          });
+        },
+        onError: (e) {
+          if (!mounted) return;
+          setState(() {
+            _downloadError = true;
+            _statusMessage = 'Error crítico: $e';
+          });
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _downloadError = true;
+        _statusMessage = 'Error al iniciar';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 340),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF1a1a2e),
+                      Color(0xFF16213e),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.1),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.5),
+                      blurRadius: 40,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(30),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Icono con pulso
+                      ScaleTransition(
+                        scale: _pulseAnimation,
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFFe94560).withOpacity(0.1),
+                          ),
+                          child: const Icon(
+                            Icons.system_update_rounded,
+                            size: 48,
+                            color: Color(0xFFff6b6b),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Título
+                      Text(
+                        widget.notification.title.isNotEmpty
+                            ? widget.notification.title
+                            : 'Actualización Obligatoria',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Mensaje
+                      Text(
+                        widget.notification.message.isNotEmpty
+                            ? widget.notification.message
+                            : 'Nueva versión disponible. Actualiza para continuar.',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.white.withOpacity(0.7),
+                          height: 1.4,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 30),
+
+                      // Progreso central
+                      if (_isDownloading) ...[
+                        _buildProgressBar(),
+                        const SizedBox(height: 12),
+                        Text(
+                          _statusMessage,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: _downloadError
+                                ? const Color(0xFFff6b6b)
+                                : Colors.white.withOpacity(0.5),
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ] else
+                        _buildDownloadButton(),
+
+                      const SizedBox(height: 20),
+                      Text(
+                        'Versión actual: ${_getCurrentVersion()}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.white.withOpacity(0.3),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressBar() {
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: LinearProgressIndicator(
+            value: _downloadComplete ? null : _downloadProgress,
+            minHeight: 6,
+            backgroundColor: Colors.white.withOpacity(0.05),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              _downloadError ? const Color(0xFFe94560) : const Color(0xFF00d2ff),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDownloadButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: ElevatedButton(
+        onPressed: _startDownload,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF00d2ff),
+          foregroundColor: const Color(0xFF1a1a2e),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          elevation: 0,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(_downloadError ? Icons.refresh : Icons.download, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              _downloadError ? 'Reintentar' : 'Actualizar ahora',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  String _getCurrentVersion() => _currentVersion;
+}

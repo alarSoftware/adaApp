@@ -8,6 +8,7 @@ import 'package:ada_app/models/operaciones_comerciales/enums/tipo_operacion.dart
 import 'package:ada_app/models/censo_activo.dart';
 import 'package:ada_app/ui/screens/operaciones_comerciales/operacion_comercial_form_screen.dart';
 import 'package:ada_app/ui/screens/censo_activo/preview_screen.dart';
+import 'package:ada_app/services/permissions_service.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 
@@ -34,11 +35,40 @@ class _HistoryViewState extends State<_HistoryView>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   TipoOperacion? _selectedOperationType;
+  bool _canSeeReposicionFilter = true;
+  bool _isLoadingPermissions = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadPermissions();
+  }
+
+  Future<void> _loadPermissions() async {
+    try {
+      final allowedModules = await PermissionsService.getAllowedModules();
+      if (allowedModules != null) {
+        final noCred = allowedModules.contains('reposicion_credito=no');
+        final noCont = allowedModules.contains('reposicion_contado=no');
+        
+        // Hide only if BOTH are explicitly disabled, as this is a global history.
+        // If one is allowed, the filter should probably remain as there might be records for that type.
+        if (noCred && noCont) {
+          setState(() {
+            _canSeeReposicionFilter = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading history permissions: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingPermissions = false;
+        });
+      }
+    }
   }
 
   @override
@@ -83,24 +113,26 @@ class _HistoryViewState extends State<_HistoryView>
           ],
         ),
       ),
-      body: Column(
-        children: [
-          _buildFilterStatus(viewModel),
-          Expanded(
-            child: viewModel.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      // Pestaña de Censos
-                      _buildCensosList(context, viewModel),
-                      // Pestaña de Operaciones con Filtros
-                      _buildOperacionesView(context, viewModel),
-                    ],
-                  ),
+      body: _isLoadingPermissions 
+        ? const Center(child: CircularProgressIndicator())
+        : Column(
+            children: [
+              _buildFilterStatus(viewModel),
+              Expanded(
+                child: viewModel.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          // Pestaña de Censos
+                          _buildCensosList(context, viewModel),
+                          // Pestaña de Operaciones con Filtros
+                          _buildOperacionesView(context, viewModel),
+                        ],
+                      ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -152,8 +184,10 @@ class _HistoryViewState extends State<_HistoryView>
               children: [
                 _buildFilterChip(null, 'Todos'),
                 const SizedBox(width: 8),
-                _buildFilterChip(TipoOperacion.notaReposicion, 'Reposición'),
-                const SizedBox(width: 8),
+                if (_canSeeReposicionFilter) ...[
+                  _buildFilterChip(TipoOperacion.notaReposicion, 'Reposición'),
+                  const SizedBox(width: 8),
+                ],
                 _buildFilterChip(TipoOperacion.notaRetiro, 'Retiro'),
                 const SizedBox(width: 8),
                 _buildFilterChip(TipoOperacion.notaRetiroDiscontinuos, 'NDR'),
