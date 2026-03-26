@@ -40,7 +40,7 @@
         android:name="android.hardware.biometrics"
         android:required="false" />
 
-    <!-- NUEVA FEATURE PARA UBICACIÓN -->
+    <!-- NUEVA FEATURE PARA UBICACIÓN --> 
     <uses-feature
         android:name="android.hardware.location.gps"
         android:required="false" />

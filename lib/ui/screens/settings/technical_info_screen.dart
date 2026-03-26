@@ -5,7 +5,6 @@ import 'package:ada_app/ui/theme/colors.dart';
 import 'package:ada_app/utils/device_info_helper.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:android_id/android_id.dart';
-
 class TechnicalInfoScreen extends StatefulWidget {
   const TechnicalInfoScreen({super.key});
 

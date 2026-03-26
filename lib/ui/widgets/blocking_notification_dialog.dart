@@ -10,8 +10,13 @@ import 'package:http/http.dart' as http;
 
 class BlockingNotificationDialog extends StatefulWidget {
   final NotificationModel notification;
+  final bool dismissible;
 
-  const BlockingNotificationDialog({super.key, required this.notification});
+  const BlockingNotificationDialog({
+    super.key,
+    required this.notification,
+    this.dismissible = false,
+  });
 
   @override
   State<BlockingNotificationDialog> createState() =>
@@ -19,12 +24,13 @@ class BlockingNotificationDialog extends StatefulWidget {
 }
 
 class _BlockingNotificationDialogState
-    extends State<BlockingNotificationDialog> with SingleTickerProviderStateMixin {
+    extends State<BlockingNotificationDialog> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
   String _statusMessage = '';
   bool _downloadComplete = false;
   bool _downloadError = false;
+  bool _waitingForInstall = false;
   String _currentVersion = '...';
 
   late AnimationController _pulseController;
@@ -41,6 +47,7 @@ class _BlockingNotificationDialogState
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     _loadVersion();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   Future<void> _loadVersion() async {
@@ -56,10 +63,45 @@ class _BlockingNotificationDialogState
     }
   }
 
+  void _resetToInitialState({String? message}) {
+    if (!mounted) return;
+    setState(() {
+      _isDownloading = false;
+      _downloadProgress = 0.0;
+      _downloadComplete = false;
+      _downloadError = false;
+      _statusMessage = message ?? '';
+    });
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pulseController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Cuando el usuario vuelve a la app después del diálogo de instalación
+    if (state == AppLifecycleState.resumed && _waitingForInstall) {
+      _waitingForInstall = false;
+      // Pequeño delay para que el sistema termine de procesar
+      Future.delayed(const Duration(milliseconds: 500), () async {
+        if (!mounted) return;
+        try {
+          final packageInfo = await PackageInfo.fromPlatform();
+          // Si la versión no cambió, el usuario canceló la instalación
+          if (packageInfo.version == _currentVersion) {
+            AppLogger.i('BLOCKING_DIALOG: Instalación cancelada por el usuario (versión sin cambio)');
+            _resetToInitialState();
+          }
+        } catch (e) {
+          AppLogger.e('BLOCKING_DIALOG: Error verificando versión post-instalación', e);
+          _resetToInitialState();
+        }
+      });
+    }
   }
 
   Future<void> _startDownload() async {
@@ -89,6 +131,8 @@ class _BlockingNotificationDialogState
       }
     } catch (e) {
       AppLogger.e('Error solicitando permiso de instalación', e);
+      _resetToInitialState(message: 'Error al solicitar permiso de instalación');
+      return;
     }
 
     setState(() {
@@ -99,40 +143,45 @@ class _BlockingNotificationDialogState
     });
 
     try {
-      final apkUrl = await ApiConfigService.getFullUrl('/api/download');
+      final apkUrl = await ApiConfigService.getFullUrl('/api/get_apk');
 
-      // ✅ Validación PRE-Descarga: Verificamos que sea un APK real y no un HTML
+      // Validación PRE-Descarga: Verificamos headers sin descargar todo el archivo
       try {
-        AppLogger.i('DEBUG_OTA: Verificando URL: $apkUrl');
-        final response = await http.get(Uri.parse(apkUrl)).timeout(const Duration(seconds: 10));
+        AppLogger.i('DEBUG_OTA: Verificando URL (HEAD): $apkUrl');
+        final response = await http.head(Uri.parse(apkUrl)).timeout(const Duration(seconds: 10));
         
         AppLogger.i('DEBUG_OTA: Status Code: ${response.statusCode}');
         final contentType = response.headers['content-type']?.toLowerCase() ?? '';
-        AppLogger.i('DEBUG_OTA: Content-Type: $contentType');
+        final contentLength = response.headers['content-length'];
+        AppLogger.i('DEBUG_OTA: Content-Type: $contentType, Size: $contentLength');
         
         if (response.statusCode != 200) {
-          throw 'Servidor devolvió error ${response.statusCode}';
-        }
-        
-        if (contentType.contains('text/html')) {
-          throw 'El servidor envió una página web en lugar del instalador. Contacta a soporte.';
+          // Si HEAD falla (algunos servidores no lo soportan), intentamos GET ligero
+          AppLogger.w('DEBUG_OTA: HEAD falló, intentando GET limitado...');
+          final getCheck = await http.get(Uri.parse(apkUrl)).timeout(const Duration(seconds: 5));
+          if (getCheck.statusCode != 200) throw 'Servidor devolvió error ${getCheck.statusCode}';
+          if (getCheck.headers['content-type']?.contains('text/html') ?? false) {
+             throw 'El servidor envió HTML en lugar de APK.';
+          }
+        } else {
+          if (contentType.contains('text/html')) {
+            throw 'El servidor envió una página web (HTML) en lugar del instalador.';
+          }
         }
       } catch (e) {
         AppLogger.e('DEBUG_OTA: Error en validación previa: $e');
-        if (mounted) {
-          setState(() {
-            _isDownloading = false;
-            _downloadError = true;
-            _statusMessage = e.toString();
-          });
-        }
-        return; // Detenemos el proceso
+        // Si no hay red o el servidor no responde, cancelar inmediatamente
+        _resetToInitialState(message: 'No se pudo conectar al servidor. Verifica tu conexión.');
+        return;
       }
 
       AppLogger.i('BLOCKING_DIALOG: Iniciando descarga de APK desde: $apkUrl');
 
       OtaUpdate()
-          .execute(apkUrl) // Sin destinationFilename para mayor compatibilidad
+          .execute(
+            apkUrl,
+            destinationFilename: 'ada_update.apk', // Forzamos extensión .apk
+          )
           .listen(
         (OtaEvent event) {
           if (!mounted) return;
@@ -145,20 +194,28 @@ class _BlockingNotificationDialogState
                 break;
               case OtaStatus.INSTALLING:
                 _downloadComplete = true;
+                _waitingForInstall = true;
                 _statusMessage = 'Instalando actualización...';
                 break;
               case OtaStatus.ALREADY_RUNNING_ERROR:
+                _isDownloading = false;
                 _statusMessage = 'Ya hay una descarga en curso';
                 break;
               case OtaStatus.PERMISSION_NOT_GRANTED_ERROR:
-                _downloadError = true;
+                _isDownloading = false;
+                _downloadProgress = 0.0;
+                _downloadComplete = false;
+                _downloadError = false;
                 _statusMessage = 'Permiso denegado: Activa "Instalar apps desconocidas"';
                 break;
               case OtaStatus.INTERNAL_ERROR:
               case OtaStatus.DOWNLOAD_ERROR:
               case OtaStatus.CHECKSUM_ERROR:
               case OtaStatus.INSTALLATION_ERROR:
-                _downloadError = true;
+                _isDownloading = false;
+                _downloadProgress = 0.0;
+                _downloadComplete = false;
+                _downloadError = false;
                 _statusMessage = 'Error: ${event.value ?? "Intenta de nuevo"}';
                 break;
               case OtaStatus.INSTALLATION_DONE:
@@ -167,32 +224,29 @@ class _BlockingNotificationDialogState
                 break;
               case OtaStatus.CANCELED:
                 _isDownloading = false;
-                _statusMessage = 'Cancelado';
+                _downloadProgress = 0.0;
+                _downloadComplete = false;
+                _downloadError = false;
+                _statusMessage = '';
                 break;
             }
           });
         },
         onError: (e) {
-          if (!mounted) return;
-          setState(() {
-            _downloadError = true;
-            _statusMessage = 'Error crítico: $e';
-          });
+          AppLogger.e('BLOCKING_DIALOG: Error crítico en OTA stream', e);
+          _resetToInitialState(message: 'Error crítico. Intenta de nuevo.');
         },
       );
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _downloadError = true;
-        _statusMessage = 'Error al iniciar';
-      });
+      AppLogger.e('BLOCKING_DIALOG: Error al iniciar descarga', e);
+      _resetToInitialState(message: 'Error al iniciar. Intenta de nuevo.');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      canPop: widget.dismissible,
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Center(
@@ -290,8 +344,26 @@ class _BlockingNotificationDialogState
                           ),
                           textAlign: TextAlign.center,
                         ),
-                      ] else
+                        if (_downloadError || _downloadComplete) ...[
+                          const SizedBox(height: 20),
+                          _buildDownloadButton(),
+                        ] else ...[
+                          const SizedBox(height: 16),
+                          TextButton(
+                            onPressed: () => _resetToInitialState(),
+                            child: Text(
+                              'Cancelar',
+                              style: TextStyle(color: Colors.white.withOpacity(0.4)),
+                            ),
+                          ),
+                        ],
+                      ] else ...[
                         _buildDownloadButton(),
+                        if (widget.dismissible && !_isDownloading) ...[
+                          const SizedBox(height: 12),
+                          _buildCloseButton(),
+                        ],
+                      ],
 
                       const SizedBox(height: 20),
                       Text(
@@ -358,5 +430,18 @@ class _BlockingNotificationDialogState
       ),
     );
   }
+  Widget _buildCloseButton() {
+    return TextButton(
+      onPressed: () => Navigator.of(context).pop(),
+      child: Text(
+        'Quizás más tarde',
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.5),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   String _getCurrentVersion() => _currentVersion;
 }

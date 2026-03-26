@@ -5,6 +5,9 @@ import 'package:ada_app/services/api/auth_service.dart';
 
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:ada_app/config/app_config.dart';
+import 'package:ada_app/services/api/version_service.dart';
+import 'package:ada_app/ui/widgets/blocking_notification_dialog.dart';
+import 'package:ada_app/models/notification_model.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -18,6 +21,7 @@ class _AboutScreenState extends State<AboutScreen> {
   String _buildNumber = '';
   Usuario? _currentUser;
   bool _isLoading = true;
+  bool _isCheckingUpdate = false;
 
   @override
   void initState() {
@@ -45,6 +49,58 @@ class _AboutScreenState extends State<AboutScreen> {
         setState(() {
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _checkForUpdate() async {
+    if (_isCheckingUpdate) return;
+
+    setState(() => _isCheckingUpdate = true);
+
+    try {
+      final info = await VersionService.checkUpdate();
+      
+      if (!mounted) return;
+
+      if (info.isUpdateAvailable) {
+        final notification = NotificationModel(
+          id: 0,
+          title: 'Nueva versión disponible',
+          message: 'Hay una actualización disponible (v${info.latestVersion}). ¿Deseas instalarla ahora?',
+          type: NotificationLevel.blocking,
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+        );
+
+        showDialog(
+          context: context,
+          barrierDismissible: true,
+          builder: (context) => BlockingNotificationDialog(
+            notification: notification,
+            dismissible: true,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('La aplicación está actualizada'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al comprobar actualización: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingUpdate = false);
       }
     }
   }
@@ -204,20 +260,33 @@ class _AboutScreenState extends State<AboutScreen> {
           'Versión $_version (Build $_buildNumber)',
           style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
         ),
-        SizedBox(height: 8),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.success.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-          ),
-          child: Text(
-            'Actualizado',
-            style: TextStyle(
-              color: AppColors.success,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+        SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _isCheckingUpdate ? null : _checkForUpdate,
+            icon: _isCheckingUpdate
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.refresh),
+            label: Text(
+              _isCheckingUpdate
+                  ? 'Comprobando...'
+                  : 'Comprobar actualización',
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 12),
             ),
           ),
         ),

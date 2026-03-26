@@ -28,11 +28,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final notifications = await _repository.getAll();
     if (mounted) {
       setState(() {
-        _notifications = notifications;
+        _notifications = notifications.toList()
+          ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
         _isLoading = false;
       });
-      // Marcar todas como leídas al entrar
       await NotificationManager().markAllAsRead();
+    }
+  }
+
+  Future<void> _deleteNotification(int id) async {
+    await _repository.delete(id);
+    if (mounted) {
+      setState(() {
+        _notifications.removeWhere((n) => n.id == id);
+      });
     }
   }
 
@@ -53,38 +62,83 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              ),
+            )
           : _notifications.isEmpty
               ? _buildEmptyState()
-              : ListView.separated(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: _notifications.length,
-                  separatorBuilder: (context, index) =>
-                      const Divider(height: 1, indent: 70),
-                  itemBuilder: (context, index) {
-                    return _NotificationTile(notification: _notifications[index]);
-                  },
+              : RefreshIndicator(
+                  onRefresh: _loadNotifications,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+                    itemCount: _notifications.length,
+                    itemBuilder: (context, index) {
+                      final notification = _notifications[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Dismissible(
+                          key: Key('notif_${notification.id}'),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.8),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(Icons.delete_outline, color: Colors.white),
+                          ),
+                          onDismissed: (_) => _deleteNotification(notification.id),
+                          child: _NotificationTile(notification: notification),
+                        ),
+                      );
+                    },
+                  ),
                 ),
     );
   }
 
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.notifications_none_outlined,
-              size: 80, color: AppColors.textSecondary.withValues(alpha: 0.3)),
-          const SizedBox(height: 16),
-          Text(
-            'No tienes notificaciones',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textSecondary,
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.notifications_off_outlined,
+                size: 64,
+                color: AppColors.textSecondary.withValues(alpha: 0.4),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            Text(
+              'Bandeja vacía',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'No tienes notificaciones pendientes. ¡Todo al día!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -122,63 +176,136 @@ class _NotificationTile extends StatelessWidget {
 
   const _NotificationTile({required this.notification});
 
+  String _formatDate(int timestamp) {
+    final now = DateTime.now();
+    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final diff = now.difference(date);
+
+    if (diff.inMinutes < 60) {
+      if (diff.inMinutes <= 0) return 'Ahora mismo';
+      return 'Hace ${diff.inMinutes} min';
+    } else if (diff.inHours < 24) {
+      return 'Hace ${diff.inHours} ${diff.inHours == 1 ? 'hora' : 'horas'}';
+    } else if (diff.inDays < 2) {
+      return 'Ayer, ${DateFormat('HH:mm').format(date)}';
+    } else {
+      return DateFormat('dd/MM, HH:mm').format(date);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final Color iconColor;
+    final Color accentColor;
     final IconData iconData;
 
     switch (notification.type) {
       case NotificationLevel.blocking:
-        iconColor = AppColors.error;
-        iconData = Icons.block_flipped;
+        accentColor = AppColors.error;
+        iconData = Icons.security_rounded;
         break;
       case NotificationLevel.important:
-        iconColor = AppColors.warning;
-        iconData = Icons.warning_amber_rounded;
+        accentColor = AppColors.warning;
+        iconData = Icons.priority_high_rounded;
         break;
       case NotificationLevel.info:
-        iconColor = AppColors.info;
-        iconData = Icons.info_outline;
+        accentColor = AppColors.info;
+        iconData = Icons.info_rounded;
         break;
       case NotificationLevel.unblocking:
-        iconColor = AppColors.success;
-        iconData = Icons.lock_open_rounded;
+        accentColor = AppColors.success;
+        iconData = Icons.check_circle_rounded;
         break;
     }
 
-    final date = DateTime.fromMillisecondsSinceEpoch(notification.timestamp);
-    final timeStr = DateFormat('dd/MM HH:mm').format(date);
-
-    return ListTile(
-      leading: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: iconColor.withValues(alpha: 0.1),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(iconData, color: iconColor),
-      ),
-      title: Text(
-        notification.title,
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 4),
-          Text(
-            notification.message,
-            style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            timeStr,
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      isThreeLine: true,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Indicador lateral de importancia
+              Container(
+                width: 6,
+                color: accentColor,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Icono con fondo suave
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: accentColor.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(iconData, color: accentColor, size: 22),
+                      ),
+                      const SizedBox(width: 16),
+                      // Contenido texto
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    notification.title,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  _formatDate(notification.timestamp),
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              notification.message,
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
