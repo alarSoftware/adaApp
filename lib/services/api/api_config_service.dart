@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiConfigService {
   static const String endpointKey = 'api_base_url';
-  static const String defaultBaseUrl = 'http://200.85.60.250:28080/adaControl';
+  static const String defaultBaseUrl = 'http://reposicion.pulp.com.py:8080/adaControl';
 
   static final ValueNotifier<String?> urlNotifier = ValueNotifier(null);
 

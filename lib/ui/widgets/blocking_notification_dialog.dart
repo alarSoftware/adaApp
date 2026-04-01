@@ -7,6 +7,8 @@ import 'package:ota_update/ota_update.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
+
 
 class BlockingNotificationDialog extends StatefulWidget {
   final NotificationModel notification;
@@ -105,6 +107,26 @@ class _BlockingNotificationDialogState
   }
 
   Future<void> _startDownload() async {
+    final String? blockingUrl = widget.notification.blockingUrl;
+    
+    // Si hay una URL pero no parece un APK (ej: WhatsApp), la abrimos externamente
+    if (blockingUrl != null && 
+        blockingUrl.isNotEmpty && 
+        !blockingUrl.toLowerCase().contains('.apk') &&
+        !blockingUrl.toLowerCase().contains('/api/get_apk')) {
+      final uri = Uri.tryParse(blockingUrl);
+      if (uri != null) {
+        try {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          return; // Salimos, no es una descarga de APK
+        } catch (e) {
+          AppLogger.e('Error lanzando URL externa', e);
+          _resetToInitialState(message: 'No se pudo abrir el enlace');
+          return;
+        }
+      }
+    }
+
     try {
       final status = await Permission.requestInstallPackages.status;
       if (!status.isGranted) {
@@ -143,7 +165,10 @@ class _BlockingNotificationDialogState
     });
 
     try {
-      final apkUrl = await ApiConfigService.getFullUrl('/api/get_apk');
+      // Priorizamos la URL que viene en la notificación si es un APK
+      final apkUrl = (blockingUrl != null && blockingUrl.isNotEmpty) 
+          ? (blockingUrl.startsWith('http') ? blockingUrl : await ApiConfigService.getFullUrl(blockingUrl))
+          : await ApiConfigService.getFullUrl('/api/get_apk');
 
       // Validación PRE-Descarga: Verificamos headers sin descargar todo el archivo
       try {
@@ -242,6 +267,7 @@ class _BlockingNotificationDialogState
       _resetToInitialState(message: 'Error al iniciar. Intenta de nuevo.');
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -358,12 +384,15 @@ class _BlockingNotificationDialogState
                           ),
                         ],
                       ] else ...[
-                        _buildDownloadButton(),
+                        if (widget.notification.blockingUrl != null && 
+                            widget.notification.blockingUrl!.isNotEmpty)
+                          _buildDownloadButton(),
                         if (widget.dismissible && !_isDownloading) ...[
                           const SizedBox(height: 12),
                           _buildCloseButton(),
                         ],
                       ],
+
 
                       const SizedBox(height: 20),
                       Text(
@@ -403,6 +432,12 @@ class _BlockingNotificationDialogState
   }
 
   Widget _buildDownloadButton() {
+    final String? blockingUrl = widget.notification.blockingUrl;
+    final bool isApk = blockingUrl == null || 
+                      blockingUrl.isEmpty || 
+                      blockingUrl.toLowerCase().contains('.apk') ||
+                      blockingUrl.toLowerCase().contains('/api/get_apk');
+
     return SizedBox(
       width: double.infinity,
       height: 50,
@@ -419,10 +454,10 @@ class _BlockingNotificationDialogState
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(_downloadError ? Icons.refresh : Icons.download, size: 20),
+            Icon(_downloadError ? Icons.refresh : (isApk ? Icons.download : Icons.open_in_new), size: 20),
             const SizedBox(width: 8),
             Text(
-              _downloadError ? 'Reintentar' : 'Actualizar ahora',
+              _downloadError ? 'Reintentar' : (isApk ? 'Actualizar ahora' : 'Acceder enlace'),
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
           ],
@@ -430,6 +465,7 @@ class _BlockingNotificationDialogState
       ),
     );
   }
+
   Widget _buildCloseButton() {
     return TextButton(
       onPressed: () => Navigator.of(context).pop(),

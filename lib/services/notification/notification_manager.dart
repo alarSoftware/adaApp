@@ -86,7 +86,10 @@ class NotificationManager {
     bool isForMe = false;
 
     // 1. Si es para todos, se acepta siempre
-    if (notification.target == "all" || notification.target == null) {
+    // Soporta tanto target: "all" (String) como target: ["all"] (List)
+    if (notification.target == null || 
+        notification.target == "all" ||
+        (notification.target is List && (notification.target as List).map((e) => e.toString().toLowerCase()).contains("all"))) {
       isForMe = true;
     } 
     // 2. Si hay configuración detallada por canales (targetConfig), esta tiene prioridad

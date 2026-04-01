@@ -90,12 +90,19 @@ class DatabaseTables {
     }
 
     if (oldVersion < 8) {
-      // Migración a v8: Agregar columna imei a device_log
+      // Migración a v8: Agregar columna imei a device_log e blockingUrl a notifications
       try {
         await db.execute('ALTER TABLE device_log ADD COLUMN imei TEXT');
         debugPrint('Migración v8: Columna imei agregada a device_log');
       } catch (e) {
         debugPrint('Migración v8 columna imei omitida (ya existe): $e');
+      }
+
+      try {
+        await db.execute('ALTER TABLE notifications ADD COLUMN blockingUrl TEXT');
+        debugPrint('Migración v8: Columna blockingUrl agregada a notifications');
+      } catch (e) {
+        debugPrint('Migración v8 columna blockingUrl omitida (ya existe): $e');
       }
     }
   }
@@ -455,7 +462,8 @@ class DatabaseTables {
       message TEXT NOT NULL,
       type TEXT NOT NULL,
       timestamp INTEGER NOT NULL,
-      isRead INTEGER DEFAULT 0
+      isRead INTEGER DEFAULT 0,
+      blockingUrl TEXT
     )
   ''';
 

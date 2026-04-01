@@ -76,6 +76,8 @@ class NotificationModel {
   final dynamic target;
   final List<TargetConfig>? targetConfig;
 
+  final String? blockingUrl;
+
   NotificationModel({
     required this.id,
     required this.title,
@@ -85,6 +87,7 @@ class NotificationModel {
     this.isRead = false,
     this.target,
     this.targetConfig,
+    this.blockingUrl,
   });
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
@@ -119,6 +122,7 @@ class NotificationModel {
               .map((i) => TargetConfig.fromJson(i))
               .toList()
           : null,
+      blockingUrl: ParsingHelpers.parseString(json['blockingUrl']),
     );
   }
 
@@ -132,6 +136,8 @@ class NotificationModel {
       'isRead': isRead ? 1 : 0,
       'target': target,
       'targetConfig': targetConfig?.map((i) => i.toJson()).toList(),
+      'blockingUrl': blockingUrl,
     };
   }
 }
+
