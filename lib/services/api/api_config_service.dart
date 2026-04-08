@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiConfigService {
   static const String endpointKey = 'api_base_url';
-  static const String defaultBaseUrl = 'http://reposicion.pulp.com.py:8080/adaControl';
+  static const String defaultBaseUrl = 'http://reposicion.pulp.com.py:8443/adaControl';
 
   static final ValueNotifier<String?> urlNotifier = ValueNotifier(null);
 
@@ -33,5 +33,15 @@ class ApiConfigService {
       return '$base$endpoint';
     }
     return '$base/$endpoint';
+  }
+
+  static const String apkEndpoint = '/api/getApk';
+
+  static Future<String> getApkUrl() => getFullUrl(apkEndpoint);
+
+  static bool isApkUrl(String url) {
+    final lowerUrl = url.toLowerCase();
+    return lowerUrl.contains('.apk') || 
+           lowerUrl.contains(apkEndpoint.toLowerCase());
   }
 }

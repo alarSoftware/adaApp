@@ -106,14 +106,15 @@ class _BlockingNotificationDialogState
     }
   }
 
+  bool _isApkUrl(String url) => ApiConfigService.isApkUrl(url);
+
   Future<void> _startDownload() async {
     final String? blockingUrl = widget.notification.blockingUrl;
     
     // Si hay una URL pero no parece un APK (ej: WhatsApp), la abrimos externamente
     if (blockingUrl != null && 
         blockingUrl.isNotEmpty && 
-        !blockingUrl.toLowerCase().contains('.apk') &&
-        !blockingUrl.toLowerCase().contains('/api/get_apk')) {
+        !_isApkUrl(blockingUrl)) {
       final uri = Uri.tryParse(blockingUrl);
       if (uri != null) {
         try {
@@ -168,7 +169,7 @@ class _BlockingNotificationDialogState
       // Priorizamos la URL que viene en la notificación si es un APK
       final apkUrl = (blockingUrl != null && blockingUrl.isNotEmpty) 
           ? (blockingUrl.startsWith('http') ? blockingUrl : await ApiConfigService.getFullUrl(blockingUrl))
-          : await ApiConfigService.getFullUrl('/api/get_apk');
+          : await ApiConfigService.getApkUrl();
 
       // Validación PRE-Descarga: Verificamos headers sin descargar todo el archivo
       try {
@@ -435,8 +436,7 @@ class _BlockingNotificationDialogState
     final String? blockingUrl = widget.notification.blockingUrl;
     final bool isApk = blockingUrl == null || 
                       blockingUrl.isEmpty || 
-                      blockingUrl.toLowerCase().contains('.apk') ||
-                      blockingUrl.toLowerCase().contains('/api/get_apk');
+                      _isApkUrl(blockingUrl);
 
     return SizedBox(
       width: double.infinity,

@@ -18,7 +18,8 @@ class SocketService {
   StompClient? _client;
   final ValueNotifier<bool> connectionNotifier = ValueNotifier<bool>(false);
   bool _isConnecting = false;
-  bool _shouldReconnect = true; // Flag para controlar reconexión después de logout
+  bool _shouldReconnect =
+      true; // Flag para controlar reconexión después de logout
 
   bool get isConnected => connectionNotifier.value;
 
@@ -86,7 +87,7 @@ class SocketService {
           wsUrl = '$wsUrl/stomp/websocket';
         }
       }
-      
+
       AppLogger.i('SOCKET_SERVICE: 🛰️ Conectando a $wsUrl');
 
       // Obtener versión de la app
@@ -114,13 +115,14 @@ class SocketService {
       // Recolectar datos del dispositivo con TIMEOUT para evitar bloqueos (GPS puede tardar 30s)
       dynamic deviceLog;
       try {
-        deviceLog = await DeviceInfoHelper.crearDeviceLog(requerirGps: false).timeout(
-          const Duration(seconds: 15),
-          onTimeout: () {
-            debugPrint('[WS] Device info timeout (15s). Proceeding.');
-            return null;
-          },
-        );
+        deviceLog = await DeviceInfoHelper.crearDeviceLog(requerirGps: false)
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () {
+                debugPrint('[WS] Device info timeout (15s). Proceeding.');
+                return null;
+              },
+            );
       } catch (e) {
         debugPrint('[WS] Error gathering device info');
       }
@@ -158,10 +160,10 @@ class SocketService {
           onDebugMessage: (String message) {
             final msg = message.trim();
             // Filtrar PING/PONG, indicadores de latido y mensajes vacíos
-            if (msg.isEmpty || 
-                msg == '<<<' || 
-                msg == '>>>' || 
-                msg.contains('PING') || 
+            if (msg.isEmpty ||
+                msg == '<<<' ||
+                msg == '>>>' ||
+                msg.contains('PING') ||
                 msg.contains('PONG')) {
               return;
             }
@@ -172,7 +174,7 @@ class SocketService {
             if (userId != null) 'user-id': userId,
             if (currentUsername != null) 'username': currentUsername,
             'client-type': 'mobile',
-            
+
             // Re-adding optional but helpful headers
             if (username != null) 'login': username,
             if (password != null) 'passcode': password,
@@ -185,7 +187,8 @@ class SocketService {
               'coords': deviceLog.latitudLongitud.toString(),
               'model': deviceLog.modelo.toString(),
               'timestamp': deviceLog.fechaRegistro.toString(),
-              if (deviceLog.imei != null) 'device-imei': deviceLog.imei.toString(),
+              if (deviceLog.imei != null)
+                'device-imei': deviceLog.imei.toString(),
             },
             'max-daily-usage': dataUsageStats['max_daily_usage'].toString(),
             'avg-daily-usage': dataUsageStats['avg_daily_usage'].toString(),
@@ -217,7 +220,9 @@ class SocketService {
 
   void _subscribeToNotifications() {
     if (_client == null || !_client!.connected) {
-      AppLogger.w('SOCKET_SERVICE: ⚠️ No se pudo suscribir, cliente no conectado');
+      AppLogger.w(
+        'SOCKET_SERVICE: ⚠️ No se pudo suscribir, cliente no conectado',
+      );
       return;
     }
 
@@ -227,7 +232,9 @@ class SocketService {
     _client?.subscribe(
       destination: '/topic/notifications',
       callback: (frame) {
-        AppLogger.i('SOCKET_SERVICE: 📩 Mensaje recibido en /topic/notifications');
+        AppLogger.i(
+          'SOCKET_SERVICE: 📩 Mensaje recibido en /topic/notifications',
+        );
         _handleNotification(frame);
       },
     );
@@ -236,7 +243,9 @@ class SocketService {
     _client?.subscribe(
       destination: '/user/queue/notifications',
       callback: (frame) {
-        AppLogger.i('SOCKET_SERVICE: 📩 Mensaje recibido en /user/queue/notifications');
+        AppLogger.i(
+          'SOCKET_SERVICE: 📩 Mensaje recibido en /user/queue/notifications',
+        );
         _handleNotification(frame);
       },
     );
@@ -249,13 +258,21 @@ class SocketService {
       AppLogger.w('SOCKET_SERVICE: Recibido frame STOMP sin cuerpo');
       return;
     }
-    
+
+    // LOG DE INVESTIGACIÓN: Muestra exactamente qué llegó del servidor
+    print('-----------------------------------------');
+    print('[NOTIF_DEBUG] LLEGÓ MENSAJE DEL SOCKET:');
+    print(frame.body);
+    print('-----------------------------------------');
+
     AppLogger.i('SOCKET_SERVICE: Procesando mensaje: ${frame.body}');
-    
+
     try {
       final decodedBody = jsonDecode(frame.body!);
       final notification = NotificationModel.fromJson(decodedBody);
-      AppLogger.i('SOCKET_SERVICE: Notificación parseada: ${notification.title}');
+      AppLogger.i(
+        'SOCKET_SERVICE: Notificación parseada: ${notification.title}',
+      );
       _notificationStreamController.add(notification);
     } catch (e) {
       AppLogger.e('SOCKET_SERVICE: Error parseando notificación', e);

@@ -2,7 +2,7 @@ name: ada_app
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 2.0.1+9
+version: 3.0.0+10
 
 environment:
   sdk: ^3.8.1
