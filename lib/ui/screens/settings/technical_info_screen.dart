@@ -39,8 +39,6 @@ class _TechnicalInfoScreenState extends State<TechnicalInfoScreen> {
         'Modelo': results[1].toString(),
         'Nivel de Batería': '${results[2]}%',
         'Versión de App': packageInfo.version,
-        'Build Number': packageInfo.buildNumber,
-        'Package Name': packageInfo.packageName,
       };
       _isLoading = false;
     });

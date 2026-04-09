@@ -15,7 +15,7 @@ class VersionService {
   static Future<VersionInfo> checkUpdate() async {
     try {
       final baseUrl = await ApiConfigService.getBaseUrl();
-      final url = '$baseUrl/api/latest_version';
+      final url = '$baseUrl/api/latestVersion';
 
       AppLogger.i('VERSION_SERVICE: Comprobando versión en $url');
 
@@ -31,8 +31,7 @@ class VersionService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         AppLogger.i('VERSION_SERVICE: Respuesta recibida: ${response.body}');
-        
-        // El servidor devuelve {"version": "1.1.0", "build": 9, "url": "/api/get_apk", ...}
+
         String? serverVersion;
         
         if (data is Map<String, dynamic>) {
