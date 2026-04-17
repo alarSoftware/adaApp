@@ -497,28 +497,107 @@ class _FormsScreenState extends State<FormsScreen> {
             Row(
               children: [
                 Expanded(
-                  child: TextFormField(
-                    controller: _viewModel.codigoBarrasController,
+                  child: RawAutocomplete<Map<String, dynamic>>(
                     focusNode: _codigoBarrasFocusNode,
-                    validator: _viewModel.validarCodigoBarras,
-                    onChanged: _viewModel.onCodigoChanged,
-                    onFieldSubmitted: _viewModel.onCodigoSubmitted,
-                    enabled: !_viewModel.isLoading,
-                    decoration: InputDecoration(
-                      hintText: _viewModel.codigoHint,
-                      prefixIcon: const Icon(Icons.barcode_reader),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: AppColors.border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: AppColors.focus),
-                      ),
-                    ),
+                    textEditingController: _viewModel.codigoBarrasController,
+                    optionsBuilder: (TextEditingValue textEditingValue) async {
+                      if (textEditingValue.text.length < 3) {
+                        return const Iterable<Map<String, dynamic>>.empty();
+                      }
+                      return await _viewModel
+                          .getSugerenciasCodigo(textEditingValue.text);
+                    },
+                    displayStringForOption: (option) =>
+                        option['cod_barras']?.toString() ?? '',
+                    fieldViewBuilder: (context, textEditingController,
+                        focusNode, onFieldSubmitted) {
+                      // Sincronizar el controlador local de Autocomplete con el del ViewModel
+                      if (textEditingController.text !=
+                          _viewModel.codigoBarrasController.text) {
+                        textEditingController.text =
+                            _viewModel.codigoBarrasController.text;
+                      }
+
+                      return TextFormField(
+                        controller: textEditingController,
+                        focusNode: focusNode,
+                        validator: _viewModel.validarCodigoBarras,
+                        enabled: !_viewModel.isLoading,
+                        decoration: InputDecoration(
+                          hintText: _viewModel.codigoHint,
+                          prefixIcon: const Icon(Icons.barcode_reader),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: AppColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: AppColors.focus),
+                          ),
+                        ),
+                        onChanged: (value) {
+                          _viewModel.onCodigoChanged(value);
+                        },
+                        onFieldSubmitted: (value) {
+                          _viewModel.onCodigoSubmitted(value);
+                          onFieldSubmitted();
+                        },
+                      );
+                    },
+                    optionsViewBuilder: (context, onSelected, options) {
+                      return Align(
+                        alignment: Alignment.topLeft,
+                        child: Material(
+                          elevation: 8,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            constraints: BoxConstraints(
+                              maxHeight: 250,
+                              maxWidth: MediaQuery.of(context).size.width - 32,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: ListView.separated(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              itemCount: options.length,
+                              separatorBuilder: (context, index) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (BuildContext context, int index) {
+                                final Map<String, dynamic> option =
+                                    options.elementAt(index);
+                                final String marca =
+                                    option['marca_nombre'] ?? '';
+                                final String modelo =
+                                    option['modelo_nombre'] ?? '';
+
+                                return ListTile(
+                                  leading: const Icon(Icons.qr_code_2,
+                                      color: AppColors.primary),
+                                  title: Text(
+                                    option['cod_barras']?.toString() ?? '',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                  subtitle: Text('$marca $modelo'),
+                                  onTap: () {
+                                    onSelected(option);
+                                    _viewModel.onCodigoSubmitted(
+                                        option['cod_barras']?.toString() ?? '');
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
                 if (_viewModel.shouldShowCamera) ...[

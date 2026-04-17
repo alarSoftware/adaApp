@@ -4,6 +4,7 @@ import 'dart:async';
 import '../models/cliente.dart';
 import '../repositories/equipo_repository.dart';
 import '../repositories/equipo_pendiente_repository.dart';
+import '../repositories/equipo_extraviado_repository.dart';
 import '../repositories/censo_activo_repository.dart';
 
 abstract class ClienteDetailUIEvent {}
@@ -29,12 +30,14 @@ class ClienteDetailState {
   final bool isLoading;
   final List<Map<String, dynamic>> equiposAsignadosList;
   final List<Map<String, dynamic>> equiposPendientesList;
+  final List<Map<String, dynamic>> equiposExtraviadosList;
   final String? errorMessage;
 
   ClienteDetailState({
     this.isLoading = false,
     this.equiposAsignadosList = const [],
     this.equiposPendientesList = const [],
+    this.equiposExtraviadosList = const [],
     this.errorMessage,
   });
 
@@ -42,6 +45,7 @@ class ClienteDetailState {
     bool? isLoading,
     List<Map<String, dynamic>>? equiposAsignadosList,
     List<Map<String, dynamic>>? equiposPendientesList,
+    List<Map<String, dynamic>>? equiposExtraviadosList,
     String? errorMessage,
   }) {
     return ClienteDetailState(
@@ -49,6 +53,8 @@ class ClienteDetailState {
       equiposAsignadosList: equiposAsignadosList ?? this.equiposAsignadosList,
       equiposPendientesList:
           equiposPendientesList ?? this.equiposPendientesList,
+      equiposExtraviadosList:
+          equiposExtraviadosList ?? this.equiposExtraviadosList,
       errorMessage: errorMessage,
     );
   }
@@ -57,27 +63,35 @@ class ClienteDetailState {
   bool get isEmpty =>
       equiposAsignadosList.isEmpty &&
       equiposPendientesList.isEmpty &&
+      equiposExtraviadosList.isEmpty &&
       !isLoading &&
       !hasError;
 
   int get equiposAsignadosCount => equiposAsignadosList.length;
   int get equiposPendientesCount => equiposPendientesList.length;
+  int get equiposExtraviadosCount => equiposExtraviadosList.length;
   int get totalEquiposCount =>
-      equiposAsignadosList.length + equiposPendientesList.length;
+      equiposAsignadosList.length +
+      equiposPendientesList.length +
+      equiposExtraviadosList.length;
 
   bool get tieneEquiposAsignados => equiposAsignadosList.isNotEmpty;
   bool get tieneEquiposPendientes => equiposPendientesList.isNotEmpty;
+  bool get tieneEquiposExtraviados => equiposExtraviadosList.isNotEmpty;
 
   List<Map<String, dynamic>> get equiposCompletos => [
-    ...equiposAsignadosList,
-    ...equiposPendientesList,
-  ];
+        ...equiposExtraviadosList,
+        ...equiposAsignadosList,
+        ...equiposPendientesList,
+      ];
 }
 
 class ClienteDetailScreenViewModel extends ChangeNotifier {
   final EquipoRepository _equipoRepository = EquipoRepository();
   final EquipoPendienteRepository _equipoPendienteRepository =
       EquipoPendienteRepository();
+  final EquipoExtraviadoRepository _equipoExtraviadoRepository =
+      EquipoExtraviadoRepository();
   final CensoActivoRepository _estadoEquipoRepository = CensoActivoRepository();
 
   ClienteDetailState _state = ClienteDetailState();
@@ -93,6 +107,8 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
       _state.equiposAsignadosList;
   List<Map<String, dynamic>> get equiposPendientesList =>
       _state.equiposPendientesList;
+  List<Map<String, dynamic>> get equiposExtraviadosList =>
+      _state.equiposExtraviadosList;
   List<Map<String, dynamic>> get equiposCompletos => _state.equiposCompletos;
 
   String? get errorMessage => _state.errorMessage;
@@ -101,6 +117,7 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
 
   int get equiposAsignadosCount => _state.equiposAsignadosCount;
   int get equiposPendientesCount => _state.equiposPendientesCount;
+  int get equiposExtraviadosCount => _state.equiposExtraviadosCount;
   int get totalEquiposCount => _state.totalEquiposCount;
 
   bool get tieneEquiposAsignados => _state.tieneEquiposAsignados;
@@ -137,12 +154,15 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
           .obtenerEquiposAsignados(_cliente!.id!);
       final equiposPendientesList = await _equipoPendienteRepository
           .obtenerEquiposPendientesPorCliente(_cliente!.id!);
+      final equiposExtraviadosList = await _equipoExtraviadoRepository
+          .obtenerEquiposExtraviadosPorCliente(_cliente!.id!);
 
       _updateState(
         _state.copyWith(
           isLoading: false,
           equiposAsignadosList: equiposAsignadosList,
           equiposPendientesList: equiposPendientesList,
+          equiposExtraviadosList: equiposExtraviadosList,
         ),
       );
     } catch (e, stackTrace) {
@@ -165,6 +185,7 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
         isLoading: false,
         equiposAsignadosList: [],
         equiposPendientesList: [],
+        equiposExtraviadosList: [],
       ),
     );
   }
@@ -184,10 +205,15 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
     bool isAsignado = _state.equiposAsignadosList.any(
       (e) => e['id'] == equipoData['id'],
     );
+    bool isExtraviado = _state.equiposExtraviadosList.any(
+      (e) => e['id'] == equipoData['id'],
+    );
 
     final equipoDataWithType = {
       ...equipoData,
-      'tipo_estado': isAsignado ? 'asignado' : 'pendiente',
+      'tipo_estado': isExtraviado
+          ? 'extraviado'
+          : (isAsignado ? 'asignado' : 'pendiente'),
     };
 
     _eventController.add(NavigateToEquipoDetailEvent(equipoDataWithType));
@@ -265,6 +291,8 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
         return '#FF9800';
       case 'disponible':
         return '#2196F3';
+      case 'extraviado':
+        return '#F44336'; // Rojo
       default:
         return '#9E9E9E';
     }
@@ -279,6 +307,8 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
         return 'schedule';
       case 'disponible':
         return 'radio_button_unchecked';
+      case 'extraviado':
+        return 'report_problem';
       default:
         return 'help';
     }
@@ -309,6 +339,16 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
           resultado = ultimoEstado?.toMap();
         }
       } else if (tipoEstado == 'asignado') {
+        final equipoId =
+            equipoData['equipo_id']?.toString() ?? equipoData['id']?.toString();
+        if (equipoId != null) {
+          final historial = await _estadoEquipoRepository
+              .obtenerHistorialDirectoPorEquipoCliente(equipoId, clienteId);
+          if (historial.isNotEmpty) {
+            resultado = historial.first.toMap();
+          }
+        }
+      } else if (tipoEstado == 'extraviado') {
         final equipoId =
             equipoData['equipo_id']?.toString() ?? equipoData['id']?.toString();
         if (equipoId != null) {
@@ -360,4 +400,13 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
 
   bool shouldShowEmptyPendientes() =>
       !isLoading && !hasError && equiposPendientesCount == 0;
+
+  bool shouldShowEmptyExtraviados() =>
+      !isLoading && !hasError && equiposExtraviadosCount == 0;
+
+  String getTabExtraviadosTitle() {
+    return state.tieneEquiposExtraviados
+        ? 'Extraviados (${state.equiposExtraviadosCount})'
+        : 'Extraviados';
+  }
 }

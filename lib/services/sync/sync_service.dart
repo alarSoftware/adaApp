@@ -9,6 +9,7 @@ import 'package:ada_app/repositories/cliente_repository.dart';
 import 'package:ada_app/services/sync/censo_sync_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ada_app/services/sync/equipos_pendientes_sync_service.dart';
+import 'package:ada_app/services/sync/equipos_extraviados_sync_service.dart';
 import 'package:ada_app/services/sync/dynamic_form_sync_service.dart';
 import 'package:ada_app/services/sync/censo_image_sync_service.dart';
 import 'package:ada_app/services/data/database_validation_service.dart';
@@ -67,6 +68,12 @@ class SyncService {
 
       await txn.delete(
         'equipos_pendientes',
+        where: 'sincronizado = ?',
+        whereArgs: [1],
+      );
+
+      await txn.delete(
+        'equipos_extraviados',
         where: 'sincronizado = ?',
         whereArgs: [1],
       );
@@ -273,8 +280,21 @@ class SyncService {
           resultado.erroresEquiposPendientes = 'Error equipos pendientes: $e';
           resultado.equiposPendientesSincronizados = 0;
         }
+
+        try {
+          onProgress?.call(0.68, 'Sincronizando equipos extraviados...');
+          final r = await EquiposExtraviadosSyncService.obtenerEquiposExtraviados(employeeId: employeeId);
+          resultado.equiposExtraviadosSincronizados = r.itemsSincronizados;
+          resultado.equiposExtraviadosExito = r.exito;
+          if (!r.exito) resultado.erroresEquiposExtraviados = r.mensaje;
+        } catch (e) {
+          resultado.equiposExtraviadosExito = false;
+          resultado.erroresEquiposExtraviados = 'Error equipos extraviados: $e';
+          resultado.equiposExtraviadosSincronizados = 0;
+        }
       } else {
         resultado.equiposPendientesExito = true;
+        resultado.equiposExtraviadosExito = true;
       }
 
       if (moduloPermitido('/formularios')) {
@@ -369,6 +389,7 @@ class SyncService {
         resultado.censosExito,
         resultado.imagenesCensosExito,
         resultado.equiposPendientesExito,
+        resultado.equiposExtraviadosExito,
         resultado.formulariosExito,
         resultado.detallesFormulariosExito,
         resultado.respuestasFormulariosExito,
@@ -426,6 +447,12 @@ class SyncService {
   static Future<SyncResult> sincronizarEquiposPendientes({
     String? employeeId,
   }) => EquiposPendientesSyncService.obtenerEquiposPendientes(
+    employeeId: employeeId,
+  );
+
+  static Future<SyncResult> sincronizarEquiposExtraviados({
+    String? employeeId,
+  }) => EquiposExtraviadosSyncService.obtenerEquiposExtraviados(
     employeeId: employeeId,
   );
 
@@ -579,6 +606,10 @@ class SyncResultUnificado {
   int equiposPendientesSincronizados = 0;
   String? erroresEquiposPendientes;
 
+  bool equiposExtraviadosExito = false;
+  int equiposExtraviadosSincronizados = 0;
+  String? erroresEquiposExtraviados;
+
   bool formulariosExito = false;
   int formulariosSincronizados = 0;
   String? erroresFormularios;
@@ -610,6 +641,7 @@ class SyncResultUnificado {
         censosSincronizados +
         imagenesCensosSincronizadas +
         equiposPendientesSincronizados +
+        equiposExtraviadosSincronizados +
         formulariosSincronizados +
         detallesFormulariosSincronizados +
         respuestasFormulariosSincronizadas +
@@ -637,6 +669,11 @@ class SyncResultUnificado {
         SyncStep(
           '$equiposPendientesSincronizados equipos pendientes',
           'Equipos pendientes descargados',
+        ),
+      if (equiposExtraviadosSincronizados > 0)
+        SyncStep(
+          '$equiposExtraviadosSincronizados equipos extraviados',
+          'Equipos extraviados descargados',
         ),
       if (formulariosSincronizados > 0)
         SyncStep(
@@ -691,6 +728,9 @@ class SyncResultUnificado {
     }
     if (equiposPendientesSincronizados > 0) {
       partes.add('$equiposPendientesSincronizados equipos pendientes');
+    }
+    if (equiposExtraviadosSincronizados > 0) {
+      partes.add('$equiposExtraviadosSincronizados equipos extraviados');
     }
     if (formulariosSincronizados > 0) {
       partes.add('$formulariosSincronizados formularios');

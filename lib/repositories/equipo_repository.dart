@@ -457,6 +457,25 @@ class EquipoRepository extends BaseRepository<Equipo> {
     ]);
   }
 
+  Future<List<Map<String, dynamic>>> buscarSugerenciasPorCodigo({
+    required String query,
+    int limit = 10,
+  }) async {
+    final sql = '''
+      SELECT e.*, m.nombre as marca_nombre, mo.nombre as modelo_nombre, l.nombre as logo_nombre
+      FROM equipos e
+      LEFT JOIN marcas m ON e.marca_id = m.id
+      LEFT JOIN modelos mo ON e.modelo_id = mo.id
+      LEFT JOIN logo l ON e.logo_id = l.id
+      WHERE LOWER(e.cod_barras) LIKE ?
+      LIMIT ?
+    ''';
+    return await dbHelper.consultarPersonalizada(sql, [
+      '%${query.toLowerCase()}%',
+      limit,
+    ]);
+  }
+
   Future<Equipo?> buscarPorCodigoBarras(String codBarras) async {
     final maps = await dbHelper.consultar(
       tableName,

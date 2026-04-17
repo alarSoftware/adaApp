@@ -11,6 +11,8 @@ import 'package:ada_app/services/device/image_service.dart';
 import 'package:ada_app/services/device/location_service.dart';
 import 'dart:io';
 
+import '../utils/logger.dart';
+
 abstract class FormsUIEvent {}
 
 class ShowSnackBarEvent extends FormsUIEvent {
@@ -285,6 +287,17 @@ class FormsScreenViewModel extends ChangeNotifier {
     }
 
     await buscarEquipoPorCodigo(codigoActual);
+  }
+
+  Future<List<Map<String, dynamic>>> getSugerenciasCodigo(String query) async {
+    if (query.length < 3) return [];
+    try {
+      final equipoRepo = EquipoRepository();
+      return await equipoRepo.buscarSugerenciasPorCodigo(query: query);
+    } catch (e) {
+      AppLogger.e("FORMS_SCREEN_VIEWMODEL: Error al obtener sugerencias", e);
+      return [];
+    }
   }
 
   Future<void> buscarEquipoPorCodigo(String codigo) async {
