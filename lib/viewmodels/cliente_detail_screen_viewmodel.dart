@@ -154,8 +154,19 @@ class ClienteDetailScreenViewModel extends ChangeNotifier {
           .obtenerEquiposAsignados(_cliente!.id!);
       final equiposPendientesList = await _equipoPendienteRepository
           .obtenerEquiposPendientesPorCliente(_cliente!.id!);
-      final equiposExtraviadosList = await _equipoExtraviadoRepository
+      final equiposExtraviadosListRaw = await _equipoExtraviadoRepository
           .obtenerEquiposExtraviadosPorCliente(_cliente!.id!);
+
+      // Filtrar para mostrar solo los que NO han sido censados localmente (sincronizado == 1)
+      final equiposExtraviadosList = equiposExtraviadosListRaw.where((e) {
+        final sincronizado = e['sincronizado']?.toString() == '1' || 
+                           e['sincronizado'] == 1;
+        return sincronizado;
+      }).toList();
+
+      AppLogger.i(
+        "CLIENT_DETAIL_VM: Extraviados totales: ${equiposExtraviadosListRaw.length}, Mostrados (sin censar): ${equiposExtraviadosList.length}",
+      );
 
       _updateState(
         _state.copyWith(

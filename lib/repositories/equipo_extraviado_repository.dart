@@ -42,6 +42,7 @@ class EquipoExtraviadoRepository extends BaseRepository<EquiposExtraviados> {
     SELECT DISTINCT
       ee.id,
       ee.equipo_id,
+      ee.sincronizado,
       e.cliente_id,
       ee.fecha_creacion,
       e.cod_barras,
@@ -84,26 +85,41 @@ class EquipoExtraviadoRepository extends BaseRepository<EquiposExtraviados> {
       final usuario = await authService.getCurrentUser();
       final usuarioCensoId = usuarioId ?? usuario?.id ?? 1;
 
-      await dbHelper.eliminar(
-        tableName,
-        where: 'equipo_id = ? AND cliente_id = ?',
-        whereArgs: [equipoIdString, clienteId],
-      );
-
       final uuid = const Uuid().v4();
       final datos = {
         'id': uuid,
         'equipo_id': equipoIdString,
-        'cliente_id': clienteId,
+        'cliente_id': clienteId.toString(),
         'fecha_censo': now.toIso8601String(),
         'usuario_censo_id': usuarioCensoId,
         'fecha_creacion': now.toIso8601String(),
         'fecha_actualizacion': now.toIso8601String(),
         'employee_id': employeeId,
-        'sincronizado': 0,
+        'sincronizado': 0, // 0 = Censado (Recuperado localmente)
       };
 
-      await dbHelper.insertar(tableName, datos);
+      AppLogger.i(
+        "EXTRAVIADO_REPOSITORY: Marcando equipo $equipoIdString como CENSADO (sincronizado=0) para cliente $clienteId",
+      );
+
+      // LIMPIEZA PREVENTIVA: Borramos CUALQUIER rastro de este equipo antes de insertar el nuevo estado
+      // Esto evita que queden duplicados si el equipo tenía IDs diferentes o estaba en varios clientes
+      final eliminadosPrevios = await dbHelper.eliminar(
+        tableName,
+        where: 'CAST(equipo_id AS TEXT) = ?',
+        whereArgs: [equipoIdString],
+      );
+      
+      if (eliminadosPrevios > 0) {
+        AppLogger.i("EXTRAVIADO_REPOSITORY: Se limpiaron $eliminadosPrevios registros previos del equipo $equipoIdString");
+      }
+
+      // Usamos el helper con ConflictAlgorithm.replace para evitar duplicados
+      await dbHelper.insertar(
+        tableName,
+        datos,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
 
       return uuid;
     } catch (e) {
@@ -111,19 +127,24 @@ class EquipoExtraviadoRepository extends BaseRepository<EquiposExtraviados> {
     }
   }
 
-  Future<int> marcarSincronizadosPorCenso(String equipoId, int clienteId) async {
+  Future<int> marcarSincronizadosPorCenso(
+    String equipoId,
+    int clienteId,
+  ) async {
     try {
-      final actualizados = await dbHelper.actualizar(
+      // Según requerimiento: Una vez sincronizado, el registro se elimina de la tabla de extraviados
+      // para limpiar la base de datos y la UI.
+      // Usamos .toString() para evitar fallos de coincidencia de tipos en SQLite
+      final eliminados = await dbHelper.eliminar(
         tableName,
-        {
-          'sincronizado': 1,
-          'fecha_actualizacion': DateTime.now().toIso8601String(),
-          'fecha_sincronizacion': DateTime.now().toIso8601String(),
-        },
-        where: 'equipo_id = ? AND cliente_id = ? AND sincronizado = 0',
-        whereArgs: [equipoId, clienteId],
+        where: 'CAST(equipo_id AS TEXT) = ? AND CAST(cliente_id AS TEXT) = ?',
+        whereArgs: [equipoId.toString(), clienteId.toString()],
       );
-      return actualizados;
+      
+      AppLogger.i(
+        "EXTRAVIADO_REPOSITORY: Intento de borrado tras sync para equipo $equipoId (Cliente $clienteId). Eliminados: $eliminados",
+      );
+      return eliminados;
     } catch (e) {
       AppLogger.e("EQUIPO_EXTRAVIADO_REPOSITORY: Error", e);
       return 0;

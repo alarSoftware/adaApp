@@ -6,6 +6,7 @@ import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/repositories/logo_repository.dart';
 import 'package:ada_app/repositories/models_repository.dart';
 import 'package:ada_app/repositories/marca_repository.dart';
+import 'package:ada_app/repositories/equipo_extraviado_repository.dart';
 import 'package:barcode_scan2/barcode_scan2.dart';
 import 'package:ada_app/services/device/image_service.dart';
 import 'package:ada_app/services/device/location_service.dart';
@@ -56,6 +57,8 @@ class DialogAction {
 
 class FormsScreenViewModel extends ChangeNotifier {
   final EquipoRepository _equipoRepository = EquipoRepository();
+  final EquipoExtraviadoRepository _equipoExtraviadoRepository =
+      EquipoExtraviadoRepository();
   final ImageService _imageService = ImageService();
   final LocationService _locationService = LocationService();
 
@@ -84,6 +87,7 @@ class FormsScreenViewModel extends ChangeNotifier {
 
   Map<String, dynamic>? _equipoCompleto;
   bool _equipoYaAsignado = false;
+  bool _esExtraviado = false;
 
   bool get isCensoMode => _isCensoMode;
   bool get isLoading => _isLoading;
@@ -342,17 +346,35 @@ class FormsScreenViewModel extends ChangeNotifier {
   Future<void> _verificarAsignacionEquipo(Map<String, dynamic> equipo) async {
     try {
       final String equipoId = equipo['id'].toString();
-      final int clienteId = _cliente!.id is int
-          ? _cliente!.id!
-          : int.parse(_cliente!.id!.toString());
+      final String clienteId = _cliente?.id?.toString() ?? '';
 
+      if (equipoId.isEmpty || clienteId.isEmpty) {
+        _esExtraviado = false;
+        _equipoYaAsignado = false;
+        return;
+      }
+
+      // 1. Prioridad: Verificar si está marcado como extraviado
+      // Según requerimiento: Si se encuentra en la tabla, se marca como extraviado sin importar el cliente
+      final todosExtraviados = await _equipoExtraviadoRepository.dbHelper
+          .consultar(
+            'equipos_extraviados',
+            where: 'CAST(equipo_id AS TEXT) = ?',
+            whereArgs: [equipoId],
+          );
+
+      _esExtraviado = todosExtraviados.isNotEmpty;
+
+      // 2. Verificar asignación normal
       final yaAsignado = await _equipoRepository
-          .verificarAsignacionEquipoCliente(equipoId, clienteId);
+          .verificarAsignacionEquipoCliente(equipoId, int.parse(clienteId));
 
       _equipoYaAsignado = yaAsignado;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppLogger.e("FORMS_SCREEN_VIEWMODEL: Error verificando estado", e);
       _equipoYaAsignado = false;
-      throw 'Error verificando asignación del equipo';
+      _esExtraviado = false;
+      throw 'Error verificando estado del equipo: $e';
     }
   }
 
@@ -370,11 +392,15 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   void _mostrarEstadoEquipo(Map<String, dynamic> equipoCompleto) {
-    if (_equipoYaAsignado) {
+    if (_esExtraviado) {
+      _showWarning(
+        'Equipo marcado anteriormente como EXTRAVIADO. Se requiere al menos una foto para continuar.',
+      );
+    } else if (_equipoYaAsignado) {
       _showSuccess('¡Equipo encontrado!');
     } else {
       _showWarning(
-        'Equipo encontrado pero no asignado al cliente, se censara como no asignado',
+        'Equipo encontrado pero no asignado al cliente, se censara como pendiente (requiere foto).',
       );
     }
   }
@@ -549,6 +575,7 @@ class FormsScreenViewModel extends ChangeNotifier {
     _eliminarImagenTemporal();
     _equipoCompleto = null;
     _equipoYaAsignado = false;
+    _esExtraviado = false;
     notifyListeners();
   }
 
@@ -594,7 +621,7 @@ class FormsScreenViewModel extends ChangeNotifier {
   }
 
   String? validarFotos() {
-    if (_equipoYaAsignado) {
+    if (_equipoYaAsignado && !_esExtraviado) {
       return null;
     }
 
@@ -672,6 +699,7 @@ class FormsScreenViewModel extends ChangeNotifier {
       'es_nuevo_equipo': !_isCensoMode,
       'equipo_completo': _equipoCompleto,
       'ya_asignado': _equipoYaAsignado,
+      'es_extraviado': _esExtraviado,
     };
   }
 
@@ -748,8 +776,9 @@ class FormsScreenViewModel extends ChangeNotifier {
   String get logoHint =>
       _isCensoMode ? 'Se completará automáticamente' : 'Seleccionar logo';
 
-  String get fotoRequerimiento =>
-      _equipoYaAsignado ? 'Fotos (Opcional)' : 'Fotos (Requerida al menos 1)';
+  String get fotoRequerimiento => (_equipoYaAsignado && !_esExtraviado)
+      ? 'Fotos (Opcional)'
+      : 'Fotos (Requerida al menos 1)';
 
   String get observacionesHint => _isCensoMode
       ? 'Comentarios u observaciones...'
@@ -757,7 +786,7 @@ class FormsScreenViewModel extends ChangeNotifier {
 
   String get observacionesLabel => 'Observaciones';
 
-  bool get sonFotosObligatorias => !_equipoYaAsignado;
+  bool get sonFotosObligatorias => !_equipoYaAsignado || _esExtraviado;
 
   String get buttonText => _isCensoMode ? 'Registrar Censo' : 'Registrar Nuevo';
 

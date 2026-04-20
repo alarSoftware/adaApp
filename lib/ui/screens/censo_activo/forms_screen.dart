@@ -68,6 +68,7 @@ class _FormsScreenState extends State<FormsScreen> {
           'pendiente',
           'No se encontró',
           'encontrado',
+          'extraviado',
         ];
 
         bool esInline = mensajesInline.any(
@@ -829,11 +830,13 @@ class _FormsScreenState extends State<FormsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Imágenes del equipo:',
+              _viewModel.fotoRequerimiento,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
+                color: _viewModel.sonFotosObligatorias
+                    ? AppColors.textPrimary
+                    : AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
