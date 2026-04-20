@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../../../utils/logger.dart';
 import 'package:provider/provider.dart';
@@ -501,6 +501,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
       ),
     );
   }
+
 
   Widget _buildBottomBar(PreviewScreenViewModel vm) {
     final esHistorial = widget.datos['es_historial'] == true;

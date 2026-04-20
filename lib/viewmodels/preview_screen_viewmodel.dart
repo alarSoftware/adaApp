@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:uuid/uuid.dart';
 import '../../models/usuario.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
+import 'package:ada_app/repositories/equipo_extraviado_repository.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
@@ -169,6 +170,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
     final equipoRepo = EquipoRepository();
     final estadoEquipoRepo = CensoActivoRepository();
     final equipoPendienteRepo = EquipoPendienteRepository();
+    final equipoExtraviadoRepo = EquipoExtraviadoRepository();
     final uploadService = CensoUploadService();
     final fotoService = CensoFotoService();
     final fotoRepo = CensoActivoFotoRepository();
@@ -261,14 +263,23 @@ class PreviewScreenViewModel extends ChangeNotifier {
         throw Exception('employeeId no encontrado');
       }
 
-      if (!yaAsignado) {
+      final esExtraviado = datos['es_extraviado'] as bool? ?? false;
+
+      if (esExtraviado && !esNuevoEquipo) {
+        await equipoExtraviadoRepo.procesarEscaneoCenso(
+          equipoId: equipoId!,
+          clienteId: clienteId,
+          usuarioId: usuarioId,
+          employeeId: employeeId,
+        );
+      } else if (!yaAsignado) {
         await equipoPendienteRepo.procesarEscaneoCenso(
           equipoId: equipoId!,
           clienteId: clienteId,
           usuarioId: usuarioId,
           employeeId: employeeId,
         );
-      } else {}
+      }
 
       // Crear censo local
       censoActivoId = await _crearCensoLocalConUsuarioStatic(

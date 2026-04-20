@@ -40,6 +40,8 @@ class CensoActivoPostService {
     required String employeeId,
     bool crearPendiente = false,
     dynamic pendienteExistente,
+    bool crearExtraviado = false,
+    dynamic extraviadoExistente,
     required int usuarioId,
     required double latitud,
     required double longitud,
@@ -77,6 +79,8 @@ class CensoActivoPostService {
         employeeId: employeeId,
         crearPendiente: crearPendiente,
         pendienteExistente: pendienteExistente,
+        crearExtraviado: crearExtraviado,
+        extraviadoExistente: extraviadoExistente,
         censoId: censoIdFinal,
         usuarioId: usuarioId,
         latitud: latitud,
@@ -128,6 +132,7 @@ class CensoActivoPostService {
           clienteId: clienteId,
           esNuevoEquipo: esNuevoEquipo,
           crearPendiente: crearPendiente,
+          crearExtraviado: crearExtraviado,
           fotos: fotosSeguras,
         );
       }
@@ -148,6 +153,8 @@ class CensoActivoPostService {
     required String employeeId,
     required bool crearPendiente,
     dynamic pendienteExistente,
+    bool crearExtraviado = false,
+    dynamic extraviadoExistente,
     required String censoId,
     required int usuarioId,
     required double latitud,
@@ -181,6 +188,16 @@ class CensoActivoPostService {
         );
       } else {
         payload['equipo_pendiente'] = {};
+      }
+
+      if (crearExtraviado &&
+          extraviadoExistente != null &&
+          (extraviadoExistente is List && extraviadoExistente.isNotEmpty)) {
+        payload['equipo_extraviado'] = _construirJsonEquipoExtraviado(
+          extraviadoExistente,
+        );
+      } else {
+        payload['equipo_extraviado'] = {};
       }
 
       payload['censo_activo'] = _construirJsonCensoActivo(
@@ -274,6 +291,37 @@ class CensoActivoPostService {
     }
 
     return pendiente;
+  }
+
+  static Map<String, dynamic> _construirJsonEquipoExtraviado(
+    dynamic extraviadoExistenteList,
+  ) {
+    var extraviadoExistente = extraviadoExistenteList[0];
+    String id = extraviadoExistente['id'];
+    var employeeId = extraviadoExistente['employee_id'] ?? '';
+    var equipoId = extraviadoExistente['equipo_id'];
+    var clienteId = extraviadoExistente['cliente_id'];
+
+    final partes = employeeId.split('_');
+    final vendedorIdValue = partes.isNotEmpty ? partes[0] : employeeId;
+    int? sucursalIdValue;
+    if (partes.length > 1) {
+      sucursalIdValue = int.tryParse(partes[1]);
+    }
+
+    final Map<String, dynamic> extraviado = {
+      'id': id,
+      'edfEquipoId': equipoId,
+      'edfClienteId': clienteId.toString(),
+      'edfVendedorSucursalId': employeeId,
+      'employeeId': vendedorIdValue,
+    };
+
+    if (sucursalIdValue != null) {
+      extraviado['edfSucursalId'] = sucursalIdValue;
+    }
+
+    return extraviado;
   }
 
   static Map<String, dynamic> _construirJsonCensoActivo({

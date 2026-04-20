@@ -3,6 +3,7 @@ import '../utils/logger.dart';
 import 'base_repository.dart';
 import 'package:ada_app/services/api/auth_service.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:uuid/uuid.dart';
 
 class EquipoExtraviadoRepository extends BaseRepository<EquiposExtraviados> {
   @override
@@ -41,7 +42,7 @@ class EquipoExtraviadoRepository extends BaseRepository<EquiposExtraviados> {
     SELECT DISTINCT
       ee.id,
       ee.equipo_id,
-      ee.cliente_id,
+      e.cliente_id,
       ee.fecha_creacion,
       e.cod_barras,
       e.numero_serie,
@@ -56,8 +57,8 @@ class EquipoExtraviadoRepository extends BaseRepository<EquiposExtraviados> {
     INNER JOIN marcas m ON e.marca_id = m.id
     INNER JOIN modelos mo ON e.modelo_id = mo.id
     INNER JOIN logo l ON e.logo_id = l.id
-    INNER JOIN clientes c ON ee.cliente_id = c.id
-    WHERE ee.cliente_id = ?
+    INNER JOIN clientes c ON e.cliente_id = c.id
+    WHERE e.cliente_id = ?
     ORDER BY ee.fecha_creacion DESC
   ''';
 
@@ -66,6 +67,66 @@ class EquipoExtraviadoRepository extends BaseRepository<EquiposExtraviados> {
       return result;
     } catch (e) {
       rethrow;
+    }
+  }
+
+  Future<String> procesarEscaneoCenso({
+    required dynamic equipoId,
+    required int clienteId,
+    int? usuarioId,
+    String? employeeId,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final equipoIdString = equipoId.toString();
+
+      final authService = AuthService();
+      final usuario = await authService.getCurrentUser();
+      final usuarioCensoId = usuarioId ?? usuario?.id ?? 1;
+
+      await dbHelper.eliminar(
+        tableName,
+        where: 'equipo_id = ? AND cliente_id = ?',
+        whereArgs: [equipoIdString, clienteId],
+      );
+
+      final uuid = const Uuid().v4();
+      final datos = {
+        'id': uuid,
+        'equipo_id': equipoIdString,
+        'cliente_id': clienteId,
+        'fecha_censo': now.toIso8601String(),
+        'usuario_censo_id': usuarioCensoId,
+        'fecha_creacion': now.toIso8601String(),
+        'fecha_actualizacion': now.toIso8601String(),
+        'employee_id': employeeId,
+        'sincronizado': 0,
+      };
+
+      await dbHelper.insertar(tableName, datos);
+
+      return uuid;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<int> marcarSincronizadosPorCenso(String equipoId, int clienteId) async {
+    try {
+      final actualizados = await dbHelper.actualizar(
+        tableName,
+        {
+          'sincronizado': 1,
+          'fecha_actualizacion': DateTime.now().toIso8601String(),
+          'fecha_sincronizacion': DateTime.now().toIso8601String(),
+        },
+        where: 'equipo_id = ? AND cliente_id = ? AND sincronizado = 0',
+        whereArgs: [equipoId, clienteId],
+      );
+      return actualizados;
+    } catch (e) {
+      AppLogger.e("EQUIPO_EXTRAVIADO_REPOSITORY: Error", e);
+      return 0;
     }
   }
 

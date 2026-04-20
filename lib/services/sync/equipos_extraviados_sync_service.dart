@@ -21,7 +21,7 @@ class EquiposExtraviadosSyncService extends BaseSyncService {
 
       final baseUrl = await BaseSyncService.getBaseUrl();
       final uri = Uri.parse(
-        '$baseUrl/api/getEquipoExtraviado',
+        '$baseUrl/api/getEdfEquipoExtraviado',
       ).replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       currentEndpoint = uri.toString();

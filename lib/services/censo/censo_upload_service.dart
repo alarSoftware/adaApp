@@ -6,6 +6,7 @@ import 'package:ada_app/repositories/censo_activo_repository.dart';
 import 'package:ada_app/repositories/censo_activo_foto_repository.dart';
 import 'package:ada_app/repositories/equipo_repository.dart';
 import 'package:ada_app/repositories/equipo_pendiente_repository.dart';
+import 'package:ada_app/repositories/equipo_extraviado_repository.dart';
 import 'package:ada_app/services/post/censo_activo_post_service.dart';
 import 'package:ada_app/services/sync/base_sync_service.dart';
 import 'package:ada_app/services/error_log/error_log_service.dart';
@@ -15,6 +16,7 @@ class CensoUploadService {
   final CensoActivoRepository censoActivoRepository;
   final CensoActivoFotoRepository _fotoRepository;
   final EquipoPendienteRepository _equipoPendienteRepository;
+  final EquipoExtraviadoRepository _equipoExtraviadoRepository;
   final EquipoRepository _equipoRepository;
 
   static const String _tableName = 'censo_activo';
@@ -32,12 +34,15 @@ class CensoUploadService {
     CensoActivoFotoRepository? fotoRepository,
     CensoLogService? logService,
     EquipoPendienteRepository? equipoPendienteRepository,
+    EquipoExtraviadoRepository? equipoExtraviadoRepository,
     EquipoRepository? equipoRepository,
   }) : censoActivoRepository =
            estadoEquipoRepository ?? CensoActivoRepository(),
        _fotoRepository = fotoRepository ?? CensoActivoFotoRepository(),
        _equipoPendienteRepository =
            equipoPendienteRepository ?? EquipoPendienteRepository(),
+       _equipoExtraviadoRepository =
+           equipoExtraviadoRepository ?? EquipoExtraviadoRepository(),
        _equipoRepository = equipoRepository ?? EquipoRepository();
 
   //=====METODO UNIFICADO PARA CONSULTAR Y ENVIAR POST CENSO ACTIVO=====
@@ -97,9 +102,19 @@ class CensoUploadService {
       final esNuevoEquipo = censoActivoMap['es_nuevo_equipo'] == true;
       final clienteId = _convertirAInt(censoActivoMap['cliente_id']);
       final yaAsignado = await _verificarEquipoAsignado(equipoId, clienteId);
-      final crearPendiente = !yaAsignado;
 
-      debugPrint('Flags - Nuevo: $esNuevoEquipo, Crear pendiente: $crearPendiente');
+      final extraviadoExistente = await _equipoExtraviadoRepository.dbHelper
+          .consultar(
+            'equipos_extraviados',
+            where: 'equipo_id = ? AND cliente_id = ? AND sincronizado = 0',
+            whereArgs: [equipoId, clienteId],
+            orderBy: 'fecha_creacion DESC',
+            limit: 1,
+          );
+      final crearExtraviado = extraviadoExistente.isNotEmpty;
+      final crearPendiente = !yaAsignado && !crearExtraviado;
+
+      debugPrint('Flags - Nuevo: $esNuevoEquipo, Pendiente: $crearPendiente, Extraviado: $crearExtraviado');
 
       final pendienteExistente = await _equipoPendienteRepository.dbHelper
           .consultar(
@@ -109,6 +124,15 @@ class CensoUploadService {
             orderBy: 'fecha_creacion DESC',
             limit: 1,
           );
+
+      final String estadoCenso;
+      if (crearExtraviado) {
+        estadoCenso = 'censado';
+      } else if (yaAsignado) {
+        estadoCenso = 'asignado';
+      } else {
+        estadoCenso = 'pendiente';
+      }
 
       await CensoActivoPostService.enviarCensoActivo(
         censoId: censoActivoId,
@@ -123,12 +147,14 @@ class CensoUploadService {
         employeeId: employeeId,
         crearPendiente: crearPendiente,
         pendienteExistente: pendienteExistente,
+        crearExtraviado: crearExtraviado,
+        extraviadoExistente: extraviadoExistente,
         usuarioId: usuarioId,
         latitud: censoActivoMap['latitud']?.toDouble() ?? 0.0,
         longitud: censoActivoMap['longitud']?.toDouble() ?? 0.0,
         observaciones: censoActivoMap['observaciones']?.toString(),
         enLocal: censoActivoMap['en_local'] == 1,
-        estadoCenso: yaAsignado ? 'asignado' : 'pendiente',
+        estadoCenso: estadoCenso,
         fotos: fotos,
         clienteNombre: censoActivoMap['cliente_nombre']?.toString(),
         marca: censoActivoMap['marca_nombre']?.toString(),
@@ -372,6 +398,7 @@ class CensoUploadService {
     required int clienteId,
     required bool esNuevoEquipo,
     required bool crearPendiente,
+    bool crearExtraviado = false,
     required List<dynamic> fotos,
   }) async {
     await censoActivoRepository.marcarComoMigrado(censoId);
@@ -386,6 +413,13 @@ class CensoUploadService {
 
     if (equipoId != null && crearPendiente) {
       await _equipoPendienteRepository.marcarSincronizadosPorCenso(
+        equipoId,
+        clienteId,
+      );
+    }
+
+    if (equipoId != null && crearExtraviado) {
+      await _equipoExtraviadoRepository.marcarSincronizadosPorCenso(
         equipoId,
         clienteId,
       );

@@ -583,13 +583,10 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   Widget _buildSyncIcon(Map<String, dynamic> equipoData) {
     final tipoEstado = equipoData['tipo_estado']?.toString();
 
-    if (tipoEstado == 'asignado' || tipoEstado == 'extraviado') {
-      final iconColor =
-          tipoEstado == 'asignado' ? AppColors.success : AppColors.error;
+    if (tipoEstado == 'asignado') {
+      final iconColor = AppColors.success;
       return Tooltip(
-        message: tipoEstado == 'asignado'
-            ? 'Equipo sincronizado desde servidor'
-            : 'Equipo marcado como extraviado',
+        message: 'Equipo sincronizado desde servidor',
         child: Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
@@ -601,7 +598,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
             ),
           ),
           child: Icon(
-            tipoEstado == 'asignado' ? Icons.cloud_done : Icons.report_problem,
+            Icons.cloud_done,
             size: 14,
             color: iconColor,
           ),
