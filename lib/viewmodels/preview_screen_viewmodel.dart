@@ -266,6 +266,7 @@ class PreviewScreenViewModel extends ChangeNotifier {
       final esExtraviado = datos['es_extraviado'] as bool? ?? false;
 
       if (esExtraviado && !esNuevoEquipo) {
+        // Equipo ya registrado como extraviado → viaja como pendiente
         await equipoExtraviadoRepo.procesarEscaneoCenso(
           equipoId: equipoId!,
           clienteId: clienteId,
@@ -273,7 +274,14 @@ class PreviewScreenViewModel extends ChangeNotifier {
           employeeId: employeeId,
         );
       } else if (!yaAsignado) {
+        // Sin asignación al cliente → pendiente + extraviado
         await equipoPendienteRepo.procesarEscaneoCenso(
+          equipoId: equipoId!,
+          clienteId: clienteId,
+          usuarioId: usuarioId,
+          employeeId: employeeId,
+        );
+        await equipoExtraviadoRepo.procesarEscaneoCenso(
           equipoId: equipoId!,
           clienteId: clienteId,
           usuarioId: usuarioId,

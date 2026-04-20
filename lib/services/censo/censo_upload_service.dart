@@ -112,9 +112,6 @@ class CensoUploadService {
             limit: 1,
           );
       final crearExtraviado = extraviadoExistente.isNotEmpty;
-      final crearPendiente = !yaAsignado && !crearExtraviado;
-
-      debugPrint('Flags - Nuevo: $esNuevoEquipo, Pendiente: $crearPendiente, Extraviado: $crearExtraviado');
 
       final pendienteExistente = await _equipoPendienteRepository.dbHelper
           .consultar(
@@ -125,11 +122,20 @@ class CensoUploadService {
             limit: 1,
           );
 
+      // crearPendiente se basa en la existencia real del registro en BD,
+      // así funciona cuando un equipo sin asignación genera ambos registros.
+      final crearPendiente = pendienteExistente.isNotEmpty;
+
+      debugPrint('Flags - Nuevo: $esNuevoEquipo, Pendiente: $crearPendiente, Extraviado: $crearExtraviado');
+
       final String estadoCenso;
-      if (crearExtraviado) {
-        estadoCenso = 'censado';
-      } else if (yaAsignado) {
+      if (yaAsignado) {
+        // Asignado tiene prioridad: aunque esté en extraviados, si el equipo
+        // pertenece a este cliente fue encontrado en su lugar correcto.
         estadoCenso = 'asignado';
+      } else if (crearExtraviado) {
+        // Extraviado en cliente no asignado → pendiente
+        estadoCenso = 'pendiente';
       } else {
         estadoCenso = 'pendiente';
       }
