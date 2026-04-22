@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:intl/intl.dart';
 import '../models/cliente.dart';
 import '../repositories/cliente_repository.dart';
+import '../repositories/equipo_extraviado_repository.dart';
 
 abstract class ClienteListUIEvent {}
 
@@ -29,6 +30,7 @@ class ClienteListState {
   final int countTodayRoute;
   final int countVisitedToday;
   final int countAll;
+  final int countConExtraviados;
 
   ClienteListState({
     this.isLoading = false,
@@ -43,6 +45,7 @@ class ClienteListState {
     this.countTodayRoute = 0,
     this.countVisitedToday = 0,
     this.countAll = 0,
+    this.countConExtraviados = 0,
   });
 
   ClienteListState copyWith({
@@ -60,6 +63,7 @@ class ClienteListState {
     int? countTodayRoute,
     int? countVisitedToday,
     int? countAll,
+    int? countConExtraviados,
   }) {
     return ClienteListState(
       isLoading: isLoading ?? this.isLoading,
@@ -74,6 +78,7 @@ class ClienteListState {
       countTodayRoute: countTodayRoute ?? this.countTodayRoute,
       countVisitedToday: countVisitedToday ?? this.countVisitedToday,
       countAll: countAll ?? this.countAll,
+      countConExtraviados: countConExtraviados ?? this.countConExtraviados,
     );
   }
 }
@@ -87,7 +92,11 @@ class ClienteListScreenViewModel extends ChangeNotifier {
   ClienteListState _state = ClienteListState();
   List<Cliente> _allClientes = [];
   List<Cliente> _filteredClientes = [];
+  Set<int> _clientesConExtraviados = {};
   Timer? _searchTimer;
+
+  final EquipoExtraviadoRepository _equipoExtraviadoRepository =
+      EquipoExtraviadoRepository();
 
   final StreamController<ClienteListUIEvent> _eventController =
       StreamController<ClienteListUIEvent>.broadcast();
@@ -170,6 +179,10 @@ class ClienteListScreenViewModel extends ChangeNotifier {
               c.tieneOperacionComercialHoy ||
               c.tieneFormularioCompleto;
         }).toList();
+      } else if (_state.filterMode == 'con_extraviados') {
+        baseList = baseList.where((c) {
+          return c.id != null && _clientesConExtraviados.contains(c.id);
+        }).toList();
       }
 
       // 2. Filtrar por Búsqueda
@@ -235,10 +248,15 @@ class ClienteListScreenViewModel extends ChangeNotifier {
 
     final totalCount = _allClientes.length;
 
+    final extraviadosCount = _allClientes.where((c) {
+      return c.id != null && _clientesConExtraviados.contains(c.id);
+    }).length;
+
     _state = _state.copyWith(
       countTodayRoute: rutaHoyCount,
       countVisitedToday: visitadosCount,
       countAll: totalCount,
+      countConExtraviados: extraviadosCount,
     );
     notifyListeners();
   }
@@ -254,11 +272,12 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     );
 
     try {
-      // Cargar TODOS los clientes una sola vez
-      final clientesDB = await _repository.buscarConFiltros(query: '');
+      // Cargar TODOS los clientes y los IDs con extraviados en paralelo
+      final clientesFuture = _repository.buscarConFiltros(query: '');
+      final extraviadosFuture = _equipoExtraviadoRepository.obtenerClientesConExtraviados();
 
-      _allClientes = clientesDB;
-      // _filteredClientes = clientesDB; // FIX: No asignar todos por defecto, esperar al filtro
+      _allClientes = await clientesFuture;
+      _clientesConExtraviados = await extraviadosFuture;
 
       _calculateCount();
 
@@ -274,7 +293,7 @@ class ClienteListScreenViewModel extends ChangeNotifier {
       );
 
       await _loadNextPage();
-    } catch (e, stackTrace) {
+    } catch (e) {
       _updateState(
         _state.copyWith(
           isLoading: false,

@@ -47,6 +47,9 @@ class EquipoExtraviadoRepository extends BaseRepository<EquiposExtraviados> {
       ee.fecha_creacion,
       e.cod_barras,
       e.numero_serie,
+      e.marca_id,
+      e.modelo_id,
+      e.logo_id,
       m.nombre as marca_nombre,
       mo.nombre as modelo_nombre,
       l.nombre as logo_nombre,
@@ -68,6 +71,29 @@ class EquipoExtraviadoRepository extends BaseRepository<EquiposExtraviados> {
       return result;
     } catch (e) {
       rethrow;
+    }
+  }
+
+  /// Retorna el conjunto de IDs de clientes que tienen equipos extraviados activos
+  Future<Set<int>> obtenerClientesConExtraviados() async {
+    try {
+      final result = await dbHelper.consultarPersonalizada(
+        '''
+        SELECT DISTINCT e.cliente_id
+        FROM equipos_extraviados ee
+        INNER JOIN equipos e ON ee.equipo_id = e.id
+        WHERE ee.sincronizado = 1
+        ''',
+        [],
+      );
+      final ids = <int>{};
+      for (final r in result) {
+        final id = int.tryParse(r['cliente_id']?.toString() ?? '');
+        if (id != null) ids.add(id);
+      }
+      return ids;
+    } catch (e) {
+      return {};
     }
   }
 

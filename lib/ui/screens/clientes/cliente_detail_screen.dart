@@ -23,13 +23,42 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   late StreamSubscription<ClienteDetailUIEvent> _eventSubscription;
   late TabController _tabController;
 
+  bool _hadExtraviados = false;
+
   @override
   void initState() {
     super.initState();
     _viewModel = ClienteDetailScreenViewModel();
-    _tabController = TabController(length: 3, vsync: this, initialIndex: 0);
+    _tabController = TabController(length: 2, vsync: this, initialIndex: 0);
     _setupEventListener();
+    _viewModel.addListener(_onViewModelChanged);
     _viewModel.initialize(widget.cliente);
+  }
+
+  void _onViewModelChanged() {
+    final hasExtraviados = _viewModel.equiposExtraviadosCount > 0;
+    if (hasExtraviados == _hadExtraviados) return;
+    _hadExtraviados = hasExtraviados;
+
+    final newLength = hasExtraviados ? 3 : 2;
+    final oldIndex = _tabController.index;
+    _tabController.dispose();
+
+    // Si aparece la tab de extraviados, ir siempre a ella (índice 0)
+    // Si desaparece y el usuario estaba en extraviados (0), ir a asignados (ahora 0)
+    int newIndex;
+    if (hasExtraviados) {
+      newIndex = 0;
+    } else {
+      newIndex = oldIndex > 0 ? oldIndex - 1 : 0;
+    }
+
+    _tabController = TabController(
+      length: newLength,
+      vsync: this,
+      initialIndex: newIndex.clamp(0, newLength - 1),
+    );
+    setState(() {});
   }
 
   @override
@@ -49,6 +78,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   void dispose() {
     MyApp.routeObserver.unsubscribe(this);
     _eventSubscription.cancel();
+    _viewModel.removeListener(_onViewModelChanged);
     _tabController.dispose();
     _viewModel.dispose();
     super.dispose();
@@ -98,13 +128,13 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   }
 
   void _navigateToEquipoDetail(dynamic equipoData) {
-    Navigator.push(
+    Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (context) =>
             EquiposClientesDetailScreen(equipoCliente: equipoData),
       ),
-    );
+    ).then((result) => _viewModel.onNavigationResult(result));
   }
 
   @override
@@ -180,30 +210,29 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
               fontSize: 13,
             ),
             tabs: [
-              Tab(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.report_problem_outlined,
-                      size: 16,
-                      color: AppColors.error,
-                    ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'Extraviados',
-                      style: TextStyle(color: AppColors.error),
-                    ),
-                    if (_viewModel.equiposExtraviadosCount > 0) ...[
+              if (_viewModel.equiposExtraviadosCount > 0)
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.report_problem_outlined,
+                        size: 16,
+                        color: AppColors.error,
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Extraviados',
+                        style: TextStyle(color: AppColors.error),
+                      ),
                       const SizedBox(width: 6),
                       _buildCountBadge(
                         _viewModel.equiposExtraviadosCount,
                         AppColors.error,
                       ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
               Tab(
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -287,13 +316,14 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
         return TabBarView(
           controller: _tabController,
           children: [
-            _buildEquiposTab(
-              equipos: _viewModel.equiposExtraviadosList,
-              estado: 'extraviado',
-              emptyTitle: 'Sin equipos extraviados',
-              emptySubtitle: 'No hay equipos marcados como extraviados para este cliente',
-              emptyIcon: Icons.report_problem_outlined,
-            ),
+            if (_viewModel.equiposExtraviadosCount > 0)
+              _buildEquiposTab(
+                equipos: _viewModel.equiposExtraviadosList,
+                estado: 'extraviado',
+                emptyTitle: 'Sin equipos extraviados',
+                emptySubtitle: 'No hay equipos marcados como extraviados para este cliente',
+                emptyIcon: Icons.report_problem_outlined,
+              ),
             _buildEquiposTab(
               equipos: _viewModel.equiposAsignadosList,
               estado: 'asignado',

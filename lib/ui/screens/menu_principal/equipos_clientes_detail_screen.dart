@@ -61,6 +61,8 @@ class _EquiposClientesDetailScreenState
             ),
           ),
         );
+      } else if (event is NavigateBackEvent) {
+        Navigator.of(context).pop(event.result);
       }
     });
   }

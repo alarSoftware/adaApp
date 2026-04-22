@@ -25,6 +25,11 @@ class ShowRetireConfirmationDialogEvent extends EquiposClienteDetailUIEvent {
   ShowRetireConfirmationDialogEvent(this.equipoCliente);
 }
 
+class NavigateBackEvent extends EquiposClienteDetailUIEvent {
+  final bool result;
+  NavigateBackEvent(this.result);
+}
+
 enum MessageType { error, success, info, warning }
 
 class EquiposClienteDetailState {
@@ -301,14 +306,13 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
 
   Future<void> recargarHistorial() async {
     try {
-      final equipoId = equipoCliente['id'];
+      final equipoId = equipoCliente['equipo_id'] ?? equipoCliente['id'];
       final clienteId = equipoCliente['cliente_id'];
 
       if (equipoId == null || clienteId == null) {
         return;
       }
 
-      final tipoEstado = equipoCliente['tipo_estado']?.toString();
       List<CensoActivo> historialCompleto = [];
 
       historialCompleto = await _estadoEquipoRepository
@@ -322,6 +326,7 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       _state = _state.copyWith(
         historialCambios: historialCompleto,
         historialUltimos5: ultimos5,
+        equipoEnLocal: _estadoLocalActual == 1,
       );
 
       notifyListeners();
@@ -384,9 +389,12 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       datos['es_nuevo_equipo'] = false;
       datos['cliente'] = {'id': int.parse(clienteId.toString())};
 
-      // CORRECCIÓN: equipo_completo debe ser un Map, no un ID
+      // Para extraviados, equipoCliente['id'] es el ID del registro en equipos_extraviados,
+      // no el ID real del equipo. El ID real está en equipoCliente['equipo_id'].
+      final realEquipoId = equipoCliente['equipo_id'] ?? equipoCliente['id'];
+
       datos['equipo_completo'] = {
-        'id': equipoCliente['id'],
+        'id': realEquipoId,
         'cod_barras': codigoBarras,
         'numero_serie': equipoCliente['numero_serie'],
         'marca_id': equipoCliente['marca_id'],
@@ -412,7 +420,9 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       datos['longitud'] = position.longitude;
       datos['observaciones'] = '';
       datos['usuario_id'] = currentUser?.id;
-      datos['equipo_id'] = equipoCliente['id'];
+      datos['equipo_id'] = realEquipoId;
+      // Si el equipo viene de la tabla equipos_extraviados tiene el campo equipo_id
+      datos['es_extraviado'] = equipoCliente['equipo_id'] != null;
 
       // Asignar el valor seleccionado en el dropdown
       datos['en_local'] = _estadoUbicacionEquipo;
@@ -430,19 +440,10 @@ class EquiposClienteDetailScreenViewModel extends ChangeNotifier {
       _estadoUbicacionEquipo = null;
       _hasUnsavedChanges = false;
 
-      // Recargar historial para reflejar cambios
-      await recargarHistorial();
-
       _state = _state.copyWith(isProcessing: false);
-
       notifyListeners();
 
-      _eventController.add(
-        ShowMessageEvent(
-          'Cambios guardados con ubicación GPS',
-          MessageType.success,
-        ),
-      );
+      _eventController.add(NavigateBackEvent(true));
     } catch (e) {
       _state = _state.copyWith(isProcessing: false);
       notifyListeners();

@@ -202,7 +202,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
     final fechaFormateada = toBeginningOfSentenceCase(fechaHoy);
 
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: _buildReactiveAppBar(fechaString: fechaFormateada),
@@ -305,10 +305,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                   onClear: _onClearSearch,
                 ),
                 Container(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade200,
                     borderRadius: BorderRadius.circular(25),
@@ -318,11 +315,13 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                     builder: (context, _) {
                       final state = _viewModel.state;
                       return TabBar(
+                        isScrollable: true,
+                        tabAlignment: TabAlignment.start,
                         onTap: (index) {
                           String mode = 'all';
                           if (index == 0) mode = 'today_route';
                           if (index == 1) mode = 'visited_today';
-                          // index 2 is 'all'
+                          if (index == 3) mode = 'con_extraviados';
                           _viewModel.setFilterMode(mode);
                         },
                         indicator: BoxDecoration(
@@ -331,8 +330,8 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                         ),
                         labelColor: Colors.white,
                         unselectedLabelColor: Colors.grey.shade600,
-                        labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-                        labelStyle: TextStyle(
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+                        labelStyle: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 11,
                         ),
@@ -342,6 +341,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                           Tab(text: "De Hoy (${state.countTodayRoute})"),
                           Tab(text: "Visitados (${state.countVisitedToday})"),
                           Tab(text: "Todos (${state.countAll})"),
+                          Tab(text: "Extraviados (${state.countConExtraviados})"),
                         ],
                       );
                     },

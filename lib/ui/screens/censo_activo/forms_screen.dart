@@ -90,6 +90,8 @@ class _FormsScreenState extends State<FormsScreen> {
           } else if (message.toLowerCase().contains('no se encontró') ||
               message.toLowerCase().contains('no encontrado')) {
             color = AppColors.error;
+          } else if (message.toLowerCase().contains('extraviado')) {
+            color = AppColors.error;
           } else {
             color = event.color;
           }
@@ -843,7 +845,7 @@ class _FormsScreenState extends State<FormsScreen> {
 
             _buildSingleImageField(
               imagen: _viewModel.imagenSeleccionada,
-              titulo: 'Foto 1',
+              titulo: 'Foto Código de Barras',
               onTomar: () => _viewModel.tomarFoto(esPrimeraFoto: true),
               onEliminar: () => _viewModel.eliminarImagen(esPrimeraFoto: true),
             ),
@@ -852,7 +854,7 @@ class _FormsScreenState extends State<FormsScreen> {
 
             _buildSingleImageField(
               imagen: _viewModel.imagenSeleccionada2,
-              titulo: 'Foto 2',
+              titulo: 'Foto Serie',
               onTomar: () => _viewModel.tomarFoto(esPrimeraFoto: false),
               onEliminar: () => _viewModel.eliminarImagen(esPrimeraFoto: false),
             ),

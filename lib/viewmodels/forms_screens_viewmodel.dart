@@ -393,7 +393,7 @@ class FormsScreenViewModel extends ChangeNotifier {
 
   void _mostrarEstadoEquipo(Map<String, dynamic> equipoCompleto) {
     if (_esExtraviado) {
-      _showWarning(
+      _showError(
         'Equipo marcado anteriormente como EXTRAVIADO. Se requiere al menos una foto para continuar.',
       );
     } else if (_equipoYaAsignado) {
@@ -495,7 +495,7 @@ class FormsScreenViewModel extends ChangeNotifier {
       }
 
       _showSuccess(
-        'Foto ${esPrimeraFoto ? "1" : "2"} capturada correctamente (${tamanoMB.toStringAsFixed(1)}MB)',
+        '${esPrimeraFoto ? "Foto Código de Barras" : "Foto Serie"} capturada correctamente (${tamanoMB.toStringAsFixed(1)}MB)',
       );
       notifyListeners();
     } catch (e) {
