@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:intl/intl.dart';
 import '../models/cliente.dart';
 import '../repositories/cliente_repository.dart';
+import '../repositories/equipo_extraviado_repository.dart';
 
 abstract class ClienteListUIEvent {}
 
@@ -25,10 +26,12 @@ class ClienteListState {
   final int currentPage;
   final int totalCount;
   final String? error;
-  final String? filterMode;
+  final String filterMode;
+  final Set<String> activeSubFilters;
   final int countTodayRoute;
   final int countVisitedToday;
   final int countAll;
+  final int countConExtraviados;
 
   ClienteListState({
     this.isLoading = false,
@@ -40,10 +43,14 @@ class ClienteListState {
     this.totalCount = 0,
     this.error,
     this.filterMode = 'today_route',
+    this.activeSubFilters = const {},
     this.countTodayRoute = 0,
     this.countVisitedToday = 0,
     this.countAll = 0,
+    this.countConExtraviados = 0,
   });
+
+  bool get subFilterExtraviados => activeSubFilters.contains('extraviados');
 
   ClienteListState copyWith({
     bool? isLoading,
@@ -57,9 +64,11 @@ class ClienteListState {
     int? totalCount,
     String? error,
     String? filterMode,
+    Set<String>? activeSubFilters,
     int? countTodayRoute,
     int? countVisitedToday,
     int? countAll,
+    int? countConExtraviados,
   }) {
     return ClienteListState(
       isLoading: isLoading ?? this.isLoading,
@@ -71,9 +80,11 @@ class ClienteListState {
       totalCount: totalCount ?? this.totalCount,
       error: error ?? this.error,
       filterMode: filterMode ?? this.filterMode,
+      activeSubFilters: activeSubFilters ?? this.activeSubFilters,
       countTodayRoute: countTodayRoute ?? this.countTodayRoute,
       countVisitedToday: countVisitedToday ?? this.countVisitedToday,
       countAll: countAll ?? this.countAll,
+      countConExtraviados: countConExtraviados ?? this.countConExtraviados,
     );
   }
 }
@@ -87,7 +98,11 @@ class ClienteListScreenViewModel extends ChangeNotifier {
   ClienteListState _state = ClienteListState();
   List<Cliente> _allClientes = [];
   List<Cliente> _filteredClientes = [];
+  Set<int> _clientesConExtraviados = {};
   Timer? _searchTimer;
+
+  final EquipoExtraviadoRepository _equipoExtraviadoRepository =
+      EquipoExtraviadoRepository();
 
   final StreamController<ClienteListUIEvent> _eventController =
       StreamController<ClienteListUIEvent>.broadcast();
@@ -125,90 +140,22 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     _applyFilters();
   }
 
-  Future<void> _applyFilters() async {
-    try {
-      List<Cliente> resultados;
-      final query = _state.searchQuery.toLowerCase().trim();
-      List<Cliente> baseList = _allClientes;
-
-      if (_state.filterMode == 'today_route') {
-        final now = DateTime.now();
-        String diaHoy;
-        try {
-          diaHoy = DateFormat('EEEE', 'es').format(now).toLowerCase().trim();
-        } catch (e) {
-          final englishDay = DateFormat(
-            //Cambio de idioma para los dias de la semana para evitar que la consulta sql no funcione
-            'EEEE',
-          ).format(now).toLowerCase().trim();
-          const dayMap = {
-            'monday': 'lunes',
-            'tuesday': 'martes',
-            'wednesday': 'miércoles',
-            'thursday': 'jueves',
-            'friday': 'viernes',
-            'saturday': 'sábado',
-            'sunday': 'domingo',
-          };
-          diaHoy = dayMap[englishDay] ?? englishDay;
-        }
-
-        baseList = baseList.where((c) {
-          if (c.rutaDia == null || c.rutaDia!.isEmpty) return false;
-
-          final rutasCliente = c.rutaDia!.toLowerCase();
-
-          final dias = rutasCliente.split(',').map((d) {
-            return d.trim();
-          }).toList();
-
-          return dias.contains(diaHoy);
-        }).toList();
-      } else if (_state.filterMode == 'visited_today') {
-        baseList = baseList.where((c) {
-          return c.tieneCensoHoy ||
-              c.tieneOperacionComercialHoy ||
-              c.tieneFormularioCompleto;
-        }).toList();
-      }
-
-      // 2. Filtrar por Búsqueda
-      if (query.isEmpty) {
-        resultados = List.from(baseList);
-      } else {
-        resultados = baseList.where((cliente) {
-          final nombreMatches = cliente.nombre.toLowerCase().contains(query);
-          final rucMatches = cliente.rucCi.toLowerCase().contains(query);
-          final codigoMatches = cliente.codigo.toString().contains(query);
-          final propMatches = cliente.propietario.toLowerCase().contains(query);
-
-          return nombreMatches || rucMatches || codigoMatches || propMatches;
-        }).toList();
-      }
-
-      _filteredClientes = resultados;
-      _updateState(
-        _state.copyWith(
-          currentPage: 0,
-          displayedClientes: [],
-          hasMoreData: true,
-          totalCount: resultados.length,
-          error: null, // Limpiar error si hubo
-        ),
-      );
-
-      await _loadNextPage();
-    } catch (e) {
-      _eventController.add(ShowErrorEvent('Error al filtrar: $e'));
+  void toggleSubFilter(String subFilter) {
+    final current = Set<String>.from(_state.activeSubFilters);
+    if (current.contains(subFilter)) {
+      current.remove(subFilter);
+    } else {
+      current.add(subFilter);
     }
+    _updateState(_state.copyWith(activeSubFilters: current));
+    _applyFilters();
   }
 
-  void _calculateCount() {
+  String _getDiaHoy() {
     final now = DateTime.now();
-    String diaHoy;
     try {
-      diaHoy = DateFormat('EEEE', 'es').format(now).toLowerCase().trim();
-    } catch (e) {
+      return DateFormat('EEEE', 'es').format(now).toLowerCase().trim();
+    } catch (_) {
       final englishDay = DateFormat('EEEE').format(now).toLowerCase().trim();
       const dayMap = {
         'monday': 'lunes',
@@ -219,26 +166,100 @@ class ClienteListScreenViewModel extends ChangeNotifier {
         'saturday': 'sábado',
         'sunday': 'domingo',
       };
-      diaHoy = dayMap[englishDay] ?? englishDay;
+      return dayMap[englishDay] ?? englishDay;
+    }
+  }
+
+  bool _clienteEnRutaHoy(cliente, String diaHoy) {
+    if (cliente.rutaDia == null || cliente.rutaDia!.isEmpty) return false;
+    final dias = cliente.rutaDia!.toLowerCase().split(',').map((d) => d.trim()).toList();
+    return dias.contains(diaHoy);
+  }
+
+  Future<void> _applyFilters() async {
+    try {
+      _calculateCount();
+      final query = _state.searchQuery.toLowerCase().trim();
+      List<Cliente> baseList = _allClientes;
+      final diaHoy = _getDiaHoy();
+
+      // 1. Filtro primario (tab activo)
+      if (_state.filterMode == 'today_route') {
+        baseList = baseList.where((c) => _clienteEnRutaHoy(c, diaHoy)).toList();
+      } else if (_state.filterMode == 'visited_today') {
+        baseList = baseList.where((c) {
+          return c.tieneCensoHoy ||
+              c.tieneOperacionComercialHoy ||
+              c.tieneFormularioCompleto;
+        }).toList();
+      }
+      // 'all' no aplica filtro primario
+
+      // 2. Subfiltros (chips) — se aplican encima del filtro primario con &&
+      if (_state.activeSubFilters.contains('extraviados')) {
+        baseList = baseList.where((c) {
+          return c.id != null && _clientesConExtraviados.contains(c.id);
+        }).toList();
+      }
+
+      // 3. Filtro de búsqueda
+      List<Cliente> resultados;
+      if (query.isEmpty) {
+        resultados = List.from(baseList);
+      } else {
+        resultados = baseList.where((cliente) {
+          return cliente.nombre.toLowerCase().contains(query) ||
+              cliente.rucCi.toLowerCase().contains(query) ||
+              cliente.codigo.toString().contains(query) ||
+              cliente.propietario.toLowerCase().contains(query);
+        }).toList();
+      }
+
+      _filteredClientes = resultados;
+      _updateState(
+        _state.copyWith(
+          currentPage: 0,
+          displayedClientes: [],
+          hasMoreData: true,
+          totalCount: resultados.length,
+          error: null,
+        ),
+      );
+
+      await _loadNextPage();
+    } catch (e) {
+      _eventController.add(ShowErrorEvent('Error al filtrar: $e'));
+    }
+  }
+
+  void _calculateCount() {
+    final diaHoy = _getDiaHoy();
+
+    // Aplicar subfiltros activos antes de contar
+    List<Cliente> base = _allClientes;
+    if (_state.activeSubFilters.contains('extraviados')) {
+      base = base.where((c) => c.id != null && _clientesConExtraviados.contains(c.id)).toList();
     }
 
-    final rutaHoyCount = _allClientes.where((c) {
-      if (c.rutaDia == null || c.rutaDia!.isEmpty) return false;
-      return c.rutaDia!.toLowerCase().contains(diaHoy);
-    }).length;
+    final rutaHoyCount = base.where((c) => _clienteEnRutaHoy(c, diaHoy)).length;
 
-    final visitadosCount = _allClientes.where((c) {
+    final visitadosCount = base.where((c) {
       return c.tieneCensoHoy ||
           c.tieneOperacionComercialHoy ||
           c.tieneFormularioCompleto;
     }).length;
 
-    final totalCount = _allClientes.length;
+    final totalCount = base.length;
+
+    final extraviadosCount = _allClientes.where((c) {
+      return c.id != null && _clientesConExtraviados.contains(c.id);
+    }).length;
 
     _state = _state.copyWith(
       countTodayRoute: rutaHoyCount,
       countVisitedToday: visitadosCount,
       countAll: totalCount,
+      countConExtraviados: extraviadosCount,
     );
     notifyListeners();
   }
@@ -254,27 +275,26 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     );
 
     try {
-      // Cargar TODOS los clientes una sola vez
-      final clientesDB = await _repository.buscarConFiltros(query: '');
+      final clientesFuture = _repository.buscarConFiltros(query: '');
+      final extraviadosFuture = _equipoExtraviadoRepository.obtenerClientesConExtraviados();
 
-      _allClientes = clientesDB;
-      // _filteredClientes = clientesDB; // FIX: No asignar todos por defecto, esperar al filtro
+      _allClientes = await clientesFuture;
+      _clientesConExtraviados = await extraviadosFuture;
 
       _calculateCount();
 
-      // Aplicar filtros siempre para respetar el filterMode inicial
       await _applyFilters();
 
       _updateState(
         _state.copyWith(
           isLoading: false,
-          totalCount: _filteredClientes.length, // Usar filtrados, no total DB
+          totalCount: _filteredClientes.length,
           hasMoreData: true,
         ),
       );
 
       await _loadNextPage();
-    } catch (e, stackTrace) {
+    } catch (e) {
       _updateState(
         _state.copyWith(
           isLoading: false,
@@ -338,29 +358,17 @@ class ClienteListScreenViewModel extends ChangeNotifier {
     _updateState(_state.copyWith(searchQuery: query));
 
     if (query.trim().isEmpty) {
-      _resetSearch();
+      _applyFilters();
       return;
     }
 
-    _searchTimer = Timer(searchDelay, () => _performSearch(query));
+    _searchTimer = Timer(searchDelay, () => _applyFilters());
   }
 
   void clearSearch() {
     _searchTimer?.cancel();
     _updateState(_state.copyWith(searchQuery: ''));
-    _resetSearch();
-  }
-
-  void _resetSearch() {
     _applyFilters();
-  }
-
-  Future<void> _performSearch(String query) async {
-    try {
-      await _applyFilters();
-    } catch (e) {
-      _eventController.add(ShowErrorEvent('Error en la búsqueda: $e'));
-    }
   }
 
   void navigateToClienteDetail(Cliente cliente) {

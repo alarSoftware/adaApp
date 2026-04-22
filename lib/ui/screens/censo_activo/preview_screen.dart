@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../../../utils/logger.dart';
 import 'package:provider/provider.dart';
@@ -16,6 +16,8 @@ import 'package:ada_app/ui/screens/clientes/cliente_detail_screen.dart';
 
 import 'dart:io';
 import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:ada_app/services/api/api_config_service.dart';
 
 class PreviewScreen extends StatefulWidget {
   final Map<String, dynamic> datos;
@@ -162,6 +164,16 @@ class _PreviewScreenState extends State<PreviewScreen> {
         _yaConfirmado = false;
       });
       return;
+    }
+
+    if (widget.datos['es_extraviado'] == true) {
+      final cancelar = await _verificarEquipoExtraviado();
+      if (cancelar) {
+        setState(() {
+          _yaConfirmado = false;
+        });
+        return;
+      }
     }
 
     if (!viewModel.canConfirm) {
@@ -502,6 +514,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
+
   Widget _buildBottomBar(PreviewScreenViewModel vm) {
     final esHistorial = widget.datos['es_historial'] == true;
 
@@ -654,6 +667,63 @@ class _PreviewScreenState extends State<PreviewScreen> {
         );
       },
     );
+  }
+
+  /// Retorna true si el usuario canceló (debe abortar el censo).
+  Future<bool> _verificarEquipoExtraviado() async {
+    try {
+      final equipoCompleto = widget.datos['equipo_completo'] as Map<String, dynamic>?;
+      final equipoId = equipoCompleto?['id']?.toString() ?? widget.datos['codigo_barras']?.toString();
+
+      if (equipoId == null || equipoId.isEmpty) return false;
+
+      final url = await ApiConfigService.getFullUrl('/api/checkEquipoExtraviado');
+      final uri = Uri.parse(url).replace(queryParameters: {'edfEquipoId': equipoId});
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        if (body['yaFueEncontrado'] == true) {
+          if (!mounted) return true;
+          final cancelar = await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              title: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 28),
+                  const SizedBox(width: 12),
+                  const Expanded(child: Text('Equipo ya encontrado')),
+                ],
+              ),
+              content: const Text(
+                'Este equipo ya fue reportado como encontrado en el sistema. '
+                '¿Deseas continuar registrando el censo de todas formas?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  child: Text('Cancelar', style: TextStyle(color: AppColors.error)),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.warning),
+                  child: const Text('Continuar de todas formas'),
+                ),
+              ],
+            ),
+          );
+          return cancelar ?? true;
+        }
+      }
+    } on SocketException {
+      AppLogger.e('PREVIEW_SCREEN: Sin conexión al verificar equipo extraviado', null);
+    } catch (e) {
+      AppLogger.e('PREVIEW_SCREEN: Error al verificar equipo extraviado', e);
+    }
+    return false;
   }
 
   void _mostrarSnackBar(String mensaje, Color color) {

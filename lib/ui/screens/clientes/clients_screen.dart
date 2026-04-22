@@ -304,48 +304,78 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                   hintText: 'Buscar por nombre, codigo o documento...',
                   onClear: _onClearSearch,
                 ),
-                Container(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: ListenableBuilder(
-                    listenable: _viewModel,
-                    builder: (context, _) {
-                      final state = _viewModel.state;
-                      return TabBar(
-                        onTap: (index) {
-                          String mode = 'all';
-                          if (index == 0) mode = 'today_route';
-                          if (index == 1) mode = 'visited_today';
-                          // index 2 is 'all'
-                          _viewModel.setFilterMode(mode);
-                        },
-                        indicator: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(25),
+                ListenableBuilder(
+                  listenable: _viewModel,
+                  builder: (context, _) {
+                    final state = _viewModel.state;
+                    return Column(
+                      children: [
+                        // Fila 1: Tabs primarios
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          child: TabBar(
+                            onTap: (index) {
+                              String mode = 'all';
+                              if (index == 0) mode = 'today_route';
+                              if (index == 1) mode = 'visited_today';
+                              _viewModel.setFilterMode(mode);
+                            },
+                            indicator: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                            labelColor: Colors.white,
+                            unselectedLabelColor: Colors.grey.shade600,
+                            labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+                            labelStyle: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                            ),
+                            dividerColor: Colors.transparent,
+                            indicatorSize: TabBarIndicatorSize.tab,
+                            tabs: [
+                              Tab(text: "De Hoy (${state.countTodayRoute})"),
+                              Tab(text: "Visitados (${state.countVisitedToday})"),
+                              Tab(text: "Todos (${state.countAll})"),
+                            ],
+                          ),
                         ),
-                        labelColor: Colors.white,
-                        unselectedLabelColor: Colors.grey.shade600,
-                        labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-                        labelStyle: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
+                        // Fila 2: Subfiltros (chips toggleables)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              FilterChip(
+                                label: Text(
+                                  "Extraviados",
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: state.subFilterExtraviados
+                                        ? Colors.white
+                                        : Colors.grey.shade700,
+                                  ),
+                                ),
+                                selected: state.subFilterExtraviados,
+                                onSelected: (_) => _viewModel.toggleSubFilter('extraviados'),
+                                selectedColor: AppColors.primary,
+                                backgroundColor: Colors.grey.shade200,
+                                checkmarkColor: Colors.white,
+                                side: BorderSide.none,
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ],
+                          ),
                         ),
-                        dividerColor: Colors.transparent,
-                        indicatorSize: TabBarIndicatorSize.tab,
-                        tabs: [
-                          Tab(text: "De Hoy (${state.countTodayRoute})"),
-                          Tab(text: "Visitados (${state.countVisitedToday})"),
-                          Tab(text: "Todos (${state.countAll})"),
-                        ],
-                      );
-                    },
-                  ),
+                        const SizedBox(height: 4),
+                      ],
+                    );
+                  },
                 ),
                 Expanded(
                   child: ListenableBuilder(

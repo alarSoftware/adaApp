@@ -23,13 +23,42 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   late StreamSubscription<ClienteDetailUIEvent> _eventSubscription;
   late TabController _tabController;
 
+  bool _hadExtraviados = false;
+
   @override
   void initState() {
     super.initState();
     _viewModel = ClienteDetailScreenViewModel();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 2, vsync: this, initialIndex: 0);
     _setupEventListener();
+    _viewModel.addListener(_onViewModelChanged);
     _viewModel.initialize(widget.cliente);
+  }
+
+  void _onViewModelChanged() {
+    final hasExtraviados = _viewModel.equiposExtraviadosCount > 0;
+    if (hasExtraviados == _hadExtraviados) return;
+    _hadExtraviados = hasExtraviados;
+
+    final newLength = hasExtraviados ? 3 : 2;
+    final oldIndex = _tabController.index;
+    _tabController.dispose();
+
+    // Si aparece la tab de extraviados, ir siempre a ella (índice 0)
+    // Si desaparece y el usuario estaba en extraviados (0), ir a asignados (ahora 0)
+    int newIndex;
+    if (hasExtraviados) {
+      newIndex = 0;
+    } else {
+      newIndex = oldIndex > 0 ? oldIndex - 1 : 0;
+    }
+
+    _tabController = TabController(
+      length: newLength,
+      vsync: this,
+      initialIndex: newIndex.clamp(0, newLength - 1),
+    );
+    setState(() {});
   }
 
   @override
@@ -49,6 +78,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   void dispose() {
     MyApp.routeObserver.unsubscribe(this);
     _eventSubscription.cancel();
+    _viewModel.removeListener(_onViewModelChanged);
     _tabController.dispose();
     _viewModel.dispose();
     super.dispose();
@@ -98,13 +128,13 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
   }
 
   void _navigateToEquipoDetail(dynamic equipoData) {
-    Navigator.push(
+    Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (context) =>
             EquiposClientesDetailScreen(equipoCliente: equipoData),
       ),
-    );
+    ).then((result) => _viewModel.onNavigationResult(result));
   }
 
   @override
@@ -160,33 +190,61 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
           color: AppColors.surface,
           child: TabBar(
             controller: _tabController,
-            // Usamos colores específicos para cada tab si es necesario,
-            // pero aquí definimos el estilo general.
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
             labelColor: AppColors.primary,
             unselectedLabelColor: AppColors.textSecondary,
-            indicatorColor: AppColors.primary,
-            indicatorWeight: 3,
+            indicatorSize: TabBarIndicatorSize.tab,
+            indicator: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: AppColors.primary.withValues(alpha: 0.1),
+            ),
+            indicatorPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            dividerColor: Colors.transparent,
             labelStyle: const TextStyle(
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
               fontSize: 13,
             ),
             unselectedLabelStyle: const TextStyle(
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
               fontSize: 13,
             ),
             tabs: [
+              if (_viewModel.equiposExtraviadosCount > 0)
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.report_problem_outlined,
+                        size: 16,
+                        color: AppColors.error,
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Extraviados',
+                        style: TextStyle(color: AppColors.error),
+                      ),
+                      const SizedBox(width: 6),
+                      _buildCountBadge(
+                        _viewModel.equiposExtraviadosCount,
+                        AppColors.error,
+                      ),
+                    ],
+                  ),
+                ),
               Tab(
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.check_circle_outline,
-                      size: 18,
+                      size: 16,
                       color: AppColors.success,
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Asignado',
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Asignados',
                       style: TextStyle(color: AppColors.success),
                     ),
                     if (_viewModel.equiposAsignadosCount > 0) ...[
@@ -203,9 +261,9 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.pending_outlined, size: 18),
-                    const SizedBox(width: 8),
-                    Text('No Asignado'),
+                    const Icon(Icons.pending_outlined, size: 16),
+                    const SizedBox(width: 4),
+                    const Text('Pendientes'),
                     if (_viewModel.equiposPendientesCount > 0) ...[
                       const SizedBox(width: 6),
                       _buildCountBadge(
@@ -258,9 +316,17 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
         return TabBarView(
           controller: _tabController,
           children: [
+            if (_viewModel.equiposExtraviadosCount > 0)
+              _buildEquiposTab(
+                equipos: _viewModel.equiposExtraviadosList,
+                estado: 'extraviado',
+                emptyTitle: 'Sin equipos extraviados',
+                emptySubtitle: 'No hay equipos marcados como extraviados para este cliente',
+                emptyIcon: Icons.report_problem_outlined,
+              ),
             _buildEquiposTab(
               equipos: _viewModel.equiposAsignadosList,
-              isAsignado: true,
+              estado: 'asignado',
               emptyTitle: 'Sin equipos asignados',
               emptySubtitle:
                   'Este cliente no tiene equipos asignados actualmente',
@@ -268,7 +334,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
             ),
             _buildEquiposTab(
               equipos: _viewModel.equiposPendientesList,
-              isAsignado: false,
+              estado: 'pendiente',
               emptyTitle: 'Sin equipos no asignados',
               emptySubtitle: 'No hay equipos no asignados a este cliente',
               emptyIcon: Icons.pending_outlined,
@@ -281,7 +347,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
 
   Widget _buildEquiposTab({
     required List<Map<String, dynamic>> equipos,
-    required bool isAsignado,
+    required String estado,
     required String emptyTitle,
     required String emptySubtitle,
     required IconData emptyIcon,
@@ -291,7 +357,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
         title: emptyTitle,
         subtitle: emptySubtitle,
         icon: emptyIcon,
-        isAsignado: isAsignado,
+        estado: estado,
       );
     }
 
@@ -302,7 +368,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
         itemCount: equipos.length,
         itemBuilder: (context, index) {
           final equipoData = equipos[index];
-          return _buildEquipoCard(equipoData, isAsignado: isAsignado);
+          return _buildEquipoCard(equipoData, estado: estado);
         },
       ),
     );
@@ -312,12 +378,21 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     required String title,
     required String subtitle,
     required IconData icon,
-    required bool isAsignado,
+    required String estado,
   }) {
-    final color = isAsignado ? AppColors.success : AppColors.warning;
-    final backgroundColor = isAsignado
-        ? AppColors.successContainer
-        : AppColors.warningContainer;
+    Color color;
+    Color backgroundColor;
+
+    if (estado == 'asignado') {
+      color = AppColors.success;
+      backgroundColor = AppColors.successContainer;
+    } else if (estado == 'extraviado') {
+      color = AppColors.error;
+      backgroundColor = AppColors.errorContainer;
+    } else {
+      color = AppColors.warning;
+      backgroundColor = AppColors.warningContainer;
+    }
 
     return Center(
       child: Padding(
@@ -335,30 +410,44 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
               child: Icon(icon, size: 40, color: color),
             ),
             const SizedBox(height: 24),
+            const SizedBox(height: 24),
             Text(
               title,
               style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
+                letterSpacing: -0.5,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-              textAlign: TextAlign.center,
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             if (_viewModel.canCreateCenso)
-              OutlinedButton.icon(
+              ElevatedButton.icon(
                 onPressed: _viewModel.navegarAAsignarEquipo,
-                icon: const Icon(Icons.qr_code_scanner),
+                icon: const Icon(Icons.qr_code_scanner, size: 20),
                 label: const Text('Realizar Censo'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: color,
-                  side: BorderSide(color: color),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: color,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
                 ),
               ),
           ],
@@ -369,12 +458,21 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
 
   Widget _buildEquipoCard(
     Map<String, dynamic> equipoData, {
-    required bool isAsignado,
+    required String estado,
   }) {
-    final equipoColor = isAsignado ? AppColors.success : AppColors.warning;
-    final borderColor = isAsignado
-        ? AppColors.borderSuccess
-        : AppColors.borderWarning;
+    Color equipoColor;
+    Color borderColor;
+
+    if (estado == 'asignado') {
+      equipoColor = AppColors.success;
+      borderColor = AppColors.borderSuccess;
+    } else if (estado == 'extraviado') {
+      equipoColor = AppColors.error;
+      borderColor = AppColors.borderError;
+    } else {
+      equipoColor = AppColors.warning;
+      borderColor = AppColors.borderWarning;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -400,7 +498,11 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
-                    isAsignado ? Icons.check_circle : Icons.pending,
+                    estado == 'asignado'
+                        ? Icons.check_circle
+                        : (estado == 'extraviado'
+                            ? Icons.report_problem
+                            : Icons.pending),
                     color: AppColors.onPrimary,
                     size: 28,
                   ),
@@ -452,7 +554,7 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
-                      if (isAsignado) ...[
+                      if (estado != 'pendiente') ...[
                         const SizedBox(height: 6),
                         Row(
                           children: [
@@ -512,19 +614,24 @@ class _ClienteDetailScreenState extends State<ClienteDetailScreen>
     final tipoEstado = equipoData['tipo_estado']?.toString();
 
     if (tipoEstado == 'asignado') {
+      final iconColor = AppColors.success;
       return Tooltip(
         message: 'Equipo sincronizado desde servidor',
         child: Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: AppColors.success.withValues(alpha: 0.1),
+            color: iconColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: AppColors.success.withValues(alpha: 0.3),
+              color: iconColor.withValues(alpha: 0.3),
               width: 0.5,
             ),
           ),
-          child: Icon(Icons.cloud_done, size: 14, color: AppColors.success),
+          child: Icon(
+            Icons.cloud_done,
+            size: 14,
+            color: iconColor,
+          ),
         ),
       );
     } else {

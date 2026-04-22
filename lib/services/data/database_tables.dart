@@ -98,14 +98,25 @@ class DatabaseTables {
         debugPrint('Migración v8 columna imei omitida (ya existe): $e');
       }
 
-      try {
-        await db.execute('ALTER TABLE notifications ADD COLUMN blockingUrl TEXT');
-        debugPrint('Migración v8: Columna blockingUrl agregada a notifications');
-      } catch (e) {
-        debugPrint('Migración v8 columna blockingUrl omitida (ya existe): $e');
+        try {
+          await db.execute('ALTER TABLE notifications ADD COLUMN blockingUrl TEXT');
+          debugPrint('Migración v8: Columna blockingUrl agregada a notifications');
+        } catch (e) {
+          debugPrint('Migración v8 columna blockingUrl omitida (ya existe): $e');
+        }
+      }
+
+      if (oldVersion < 9) {
+        // Migración a v9: Agregar tabla equipos_extraviados
+        try {
+          await db.execute(_sqlEquiposExtraviados());
+          await _crearIndicesEquiposExtraviados(db);
+          debugPrint('Migración v9: Tabla equipos_extraviados creada');
+        } catch (e) {
+          debugPrint('Migración v9 tabla equipos_extraviados omitida (ya existe): $e');
+        }
       }
     }
-  }
 
   Future<void> _crearTablasMaestras(Database db) async {
     await db.execute(_sqlModelos());
@@ -117,6 +128,7 @@ class DatabaseTables {
     await db.execute(_sqlClientes());
     await db.execute(_sqlEquipos());
     await db.execute(_sqlEquiposPendientes());
+    await db.execute(_sqlEquiposExtraviados());
     await db.execute(_sqlUsuarios());
     await db.execute(_sqlCensoActivo());
     await db.execute(_sqlCensoActivoFoto());
@@ -206,6 +218,27 @@ class DatabaseTables {
     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion DATETIME,
     sincronizado INTEGER DEFAULT 0,
+    fecha_sincronizacion DATETIME,
+    intentos_sync INTEGER DEFAULT 0,
+    ultimo_intento TEXT,                  
+    error_mensaje TEXT,                    
+    UNIQUE(equipo_id, cliente_id),
+    FOREIGN KEY (equipo_id) REFERENCES equipos (id),
+    FOREIGN KEY (cliente_id) REFERENCES clientes (id)
+  )
+''';
+
+  String _sqlEquiposExtraviados() => '''
+  CREATE TABLE equipos_extraviados (
+    id TEXT PRIMARY KEY,
+    employee_id TEXT,
+    equipo_id TEXT,
+    cliente_id TEXT,
+    fecha_censo DATETIME,
+    usuario_censo_id INTEGER,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion DATETIME,
+    sincronizado INTEGER DEFAULT 1,
     fecha_sincronizacion DATETIME,
     intentos_sync INTEGER DEFAULT 0,
     ultimo_intento TEXT,                  
@@ -488,6 +521,7 @@ class DatabaseTables {
     await _crearIndicesClientes(db);
     await _crearIndicesEquipos(db);
     await _crearIndicesEquiposPendientes(db);
+    await _crearIndicesEquiposExtraviados(db);
     await _crearIndicesMaestras(db);
     await _crearIndicesCensoActivo(db);
     await _crearIndicesDynamicForms(db);
@@ -534,6 +568,19 @@ class DatabaseTables {
       'CREATE INDEX IF NOT EXISTS idx_equipos_pendientes_cliente_id ON equipos_pendientes (cliente_id)',
       'CREATE INDEX IF NOT EXISTS idx_equipos_pendientes_fecha_censo ON equipos_pendientes (fecha_censo)',
       'CREATE INDEX IF NOT EXISTS idx_equipos_pendientes_usuario_censo_id ON equipos_pendientes (usuario_censo_id)',
+    ];
+
+    for (final indice in indices) {
+      await db.execute(indice);
+    }
+  }
+
+  Future<void> _crearIndicesEquiposExtraviados(Database db) async {
+    final indices = [
+      'CREATE INDEX IF NOT EXISTS idx_equipos_extraviados_equipo_id ON equipos_extraviados (equipo_id)',
+      'CREATE INDEX IF NOT EXISTS idx_equipos_extraviados_cliente_id ON equipos_extraviados (cliente_id)',
+      'CREATE INDEX IF NOT EXISTS idx_equipos_extraviados_fecha_censo ON equipos_extraviados (fecha_censo)',
+      'CREATE INDEX IF NOT EXISTS idx_equipos_extraviados_usuario_censo_id ON equipos_extraviados (usuario_censo_id)',
     ];
 
     for (final indice in indices) {
