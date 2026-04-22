@@ -178,6 +178,7 @@ class ClienteListScreenViewModel extends ChangeNotifier {
 
   Future<void> _applyFilters() async {
     try {
+      _calculateCount();
       final query = _state.searchQuery.toLowerCase().trim();
       List<Cliente> baseList = _allClientes;
       final diaHoy = _getDiaHoy();
@@ -234,15 +235,21 @@ class ClienteListScreenViewModel extends ChangeNotifier {
   void _calculateCount() {
     final diaHoy = _getDiaHoy();
 
-    final rutaHoyCount = _allClientes.where((c) => _clienteEnRutaHoy(c, diaHoy)).length;
+    // Aplicar subfiltros activos antes de contar
+    List<Cliente> base = _allClientes;
+    if (_state.activeSubFilters.contains('extraviados')) {
+      base = base.where((c) => c.id != null && _clientesConExtraviados.contains(c.id)).toList();
+    }
 
-    final visitadosCount = _allClientes.where((c) {
+    final rutaHoyCount = base.where((c) => _clienteEnRutaHoy(c, diaHoy)).length;
+
+    final visitadosCount = base.where((c) {
       return c.tieneCensoHoy ||
           c.tieneOperacionComercialHoy ||
           c.tieneFormularioCompleto;
     }).length;
 
-    final totalCount = _allClientes.length;
+    final totalCount = base.length;
 
     final extraviadosCount = _allClientes.where((c) {
       return c.id != null && _clientesConExtraviados.contains(c.id);

@@ -351,7 +351,7 @@ class _ClienteListScreenState extends State<ClienteListScreen> with RouteAware {
                             children: [
                               FilterChip(
                                 label: Text(
-                                  "Extraviados (${state.countConExtraviados})",
+                                  "Extraviados",
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
